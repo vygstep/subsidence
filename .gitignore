@@ -1,1 +1,6 @@
 repos/
+
+# Python artifacts
+__pycache__/
+*.egg-info/
+.venv/
