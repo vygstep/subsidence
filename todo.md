@@ -86,9 +86,9 @@ data/
   - [x] 1.3.f Implement separate unconformity loader (`unconformities.csv`)
   - [x] 1.3.g Add linking between strat tops and unconformity boundaries
 - [x] **1.4** — Load stratigraphy master table (CSV with colors, ages, units)
-- [ ] **1.5** — Build Plotly subplot layout (strat column left, log curves center/right)
-- [ ] **1.6** — Add hover annotations for depth, age, lithology, curve values
-- [ ] **1.7** — Implement well selector dropdown (test with synthetic data)
+- [x] **1.5** — Build Plotly subplot layout (strat column left, log curves center/right)
+- [x] **1.6** — Add hover annotations for depth, age, lithology, curve values
+- [x] **1.7** — Implement well selector dropdown (test with synthetic data)
 - [ ] **Test MVP** — Display sample well with carotage + strata
 
 ### Tasks (Phase 2: Data Processing)
