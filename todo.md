@@ -64,11 +64,27 @@ data/
   - Unconformity requires: `MD`, `unc_name`, `start_age_ma`, `base_age_ma`.
   - Deviation formats supported: `MD+INCL+AZIM`, `MD+X+Y`, `MD+DX+DY`, and the same sets for `TVD` and `TVDSS`.
 
+### Decisions (Approved)
+
+- Runtime dictionary source: SQLite (`project.db`)
+- Import/export dictionary formats: CSV and YAML
+- Dictionary layering and priority: `user` > `project` > `base`
+- Curve matching strategy: pattern-based alias matching with explicit priority
+- Unit normalization: convert to canonical units after mnemonic/family mapping
+- Unknown curves: do not fail load; keep as `unknown` and log warning
+
 ### Tasks (Phase 1: MVP Viz)
 
 - [x] **1.1** — Setup Dash + FastAPI boilerplate
 - [x] **1.2** — Create data models: Well, Stratum, LogCurve, StratColumn
-- [ ] **1.3** — Parse LAS files (lasio) + CSV logs  
+- [ ] **1.3** — Parse LAS files (lasio) + CSV logs
+  - [ ] 1.3.a Implement LAS loader (depth axis + curves)
+  - [ ] 1.3.b Implement CSV log loader (depth + multi-curve)
+  - [ ] 1.3.c Add mnemonic dictionary lookup (SQLite aliases)
+  - [ ] 1.3.d Add unit normalization (depth + curve units) to canonical units
+  - [ ] 1.3.e Keep unknown mnemonics as pass-through with warnings
+  - [ ] 1.3.f Implement separate unconformity loader (`unconformities.csv`)
+  - [ ] 1.3.g Add linking between strat tops and unconformity boundaries
 - [ ] **1.4** — Load stratigraphy master table (CSV with colors, ages, units)
 - [ ] **1.5** — Build Plotly subplot layout (strat column left, log curves center/right)
 - [ ] **1.6** — Add hover annotations for depth, age, lithology, curve values
