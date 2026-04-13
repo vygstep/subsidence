@@ -5,14 +5,33 @@ build-backend = "setuptools.build_meta"
 [project]
 name = "subsidence"
 version = "0.1.0"
-description = "Assemble subsidence curves from multiple open-source repositories"
+description = "Well log visualization and subsidence curve calculation"
 readme = "README.md"
 requires-python = ">=3.10"
 authors = [{ name = "SUBSIDENCE team" }]
-dependencies = []
+dependencies = [
+    # Visualization
+    "dash>=2.16",
+    "dash-bootstrap-components>=1.6",
+    "plotly>=5.20",
+    # Backend
+    "fastapi>=0.111",
+    "uvicorn[standard]>=0.29",
+    # Data
+    "lasio>=0.31",
+    "pandas>=2.2",
+    "sqlalchemy>=2.0",
+    # Numerics
+    "numpy>=1.26",
+    "scipy>=1.13",
+]
+
+[project.optional-dependencies]
+dev = ["pytest>=8", "httpx>=0.27"]
 
 [project.scripts]
-subsidence = "subsidence.cli:main"
+subsidence-api = "subsidence.api.main:app"
+subsidence-viz = "subsidence.viz.app:app"
 
 [tool.setuptools]
 package-dir = {"" = "src"}

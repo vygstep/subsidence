@@ -1,27 +1,44 @@
-# subsidence
+# SUBSIDENCE
 
-Структура:
-- repos/ — внешние репозитории для заимствования и сравнения
-- app/ — собственный проект
+A tool for calculating and visualizing subsidence curves from well data:
+well logs (LAS), formation tops, and a stratigraphic column.
 
-Дальше:
-1) Клонируем нужные репозитории в repos/
-2) Инициализируем и развиваем app/
+## Project Structure
 
-## Быстрый старт
+```
+app/                            # main application
+  src/subsidence/
+    api/                        # FastAPI backend
+    core/                       # burial history, backstripping, decompaction
+    data/                       # LAS/CSV parsers, SQLite layer
+    viz/                        # Dash frontend
+  tests/
+data/
+  stratigraphy_master.csv       # reference stratigraphic column
+  wells/<well_name>/
+    metadata.json
+    logs.las
+    tops.csv
+docs/
+  decisions/                    # Architecture Decision Records
+repos/                          # reference repositories (git-ignored)
+```
 
-1) Перейти в `app/`
-2) Установить проект в editable-режиме:
+## Quick Start
 
 ```bash
+cd app
 pip install -e .
 ```
 
-3) Положить исходные CSV-файлы в `repos/` (или в любую папку)
-4) Собрать единую кривую:
-
+Run the Dash frontend:
 ```bash
-python -m subsidence.cli --inputs "../repos/**/*.csv" --output out/merged_curve.csv
+python -m subsidence.viz.app
 ```
 
-Ожидаемый CSV-формат: колонки `time,value`.
+Run the FastAPI backend:
+```bash
+uvicorn subsidence.api.main:app --reload
+```
+
+See [docs/decisions/ADR-001-project-architecture.md](docs/decisions/ADR-001-project-architecture.md) for full architecture decisions.

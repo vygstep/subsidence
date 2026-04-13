@@ -1,32 +1,40 @@
 # app
 
-Core app for building a merged subsidence curve from multiple source repositories.
+Main application package for SUBSIDENCE.
 
-## What is inside
+## Package Structure
 
-- `src/subsidence/pipeline.py` — CSV loading, normalization, merge, export
-- `src/subsidence/cli.py` — command-line entry point
-- `tests/` — baseline tests for merge behavior
+```
+src/subsidence/
+  api/       # FastAPI backend — REST endpoints
+  core/      # Calculations: burial history, backstripping, decompaction
+  data/      # LAS/CSV parsers, SQLite repository
+  viz/       # Dash frontend — layout and Plotly components
+tests/
+```
 
-## Input format
+## Install
 
-Every input CSV must contain:
+```bash
+pip install -e .
+```
 
-- `time`
-- `value`
+For development dependencies:
 
-Example:
-
-```csv
-time,value
-0,0.0
-1,1.2
-2,1.7
+```bash
+pip install -e ".[dev]"
 ```
 
 ## Run
 
+Dash frontend (well log viewer):
 ```bash
-pip install -e .
-python -m subsidence.cli --inputs "../repos/**/*.csv" --output out/merged_curve.csv
+python -m subsidence.viz.app
 ```
+
+FastAPI backend:
+```bash
+uvicorn subsidence.api.main:app --reload
+```
+
+API docs available at: http://localhost:8000/docs
