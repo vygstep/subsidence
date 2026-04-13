@@ -56,11 +56,18 @@ data/
 - **Stratigraphy master data:** Static CSV with geological units (won't change per well)
 - **Interactivity:** Hover over stratum → show age, lithology; Hover over log curve → show values
 - **Future:** Selection of depth intervals → trigger burial calc
+- **Input contract:**
+  - Strat chart is a standalone static dictionary loaded from CSV (`units` + `ranks`), including ages, RGB colors, hierarchy.
+  - Well creation requires `well_name`; defaults: `kb_elev=10`, `gl_elev=10`, `td_md=1000`, `td_tvd=1000`, `x=0`, `y=0`, `crs=unset`; `well_id` auto-generated.
+  - Tops fields: `well_name`, `top_name`, `depth`, `strat_age_ma`; global load setting for depth reference (`MD` or `TVD`).
+  - Tops have two types: `strat` and `unconformity`.
+  - Unconformity requires: `MD`, `unc_name`, `start_age_ma`, `base_age_ma`.
+  - Deviation formats supported: `MD+INCL+AZIM`, `MD+X+Y`, `MD+DX+DY`, and the same sets for `TVD` and `TVDSS`.
 
 ### Tasks (Phase 1: MVP Viz)
 
-- [ ] **1.1** — Setup Dash + FastAPI boilerplate
-- [ ] **1.2** — Create data models: Well, Stratum, LogCurve, StratColumn
+- [x] **1.1** — Setup Dash + FastAPI boilerplate
+- [x] **1.2** — Create data models: Well, Stratum, LogCurve, StratColumn
 - [ ] **1.3** — Parse LAS files (lasio) + CSV logs  
 - [ ] **1.4** — Load stratigraphy master table (CSV with colors, ages, units)
 - [ ] **1.5** — Build Plotly subplot layout (strat column left, log curves center/right)
