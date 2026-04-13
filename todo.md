@@ -89,7 +89,7 @@ data/
 - [x] **1.5** — Build Plotly subplot layout (strat column left, log curves center/right)
 - [x] **1.6** — Add hover annotations for depth, age, lithology, curve values
 - [x] **1.7** — Implement well selector dropdown (test with synthetic data)
-- [ ] **Test MVP** — Display sample well with carotage + strata
+- [x] **Test MVP** — Display sample well with carotage + strata
 
 ### Tasks (Phase 2: Data Processing)
 
