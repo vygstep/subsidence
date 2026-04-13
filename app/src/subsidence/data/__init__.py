@@ -19,6 +19,14 @@ from .models import WellCreateInput
 from .models import make_strat_chart
 from .models import supported_deviation_formats
 from .models import validate_tops
+from .loaders import load_csv_log_curves
+from .loaders import load_las_curves
+from .loaders import load_strat_tops_csv
+from .loaders import load_unconformities_csv
+from .unit_conversion import canonicalize_gamma_unit
+from .unit_conversion import convert_depth_to_meters
+from .unit_conversion import convert_slowness
+from .unit_conversion import normalize_unit_name
 
 __all__ = [
 	"CRSCatalog",
@@ -38,6 +46,14 @@ __all__ = [
 	"Well",
 	"WellCreateInput",
 	"make_strat_chart",
+	"load_csv_log_curves",
+	"load_las_curves",
+	"load_strat_tops_csv",
+	"load_unconformities_csv",
+	"canonicalize_gamma_unit",
+	"convert_depth_to_meters",
+	"convert_slowness",
+	"normalize_unit_name",
 	"supported_deviation_formats",
 	"validate_tops",
 ]
