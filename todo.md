@@ -77,15 +77,15 @@ data/
 
 - [x] **1.1** — Setup Dash + FastAPI boilerplate
 - [x] **1.2** — Create data models: Well, Stratum, LogCurve, StratColumn
-- [ ] **1.3** — Parse LAS files (lasio) + CSV logs
+- [x] **1.3** — Parse LAS files (lasio) + CSV logs
   - [x] 1.3.a Implement LAS loader (depth axis + curves)
   - [x] 1.3.b Implement CSV log loader (depth + multi-curve)
-  - [ ] 1.3.c Add mnemonic dictionary lookup (SQLite aliases)
-  - [ ] 1.3.d Add unit normalization (depth + curve units) to canonical units
-  - [ ] 1.3.e Keep unknown mnemonics as pass-through with warnings
+  - [x] 1.3.c Add mnemonic dictionary lookup (SQLite aliases)
+  - [x] 1.3.d Add unit normalization (depth + curve units) to canonical units
+  - [x] 1.3.e Keep unknown mnemonics as pass-through with warnings
   - [x] 1.3.f Implement separate unconformity loader (`unconformities.csv`)
-  - [ ] 1.3.g Add linking between strat tops and unconformity boundaries
-- [ ] **1.4** — Load stratigraphy master table (CSV with colors, ages, units)
+  - [x] 1.3.g Add linking between strat tops and unconformity boundaries
+- [x] **1.4** — Load stratigraphy master table (CSV with colors, ages, units)
 - [ ] **1.5** — Build Plotly subplot layout (strat column left, log curves center/right)
 - [ ] **1.6** — Add hover annotations for depth, age, lithology, curve values
 - [ ] **1.7** — Implement well selector dropdown (test with synthetic data)

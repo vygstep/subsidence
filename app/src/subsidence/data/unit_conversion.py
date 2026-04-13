@@ -33,3 +33,24 @@ def canonicalize_gamma_unit(unit: str) -> str:
     if src in {"", "api", "gapi"}:
         return "gAPI"
     return unit
+
+
+def convert_curve_units(
+    values: list[float],
+    *,
+    from_unit: str,
+    to_unit: str,
+    family_code: str | None,
+) -> list[float]:
+    src = normalize_unit_name(from_unit)
+    dst = normalize_unit_name(to_unit)
+    if not src or not dst or src == dst:
+        return values
+
+    family = (family_code or "").lower()
+    if "slowness" in family or family in {"acoustic", "sonic"}:
+        return convert_slowness(values, from_unit=from_unit, to_unit=to_unit)
+
+    raise ValueError(
+        f"Unsupported conversion for family '{family_code}': {from_unit} -> {to_unit}"
+    )

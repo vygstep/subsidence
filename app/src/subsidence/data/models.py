@@ -17,6 +17,11 @@ class TopKind(str, Enum):
     UNCONFORMITY = "unconformity"
 
 
+class BoundaryType(str, Enum):
+    CONFORMABLE = "conformable"
+    UNCONFORMITY = "unconformity"
+
+
 class SurveyMode(str, Enum):
     INCL_AZIM = "INCL_AZIM"
     XY = "X_Y"
@@ -177,6 +182,9 @@ class LogCurve:
     depth_ref: DepthReference
     depths: list[float]
     values: list[float]
+    standard_mnemonic: str | None = None
+    family_code: str | None = None
+    original_unit: str | None = None
 
     def validate(self) -> None:
         if not self.mnemonic.strip():
@@ -197,12 +205,16 @@ class StratTopPick:
     strat_age_ma: float | None
     depth_ref: DepthReference
     kind: TopKind = TopKind.STRAT
+    boundary_type: BoundaryType = BoundaryType.CONFORMABLE
+    unconformity_ref: str | None = None
 
     def validate(self) -> None:
         if not self.well_name.strip():
             raise ValueError("well_name is required")
         if not self.top_name.strip():
             raise ValueError("top_name is required")
+        if self.boundary_type == BoundaryType.UNCONFORMITY and not self.unconformity_ref:
+            raise ValueError("unconformity_ref is required when boundary_type=unconformity")
 
 
 @dataclass(frozen=True)
@@ -226,6 +238,16 @@ class UnconformityPick:
 @dataclass(frozen=True)
 class TopsLoadOptions:
     depth_ref: DepthReference = DepthReference.MD
+
+
+@dataclass(frozen=True)
+class TopUnconformityLink:
+    well_name: str
+    top_name: str
+    unconformity_name: str
+    top_depth: float
+    unconformity_md: float
+    link_method: str
 
 
 @dataclass(frozen=True)
