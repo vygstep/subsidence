@@ -1,29 +1,93 @@
 # TODO & Ideas — SUBSIDENCE Project
 
-## Sprint 1: Architecture & Reference Analysis
+## Data Storage (Approved)
 
-### Current Phase: Project Architecture & Reference Analysis
+**Strategy:** File-based + SQLite
 
-**Goal:** 
-- Understand what can be borrowed from reference repositories
-- Design core data model for inputs/outputs
-- Plan implementation roadmap
+- Сырые данные (LAS, CSV каротаж, отбивки) → `data/wells/<well_name>/` на диске
+- Метаданные скважин, стратиграфия, результаты расчетов → SQLite (`project.db`)
+- SQLite подключается на фазе 1, чтобы не переделывать позже
 
-### Ideas (Brainstorm)
+**Структура данных:**
+```
+data/
+  stratigraphy_master.csv       # эталонная стратиграфическая колонка (цвета, возраста, юниты)
+  wells/
+    <well_name>/
+      metadata.json             # имя, координаты, TD, CRS
+      logs.las                  # каротаж (читается через lasio)
+      tops.csv                  # отбивки: formation, depth_top, depth_bot
+```
 
-_Ideas recorded here during discussion._
+**SQLite (project.db) tables:**
+- `wells` — метаданные скважин
+- `tops` — отбивки (linked to well)
+- `strat_units` — стратиграфические юниты (из master CSV)
+- `burial_results` — результаты расчетов burial history
+- `subsidence_results` — результаты backstripping
 
 ---
 
-## Tasks (Ordered by Execution)
+## Tech Stack (Approved)
 
-- [ ] **A1** — Audit pyBacktrack source code (backstrip.py, decompact modules)
-- [ ] **A2** — Document input/output format contract (CSV, JSON, or binary)
-- [ ] **B1** — Design data model for well, strata, ages, depths
-- [ ] **B2** — Implement burial history module (align with pybasin patterns)
-- [ ] **C1** — Implement backstripping/decompaction module (adapt from pyBacktrack)
-- [ ] **D1** — Create CLI integration (combine A + C modules)
-- [ ] **Test** — End-to-end test with synthetic well data
+**Frontend:**
+- Dash (Python web framework for interactive dashboards)
+- Plotly (charts with hover, zoom, selection)
+- dash-bootstrap-components (UI components)
+
+**Backend:**
+- FastAPI (REST API for data processing)
+- lasio (LAS file reader)
+- Pandas (CSV/data manipulation)
+
+**Core/Calculation:**
+- numpy, scipy (numerical computations)
+- pybacktrack logic (backstrip/decompaction)
+- pybasin logic (burial history)
+
+---
+
+## Sprint 1: MVP Visualization — Well Log Display
+
+### Ideas (Brainstorm)
+
+- **Data input:** CSV for stratigraphy (colors, ages, units), LAS or CSV for log curves
+- **Visual layout:** Left side = vertical well column with strata; Right side = log curves (gamma, porosity, etc.)
+- **Stratigraphy master data:** Static CSV with geological units (won't change per well)
+- **Interactivity:** Hover over stratum → show age, lithology; Hover over log curve → show values
+- **Future:** Selection of depth intervals → trigger burial calc
+
+### Tasks (Phase 1: MVP Viz)
+
+- [ ] **1.1** — Setup Dash + FastAPI boilerplate
+- [ ] **1.2** — Create data models: Well, Stratum, LogCurve, StratColumn
+- [ ] **1.3** — Parse LAS files (lasio) + CSV logs  
+- [ ] **1.4** — Load stratigraphy master table (CSV with colors, ages, units)
+- [ ] **1.5** — Build Plotly subplot layout (strat column left, log curves center/right)
+- [ ] **1.6** — Add hover annotations for depth, age, lithology, curve values
+- [ ] **1.7** — Implement well selector dropdown (test with synthetic data)
+- [ ] **Test MVP** — Display sample well with carotage + strata
+
+### Tasks (Phase 2: Data Processing)
+
+- [ ] **2.1** — Input format spec (CSV for strat, LAS for logs, JSON for well metadata)
+- [ ] **2.2** — Depth normalization and curve alignment
+- [ ] **2.3** — Quality checks (missing depth intervals, curve alignment)
+
+### Tasks (Phase 3: Burial History — Level A)
+
+- [ ] **3.1** — Audit pybasin burial history module
+- [ ] **3.2** — Implement burial history calculator (ages, depths, erosion)
+- [ ] **3.3** — Add burial curve visualization to dashboard
+- [ ] **3.4** — Export burial history table
+
+### Tasks (Phase 4: Tectonic Subsidence — Level B)
+
+- [ ] **4.1** — Audit pyBacktrack decompaction logic
+- [ ] **4.2** — Implement decompaction module
+- [ ] **4.3** — Implement backstripping calculator
+- [ ] **4.4** — Visualize tectonic subsidence curve
+- [ ] **4.5** — Export tectonic subsidence results
 
 ---
 
