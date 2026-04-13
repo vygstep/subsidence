@@ -7,11 +7,11 @@
 
 ## Context
 
-Проект SUBSIDENCE — инструмент для расчета и визуализации кривой погружения (subsidence curve) на основе данных скважин: каротажа, отбивок и стратиграфической колонки.
+SUBSIDENCE is a tool for calculating and visualizing subsidence curves from well data: well logs (LAS), formation tops, and a stratigraphic column.
 
-Два уровня расчетов:
-- **Уровень A (Burial History):** история захоронения слоев с учетом возрастов, глубин, толщин, эрозии
-- **Уровень B (Tectonic Subsidence):** backstripping — снятие эффекта уплотнения и нагрузки, получение кривой тектонической субсиденции
+Two levels of calculation:
+- **Level A (Burial History):** layer burial history accounting for ages, depths, thicknesses, and erosion
+- **Level B (Tectonic Subsidence):** backstripping — removing compaction and load effects to obtain a tectonic subsidence curve
 
 ---
 
@@ -19,64 +19,64 @@
 
 ### 1. Frontend: Dash + Plotly
 
-**Выбор:** Dash (Plotly) + dash-bootstrap-components  
-**Альтернатива:** Streamlit  
-**Причина:**  
-- Необходима точная компоновка: вертикальная колонка стратиграфии слева, кривые каротажа справа
-- Нативная поддержка hover, zoom, callbacks без хаков
-- Единая кодовая база на Python — проще переиспользовать логику расчетов
-- Легко расширяется на 2D визуализацию
+**Decision:** Dash (Plotly) + dash-bootstrap-components  
+**Alternative considered:** Streamlit  
+**Rationale:**
+- Precise layout control required: vertical stratigraphy column on the left, log curves on the right
+- Native hover, zoom, and callbacks without workarounds
+- Single Python codebase — easier to reuse calculation logic
+- Straightforward path to 2D visualization
 
 ### 2. Backend: FastAPI
 
-**Выбор:** FastAPI  
-**Причина:**  
-- REST API для парсинга LAS/CSV и запуска расчетов burial/subsidence
-- Async-ready, хорошо масштабируется
-- Автоматическая OpenAPI документация
+**Decision:** FastAPI  
+**Rationale:**
+- REST API for LAS/CSV parsing and burial/subsidence calculation endpoints
+- Async-ready, scales well
+- Automatic OpenAPI documentation
 
 ### 3. Data Storage: File-based + SQLite
 
-**Выбор:** Сырые данные на диске, метаданные и результаты в SQLite  
-**Альтернативы:** только файлы / PostgreSQL  
-**Причина:**  
-- LAS-файлы — стандартный геофизический формат, хранятся как есть
-- SQLite — нет сервера, один файл `project.db`, подходит для локального инструмента
-- PostgreSQL — избыточно на текущем этапе, можно подключить позже без переделки архитектуры
+**Decision:** Raw files on disk; metadata and results in SQLite  
+**Alternatives considered:** files only / PostgreSQL  
+**Rationale:**
+- LAS files are a standard geophysical format and should be stored as-is
+- SQLite requires no server, single `project.db` file, fits a local desktop tool
+- PostgreSQL is over-engineered at this stage; can be swapped in later via SQLAlchemy with no business logic changes
 
-**Структура файлов:**
+**File structure:**
 ```
 data/
-  stratigraphy_master.csv       # эталонная стратиграфическая колонка
+  stratigraphy_master.csv       # reference stratigraphic column
   wells/
     <well_name>/
-      metadata.json             # имя, координаты, TD, CRS
-      logs.las                  # каротаж (читается через lasio)
-      tops.csv                  # отбивки: formation, depth_top, depth_bot
+      metadata.json             # name, coordinates, TD, CRS
+      logs.las                  # well log (read by lasio)
+      tops.csv                  # formation tops: formation, depth_top, depth_bot
 ```
 
 **SQLite (project.db) tables:**
-- `wells` — метаданные скважин
-- `tops` — отбивки (linked to well)
-- `strat_units` — стратиграфические юниты (из master CSV)
-- `burial_results` — результаты расчетов burial history
-- `subsidence_results` — результаты backstripping
+- `wells` — well metadata
+- `tops` — formation tops (linked to well)
+- `strat_units` — stratigraphic units (loaded from master CSV)
+- `burial_results` — burial history calculation results
+- `subsidence_results` — backstripping results
 
 ### 4. LAS Parsing: lasio
 
-**Выбор:** lasio  
-**Причина:** де-факто стандарт для чтения LAS-файлов в Python, активно поддерживается
+**Decision:** lasio  
+**Rationale:** De-facto standard for reading LAS files in Python, actively maintained
 
 ### 5. Reference Repositories
 
-Логика заимствуется из open-source репозиториев, не добавляются как зависимости:
+Algorithmic logic is borrowed from open-source repositories; they are not added as package dependencies:
 
-| Repo | Что заимствуем |
+| Repo | What we borrow |
 |---|---|
-| pyBacktrack | decompaction, backstripping алгоритмы |
-| pybasin | burial history, тепловая история |
-| py_lopatin | Lopatin-логика для зрелости органики |
-| Stratya2D | 2D decompaction (опционально) |
+| pyBacktrack | decompaction and backstripping algorithms |
+| pybasin | burial history and thermal history |
+| py_lopatin | Lopatin maturity logic |
+| Stratya2D | 2D decompaction (optional) |
 
 ### 6. Project Layout
 
@@ -84,22 +84,22 @@ data/
 app/
   src/subsidence/
     api/          # FastAPI endpoints
-    core/         # расчеты: burial history, backstripping, decompaction
-    data/         # парсинг LAS, CSV, SQLite слой
-    viz/          # Dash layout и Plotly компоненты
+    core/         # calculations: burial history, backstripping, decompaction
+    data/         # LAS/CSV parsers, SQLite layer
+    viz/          # Dash layout and Plotly components
   tests/
 data/
   stratigraphy_master.csv
   wells/
 docs/
-  decisions/      # ADR (Architecture Decision Records)
-repos/            # клонированные референс-репозитории (в .gitignore)
+  decisions/      # Architecture Decision Records (ADR)
+repos/            # cloned reference repositories (in .gitignore)
 ```
 
 ---
 
 ## Consequences
 
-- Весь стек на Python → единая кодовая база
-- Dash — не классическое SPA (нет роутинга как в React), но достаточно для инструмента анализа
-- SQLite — не подходит для многопользовательского режима; при необходимости заменяем на PostgreSQL через SQLAlchemy (без изменения бизнес-логики)
+- Full Python stack — single codebase
+- Dash is not a classic SPA (no React-style routing), but sufficient for an analysis tool
+- SQLite is not suitable for multi-user scenarios; can be replaced with PostgreSQL via SQLAlchemy without changing business logic
