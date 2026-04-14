@@ -94,6 +94,7 @@ data/
 ### Tasks (Phase 2: Data Processing)
 
 - [x] **Doc.1** — Add module reference docs for `api`, `core`, `data`, `viz`, and tests
+- [x] **Doc.2** — Consolidate project documentation into one canonical root README
 - [ ] **2.1** — Input format spec (CSV for strat, LAS for logs, JSON for well metadata)
 - [ ] **2.2** — Depth normalization and curve alignment
 - [ ] **2.3** — Quality checks (missing depth intervals, curve alignment)

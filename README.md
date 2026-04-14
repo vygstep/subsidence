@@ -1,70 +1,149 @@
 # SUBSIDENCE
 
-A tool for calculating and visualizing subsidence curves from well data:
-well logs (LAS), formation tops, and a stratigraphic column.
+SUBSIDENCE is a Python project for loading well data, viewing it, and later calculating burial history and tectonic subsidence.
 
-## Project Structure
+Right now this is an early working foundation, not a finished scientific package.
 
-```
-app/                            # main application
-  src/subsidence/
-    api/                        # FastAPI backend
-    core/                       # burial history, backstripping, decompaction
-    data/                       # LAS/CSV parsers, SQLite layer
-    viz/                        # Dash frontend
-  tests/
-data/
-  stratigraphy_master.csv       # reference stratigraphic column
-  wells/<well_name>/
-    metadata.json
-    logs.las
-    tops.csv
-docs/
-  decisions/                    # Architecture Decision Records
-repos/                          # reference repositories (git-ignored)
-```
+## What It Does Right Now
+
+- loads well-log data from LAS and CSV files
+- loads stratigraphy dictionaries from CSV
+- loads tops and unconformities from CSV
+- normalizes selected curve aliases and units
+- runs a demo Dash viewer
+- runs a minimal FastAPI backend
+
+## What Is Not Ready Yet
+
+- burial-history calculations
+- decompaction and backstripping calculations
+- a full end-to-end workflow from raw project files to calculated results
+- a UI connected to real project data instead of demo data
 
 ## Quick Start
 
-```bash
-cd app
+### 1. Create a virtual environment
+
+```powershell
+cd d:\github\subsidence
+python -m venv .venv
+```
+
+### 2. Activate it
+
+```powershell
+.\.venv\Scripts\Activate.ps1
+```
+
+If another environment is already active, deactivate it first if you want to work only inside `.venv`.
+
+### 3. Install the project
+
+```powershell
+cd d:\github\subsidence\app
+pip install -e ".[dev]"
+```
+
+If you do not want test dependencies:
+
+```powershell
 pip install -e .
 ```
 
-Run the Dash frontend:
-```bash
+## Run The Project
+
+### Run the viewer
+
+From the `app` directory:
+
+```powershell
 python -m subsidence.viz.app
 ```
 
-Run the FastAPI backend:
-```bash
+What you should expect:
+
+- a Dash app opens locally
+- the left side shows a demo stratigraphic column
+- the right side shows demo log curves
+- the data is synthetic for now
+
+### Run the API
+
+From the `app` directory:
+
+```powershell
 uvicorn subsidence.api.main:app --reload
 ```
 
-See [docs/decisions/ADR-001-project-architecture.md](docs/decisions/ADR-001-project-architecture.md) for full architecture decisions.
+Then open:
 
-## Module Reference
+- `http://localhost:8000/docs` for API docs
+- `http://localhost:8000/health` for the health check
 
-This section describes the current Python modules in `app/src/subsidence` and the test suite in `app/tests`.
+### Run tests
 
-### Scope
+From the `app` directory:
 
-- `data` — domain models, CSV/LAS loaders, curve dictionary matching, and unit normalization
-- `viz` — Dash application and Plotly figure builders for well log display
-- `api` — FastAPI application entrypoint
-- `core` — reserved package for burial history, decompaction, and backstripping logic
-- `tests` — current automated coverage for the data layer
+```powershell
+pytest
+```
 
-### Current Status
+## Minimal Example
 
-- `data` is the most complete package in the current MVP
-- `viz` provides a working demo viewer based on synthetic in-memory data
-- `api` exposes only a health-check endpoint
-- `core` is intentionally empty and still awaits implementation
-- `tests` currently validate CSV parsing, stratigraphy loading, dictionary matching, and unconformity linking
+```powershell
+cd d:\github\subsidence
+python -m venv .venv
+.\.venv\Scripts\Activate.ps1
+cd app
+pip install -e ".[dev]"
+python -m subsidence.viz.app
+```
 
-### Detailed Pages
+In another terminal:
 
+```powershell
+cd d:\github\subsidence
+.\.venv\Scripts\Activate.ps1
+cd app
+uvicorn subsidence.api.main:app --reload
+```
+
+## Built With
+
+- Python 3.10+
+- Dash
+- Plotly
+- FastAPI
+- Uvicorn
+- lasio
+- pandas
+- SQLAlchemy
+- numpy
+- scipy
+
+## Repository Layout
+
+```text
+subsidence/
+  app/
+    src/subsidence/
+      api/
+      core/
+      data/
+      viz/
+    tests/
+    pyproject.toml
+  docs/
+    decisions/
+    modules/
+  repos/
+  todo.md
+```
+
+## More Documentation
+
+- [Architecture Decision Record](docs/decisions/ADR-001-project-architecture.md)
+- [Planning TODO](todo.md)
 - [Data Module](docs/modules/data.md)
 - [Visualization Module](docs/modules/viz.md)
 - [API Module](docs/modules/api.md)
