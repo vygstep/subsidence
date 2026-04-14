@@ -103,3 +103,8 @@ repos/            # cloned reference repositories (in .gitignore)
 - Full Python stack — single codebase
 - Dash is not a classic SPA (no React-style routing), but sufficient for an analysis tool
 - SQLite is not suitable for multi-user scenarios; can be replaced with PostgreSQL via SQLAlchemy without changing business logic
+
+## Related Documentation
+
+- Module reference: `README.md`
+
