@@ -231,41 +231,6 @@ def build_log_track_figure(
     else:
         value_min, value_max = 0.0, 1.0
 
-    curve_names = "<br>".join(curve.mnemonic for curve in curves) if curves else "No curves"
-    fig.add_annotation(
-        x=value_min,
-        y=1.03,
-        text=f"{value_min:.1f}",
-        showarrow=False,
-        xref="x",
-        yref="paper",
-        yanchor="top",
-        xanchor="left",
-        font={"size": 8, "color": "#64748b"},
-    )
-    fig.add_annotation(
-        x=(value_min + value_max) / 2,
-        y=1.03,
-        text=curve_names,
-        showarrow=False,
-        xref="x",
-        yref="paper",
-        yanchor="top",
-        xanchor="center",
-        font={"size": 8, "color": "#24323f"},
-    )
-    fig.add_annotation(
-        x=value_max,
-        y=1.03,
-        text=f"{value_max:.1f}",
-        showarrow=False,
-        xref="x",
-        yref="paper",
-        yanchor="top",
-        xanchor="right",
-        font={"size": 8, "color": "#64748b"},
-    )
-
     fig.update_xaxes(
         title_text=None,
         showgrid=False,

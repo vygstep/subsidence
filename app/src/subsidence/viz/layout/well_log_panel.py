@@ -14,15 +14,47 @@ _TRACK_LAYOUT = [
 ]
 
 
+def _track_header(label: str, graph_id: str) -> html.Div:
+    if graph_id == "track-log":
+        return html.Div(
+            id="track-log-header",
+            style={
+                "height": "2.1rem",
+                "display": "flex",
+                "alignItems": "flex-end",
+                "justifyContent": "space-between",
+                "fontSize": "0.75rem",
+                "lineHeight": "0.8rem",
+                "color": "#24323f",
+                "marginBottom": "0.25rem",
+                "whiteSpace": "nowrap",
+                "overflow": "hidden",
+                "transform": "translateY(10px)",
+            },
+        )
+
+    return html.Div(
+        label,
+        className="small text-muted text-center mb-1",
+        style={
+            "height": "2.1rem",
+            "display": "flex",
+            "alignItems": "flex-end",
+            "justifyContent": "center",
+            "transform": "translateY(10px)",
+        },
+    )
+
+
 def _track_panel(label: str, graph_id: str, basis: str, scroll_zoom: bool) -> html.Div:
     return html.Div(
         [
-            html.Div(label or " ", className="small text-muted text-center mb-1", style={"minHeight": "1rem", "lineHeight": "1rem"}),
+            _track_header(label, graph_id),
             dcc.Graph(
                 id=graph_id,
                 config={"displaylogo": False, "scrollZoom": scroll_zoom},
                 className="mb-0",
-                style={"height": "392px"},
+                style={"height": "387px", "marginTop": "5px"},
             ),
         ],
         style={"flex": f"0 0 {basis}", "minWidth": basis, "margin": "0", "padding": "0"},

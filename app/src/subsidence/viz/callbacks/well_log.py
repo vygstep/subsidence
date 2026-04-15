@@ -2,7 +2,7 @@
 from __future__ import annotations
 
 import dash
-from dash import Input, Output, State
+from dash import Input, Output, State, html
 
 from ..constants import DATASET
 from ..plotting import (
@@ -13,6 +13,40 @@ from ..plotting import (
 )
 
 
+def _build_log_header(curves) -> html.Div:
+    all_values = [value for curve in curves for value in curve.values]
+    if all_values:
+        value_min = min(all_values)
+        value_max = max(all_values)
+        if abs(value_max - value_min) < 1e-9:
+            value_min -= 1.0
+            value_max += 1.0
+    else:
+        value_min, value_max = 0.0, 1.0
+
+    return html.Div(
+        [
+            html.Span(f"{value_min:.1f}", style={"color": "#64748b"}),
+            html.Span(
+                [html.Span(curve.mnemonic) for curve in curves] or "No curves",
+                style={
+                    "display": "flex",
+                    "flexDirection": "column",
+                    "alignItems": "center",
+                    "lineHeight": "0.8rem",
+                },
+            ),
+            html.Span(f"{value_max:.1f}", style={"color": "#64748b"}),
+        ],
+        style={
+            "display": "flex",
+            "alignItems": "flex-end",
+            "justifyContent": "space-between",
+            "width": "100%",
+        },
+    )
+
+
 def register_well_log_callbacks(app: dash.Dash) -> None:
 
     @app.callback(
@@ -20,6 +54,7 @@ def register_well_log_callbacks(app: dash.Dash) -> None:
         Output("track-lithology", "figure"),
         Output("track-log", "figure"),
         Output("track-depth", "figure"),
+        Output("track-log-header", "children"),
         Input("well-selector", "value"),
         State("depth-viewport", "data"),
     )
@@ -48,4 +83,5 @@ def register_well_log_callbacks(app: dash.Dash) -> None:
             build_lithology_track_figure(lithology_intervals=lithology_intervals, min_depth=min_depth, max_depth=max_depth),
             build_log_track_figure(curves=curves, min_depth=min_depth, max_depth=max_depth),
             build_depth_track_figure(min_depth=min_depth, max_depth=max_depth),
+            _build_log_header(curves),
         )
