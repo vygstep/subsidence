@@ -6,6 +6,8 @@ from dash import dcc, html
 
 from ..constants import CARD_CLASS, GRAPH_CARD_STYLE
 
+_PANEL_WIDTH_PX = 520
+
 
 def _summary_panel(title: str | html.Span, timescale_id: str, burial_id: str) -> dbc.Card:
     return dbc.Card(
@@ -19,14 +21,14 @@ def _summary_panel(title: str | html.Span, timescale_id: str, burial_id: str) ->
                 ),
                 dcc.Graph(
                     id=burial_id,
-                    config={"displaylogo": False},
+                    config={"displaylogo": False, "scrollZoom": True},
                     style={"margin": "0", "padding": "0", "display": "block"},
                 ),
             ],
             className="p-2",
         ),
         className=CARD_CLASS,
-        style=GRAPH_CARD_STYLE,
+        style={**GRAPH_CARD_STYLE, "width": f"{_PANEL_WIDTH_PX}px", "minWidth": f"{_PANEL_WIDTH_PX}px"},
     )
 
 
@@ -35,25 +37,37 @@ def build_burial_cols() -> dbc.Col:
         html.Div(
             [
                 html.Div(
-                    _summary_panel(
-                        "Multi-Well Comparison",
-                        "multi-timescale-figure",
-                        "multi-burial-figure",
-                    ),
-                    id="multi-summary-wrap",
-                    className="pt-3",
-                ),
-                html.Div(
-                    _summary_panel(
-                        html.Span(id="selected-summary-title"),
-                        "selected-timescale-figure",
-                        "selected-burial-figure",
-                    ),
-                    id="selected-summary-wrap",
+                    [
+                        html.Div(
+                            [
+                                _summary_panel(
+                                    "Multi-Well Comparison",
+                                    "multi-timescale-figure",
+                                    "burial-multi",
+                                ),
+                                _summary_panel(
+                                    html.Span(id="selected-summary-title"),
+                                    "selected-timescale-figure",
+                                    "burial-selected",
+                                ),
+                            ],
+                            className="d-flex gap-3 flex-nowrap",
+                        ),
+                        html.Div(
+                            dbc.Button(
+                                "Sync scales",
+                                id="fit-to-subsidence",
+                                color="secondary",
+                                outline=True,
+                                size="sm",
+                            ),
+                            className="mt-2",
+                        ),
+                    ],
                     className="pt-3",
                 ),
             ],
-            className="d-flex gap-3 flex-nowrap overflow-auto",
+            className="overflow-auto",
         ),
         xs=12, md=5, lg=6, xl=6,
     )

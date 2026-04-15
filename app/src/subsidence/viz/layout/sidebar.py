@@ -47,6 +47,9 @@ def build_data_manager_col() -> dbc.Col:
                     ),
                     html.Div("Objects", className="small text-muted mb-2"),
                     dbc.ListGroup(id="object-manager-list", flush=True, className="small"),
+                    html.Hr(className="my-2"),
+                    html.Div("Depth viewport", className="small text-muted"),
+                    html.Div(id="debug-viewport", className="small font-monospace text-secondary"),
                 ]
             ),
             className=CARD_CLASS,

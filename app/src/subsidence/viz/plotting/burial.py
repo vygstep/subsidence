@@ -181,7 +181,7 @@ def build_burial_figure(
         ticklabelposition="inside" if show_axes else "outside",
         tickvals=[0, 500, 1000, 1500, 2000, 2500],
         ticktext=["0", "0.5", "1.0", "1.5", "2.0", "2.5"],
-        fixedrange=True,
+        fixedrange=False,
         automargin=False,
     )
     fig.update_layout(

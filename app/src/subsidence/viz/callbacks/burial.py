@@ -4,7 +4,7 @@ from __future__ import annotations
 import dash
 from dash import Input, Output
 
-from ..constants import DATASET, SUMMARY_AGE_MAX_MA, SUMMARY_AGE_MIN_MA, AGE_BANDS, SYSTEM_BANDS
+from ..constants import AGE_BANDS, DATASET, SUMMARY_AGE_MAX_MA, SUMMARY_AGE_MIN_MA, SYSTEM_BANDS
 from ..plotting import BurialCurve, build_burial_figure, build_timescale_figure
 
 
@@ -19,23 +19,17 @@ def register_burial_callbacks(app: dash.Dash) -> None:
         Input("well-selector", "value"),
     )
     def update_selected_timescale(_well_name: str):
-        return build_timescale_figure(
-            system_bands=SYSTEM_BANDS,
-            age_bands=AGE_BANDS,
-        )
+        return build_timescale_figure(system_bands=SYSTEM_BANDS, age_bands=AGE_BANDS)
 
     @app.callback(
         Output("multi-timescale-figure", "figure"),
         Input("well-selector", "value"),
     )
     def update_multi_timescale(_well_name: str):
-        return build_timescale_figure(
-            system_bands=SYSTEM_BANDS,
-            age_bands=AGE_BANDS,
-        )
+        return build_timescale_figure(system_bands=SYSTEM_BANDS, age_bands=AGE_BANDS)
 
     @app.callback(
-        Output("selected-burial-figure", "figure"),
+        Output("burial-selected", "figure"),
         Input("well-selector", "value"),
     )
     def update_selected_burial(well_name: str):
@@ -47,7 +41,7 @@ def register_burial_callbacks(app: dash.Dash) -> None:
         )
 
     @app.callback(
-        Output("multi-burial-figure", "figure"),
+        Output("burial-multi", "figure"),
         Input("well-selector", "value"),
     )
     def update_multi_burial(_well_name: str):

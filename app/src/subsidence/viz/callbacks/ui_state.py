@@ -9,6 +9,12 @@ from ..constants import CLEAR_OPTIONS, DATASET, MODAL_IDS
 
 def register_ui_state_callbacks(app: dash.Dash) -> None:
 
+    @app.callback(Output("debug-viewport", "children"), Input("depth-viewport", "data"))
+    def show_viewport(viewport):
+        if not viewport:
+            return "—"
+        return f"r0={viewport['r0']:.1f}  r1={viewport['r1']:.1f}"
+
     @app.callback(Output("object-manager-list", "children"), Input("well-selector", "value"))
     def update_object_manager(well_name: str):
         import dash_bootstrap_components as dbc
@@ -21,20 +27,6 @@ def register_ui_state_callbacks(app: dash.Dash) -> None:
             dbc.ListGroupItem(f"Log tracks: {len(payload['curves'])}"),
             dbc.ListGroupItem("Deviation survey: not loaded"),
         ]
-
-    @app.callback(
-        Output("multi-summary-wrap", "style"),
-        Output("selected-summary-wrap", "style"),
-        Input("well-selector", "value"),
-    )
-    def sync_summary_card_sizes(_well_name: str):
-        width_px = 540
-        style = {
-            "width": f"{width_px}px",
-            "minWidth": f"{width_px}px",
-            "flex": f"0 0 {width_px}px",
-        }
-        return style, style
 
     @app.callback(
         Output("one-d-wrapper", "style"),
