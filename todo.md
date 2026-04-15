@@ -90,10 +90,9 @@ data/
 - [x] **1.6** вЂ” Add hover annotations for depth, age, lithology, curve values
 - [x] **1.7** вЂ” Implement well selector dropdown (test with synthetic data)
 - [x] **Test MVP** вЂ” Display sample well with carotage + strata
-- [ ] **1.8** вЂ” Rework `Sync scales` into a true ON/OFF mode for `burial-multi`, `burial-selected`, and `well-figure`
-  - [ ] Record contract in `docs/viz-contract.md`
-  - [ ] Commit contract-only change
-  - [ ] Implement shared viewport sync with `sync-enabled`
+- [x] **1.8** — Rework `Sync charts` into a true ON/OFF mode for `burial-multi`, `burial-selected`, and `well-figure`
+- [ ] **1.9** — Build `Object Manager` as a real object list for the selected well
+- [ ] **1.10** — Split `well-figure` into independent strat/lith/log/depth track graphs
 
 ### Tasks (Phase 2: Data Processing)
 
