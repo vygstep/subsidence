@@ -4,6 +4,7 @@ from __future__ import annotations
 import dash_bootstrap_components as dbc
 from dash import dcc, html
 
+from ..constants import WELL_TRACK_IDS
 from .burial_panel import build_burial_cols
 from .modals import (
     build_add_deviation_modal,
@@ -47,22 +48,20 @@ def _two_d_panel() -> dbc.Card:
 def _stores() -> list:
     return [
         dcc.Store(id="selected-well", data=None),
-        # r0/r1 map directly to Plotly yaxis.range[0]/[1]:
-        # r0 = bottom of chart (deeper depth, larger value), r1 = top (shallower, smaller)
-        # Default matches burial chart range=[2500, 0]: 0m at top, 2500m at bottom.
         dcc.Store(id="depth-viewport", data={"r0": 2500.0, "r1": 0.0}),
         dcc.Store(id="sync-enabled", data=False),
         dcc.Store(id="picks-store", data={}),
         dcc.Store(id="pick-mode", data=False),
         dcc.Store(id="track-x-ranges", data={}),
-        dcc.Store(id="track-graph-ids", data=[]),
+        dcc.Store(id="track-graph-ids", data=WELL_TRACK_IDS),
         dcc.Store(id="sync-dummy", data=None),
     ]
 
 
 def build_layout() -> dbc.Container:
     return dbc.Container(
-        _stores() + [
+        _stores()
+        + [
             dbc.Row(
                 dbc.Col(
                     [

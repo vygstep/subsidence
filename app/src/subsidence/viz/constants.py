@@ -25,6 +25,13 @@ MODAL_IDS = [
 CARD_CLASS = "border-0 shadow-sm"
 GRAPH_CARD_STYLE = {"border": "1px solid #cbd5e1", "borderRadius": "0.6rem", "width": "100%"}
 
+WELL_TRACK_IDS = [
+    "track-strat",
+    "track-lithology",
+    "track-log",
+    "track-depth",
+]
+
 SYSTEM_BANDS = [
     TimeScaleBand("Cenozoic", 0.0, 66.0, "#f3e36f"),
     TimeScaleBand("Mesozoic", 66.0, 252.0, "#72c7d6"),

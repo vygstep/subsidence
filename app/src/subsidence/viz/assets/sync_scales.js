@@ -1,18 +1,24 @@
 window.dash_clientside = window.dash_clientside || {};
 window.dash_clientside.syncScales = {
     applyViewport: function (viewport, syncEnabled, graphIds) {
-        if (!syncEnabled || !viewport) {
+        if (!viewport) {
             return window.dash_clientside.no_update;
         }
 
-        var targets = ["burial-multi", "burial-selected", "well-figure"];
+        var wellTargets = [];
         if (Array.isArray(graphIds)) {
             for (var i = 0; i < graphIds.length; i += 1) {
-                var gid = graphIds[i];
-                if (targets.indexOf(gid) === -1) {
-                    targets.push(gid);
-                }
+                wellTargets.push(graphIds[i]);
             }
+        }
+
+        var targets = wellTargets.slice();
+        if (syncEnabled) {
+            ["burial-multi", "burial-selected"].forEach(function (graphId) {
+                if (targets.indexOf(graphId) === -1) {
+                    targets.push(graphId);
+                }
+            });
         }
 
         function resolvePlotElement(graphId) {
@@ -31,13 +37,13 @@ window.dash_clientside.syncScales = {
             });
         }
 
-        function buildUpdate(el) {
+        function buildUpdate(el, nextViewport) {
             var update = {};
             var keys = axisKeys(el);
             for (var i = 0; i < keys.length; i += 1) {
                 var axisKey = keys[i];
-                update[axisKey + ".range[0]"] = viewport.r0;
-                update[axisKey + ".range[1]"] = viewport.r1;
+                update[axisKey + ".range[0]"] = nextViewport.r0;
+                update[axisKey + ".range[1]"] = nextViewport.r1;
                 update[axisKey + ".autorange"] = false;
             }
             return update;
@@ -61,12 +67,65 @@ window.dash_clientside.syncScales = {
             return true;
         }
 
+        function installWellWheelPan(graphId) {
+            if (graphId === "track-depth") {
+                return;
+            }
+
+            var el = resolvePlotElement(graphId);
+            if (!el || el.__subsidenceWheelPanBound) {
+                return;
+            }
+
+            el.addEventListener(
+                "wheel",
+                function (event) {
+                    if (!el._fullLayout) {
+                        return;
+                    }
+                    var axis = el._fullLayout.yaxis;
+                    var current = axis && axis.range;
+                    if (!current || current.length !== 2) {
+                        return;
+                    }
+
+                    event.preventDefault();
+                    event.stopPropagation();
+
+                    var span = current[0] - current[1];
+                    if (!isFinite(span) || span === 0) {
+                        return;
+                    }
+
+                    var direction = event.deltaY === 0 ? 0 : (event.deltaY > 0 ? 1 : -1);
+                    if (direction === 0) {
+                        return;
+                    }
+
+                    var shift = span * 0.12 * direction;
+                    var nextViewport = {
+                        r0: current[0] + shift,
+                        r1: current[1] + shift
+                    };
+
+                    Plotly.relayout(el, buildUpdate(el, nextViewport));
+                },
+                { passive: false }
+            );
+
+            el.__subsidenceWheelPanBound = true;
+        }
+
+        for (var j = 0; j < wellTargets.length; j += 1) {
+            installWellWheelPan(wellTargets[j]);
+        }
+
         for (var i = 0; i < targets.length; i += 1) {
             var el = resolvePlotElement(targets[i]);
             if (!el || !el._fullLayout || sameRange(el)) {
                 continue;
             }
-            Plotly.relayout(el, buildUpdate(el));
+            Plotly.relayout(el, buildUpdate(el, viewport));
         }
 
         return window.dash_clientside.no_update;

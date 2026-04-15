@@ -10,7 +10,7 @@
 This contract covers the current 1D modelling UI only:
 
 - the two burial summary views
-- the well view
+- the independent well tracks
 - shared vertical scale behaviour
 - the `Sync charts` control
 
@@ -20,16 +20,22 @@ It does not define calculation logic or real geological results yet. Current plo
 
 ## 2. Current Views
 
-The current 1D screen contains three syncable views:
+The current 1D screen contains six syncable graphs:
 
 1. `burial-multi`
    Multi-well comparison chart.
 2. `burial-selected`
    Selected-well burial chart.
-3. `well-figure`
-   Well view / well data chart.
+3. `track-strat`
+   Combined stratigraphy track with two discrete lanes: `System` and `Age`.
+4. `track-lithology`
+   Discrete lithology interval track.
+5. `track-log`
+   Continuous log track.
+6. `track-depth`
+   Depth scale track.
 
-All three views use depth on the Y axis, positive downward.
+All graphs use depth on the Y axis, positive downward.
 
 ---
 
@@ -80,8 +86,8 @@ false
 
 Meaning:
 
-- `false` = all syncable views are independent
-- `true` = all syncable views share the same Y viewport
+- `false` = all syncable graphs are independent
+- `true` = all syncable graphs share the same Y viewport
 
 Written by:
 
@@ -94,19 +100,63 @@ Read by:
 
 ---
 
-## 4. Syncable Graph Contract
+## 4. Well Track Contract
 
-### 4.1 Sync Targets
+### 4.1 Stratigraphy Track
+
+`track-strat` is a single discrete track with two vertical lanes inside one graph:
+
+- left lane = `System`
+- right lane = `Age`
+
+Current meaning:
+
+- this track displays the loaded well stratigraphy as-is
+- it represents the stratigraphic intervals currently attached to the selected well
+- it is not yet required to be normalized against a canonical stratigraphy dictionary
+
+Rules:
+
+- both lanes represent the same loaded well intervals
+- both lanes are derived from the same well stratigraphy payload
+- later, these intervals may be linked to canonical stratigraphy dictionary entries
+- dictionary binding is an enrichment step, not the current source of the rendered track
+- merging the lanes into one track does not change the future dictionary or tops integration contract
+
+### 4.2 Discrete vs Continuous Rendering
+
+Rendering rules:
+
+- `track-strat` is a discrete interval track
+- `track-lithology` is a discrete interval track
+- `track-log` is a continuous curve track
+- `track-depth` is a scale-only track
+
+Discrete interval tracks must render categorical blocks by depth interval.
+They are not treated as continuous logs.
+
+Later enrichment model:
+
+- loaded well stratigraphy remains the display source
+- strat dictionary provides canonical metadata, hierarchy, ages, and colors
+- dictionary mapping enriches the loaded intervals instead of replacing the well-local input contract
+
+---
+
+## 5. Syncable Graph Contract
+
+### 5.1 Sync Targets
 
 The current sync targets are:
 
 - `burial-multi`
 - `burial-selected`
-- `well-figure`
+- `track-strat`
+- `track-lithology`
+- `track-log`
+- `track-depth`
 
-Any later per-track well graphs may subscribe to the same contract, but current implementation must first make these three views correct.
-
-### 4.2 Source Selection
+### 5.2 Source Selection
 
 The viewport source is determined only by the graph that actually triggered the callback.
 
@@ -115,7 +165,7 @@ Implementation rule:
 - use `dash.ctx.triggered_id`
 - do not use fallback logic such as `multi_relay or selected_relay`
 
-### 4.3 Reset Behaviour
+### 5.3 Reset Behaviour
 
 If the active source graph emits a double-click reset / autorange event:
 
@@ -131,19 +181,19 @@ Default viewport:
 
 ---
 
-## 5. `Sync charts` Behaviour
+## 6. `Sync charts` Behaviour
 
-### 5.1 Component
+### 6.1 Component
 
 - component type: `dbc.Button`
 - component id: `sync-scales-toggle`
 - label: `Sync charts`
 
-### 5.2 OFF State
+### 6.2 OFF State
 
 When `sync-enabled = false`:
 
-- `burial-multi`, `burial-selected`, and `well-figure` are independent
+- all burial and well-track graphs are independent
 - zoom/pan on one graph must not modify any other graph
 - user interaction still updates the shared `depth-viewport` candidate
 - clientside apply callbacks must not call `Plotly.relayout` on other views
@@ -153,7 +203,7 @@ Expected result:
 - each graph lives its own life
 - the most recently changed graph defines the candidate viewport for a later sync
 
-### 5.3 ON State
+### 6.3 ON State
 
 When `sync-enabled = true`:
 
@@ -166,9 +216,9 @@ When `sync-enabled = true`:
 Expected result:
 
 - pressing `Sync charts` aligns all views immediately to the last active viewport
-- moving any one of the three views updates the other two
+- moving any one of the six graphs updates the other five
 
-### 5.4 Visual State
+### 6.4 Visual State
 
 The button must show explicit mode state:
 
@@ -179,9 +229,9 @@ This button is a persistent mode toggle, not a one-shot action.
 
 ---
 
-## 6. Callback Contract
+## 7. Callback Contract
 
-### 6.1 Server Callback Responsibilities
+### 7.1 Server Callback Responsibilities
 
 Server-side sync code is responsible for:
 
@@ -190,11 +240,7 @@ Server-side sync code is responsible for:
 - parsing `relayoutData` from the triggered graph only
 - writing the new Y viewport to `depth-viewport`
 
-Server-side sync code is not responsible for:
-
-- directly forcing all other graphs to redraw one by one if clientside relayout can do it cleanly
-
-### 6.2 Clientside Callback Responsibilities
+### 7.2 Clientside Callback Responsibilities
 
 Clientside sync code in `assets/sync_scales.js` is responsible for:
 
@@ -204,7 +250,7 @@ Clientside sync code in `assets/sync_scales.js` is responsible for:
 - doing nothing when sync is disabled
 - re-applying the current `depth-viewport` when `sync-enabled` switches from `false` to `true`
 
-### 6.3 One-Way Rule
+### 7.3 One-Way Rule
 
 There is one shared viewport state only:
 
@@ -215,9 +261,9 @@ There must not be multiple competing shared viewport states.
 
 ---
 
-## 7. Required Behaviour Scenarios
+## 8. Required Behaviour Scenarios
 
-### 7.1 Independent Mode
+### 8.1 Independent Mode
 
 Given:
 
@@ -225,11 +271,11 @@ Given:
 
 Then:
 
-- drag `burial-multi` -> `burial-selected` and `well-figure` stay unchanged
-- drag `burial-selected` -> `burial-multi` and `well-figure` stay unchanged
-- drag `well-figure` -> both burial charts stay unchanged
+- drag `burial-multi` -> every other graph stays unchanged
+- drag `burial-selected` -> every other graph stays unchanged
+- drag any well track -> all other graphs stay unchanged
 
-### 7.2 Shared Mode
+### 8.2 Shared Mode
 
 Given:
 
@@ -237,11 +283,11 @@ Given:
 
 Then:
 
-- drag `burial-multi` -> `burial-selected` and `well-figure` follow
-- drag `burial-selected` -> `burial-multi` and `well-figure` follow
-- drag `well-figure` -> both burial charts follow
+- drag `burial-multi` -> every other graph follows
+- drag `burial-selected` -> every other graph follows
+- drag any well track -> every other graph follows
 
-### 7.3 Mode Switch
+### 8.3 Mode Switch
 
 Given:
 
@@ -253,44 +299,43 @@ When:
 
 Then:
 
-- all three views align immediately to the last active `depth-viewport`
+- all graphs align immediately to the last active `depth-viewport`
 - no extra drag is required to trigger the first alignment
 
 ---
 
-## 8. Current File Ownership
+## 9. Current File Ownership
 
 Files responsible for this contract:
 
 - `app/src/subsidence/viz/layout/__init__.py`
 - `app/src/subsidence/viz/layout/sidebar.py`
 - `app/src/subsidence/viz/layout/burial_panel.py`
+- `app/src/subsidence/viz/layout/well_log_panel.py`
 - `app/src/subsidence/viz/callbacks/sync.py`
+- `app/src/subsidence/viz/callbacks/well_log.py`
 - `app/src/subsidence/viz/assets/sync.js`
 - `app/src/subsidence/viz/assets/sync_scales.js`
-
-Related figure callbacks:
-
-- `app/src/subsidence/viz/callbacks/burial.py`
+- `app/src/subsidence/viz/plotting/well_log.py`
 
 ---
 
-## 9. Immediate Implementation Plan
+## 10. Immediate Implementation Focus
 
-1. Keep `depth-viewport` updated from whichever syncable graph the user changed last.
-2. Keep `Sync charts` as the ON/OFF propagation gate.
-3. Apply the current `depth-viewport` immediately when sync is turned ON.
+1. Keep the merged `track-strat` stable as a two-lane discrete track.
+2. Keep `track-lithology`, `track-log`, and `track-depth` as independent graphs.
+3. Keep `Sync charts` as the ON/OFF propagation gate.
 4. Continue using `ctx.triggered_id` for source detection.
-5. Verify immediate alignment and subsequent shared dragging in the running app.
+5. Move from demo well data to real loaded data in a later phase.
 
 ---
 
-## 10. Out of Scope for This Fix
+## 11. Out of Scope for This Step
 
-The following are not part of this sync fix:
+The following are not part of this track merge:
 
-- per-track well-log graph split
+- real tops-driven stratigraphy generation
+- object manager implementation
 - pick mode
-- stratigraphy editing
 - geology calculations
 - final visual polish of test plots

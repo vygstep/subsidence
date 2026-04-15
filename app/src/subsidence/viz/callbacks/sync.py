@@ -6,8 +6,10 @@ import re
 import dash
 from dash import ClientsideFunction, Input, Output, State, ctx
 
+from ..constants import WELL_TRACK_IDS
+
 _DEFAULT_VIEWPORT = {"r0": 2500.0, "r1": 0.0}
-_SYNC_GRAPH_IDS = {"burial-multi", "burial-selected", "well-figure"}
+_SYNC_GRAPH_IDS = {"burial-multi", "burial-selected", *WELL_TRACK_IDS}
 _RANGE0_RE = re.compile(r"^(yaxis\d*)\.range\[0\]$")
 
 
@@ -76,19 +78,39 @@ def register_sync_callbacks(app: dash.Dash) -> None:
         Output("depth-viewport", "data"),
         Input("burial-multi", "relayoutData"),
         Input("burial-selected", "relayoutData"),
-        Input("well-figure", "relayoutData"),
+        Input("track-strat", "relayoutData"),
+        Input("track-lithology", "relayoutData"),
+        Input("track-log", "relayoutData"),
+        Input("track-depth", "relayoutData"),
+        State("sync-enabled", "data"),
         State("depth-viewport", "data"),
         prevent_initial_call=True,
     )
-    def update_depth_viewport(multi_relayout, selected_relayout, well_relayout, current):
+    def update_depth_viewport(
+        multi_relayout,
+        selected_relayout,
+        strat_relayout,
+        lithology_relayout,
+        log_relayout,
+        depth_relayout,
+        sync_enabled,
+        current,
+    ):
         triggered_id = ctx.triggered_id
         if triggered_id not in _SYNC_GRAPH_IDS:
+            return dash.no_update
+
+        burial_graph_ids = {"burial-multi", "burial-selected"}
+        if triggered_id in burial_graph_ids and not sync_enabled:
             return dash.no_update
 
         relay_map = {
             "burial-multi": multi_relayout,
             "burial-selected": selected_relayout,
-            "well-figure": well_relayout,
+            "track-strat": strat_relayout,
+            "track-lithology": lithology_relayout,
+            "track-log": log_relayout,
+            "track-depth": depth_relayout,
         }
         viewport = _extract_viewport(relay_map.get(triggered_id))
         if viewport is None:
