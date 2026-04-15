@@ -1,30 +1,30 @@
-# TODO & Ideas — SUBSIDENCE Project
+# TODO & Ideas вЂ” SUBSIDENCE Project
 
 ## Data Storage (Approved)
 
 **Strategy:** File-based + SQLite
 
-- Сырые данные (LAS, CSV каротаж, отбивки) → `data/wells/<well_name>/` на диске
-- Метаданные скважин, стратиграфия, результаты расчетов → SQLite (`project.db`)
-- SQLite подключается на фазе 1, чтобы не переделывать позже
+- РЎС‹СЂС‹Рµ РґР°РЅРЅС‹Рµ (LAS, CSV РєР°СЂРѕС‚Р°Р¶, РѕС‚Р±РёРІРєРё) в†’ `data/wells/<well_name>/` РЅР° РґРёСЃРєРµ
+- РњРµС‚Р°РґР°РЅРЅС‹Рµ СЃРєРІР°Р¶РёРЅ, СЃС‚СЂР°С‚РёРіСЂР°С„РёСЏ, СЂРµР·СѓР»СЊС‚Р°С‚С‹ СЂР°СЃС‡РµС‚РѕРІ в†’ SQLite (`project.db`)
+- SQLite РїРѕРґРєР»СЋС‡Р°РµС‚СЃСЏ РЅР° С„Р°Р·Рµ 1, С‡С‚РѕР±С‹ РЅРµ РїРµСЂРµРґРµР»С‹РІР°С‚СЊ РїРѕР·Р¶Рµ
 
-**Структура данных:**
+**РЎС‚СЂСѓРєС‚СѓСЂР° РґР°РЅРЅС‹С…:**
 ```
 data/
-  stratigraphy_master.csv       # эталонная стратиграфическая колонка (цвета, возраста, юниты)
+  stratigraphy_master.csv       # Р­С‚Р°Р»РѕРЅРЅР°СЏ СЃС‚СЂР°С‚РёРіСЂР°С„РёС‡РµСЃРєР°СЏ РєРѕР»РѕРЅРєР° (С†РІРµС‚Р°, РІРѕР·СЂР°СЃС‚Р°, СЋРЅРёС‚С‹)
   wells/
     <well_name>/
-      metadata.json             # имя, координаты, TD, CRS
-      logs.las                  # каротаж (читается через lasio)
-      tops.csv                  # отбивки: formation, depth_top, depth_bot
+      metadata.json             # РёРјСЏ, РєРѕРѕСЂРґРёРЅР°С‚С‹, TD, CRS
+      logs.las                  # РєР°СЂРѕС‚Р°Р¶ (С‡РёС‚Р°РµС‚СЃСЏ С‡РµСЂРµР· lasio)
+      tops.csv                  # РѕС‚Р±РёРІРєРё: formation, depth_top, depth_bot
 ```
 
 **SQLite (project.db) tables:**
-- `wells` — метаданные скважин
-- `tops` — отбивки (linked to well)
-- `strat_units` — стратиграфические юниты (из master CSV)
-- `burial_results` — результаты расчетов burial history
-- `subsidence_results` — результаты backstripping
+- `wells` вЂ” РјРµС‚Р°РґР°РЅРЅС‹Рµ СЃРєРІР°Р¶РёРЅ
+- `tops` вЂ” РѕС‚Р±РёРІРєРё (linked to well)
+- `strat_units` вЂ” СЃС‚СЂР°С‚РёРіСЂР°С„РёС‡РµСЃРєРёРµ СЋРЅРёС‚С‹ (РёР· master CSV)
+- `burial_results` вЂ” СЂРµР·СѓР»СЊС‚Р°С‚С‹ СЂР°СЃС‡РµС‚РѕРІ burial history
+- `subsidence_results` вЂ” СЂРµР·СѓР»СЊС‚Р°С‚С‹ backstripping
 
 ---
 
@@ -47,15 +47,15 @@ data/
 
 ---
 
-## Sprint 1: MVP Visualization — Well Log Display
+## Sprint 1: MVP Visualization вЂ” Well Log Display
 
 ### Ideas (Brainstorm)
 
 - **Data input:** CSV for stratigraphy (colors, ages, units), LAS or CSV for log curves
 - **Visual layout:** Left side = vertical well column with strata; Right side = log curves (gamma, porosity, etc.)
 - **Stratigraphy master data:** Static CSV with geological units (won't change per well)
-- **Interactivity:** Hover over stratum → show age, lithology; Hover over log curve → show values
-- **Future:** Selection of depth intervals → trigger burial calc
+- **Interactivity:** Hover over stratum в†’ show age, lithology; Hover over log curve в†’ show values
+- **Future:** Selection of depth intervals в†’ trigger burial calc
 - **Input contract:**
   - Strat chart is a standalone static dictionary loaded from CSV (`units` + `ranks`), including ages, RGB colors, hierarchy.
   - Well creation requires `well_name`; defaults: `kb_elev=10`, `gl_elev=10`, `td_md=1000`, `td_tvd=1000`, `x=0`, `y=0`, `crs=unset`; `well_id` auto-generated.
@@ -75,9 +75,9 @@ data/
 
 ### Tasks (Phase 1: MVP Viz)
 
-- [x] **1.1** — Setup Dash + FastAPI boilerplate
-- [x] **1.2** — Create data models: Well, Stratum, LogCurve, StratColumn
-- [x] **1.3** — Parse LAS files (lasio) + CSV logs
+- [x] **1.1** вЂ” Setup Dash + FastAPI boilerplate
+- [x] **1.2** вЂ” Create data models: Well, Stratum, LogCurve, StratColumn
+- [x] **1.3** вЂ” Parse LAS files (lasio) + CSV logs
   - [x] 1.3.a Implement LAS loader (depth axis + curves)
   - [x] 1.3.b Implement CSV log loader (depth + multi-curve)
   - [x] 1.3.c Add mnemonic dictionary lookup (SQLite aliases)
@@ -85,39 +85,42 @@ data/
   - [x] 1.3.e Keep unknown mnemonics as pass-through with warnings
   - [x] 1.3.f Implement separate unconformity loader (`unconformities.csv`)
   - [x] 1.3.g Add linking between strat tops and unconformity boundaries
-- [x] **1.4** — Load stratigraphy master table (CSV with colors, ages, units)
-- [x] **1.5** — Build Plotly subplot layout (strat column left, log curves center/right)
-- [x] **1.6** — Add hover annotations for depth, age, lithology, curve values
-- [x] **1.7** — Implement well selector dropdown (test with synthetic data)
-- [x] **Test MVP** — Display sample well with carotage + strata
+- [x] **1.4** вЂ” Load stratigraphy master table (CSV with colors, ages, units)
+- [x] **1.5** вЂ” Build Plotly subplot layout (strat column left, log curves center/right)
+- [x] **1.6** вЂ” Add hover annotations for depth, age, lithology, curve values
+- [x] **1.7** вЂ” Implement well selector dropdown (test with synthetic data)
+- [x] **Test MVP** вЂ” Display sample well with carotage + strata
+- [ ] **1.8** вЂ” Rework `Sync scales` into a true ON/OFF mode for `burial-multi`, `burial-selected`, and `well-figure`
+  - [ ] Record contract in `docs/viz-contract.md`
+  - [ ] Commit contract-only change
+  - [ ] Implement shared viewport sync with `sync-enabled`
 
 ### Tasks (Phase 2: Data Processing)
 
-- [x] **Doc.1** — Add module reference docs for `api`, `core`, `data`, `viz`, and tests
-- [x] **Doc.2** — Consolidate project documentation into one canonical root README
-- [ ] **2.1** — Input format spec (CSV for strat, LAS for logs, JSON for well metadata)
-- [ ] **2.2** — Depth normalization and curve alignment
-- [ ] **2.3** — Quality checks (missing depth intervals, curve alignment)
+- [x] **Doc.1** вЂ” Add module reference docs for `api`, `core`, `data`, `viz`, and tests
+- [x] **Doc.2** вЂ” Consolidate project documentation into one canonical root README
+- [ ] **2.1** вЂ” Input format spec (CSV for strat, LAS for logs, JSON for well metadata)
+- [ ] **2.2** вЂ” Depth normalization and curve alignment
+- [ ] **2.3** вЂ” Quality checks (missing depth intervals, curve alignment)
 
-### Tasks (Phase 3: Burial History — Level A)
+### Tasks (Phase 3: Burial History вЂ” Level A)
 
-- [ ] **3.1** — Audit pybasin burial history module
-- [ ] **3.2** — Implement burial history calculator (ages, depths, erosion)
-- [ ] **3.3** — Add burial curve visualization to dashboard
-- [ ] **3.4** — Export burial history table
+- [ ] **3.1** вЂ” Audit pybasin burial history module
+- [ ] **3.2** вЂ” Implement burial history calculator (ages, depths, erosion)
+- [ ] **3.3** вЂ” Add burial curve visualization to dashboard
+- [ ] **3.4** вЂ” Export burial history table
 
-### Tasks (Phase 4: Tectonic Subsidence — Level B)
+### Tasks (Phase 4: Tectonic Subsidence вЂ” Level B)
 
-- [ ] **4.1** — Audit pyBacktrack decompaction logic
-- [ ] **4.2** — Implement decompaction module
-- [ ] **4.3** — Implement backstripping calculator
-- [ ] **4.4** — Visualize tectonic subsidence curve
-- [ ] **4.5** — Export tectonic subsidence results
+- [ ] **4.1** вЂ” Audit pyBacktrack decompaction logic
+- [ ] **4.2** вЂ” Implement decompaction module
+- [ ] **4.3** вЂ” Implement backstripping calculator
+- [ ] **4.4** вЂ” Visualize tectonic subsidence curve
+- [ ] **4.5** вЂ” Export tectonic subsidence results
 
 ---
 
 ## Archive
 
 _Completed tasks and decisions moved here._
-
 
