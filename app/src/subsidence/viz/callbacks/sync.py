@@ -77,14 +77,10 @@ def register_sync_callbacks(app: dash.Dash) -> None:
         Input("burial-multi", "relayoutData"),
         Input("burial-selected", "relayoutData"),
         Input("well-figure", "relayoutData"),
-        State("sync-enabled", "data"),
         State("depth-viewport", "data"),
         prevent_initial_call=True,
     )
-    def update_depth_viewport(multi_relayout, selected_relayout, well_relayout, sync_enabled, current):
-        if not sync_enabled:
-            return dash.no_update
-
+    def update_depth_viewport(multi_relayout, selected_relayout, well_relayout, current):
         triggered_id = ctx.triggered_id
         if triggered_id not in _SYNC_GRAPH_IDS:
             return dash.no_update
@@ -107,6 +103,6 @@ def register_sync_callbacks(app: dash.Dash) -> None:
         ClientsideFunction(namespace="syncScales", function_name="applyViewport"),
         Output("sync-dummy", "data"),
         Input("depth-viewport", "data"),
-        State("sync-enabled", "data"),
+        Input("sync-enabled", "data"),
         State("track-graph-ids", "data"),
     )

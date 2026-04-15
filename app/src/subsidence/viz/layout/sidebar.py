@@ -23,6 +23,7 @@ def build_action_toolbar() -> dbc.Card:
                     _action_button("Add log", "open-add-log"),
                     _action_button("Clear well data", "open-clear-well-data", color="warning"),
                     _action_button("Delete well", "open-delete-well", color="danger"),
+                    dbc.Button("Sync charts", id="sync-scales-toggle", color="secondary", outline=True, size="sm"),
                 ],
                 className="d-flex flex-wrap gap-2",
             )

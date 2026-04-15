@@ -12,7 +12,7 @@ This contract covers the current 1D modelling UI only:
 - the two burial summary views
 - the well view
 - shared vertical scale behaviour
-- the `Sync scales` control
+- the `Sync charts` control
 
 It does not define calculation logic or real geological results yet. Current plots are still a test plotting layout.
 
@@ -68,8 +68,8 @@ Meaning:
 
 Rules:
 
-- this is the single source of truth for the shared Y viewport
-- it is written only from real user interaction on a syncable graph
+- this is the single source of truth for the last active Y viewport
+- it is written from real user interaction on a syncable graph even when sync is OFF
 - it is never inferred from stale `relayoutData` of another graph
 
 ### 3.3 `sync-enabled`
@@ -85,7 +85,7 @@ Meaning:
 
 Written by:
 
-- `Sync scales` toggle button
+- `Sync charts` toggle button
 
 Read by:
 
@@ -108,7 +108,7 @@ Any later per-track well graphs may subscribe to the same contract, but current 
 
 ### 4.2 Source Selection
 
-When sync is enabled, the viewport source is determined only by the graph that actually triggered the callback.
+The viewport source is determined only by the graph that actually triggered the callback.
 
 Implementation rule:
 
@@ -131,13 +131,13 @@ Default viewport:
 
 ---
 
-## 5. `Sync scales` Behaviour
+## 5. `Sync charts` Behaviour
 
 ### 5.1 Component
 
 - component type: `dbc.Button`
 - component id: `sync-scales-toggle`
-- label: `Sync scales`
+- label: `Sync charts`
 
 ### 5.2 OFF State
 
@@ -145,12 +145,13 @@ When `sync-enabled = false`:
 
 - `burial-multi`, `burial-selected`, and `well-figure` are independent
 - zoom/pan on one graph must not modify any other graph
-- user interaction may still update that graph locally
-- shared apply callbacks must not call `Plotly.relayout` on other views
+- user interaction still updates the shared `depth-viewport` candidate
+- clientside apply callbacks must not call `Plotly.relayout` on other views
 
 Expected result:
 
 - each graph lives its own life
+- the most recently changed graph defines the candidate viewport for a later sync
 
 ### 5.3 ON State
 
@@ -158,11 +159,13 @@ When `sync-enabled = true`:
 
 - any syncable graph may become the source
 - the last graph the user actually moved becomes the source
-- that graph writes its Y range to `depth-viewport`
+- the current `depth-viewport` is applied immediately when sync is turned ON
+- after that, any new source graph writes its Y range to `depth-viewport`
 - the shared viewport is applied to every other sync target
 
 Expected result:
 
+- pressing `Sync charts` aligns all views immediately to the last active viewport
 - moving any one of the three views updates the other two
 
 ### 5.4 Visual State
@@ -193,12 +196,13 @@ Server-side sync code is not responsible for:
 
 ### 6.2 Clientside Callback Responsibilities
 
-Clientside sync code in `assets/sync.js` is responsible for:
+Clientside sync code in `assets/sync_scales.js` is responsible for:
 
 - reading `depth-viewport`
 - reading `sync-enabled`
-- applying the viewport to all sync targets only when sync is enabled
+- applying the viewport to all sync targets when sync is enabled
 - doing nothing when sync is disabled
+- re-applying the current `depth-viewport` when `sync-enabled` switches from `false` to `true`
 
 ### 6.3 One-Way Rule
 
@@ -249,8 +253,8 @@ When:
 
 Then:
 
-- the next user interaction on any syncable graph becomes the source of truth
-- after that interaction, all three views become aligned
+- all three views align immediately to the last active `depth-viewport`
+- no extra drag is required to trigger the first alignment
 
 ---
 
@@ -259,9 +263,11 @@ Then:
 Files responsible for this contract:
 
 - `app/src/subsidence/viz/layout/__init__.py`
+- `app/src/subsidence/viz/layout/sidebar.py`
 - `app/src/subsidence/viz/layout/burial_panel.py`
 - `app/src/subsidence/viz/callbacks/sync.py`
 - `app/src/subsidence/viz/assets/sync.js`
+- `app/src/subsidence/viz/assets/sync_scales.js`
 
 Related figure callbacks:
 
@@ -271,12 +277,11 @@ Related figure callbacks:
 
 ## 9. Immediate Implementation Plan
 
-1. Add `dcc.Store(id="sync-enabled", data=False)` to the layout.
-2. Replace the current mislabeled `fit-to-subsidence` behaviour with a true `Sync scales` toggle.
-3. Rewrite `callbacks/sync.py` so the source graph is chosen via `ctx.triggered_id`.
-4. Allow all three current views to participate in the shared viewport contract.
-5. Update `assets/sync.js` so viewport application is gated by `sync-enabled`.
-6. Verify the six scenarios from Section 7 manually in the running app.
+1. Keep `depth-viewport` updated from whichever syncable graph the user changed last.
+2. Keep `Sync charts` as the ON/OFF propagation gate.
+3. Apply the current `depth-viewport` immediately when sync is turned ON.
+4. Continue using `ctx.triggered_id` for source detection.
+5. Verify immediate alignment and subsequent shared dragging in the running app.
 
 ---
 

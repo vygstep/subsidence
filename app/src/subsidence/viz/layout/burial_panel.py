@@ -53,16 +53,6 @@ def build_burial_cols() -> dbc.Col:
                             ],
                             className="d-flex gap-3 flex-nowrap",
                         ),
-                        html.Div(
-                            dbc.Button(
-                                "Sync scales",
-                                id="sync-scales-toggle",
-                                color="secondary",
-                                outline=True,
-                                size="sm",
-                            ),
-                            className="mt-2",
-                        ),
                     ],
                     className="pt-3",
                 ),
