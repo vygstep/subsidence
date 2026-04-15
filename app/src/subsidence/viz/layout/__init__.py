@@ -1,4 +1,4 @@
-"""Layout assembly — builds the full dbc.Container for the app."""
+"""Layout assembly - builds the full dbc.Container for the app."""
 from __future__ import annotations
 
 import dash_bootstrap_components as dbc
@@ -23,8 +23,8 @@ def _one_d_panel() -> html.Div:
         dbc.Row(
             [
                 build_data_manager_col(),
-                build_burial_cols(),
                 build_well_log_col(),
+                build_burial_cols(),
             ],
             className="g-3 mt-3",
         )
@@ -51,6 +51,7 @@ def _stores() -> list:
         # r0 = bottom of chart (deeper depth, larger value), r1 = top (shallower, smaller)
         # Default matches burial chart range=[2500, 0]: 0m at top, 2500m at bottom.
         dcc.Store(id="depth-viewport", data={"r0": 2500.0, "r1": 0.0}),
+        dcc.Store(id="sync-enabled", data=False),
         dcc.Store(id="picks-store", data={}),
         dcc.Store(id="pick-mode", data=False),
         dcc.Store(id="track-x-ranges", data={}),

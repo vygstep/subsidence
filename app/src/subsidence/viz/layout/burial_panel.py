@@ -1,4 +1,4 @@
-"""Burial panel layout — timescale + multi-well + selected-well charts."""
+"""Burial panel layout - timescale + multi-well + selected-well charts."""
 from __future__ import annotations
 
 import dash_bootstrap_components as dbc
@@ -41,14 +41,14 @@ def build_burial_cols() -> dbc.Col:
                         html.Div(
                             [
                                 _summary_panel(
-                                    "Multi-Well Comparison",
-                                    "multi-timescale-figure",
-                                    "burial-multi",
-                                ),
-                                _summary_panel(
                                     html.Span(id="selected-summary-title"),
                                     "selected-timescale-figure",
                                     "burial-selected",
+                                ),
+                                _summary_panel(
+                                    "Multi-Well Comparison",
+                                    "multi-timescale-figure",
+                                    "burial-multi",
                                 ),
                             ],
                             className="d-flex gap-3 flex-nowrap",
@@ -56,7 +56,7 @@ def build_burial_cols() -> dbc.Col:
                         html.Div(
                             dbc.Button(
                                 "Sync scales",
-                                id="fit-to-subsidence",
+                                id="sync-scales-toggle",
                                 color="secondary",
                                 outline=True,
                                 size="sm",
@@ -69,5 +69,8 @@ def build_burial_cols() -> dbc.Col:
             ],
             className="overflow-auto",
         ),
-        xs=12, md=5, lg=6, xl=6,
+        xs=12,
+        md=5,
+        lg=6,
+        xl=6,
     )
