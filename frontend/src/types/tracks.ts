@@ -10,6 +10,7 @@
 
 export interface CurveConfig {
   mnemonic: string
+  unit?: string
   color: string
   lineWidth: number
   lineStyle: 'solid' | 'dashed' | 'dotted'

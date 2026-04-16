@@ -229,6 +229,7 @@ textarea {
   display: flex;
   flex-direction: column;
   gap: 1px;
+  width: 100%;
 }
 
 .curve-scale-bar__header {
@@ -251,10 +252,19 @@ textarea {
   white-space: nowrap;
 }
 
+.curve-scale-bar__unit {
+  font-size: 0.65rem;
+  font-weight: 400;
+  color: #6a7d90;
+  white-space: nowrap;
+}
+
 .curve-scale-bar__range {
+  display: flex;
+  justify-content: space-between;
+  width: 100%;
   font-size: 0.63rem;
   font-weight: 500;
-  white-space: nowrap;
   opacity: 0.85;
 }
 

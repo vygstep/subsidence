@@ -16,6 +16,7 @@ const grTrackConfig: TrackConfig = {
   curves: [
     {
       mnemonic: 'GR',
+      unit: 'API',
       color: '#1f9d55',
       lineWidth: 2,
       lineStyle: 'solid',
@@ -122,13 +123,16 @@ const previewTracks = [grTrackConfig]
 
 function HeaderRowPreview() {
   return (
-    <section className="header-preview">
-      <p className="wave-panel__eyebrow" style={{ marginTop: 24 }}>Track Header Proof</p>
-      <h2 className="wave-panel__title">Step 9 — Track Headers</h2>
-      <p className="wave-panel__text">
-        Sticky header row with mnemonic, colour swatch, and scale range per curve.
-      </p>
-      <div className="header-preview__wrap">
+    <section className="wave-panel">
+      <div className="wave-panel__copy">
+        <p className="wave-panel__eyebrow">Track Header Proof</p>
+        <h2 className="wave-panel__title">Step 9 — Track Headers</h2>
+        <p className="wave-panel__text">
+          Full-width header row: colour swatch + mnemonic + unit, min/max at opposite edges.
+          Sticky top-0 so it stays visible while the track area scrolls.
+        </p>
+      </div>
+      <div className="depth-proof__trackWrap">
         <TrackHeaderRow tracks={previewTracks} />
       </div>
     </section>
