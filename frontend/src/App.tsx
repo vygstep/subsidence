@@ -14,6 +14,7 @@ const DEFAULT_TRACKS: TrackConfig[] = [
     showGrid: true,
     curves: [
       { mnemonic: 'GR', unit: 'API', color: '#22c55e', lineWidth: 1.5, lineStyle: 'solid', scaleMin: 0, scaleMax: 150, scaleReversed: false },
+      { mnemonic: 'CALI', unit: 'in', color: '#111827', lineWidth: 2, lineStyle: 'dashed', scaleMin: 6, scaleMax: 16, scaleReversed: false },
     ],
   },
   {
@@ -36,6 +37,7 @@ const DEFAULT_TRACKS: TrackConfig[] = [
     showGrid: true,
     curves: [
       { mnemonic: 'RHOB', unit: 'g/cc', color: '#ef4444', lineWidth: 1.5, lineStyle: 'solid', scaleMin: 1.95, scaleMax: 2.95, scaleReversed: false },
+      { mnemonic: 'NPHI', unit: 'v/v', color: '#2563eb', lineWidth: 1.2, lineStyle: 'dashed', scaleMin: 0.45, scaleMax: -0.15, scaleReversed: true },
     ],
   },
 ]
@@ -52,15 +54,19 @@ function App() {
   }, [loadWell])
 
   const { minDepth, maxDepth } = useMemo(() => {
-    if (curves.length === 0) return { minDepth: 0, maxDepth: 1000 }
+    if (curves.length === 0) {
+      return { minDepth: 0, maxDepth: 1000 }
+    }
+
     let min = Infinity
     let max = -Infinity
-    for (const c of curves) {
-      if (c.depths.length > 0) {
-        min = Math.min(min, c.depths[0])
-        max = Math.max(max, c.depths[c.depths.length - 1])
+    for (const curve of curves) {
+      if (curve.depths.length > 0) {
+        min = Math.min(min, curve.depths[0])
+        max = Math.max(max, curve.depths[curve.depths.length - 1])
       }
     }
+
     return { minDepth: min, maxDepth: max }
   }, [curves])
 
@@ -69,11 +75,11 @@ function App() {
       <header className="app-topbar">
         <span className="app-topbar__brand">SUBSIDENCE</span>
         <span className="app-topbar__well">
-          {isLoading ? 'Loading…' : error ? 'Error loading well' : (well?.well_name ?? '—')}
+          {isLoading ? 'Loading...' : error ? 'Error loading well' : (well?.well_name ?? '-')}
         </span>
         {curves.length > 0 && (
           <span className="app-topbar__meta">
-            {curves.length} curves · {curves[0].depths.length.toLocaleString()} samples
+            {curves.length} curves | {curves[0].depths.length.toLocaleString()} samples
           </span>
         )}
       </header>

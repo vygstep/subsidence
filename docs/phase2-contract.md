@@ -9,7 +9,7 @@
 | Step | Status | Verification | Commit |
 |---|---|---|---|
 | Step 1 | done | ILD track shows 4-decade log grid at 0.2 · 2 · 20 · 200 · 2000 | pending |
-| Step 2 | pending | - | - |
+| Step 2 | done | GR track shows GR+CALI; Porosity shows RHOB+reversed NPHI | pending |
 | Step 3 | pending | - | - |
 | Step 4 | pending | - | - |
 | Step 5 | pending | - | - |
@@ -27,10 +27,10 @@
 - [x] 1.3 Verify: ILD (Resistivity) track shows 4-decade log grid lines at 0.2 · 2 · 20 · 200 · 2000
 
 ### Step 2 - Multi-curve track configs
-- [ ] 2.1 Add `CALI` curve to GR track config (`GR` green + `CALI` black dashed, 6–16 in)
-- [ ] 2.2 Add `NPHI` curve to Porosity track config (`RHOB` red + `NPHI` blue dashed, reversed 0.45 → -0.15)
-- [ ] 2.3 Verify each curve in `DataTrack` uses its own scale (confirm via visual: NPHI runs right-to-left)
-- [ ] 2.4 Verify: GR track shows two curves; Porosity track shows two curves with correct reversed NPHI
+- [x] 2.1 Add `CALI` curve to GR track config (`GR` green + `CALI` black dashed, 6–16 in)
+- [x] 2.2 Add `NPHI` curve to Porosity track config (`RHOB` red + `NPHI` blue dashed, reversed 0.45 → -0.15)
+- [x] 2.3 Verify each curve in `DataTrack` uses its own scale (confirm via visual: NPHI runs right-to-left)
+- [x] 2.4 Verify: GR track shows two curves; Porosity track shows two curves with correct reversed NPHI
 
 ### Step 3 - CurveFillConfig type
 - [ ] 3.1 Add `CurveFillConfig` interface to `src/types/tracks.ts`
@@ -105,6 +105,10 @@ clear → grid (linear or log) → depth gridlines → fills → curves
 ---
 
 ### Step 2 - Multi-curve track configs
+
+Status: done
+Verification: GR track renders GR+CALI, and Porosity renders RHOB+reversed NPHI from the sample well
+Commit: pending
 
 Update `DEFAULT_TRACKS` in `App.tsx`:
 
@@ -408,6 +412,9 @@ Step 8 (track resize)         ← can run parallel with Step 7
 - `1:200` / `1:500` / `1:1000` buttons in topbar snap to the correct scale
 - Track width resizable by drag; header and canvas resize together; minimum 80 px
 - `npx tsc --noEmit` — zero errors
+
+
+
 
 
 

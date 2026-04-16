@@ -26,7 +26,7 @@ Primary references:
 - [x] C13 Execute Phase 1 Step 10: LogViewPanel and synchronized scroll
 
 - [x] C14 Execute Phase 2 Step 1: logarithmic grid renderer
-- [ ] C15 Execute Phase 2 Step 2: multi-curve track configs
+- [x] C15 Execute Phase 2 Step 2: multi-curve track configs
 - [ ] C16 Execute Phase 2 Step 3: CurveFillConfig type
 - [ ] C17 Execute Phase 2 Step 4: fill renderer
 - [ ] C18 Execute Phase 2 Step 5: wire fills in DataTrack
@@ -36,5 +36,6 @@ Primary references:
 
 ## Immediate Next Step
 
-Execute Phase 2 Step 2: multi-curve track configs.
+Execute Phase 2 Step 3: CurveFillConfig type.
+
 
