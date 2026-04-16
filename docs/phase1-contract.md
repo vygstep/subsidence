@@ -15,7 +15,7 @@
 | Step 5 | done | test component renders sine wave; no flicker on window resize | `e02d07c` |
 | Step 6 | done | renderers have zero React imports and build passes | `577bb81` |
 | Step 7 | done | depth labels preview shows 1000 m, 1100 m, 1200 m at the expected range | `afe9034` |
-| Step 8 | done | GR data track preview renders 0-150 API; no crash past data end | pending |
+| Step 8 | done | GR data track preview renders 0-150 API; no crash past data end | `195b64d` |
 | Step 9 | pending | - | - |
 | Step 10 | pending | - | - |
 
@@ -65,8 +65,8 @@
 - [x] 7.2 Verify: at `scrollDepth=1000`, labels `1000 m`, `1100 m`, `1200 m` appear at correct pixel positions
 
 ### Step 8 - DataTrack
-- [ ] 8.1 Write `src/components/logview/DataTrack.tsx`: Canvas, binary-search clip, draw loop
-- [ ] 8.2 Verify: GR (green, 0-150 API) renders correctly; no crash when scrolling past data end
+- [x] 8.1 Write `src/components/logview/DataTrack.tsx`: Canvas, binary-search clip, draw loop
+- [x] 8.2 Verify: GR (green, 0-150 API) renders correctly; no crash when scrolling past data end
 
 ### Step 9 - Track headers
 - [ ] 9.1 Write `src/components/logview/CurveScaleBar.tsx`: mnemonic + unit + color bar
@@ -388,7 +388,7 @@ Requirements:
 
 Status: done
 Verification: GR track renders correctly and disappears cleanly outside data bounds
-Commit: pending
+Commit: `195b64d`
 
 Implement `src/components/logview/DataTrack.tsx`.
 
@@ -498,6 +498,7 @@ Step 10 (LogViewPanel + scroll)
 - sticky track headers visible at all scroll positions
 - mouse-wheel scrolls all tracks in sync at 60 fps with no visual artifacts
 - `npx tsc --noEmit` reports zero type errors
+
 
 
 
