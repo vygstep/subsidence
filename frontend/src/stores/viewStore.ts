@@ -1,4 +1,4 @@
-﻿import { create } from 'zustand'
+import { create } from 'zustand'
 
 interface VisibleDepthRange {
   min: number
@@ -16,6 +16,7 @@ export interface ViewStore {
   setScale: (dpp: number) => void
   setCursorDepth: (depth: number | null) => void
   setViewportHeight: (height: number) => void
+  setTrackWidth: (id: string, width: number) => void
 }
 
 function deriveVisibleDepthRange(scrollDepth: number, depthPerPixel: number, viewportHeight: number): VisibleDepthRange {
@@ -29,6 +30,7 @@ function deriveVisibleDepthRange(scrollDepth: number, depthPerPixel: number, vie
 const initialScrollDepth = 0
 const initialDepthPerPixel = 0.2
 const initialViewportHeight = 800
+const minimumTrackWidth = 80
 
 export const useViewStore = create<ViewStore>((set) => ({
   scrollDepth: initialScrollDepth,
@@ -56,6 +58,14 @@ export const useViewStore = create<ViewStore>((set) => ({
     set((state) => ({
       viewportHeight,
       visibleDepthRange: deriveVisibleDepthRange(state.scrollDepth, state.depthPerPixel, viewportHeight),
+    }))
+  },
+  setTrackWidth(id, width) {
+    set((state) => ({
+      trackWidths: {
+        ...state.trackWidths,
+        [id]: Math.max(minimumTrackWidth, Math.round(width)),
+      },
     }))
   },
 }))

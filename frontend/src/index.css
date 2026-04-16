@@ -102,12 +102,33 @@ textarea {
   width: 60px;
   display: block;
   background: #ffffff;
+  border-right: 1px solid #c4d0dc;
 }
 
 .data-track,
 .formation-column {
   display: block;
   background: #ffffff;
+}
+
+.formation-column {
+  border-left: 1px solid #c4d0dc;
+  border-right: 1px solid #c4d0dc;
+}
+
+.track-resize-handle,
+.track-header-row__resize-spacer {
+  width: 2px;
+  flex-shrink: 0;
+  background: #c4d0dc;
+}
+
+.track-resize-handle {
+  cursor: col-resize;
+}
+
+.track-resize-handle:hover {
+  background: #7cb8e8;
 }
 
 .track-header-row {
@@ -121,13 +142,9 @@ textarea {
   flex-shrink: 0;
 }
 
-.track-header-row__depth-spacer,
+.track-header-row__depth-header,
 .track-header-row__formation-header {
   flex-shrink: 0;
-  border-right: 1px solid #c4d0dc;
-}
-
-.track-header-row__formation-header {
   display: flex;
   align-items: center;
   justify-content: center;
@@ -140,10 +157,23 @@ textarea {
   min-height: 80px;
 }
 
+.track-header-row__depth-header {
+  border-right: 1px solid #c4d0dc;
+}
+
+.track-header-row__track-group {
+  display: flex;
+  flex-shrink: 0;
+}
+
+.track-header-row__formation-header {
+  border-left: 1px solid #c4d0dc;
+  border-right: 1px solid #c4d0dc;
+}
+
 .track-header {
   flex-shrink: 0;
   padding: 6px 8px;
-  border-right: 1px solid #c4d0dc;
   display: flex;
   flex-direction: column;
   gap: 3px;

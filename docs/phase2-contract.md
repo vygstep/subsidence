@@ -15,7 +15,7 @@
 | Step 5 | done | Porosity shows crossover fill; GR track shows baseline shading | pending |
 | Step 6 | done | Formation column shows aligned lithology blocks with readable names | pending |
 | Step 7 | done | Ctrl+Wheel zooms depth axis; preset buttons snap to 1:200 / 1:500 / 1:1000 | pending |
-| Step 8 | pending | - | - |
+| Step 8 | done | Dragging a handle resizes the track and header together; minimum width stays at 80 px | pending |
 
 ---
 
@@ -64,11 +64,11 @@
 - [x] 7.5 Verify: Ctrl+Wheel zooms the depth axis; clicking preset buttons snaps to the correct scale
 
 ### Step 8 - Track resize via drag
-- [ ] 8.1 Add `setTrackWidth(id: string, width: number)` action to `viewStore.ts`
-- [ ] 8.2 Write `src/components/logview/TrackResizeHandle.tsx`: thin drag handle rendered between adjacent tracks
-- [ ] 8.3 Update `LogViewPanel.tsx`: read track widths from `viewStore.trackWidths`, render `TrackResizeHandle` between each `DataTrack`
-- [ ] 8.4 Update `TrackHeaderRow.tsx`: track header widths also read from `viewStore.trackWidths`
-- [ ] 8.5 Verify: dragging a handle resizes the track and its header simultaneously; minimum track width 80 px
+- [x] 8.1 Add `setTrackWidth(id: string, width: number)` action to `viewStore.ts`
+- [x] 8.2 Write `src/components/logview/TrackResizeHandle.tsx`: thin drag handle rendered between adjacent tracks
+- [x] 8.3 Update `LogViewPanel.tsx`: read track widths from `viewStore.trackWidths`, render `TrackResizeHandle` between each `DataTrack`
+- [x] 8.4 Update `TrackHeaderRow.tsx`: track header widths also read from `viewStore.trackWidths`
+- [x] 8.5 Verify: dragging a handle resizes the track and its header simultaneously; minimum track width 80 px
 
 ---
 

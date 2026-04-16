@@ -39,6 +39,7 @@ class WellResponse(BaseModel):
     x: float
     y: float
     crs: str
+    depth_reference: str
     curves: list[CurveResponse]
     formations: list[FormationResponse]
 
@@ -101,6 +102,7 @@ def get_sample_well() -> WellResponse:
         x=0.0,
         y=0.0,
         crs='unset',
+        depth_reference='MD',
         curves=[
             CurveResponse(
                 mnemonic=curve.mnemonic,

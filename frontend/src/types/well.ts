@@ -1,4 +1,4 @@
-﻿export interface Well {
+export interface Well {
   well_id: string
   well_name: string
   kb_elev: number
@@ -6,6 +6,7 @@
   x: number
   y: number
   crs: string
+  depth_reference: 'MD' | 'TVD' | 'TVDSS'
 }
 
 export interface CurveData {

@@ -32,11 +32,12 @@ Primary references:
 - [x] C18 Execute Phase 2 Step 5: wire fills in DataTrack
 - [x] C19 Execute Phase 2 Step 6: FormationColumn
 - [x] C20 Execute Phase 2 Step 7: depth scale presets
-- [ ] C21 Execute Phase 2 Step 8: track resize via drag
+- [x] C21 Execute Phase 2 Step 8: track resize via drag
 
 ## Immediate Next Step
 
-Execute Phase 2 Step 8: track resize via drag.
+Close Phase 2 and transition the active scope to post-Phase-2 data contract work.
+
 
 
 
