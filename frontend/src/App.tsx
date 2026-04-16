@@ -188,14 +188,16 @@ function LogViewPanelPreview() {
   }, [curves])
 
   return (
-    <section style={{ marginTop: 32 }}>
-      <p className="wave-panel__eyebrow">Log View Panel Proof</p>
-      <h2 className="wave-panel__title">Step 10 — Synchronized Scroll</h2>
-      <p className="wave-panel__text" style={{ marginBottom: 16 }}>
-        Four tracks (Depth · GR · ILD · RHOB) scroll in sync via mouse wheel.
-        Headers stay fixed. Scroll is clamped to data bounds.
-      </p>
-      <div style={{ height: 560 }}>
+    <section className="wave-panel">
+      <div className="wave-panel__copy">
+        <p className="wave-panel__eyebrow">Log View Panel Proof</p>
+        <h2 className="wave-panel__title">Step 10 — Synchronized Scroll</h2>
+        <p className="wave-panel__text">
+          Four tracks (Depth · GR · ILD · RHOB) scroll in sync via mouse wheel.
+          Headers stay fixed. Scroll is clamped to data bounds.
+        </p>
+      </div>
+      <div className="logview-proof__wrap">
         <LogViewPanel
           tracks={DEFAULT_TRACKS}
           curves={curves}
