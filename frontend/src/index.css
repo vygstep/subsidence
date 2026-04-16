@@ -181,6 +181,90 @@ textarea {
   font-weight: 600;
 }
 
+/* ── Track header row ──────────────────────────────────── */
+
+.track-header-row {
+  position: sticky;
+  top: 0;
+  z-index: 10;
+  display: flex;
+  flex-direction: row;
+  background: #f0f5fa;
+  border-bottom: 2px solid #c4d0dc;
+  flex-shrink: 0;
+}
+
+.track-header-row__depth-spacer {
+  flex-shrink: 0;
+  border-right: 1px solid #c4d0dc;
+}
+
+/* ── Single track header ───────────────────────────────── */
+
+.track-header {
+  flex-shrink: 0;
+  padding: 6px 8px;
+  border-right: 1px solid #c4d0dc;
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  min-height: 80px;
+}
+
+.track-header__title {
+  font-size: 0.68rem;
+  font-weight: 700;
+  letter-spacing: 0.07em;
+  text-transform: uppercase;
+  color: #43586d;
+  margin-bottom: 2px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* ── Curve scale bar ───────────────────────────────────── */
+
+.curve-scale-bar {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+}
+
+.curve-scale-bar__header {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+}
+
+.curve-scale-bar__swatch {
+  width: 16px;
+  height: 3px;
+  border-radius: 2px;
+  flex-shrink: 0;
+}
+
+.curve-scale-bar__mnemonic {
+  font-size: 0.72rem;
+  font-weight: 600;
+  color: #17212b;
+  white-space: nowrap;
+}
+
+.curve-scale-bar__range {
+  font-size: 0.63rem;
+  font-weight: 500;
+  white-space: nowrap;
+  opacity: 0.85;
+}
+
+.header-preview__wrap {
+  margin-top: 12px;
+  border: 1px solid #d6e0eb;
+  border-radius: 12px;
+  overflow: hidden;
+}
+
 @media (max-width: 760px) {
   .app-card {
     padding: 28px;

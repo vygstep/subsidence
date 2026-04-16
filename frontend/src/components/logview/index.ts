@@ -1,2 +1,5 @@
-﻿export * from './DepthTrack'
+﻿export * from './CurveScaleBar'
 export * from './DataTrack'
+export * from './DepthTrack'
+export * from './TrackHeader'
+export * from './TrackHeaderRow'

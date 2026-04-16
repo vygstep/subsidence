@@ -1,6 +1,6 @@
 ﻿import { useEffect } from 'react'
 
-import { DataTrack, DepthTrack } from '@/components'
+import { DataTrack, DepthTrack, TrackHeaderRow } from '@/components'
 import { useCanvasRenderer, useDepthScale, useValueScale } from '@/hooks'
 import { drawCurve, drawDepthGridlines, drawDepthLabels, drawLinearGrid } from '@/renderers'
 import { useViewStore, useWellDataStore } from '@/stores'
@@ -118,6 +118,23 @@ function DataTrackPreview() {
   )
 }
 
+const previewTracks = [grTrackConfig]
+
+function HeaderRowPreview() {
+  return (
+    <section className="header-preview">
+      <p className="wave-panel__eyebrow" style={{ marginTop: 24 }}>Track Header Proof</p>
+      <h2 className="wave-panel__title">Step 9 — Track Headers</h2>
+      <p className="wave-panel__text">
+        Sticky header row with mnemonic, colour swatch, and scale range per curve.
+      </p>
+      <div className="header-preview__wrap">
+        <TrackHeaderRow tracks={previewTracks} />
+      </div>
+    </section>
+  )
+}
+
 function App() {
   const loadWell = useWellDataStore((state) => state.loadWell)
   const well = useWellDataStore((state) => state.well)
@@ -175,6 +192,7 @@ function App() {
         </section>
         <DepthTrackPreview />
         <DataTrackPreview />
+        <HeaderRowPreview />
         {error ? <p className="app-error">{error}</p> : null}
       </section>
     </main>
