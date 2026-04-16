@@ -1,21 +1,15 @@
-﻿import { useEffect } from 'react'
-
-import { useCanvasRenderer, useDepthScale } from '@/hooks'
+﻿import { useCanvasRenderer, useDepthScale } from '@/hooks'
 import { drawDepthGridlines, drawDepthLabels } from '@/renderers'
 import { useViewStore } from '@/stores'
 
 interface DepthTrackProps {
-  height?: number
+  // Height must be supplied by the parent (LogViewPanel owns viewport height).
+  height: number
 }
 
-export function DepthTrack({ height = 1000 }: DepthTrackProps) {
+export function DepthTrack({ height }: DepthTrackProps) {
   const visibleDepthRange = useViewStore((state) => state.visibleDepthRange)
-  const setViewportHeight = useViewStore((state) => state.setViewportHeight)
   const { scale: depthScale } = useDepthScale(visibleDepthRange, height)
-
-  useEffect(() => {
-    setViewportHeight(height)
-  }, [height, setViewportHeight])
 
   const canvasRef = useCanvasRenderer(
     (ctx, width, canvasHeight) => {

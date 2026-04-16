@@ -53,15 +53,19 @@ function SineWavePreview() {
   return <canvas ref={canvasRef} className="wave-canvas" />
 }
 
+const PREVIEW_HEIGHT = 800
+
 function DepthTrackPreview() {
   const setScroll = useViewStore((state) => state.setScroll)
   const setScale = useViewStore((state) => state.setScale)
+  const setViewportHeight = useViewStore((state) => state.setViewportHeight)
   const visibleDepthRange = useViewStore((state) => state.visibleDepthRange)
 
   useEffect(() => {
     setScroll(1000)
     setScale(0.2)
-  }, [setScale, setScroll])
+    setViewportHeight(PREVIEW_HEIGHT)
+  }, [setScale, setScroll, setViewportHeight])
 
   return (
     <section className="depth-proof">
@@ -76,7 +80,7 @@ function DepthTrackPreview() {
         </p>
       </div>
       <div className="depth-proof__trackWrap">
-        <DepthTrack />
+        <DepthTrack height={PREVIEW_HEIGHT} />
       </div>
     </section>
   )
@@ -85,13 +89,15 @@ function DepthTrackPreview() {
 function DataTrackPreview() {
   const setScroll = useViewStore((state) => state.setScroll)
   const setScale = useViewStore((state) => state.setScale)
+  const setViewportHeight = useViewStore((state) => state.setViewportHeight)
   const visibleDepthRange = useViewStore((state) => state.visibleDepthRange)
   const curves = useWellDataStore((state) => state.curves)
 
   useEffect(() => {
     setScroll(1000)
     setScale(0.2)
-  }, [setScale, setScroll])
+    setViewportHeight(PREVIEW_HEIGHT)
+  }, [setScale, setScroll, setViewportHeight])
 
   return (
     <section className="data-proof">
@@ -106,7 +112,7 @@ function DataTrackPreview() {
         </p>
       </div>
       <div className="data-proof__trackWrap">
-        <DataTrack config={grTrackConfig} curves={curves} width={grTrackConfig.width} height={1000} />
+        <DataTrack config={grTrackConfig} curves={curves} width={grTrackConfig.width} height={PREVIEW_HEIGHT} />
       </div>
     </section>
   )
