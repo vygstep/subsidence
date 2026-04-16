@@ -2,7 +2,14 @@ import { scaleLinear, scaleLog, type ScaleLinear, type ScaleLogarithmic } from '
 import { useMemo } from 'react'
 
 import { useCanvasRenderer, useDepthScale } from '@/hooks'
-import { drawCurve, drawDepthGridlines, drawLinearGrid, drawLogarithmicGrid } from '@/renderers'
+import {
+  drawCurve,
+  drawDepthGridlines,
+  drawFillBetweenCurves,
+  drawFillToBaseline,
+  drawLinearGrid,
+  drawLogarithmicGrid,
+} from '@/renderers'
 import type { CurveConfig, CurveData, TrackConfig } from '@/types'
 import { useViewStore } from '@/stores'
 
@@ -99,6 +106,11 @@ export function DataTrack({ config, curves, width, height }: DataTrackProps) {
     [depthWindow.max, depthWindow.min, visibleCurves],
   )
 
+  const clippedCurveMap = useMemo(
+    () => new Map(clippedCurves.map((entry) => [entry.style.mnemonic, entry])),
+    [clippedCurves],
+  )
+
   const { scale: depthScale } = useDepthScale(visibleDepthRange, height)
 
   const curveScales = useMemo(() => {
@@ -150,6 +162,52 @@ export function DataTrack({ config, curves, width, height }: DataTrackProps) {
       drawDepthGridlines(ctx, depthScale, canvasWidth, 100, 10)
 
       clippedCurves.forEach(({ curve, style }) => {
+        if (!style.fill) {
+          return
+        }
+
+        const valueScale = curveScales.get(style.mnemonic)
+        if (!valueScale) {
+          return
+        }
+
+        if (style.fill.type === 'to-baseline' && style.fill.baseline !== undefined) {
+          drawFillToBaseline(
+            ctx,
+            curve.depths,
+            curve.values,
+            style.fill.baseline,
+            depthScale,
+            valueScale,
+            style.fill.colorPositive,
+            style.fill.colorNegative,
+            style.fill.opacity,
+            curve.null_value,
+          )
+        }
+
+        if (style.fill.type === 'crossover' && style.fill.pairedCurve) {
+          const paired = clippedCurveMap.get(style.fill.pairedCurve)
+          const pairedScale = paired ? curveScales.get(paired.style.mnemonic) : undefined
+          if (paired && pairedScale) {
+            drawFillBetweenCurves(
+              ctx,
+              curve.depths,
+              curve.values,
+              paired.curve.values,
+              depthScale,
+              valueScale,
+              pairedScale,
+              style.fill.colorPositive,
+              style.fill.colorNegative,
+              style.fill.opacity,
+              curve.null_value,
+            )
+          }
+        }
+      })
+
+      clippedCurves.forEach(({ curve, style }) => {
         const valueScale = curveScales.get(style.mnemonic)
         if (!valueScale) {
           return
@@ -158,7 +216,16 @@ export function DataTrack({ config, curves, width, height }: DataTrackProps) {
         drawCurve(ctx, curve.depths, curve.values, depthScale, valueScale, style, curve.null_value)
       })
     },
-    [clippedCurves, config.curves, config.gridDivisions, config.scaleType, config.showGrid, curveScales, depthScale],
+    [
+      clippedCurveMap,
+      clippedCurves,
+      config.curves,
+      config.gridDivisions,
+      config.scaleType,
+      config.showGrid,
+      curveScales,
+      depthScale,
+    ],
   )
 
   return <canvas ref={canvasRef} className="data-track" style={{ width, height }} />

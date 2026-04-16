@@ -12,7 +12,7 @@
 | Step 2 | done | GR track shows GR+CALI; Porosity shows RHOB+reversed NPHI | pending |
 | Step 3 | done | `npx tsc --noEmit` passes with zero errors | pending |
 | Step 4 | done | fillRenderer builds cleanly and renderers contain zero React imports | pending |
-| Step 5 | pending | - | - |
+| Step 5 | done | Porosity shows crossover fill; GR track shows baseline shading | pending |
 | Step 6 | pending | - | - |
 | Step 7 | pending | - | - |
 | Step 8 | pending | - | - |
@@ -44,10 +44,10 @@
 - [x] 4.4 Verify: renderers are pure functions (no React imports); crossover detection switches fill colour at intersection points
 
 ### Step 5 - Wire fills in DataTrack
-- [ ] 5.1 Update `DataTrack.tsx`: before drawing curves, call fill renderers for any `CurveConfig` with `fill` defined
-- [ ] 5.2 Add crossover fill config to Porosity track: NPHI > RHOB → yellow (gas), NPHI < RHOB → grey
-- [ ] 5.3 Add baseline fill config to GR track: left of 75 API → sand-yellow, right → grey-green
-- [ ] 5.4 Verify: Porosity track shows yellow crossover fill; GR track shows baseline shading
+- [x] 5.1 Update `DataTrack.tsx`: before drawing curves, call fill renderers for any `CurveConfig` with `fill` defined
+- [x] 5.2 Add crossover fill config to Porosity track: NPHI > RHOB → yellow (gas), NPHI < RHOB → grey
+- [x] 5.3 Add baseline fill config to GR track: left of 75 API → sand-yellow, right → grey-green
+- [x] 5.4 Verify: Porosity track shows yellow crossover fill; GR track shows baseline shading
 
 ### Step 6 - FormationColumn
 - [ ] 6.1 Write `src/renderers/lithologyRenderer.ts`: `drawLithologyBlock(ctx, pattern, x, y, w, h)` for sandstone, shale, limestone, dolomite
@@ -206,7 +206,11 @@ This approach handles smooth crossover transitions without gaps or overlaps.
 
 ### Step 5 - Wire fills in DataTrack
 
-Update `DataTrack.tsx` draw callback — before drawing curves, iterate `clippedCurves` and call fill renderers for any curve with `style.fill` defined:
+Status: done
+Verification: Porosity track shows yellow crossover fill, and GR track shows baseline shading
+Commit: pending
+
+Update DataTrack.tsx draw callback — before drawing curves, iterate clippedCurves and call fill renderers for any curve with style.fill defined:
 
 ```ts
 // Fill pass (before curve lines)
@@ -422,6 +426,7 @@ Step 8 (track resize)         ← can run parallel with Step 7
 - `1:200` / `1:500` / `1:1000` buttons in topbar snap to the correct scale
 - Track width resizable by drag; header and canvas resize together; minimum 80 px
 - `npx tsc --noEmit` — zero errors
+
 
 
 
