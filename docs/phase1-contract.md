@@ -13,8 +13,8 @@
 | Step 3 | done | `curl http://localhost:8000/api/wells/sample` returns valid JSON with curves | `bd72ea3` |
 | Step 4 | done | `loadWell("sample")` logs curves as `Float32Array` in browser console | `40f0847` |
 | Step 5 | done | test component renders sine wave; no flicker on window resize | `e02d07c` |
-| Step 6 | done | renderers have zero React imports and build passes | pending |
-| Step 7 | pending | - | - |
+| Step 6 | done | renderers have zero React imports and build passes | `577bb81` |
+| Step 7 | done | depth labels preview shows 1000 m, 1100 m, 1200 m at the expected range | pending |
 | Step 8 | pending | - | - |
 | Step 9 | pending | - | - |
 | Step 10 | pending | - | - |
@@ -61,8 +61,8 @@
 - [x] 6.4 Verify: renderers have zero React imports; callable as plain functions
 
 ### Step 7 - DepthTrack
-- [ ] 7.1 Write `src/components/logview/DepthTrack.tsx`: 60 px wide, depth labels + gridlines
-- [ ] 7.2 Verify: at `scrollDepth=1000`, labels `1000 m`, `1100 m`, `1200 m` appear at correct pixel positions
+- [x] 7.1 Write `src/components/logview/DepthTrack.tsx`: 60 px wide, depth labels + gridlines
+- [x] 7.2 Verify: at `scrollDepth=1000`, labels `1000 m`, `1100 m`, `1200 m` appear at correct pixel positions
 
 ### Step 8 - DataTrack
 - [ ] 8.1 Write `src/components/logview/DataTrack.tsx`: Canvas, binary-search clip, draw loop
@@ -361,11 +361,7 @@ drawDepthLabels(ctx, depthScale, width, majorInterval): void
 
 ---
 
-## Step 7 - DepthTrack
-
-Status: pending
-Verification: with `scrollDepth=1000` and `depthPerPixel=0.2`, labels align correctly
-Commit: -
+## Step 7 - DepthTrack`r`n`r`nStatus: done`r`nVerification: with `scrollDepth=1000` and `depthPerPixel=0.2`, labels align correctly`r`nCommit: pending
 
 Implement `src/components/logview/DepthTrack.tsx`.
 
@@ -494,4 +490,5 @@ Step 10 (LogViewPanel + scroll)
 - sticky track headers visible at all scroll positions
 - mouse-wheel scrolls all tracks in sync at 60 fps with no visual artifacts
 - `npx tsc --noEmit` reports zero type errors
+
 

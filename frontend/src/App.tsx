@@ -1,8 +1,9 @@
 ﻿import { useEffect } from 'react'
 
+import { DepthTrack } from '@/components'
 import { useCanvasRenderer, useDepthScale, useValueScale } from '@/hooks'
 import { drawCurve, drawDepthGridlines, drawDepthLabels, drawLinearGrid } from '@/renderers'
-import { useWellDataStore } from '@/stores'
+import { useViewStore, useWellDataStore } from '@/stores'
 
 function SineWavePreview() {
   const { scale: yScale } = useDepthScale({ min: 0, max: 1 }, 180)
@@ -29,6 +30,35 @@ function SineWavePreview() {
   )
 
   return <canvas ref={canvasRef} className="wave-canvas" />
+}
+
+function DepthTrackPreview() {
+  const setScroll = useViewStore((state) => state.setScroll)
+  const setScale = useViewStore((state) => state.setScale)
+  const visibleDepthRange = useViewStore((state) => state.visibleDepthRange)
+
+  useEffect(() => {
+    setScroll(1000)
+    setScale(0.2)
+  }, [setScale, setScroll])
+
+  return (
+    <section className="depth-proof">
+      <div className="depth-proof__copy">
+        <p className="wave-panel__eyebrow">Depth Track Proof</p>
+        <h2 className="wave-panel__title">Depth Labels Preview</h2>
+        <p className="wave-panel__text">
+          Step 7 verification track. It reads `visibleDepthRange` from `viewStore` and draws depth labels and gridlines.
+        </p>
+        <p className="depth-proof__range">
+          Visible range: {visibleDepthRange.min.toFixed(0)} m - {visibleDepthRange.max.toFixed(0)} m
+        </p>
+      </div>
+      <div className="depth-proof__trackWrap">
+        <DepthTrack />
+      </div>
+    </section>
+  )
 }
 
 function App() {
@@ -86,6 +116,7 @@ function App() {
           </div>
           <SineWavePreview />
         </section>
+        <DepthTrackPreview />
         {error ? <p className="app-error">{error}</p> : null}
       </section>
     </main>
