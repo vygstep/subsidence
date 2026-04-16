@@ -17,7 +17,7 @@
 | Step 7 | done | depth labels preview shows 1000 m, 1100 m, 1200 m at the expected range | `afe9034` |
 | Step 8 | done | GR data track preview renders 0-150 API; no crash past data end | `195b64d` |
 | Step 9 | done | GR header: `══ GR API ══` with `0` left / `150` right, full track width | `3d066d2` |
-| Step 10 | pending | - | - |
+| Step 10 | done | 4 tracks scroll in sync; headers fixed; scroll clamped to data bounds | `dfadae7` |
 
 ---
 
@@ -75,10 +75,10 @@
 - [x] 9.4 Verify: GR header reads `══ GR API ══` with `0` left / `150` right, full track width
 
 ### Step 10 - LogViewPanel + synchronized scroll
-- [ ] 10.1 Write `src/hooks/useSynchronizedScroll.ts`: wheel -> depth delta -> `viewStore`
-- [ ] 10.2 Write `src/components/logview/LogViewPanel.tsx`: sticky header + 4-track flex row
-- [ ] 10.3 Define default 4-track layout config (Depth, GR, ILD, RHOB)
-- [ ] 10.4 Verify: all 4 tracks scroll in sync at 60 fps; no overscroll past data bounds
+- [x] 10.1 Write `src/hooks/useSynchronizedScroll.ts`: wheel -> depth delta -> `viewStore`
+- [x] 10.2 Write `src/components/logview/LogViewPanel.tsx`: sticky header + 4-track flex row
+- [x] 10.3 Define default 4-track layout config (Depth, GR, ILD, RHOB)
+- [x] 10.4 Verify: all 4 tracks scroll in sync at 60 fps; no overscroll past data bounds
 
 ---
 
