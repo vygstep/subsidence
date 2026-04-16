@@ -1,4 +1,4 @@
-﻿import type { ScaleLinear } from 'd3-scale'
+import type { ScaleLinear, ScaleLogarithmic } from 'd3-scale'
 
 export function drawLinearGrid(
   ctx: CanvasRenderingContext2D,
@@ -32,6 +32,71 @@ export function drawLinearGrid(
   ctx.moveTo(0, height - 0.5)
   ctx.lineTo(width, height - 0.5)
   ctx.stroke()
+  ctx.restore()
+}
+
+export function drawLogarithmicGrid(
+  ctx: CanvasRenderingContext2D,
+  xScale: ScaleLogarithmic<number, number>,
+  decades: number,
+  width: number,
+  height: number,
+  color: string,
+): void {
+  if (decades <= 0) {
+    return
+  }
+
+  const [domainStart, domainEnd] = xScale.domain()
+  if (domainStart <= 0 || domainEnd <= 0) {
+    return
+  }
+
+  const startExponent = Math.floor(Math.log10(domainStart))
+  const normalizedStart = domainStart / 10 ** startExponent
+  const majorMantissa = Math.max(1, Math.min(9, Math.round(normalizedStart)))
+
+  ctx.save()
+
+  for (let exponent = startExponent; exponent <= startExponent + decades; exponent += 1) {
+    const majorValue = majorMantissa * 10 ** exponent
+    if (majorValue >= domainStart && majorValue <= domainEnd) {
+      const x = xScale(majorValue)
+      ctx.beginPath()
+      ctx.strokeStyle = '#8ea3b5'
+      ctx.lineWidth = 1.1
+      ctx.moveTo(x, 0)
+      ctx.lineTo(x, height)
+      ctx.stroke()
+    }
+
+    if (exponent === startExponent + decades) {
+      continue
+    }
+
+    for (let mantissa = majorMantissa + 1; mantissa <= 10; mantissa += 1) {
+      const minorValue = mantissa * 10 ** exponent
+      if (minorValue < domainStart || minorValue > domainEnd) {
+        continue
+      }
+
+      const x = xScale(minorValue)
+      ctx.beginPath()
+      ctx.strokeStyle = color
+      ctx.lineWidth = 0.8
+      ctx.moveTo(x, 0)
+      ctx.lineTo(x, height)
+      ctx.stroke()
+    }
+  }
+
+  ctx.beginPath()
+  ctx.strokeStyle = color
+  ctx.lineWidth = 1
+  ctx.moveTo(0, height - 0.5)
+  ctx.lineTo(width, height - 0.5)
+  ctx.stroke()
+
   ctx.restore()
 }
 

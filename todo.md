@@ -1,4 +1,4 @@
-# SUBSIDENCE TODO
+﻿# SUBSIDENCE TODO
 
 ## Current Program
 
@@ -25,7 +25,7 @@ Primary references:
 - [x] C12 Execute Phase 1 Step 9: track headers
 - [x] C13 Execute Phase 1 Step 10: LogViewPanel and synchronized scroll
 
-- [ ] C14 Execute Phase 2 Step 1: logarithmic grid renderer
+- [x] C14 Execute Phase 2 Step 1: logarithmic grid renderer
 - [ ] C15 Execute Phase 2 Step 2: multi-curve track configs
 - [ ] C16 Execute Phase 2 Step 3: CurveFillConfig type
 - [ ] C17 Execute Phase 2 Step 4: fill renderer
@@ -36,4 +36,5 @@ Primary references:
 
 ## Immediate Next Step
 
-Execute Phase 2 Step 1: logarithmic grid renderer.
+Execute Phase 2 Step 2: multi-curve track configs.
+

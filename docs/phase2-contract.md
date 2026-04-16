@@ -1,4 +1,4 @@
-# Phase 2: Multi-Curve Tracks and Grids — Implementation Contract
+﻿# Phase 2: Multi-Curve Tracks and Grids — Implementation Contract
 
 **Goal**: Multiple curves per track, logarithmic grid, reversed scales, area fills between curves, stratigraphy column, depth scale zoom presets, and track resize by drag.
 
@@ -8,7 +8,7 @@
 
 | Step | Status | Verification | Commit |
 |---|---|---|---|
-| Step 1 | pending | - | - |
+| Step 1 | done | ILD track shows 4-decade log grid at 0.2 · 2 · 20 · 200 · 2000 | pending |
 | Step 2 | pending | - | - |
 | Step 3 | pending | - | - |
 | Step 4 | pending | - | - |
@@ -22,9 +22,9 @@
 ## Task Checklist
 
 ### Step 1 - Logarithmic grid renderer
-- [ ] 1.1 Add `drawLogarithmicGrid(ctx, xScale, decades, width, height, color)` to `src/renderers/gridRenderer.ts`
-- [ ] 1.2 Update `DataTrack.tsx`: call `drawLogarithmicGrid` when `config.scaleType === 'logarithmic'`
-- [ ] 1.3 Verify: ILD (Resistivity) track shows 4-decade log grid lines at 0.2 · 2 · 20 · 200 · 2000
+- [x] 1.1 Add `drawLogarithmicGrid(ctx, xScale, decades, width, height, color)` to `src/renderers/gridRenderer.ts`
+- [x] 1.2 Update `DataTrack.tsx`: call `drawLogarithmicGrid` when `config.scaleType === 'logarithmic'`
+- [x] 1.3 Verify: ILD (Resistivity) track shows 4-decade log grid lines at 0.2 · 2 · 20 · 200 · 2000
 
 ### Step 2 - Multi-curve track configs
 - [ ] 2.1 Add `CALI` curve to GR track config (`GR` green + `CALI` black dashed, 6–16 in)
@@ -75,6 +75,10 @@
 ## Detailed step specifications
 
 ### Step 1 - Logarithmic grid renderer
+
+Status: done
+Verification: ILD track displays vertical lines at 0.2, 2, 20, 200, 2000 with minor subdivisions between each decade
+Commit: pending
 
 Add to `src/renderers/gridRenderer.ts`:
 
@@ -404,3 +408,7 @@ Step 8 (track resize)         ← can run parallel with Step 7
 - `1:200` / `1:500` / `1:1000` buttons in topbar snap to the correct scale
 - Track width resizable by drag; header and canvas resize together; minimum 80 px
 - `npx tsc --noEmit` — zero errors
+
+
+
+

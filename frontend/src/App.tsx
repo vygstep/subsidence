@@ -22,7 +22,7 @@ const DEFAULT_TRACKS: TrackConfig[] = [
     width: 200,
     scaleType: 'logarithmic',
     gridDivisions: 4,
-    showGrid: false,
+    showGrid: true,
     curves: [
       { mnemonic: 'ILD', unit: 'ohm.m', color: '#ef4444', lineWidth: 1.5, lineStyle: 'solid', scaleMin: 0.2, scaleMax: 2000, scaleReversed: false },
     ],

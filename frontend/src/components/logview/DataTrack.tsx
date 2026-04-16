@@ -1,8 +1,8 @@
-﻿import { scaleLinear, scaleLog, type ScaleLinear, type ScaleLogarithmic } from 'd3-scale'
+import { scaleLinear, scaleLog, type ScaleLinear, type ScaleLogarithmic } from 'd3-scale'
 import { useMemo } from 'react'
 
 import { useCanvasRenderer, useDepthScale } from '@/hooks'
-import { drawCurve, drawDepthGridlines, drawLinearGrid } from '@/renderers'
+import { drawCurve, drawDepthGridlines, drawLinearGrid, drawLogarithmicGrid } from '@/renderers'
 import type { CurveConfig, CurveData, TrackConfig } from '@/types'
 import { useViewStore } from '@/stores'
 
@@ -101,17 +101,16 @@ export function DataTrack({ config, curves, width, height }: DataTrackProps) {
 
   const { scale: depthScale } = useDepthScale(visibleDepthRange, height)
 
-  // One value scale per curve — each curve may have different scaleMin/scaleMax/reversed.
   const curveScales = useMemo(() => {
     return new Map<string, ScaleLinear<number, number> | ScaleLogarithmic<number, number>>(
-      config.curves.map((c) => {
-        const range: [number, number] = c.scaleReversed ? [width, 0] : [0, width]
-        const domain: [number, number] = [c.scaleMin, c.scaleMax]
+      config.curves.map((curveConfig) => {
+        const range: [number, number] = curveConfig.scaleReversed ? [width, 0] : [0, width]
+        const domain: [number, number] = [curveConfig.scaleMin, curveConfig.scaleMax]
         const scale =
           config.scaleType === 'logarithmic'
             ? scaleLog().domain(domain).range(range)
             : scaleLinear().domain(domain).range(range)
-        return [c.mnemonic, scale]
+        return [curveConfig.mnemonic, scale]
       }),
     )
   }, [config.curves, config.scaleType, width])
@@ -121,18 +120,30 @@ export function DataTrack({ config, curves, width, height }: DataTrackProps) {
       ctx.fillStyle = '#ffffff'
       ctx.fillRect(0, 0, canvasWidth, canvasHeight)
 
-      if (config.showGrid && config.scaleType === 'linear') {
+      if (config.showGrid) {
         const primaryMnemonic = config.curves[0]?.mnemonic
         const primaryScale = primaryMnemonic ? curveScales.get(primaryMnemonic) : undefined
+
         if (primaryScale) {
-          drawLinearGrid(
-            ctx,
-            primaryScale as ScaleLinear<number, number>,
-            config.gridDivisions,
-            canvasWidth,
-            canvasHeight,
-            '#d5e1ec',
-          )
+          if (config.scaleType === 'logarithmic') {
+            drawLogarithmicGrid(
+              ctx,
+              primaryScale as ScaleLogarithmic<number, number>,
+              config.gridDivisions,
+              canvasWidth,
+              canvasHeight,
+              '#d5e1ec',
+            )
+          } else {
+            drawLinearGrid(
+              ctx,
+              primaryScale as ScaleLinear<number, number>,
+              config.gridDivisions,
+              canvasWidth,
+              canvasHeight,
+              '#d5e1ec',
+            )
+          }
         }
       }
 
@@ -140,11 +151,14 @@ export function DataTrack({ config, curves, width, height }: DataTrackProps) {
 
       clippedCurves.forEach(({ curve, style }) => {
         const valueScale = curveScales.get(style.mnemonic)
-        if (!valueScale) return
+        if (!valueScale) {
+          return
+        }
+
         drawCurve(ctx, curve.depths, curve.values, depthScale, valueScale, style, curve.null_value)
       })
     },
-    [clippedCurves, config.gridDivisions, config.showGrid, config.scaleType, config.curves, curveScales, depthScale],
+    [clippedCurves, config.curves, config.gridDivisions, config.scaleType, config.showGrid, curveScales, depthScale],
   )
 
   return <canvas ref={canvasRef} className="data-track" style={{ width, height }} />
