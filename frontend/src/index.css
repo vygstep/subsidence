@@ -238,11 +238,10 @@ textarea {
   gap: 5px;
 }
 
-.curve-scale-bar__swatch {
-  width: 16px;
-  height: 3px;
-  border-radius: 2px;
-  flex-shrink: 0;
+.curve-scale-bar__line {
+  flex: 1;
+  height: 2px;
+  border-radius: 1px;
 }
 
 .curve-scale-bar__mnemonic {

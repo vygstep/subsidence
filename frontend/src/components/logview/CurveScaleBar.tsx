@@ -11,9 +11,10 @@ export function CurveScaleBar({ curve }: CurveScaleBarProps) {
   return (
     <div className="curve-scale-bar">
       <div className="curve-scale-bar__header">
-        <span className="curve-scale-bar__swatch" style={{ background: curve.color }} />
+        <span className="curve-scale-bar__line" style={{ background: curve.color }} />
         <span className="curve-scale-bar__mnemonic">{curve.mnemonic}</span>
-        <span className="curve-scale-bar__unit">{curve.unit}</span>
+        {curve.unit && <span className="curve-scale-bar__unit">{curve.unit}</span>}
+        <span className="curve-scale-bar__line" style={{ background: curve.color }} />
       </div>
       <div className="curve-scale-bar__range" style={{ color: curve.color }}>
         <span>{left}</span>
