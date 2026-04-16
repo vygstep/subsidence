@@ -5,6 +5,10 @@ export function useCanvasRenderer(
   deps: unknown[],
 ): React.RefObject<HTMLCanvasElement | null> {
   const canvasRef = useRef<HTMLCanvasElement | null>(null)
+  // Keep draw in a ref so the effect never needs to re-subscribe when the
+  // draw callback changes — only the data deps below trigger a new frame.
+  const drawRef = useRef(draw)
+  drawRef.current = draw
 
   useEffect(() => {
     const canvas = canvasRef.current
@@ -40,7 +44,7 @@ export function useCanvasRenderer(
       context.setTransform(1, 0, 0, 1, 0, 0)
       context.clearRect(0, 0, canvas.width, canvas.height)
       context.scale(ratio, ratio)
-      draw(context, width, height)
+      drawRef.current(context, width, height)
     }
 
     const queueRender = () => {
@@ -60,7 +64,9 @@ export function useCanvasRenderer(
       cancelAnimationFrame(frameId)
       observer.disconnect()
     }
-  }, [draw, ...deps])
+  // Data deps drive re-renders; draw itself is stable via drawRef.
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, deps)
 
   return canvasRef
 }
