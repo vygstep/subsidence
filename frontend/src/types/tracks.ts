@@ -1,4 +1,4 @@
-﻿export interface TrackConfig {
+export interface TrackConfig {
   id: string
   title: string
   width: number
@@ -6,6 +6,15 @@
   scaleType: 'linear' | 'logarithmic'
   gridDivisions: number
   showGrid: boolean
+}
+
+export interface CurveFillConfig {
+  type: 'to-baseline' | 'between-curves' | 'crossover'
+  baseline?: number
+  pairedCurve?: string
+  colorPositive: string
+  colorNegative: string
+  opacity: number
 }
 
 export interface CurveConfig {
@@ -17,4 +26,5 @@ export interface CurveConfig {
   scaleMin: number
   scaleMax: number
   scaleReversed: boolean
+  fill?: CurveFillConfig
 }

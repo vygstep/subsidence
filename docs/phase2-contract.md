@@ -10,7 +10,7 @@
 |---|---|---|---|
 | Step 1 | done | ILD track shows 4-decade log grid at 0.2 · 2 · 20 · 200 · 2000 | pending |
 | Step 2 | done | GR track shows GR+CALI; Porosity shows RHOB+reversed NPHI | pending |
-| Step 3 | pending | - | - |
+| Step 3 | done | `npx tsc --noEmit` passes with zero errors | pending |
 | Step 4 | pending | - | - |
 | Step 5 | pending | - | - |
 | Step 6 | pending | - | - |
@@ -33,9 +33,9 @@
 - [x] 2.4 Verify: GR track shows two curves; Porosity track shows two curves with correct reversed NPHI
 
 ### Step 3 - CurveFillConfig type
-- [ ] 3.1 Add `CurveFillConfig` interface to `src/types/tracks.ts`
-- [ ] 3.2 Add optional `fill?: CurveFillConfig` field to `CurveConfig`
-- [ ] 3.3 Verify: `npx tsc --noEmit` passes with zero errors
+- [x] 3.1 Add `CurveFillConfig` interface to `src/types/tracks.ts`
+- [x] 3.2 Add optional `fill?: CurveFillConfig` field to `CurveConfig`
+- [x] 3.3 Verify: `npx tsc --noEmit` passes with zero errors
 
 ### Step 4 - fillRenderer.ts
 - [ ] 4.1 Write `src/renderers/fillRenderer.ts`: `drawFillToBaseline`
@@ -130,7 +130,12 @@ Update `DEFAULT_TRACKS` in `App.tsx`:
 
 ### Step 3 - CurveFillConfig type
 
-Add to `src/types/tracks.ts`:
+Status: done
+Verification: 
+px tsc --noEmit passes with zero errors
+Commit: pending
+
+Add to src/types/tracks.ts:
 
 ```ts
 export interface CurveFillConfig {
@@ -412,6 +417,7 @@ Step 8 (track resize)         ← can run parallel with Step 7
 - `1:200` / `1:500` / `1:1000` buttons in topbar snap to the correct scale
 - Track width resizable by drag; header and canvas resize together; minimum 80 px
 - `npx tsc --noEmit` — zero errors
+
 
 
 
