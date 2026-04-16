@@ -1,6 +1,7 @@
-﻿import { useMemo } from 'react'
+﻿import { scaleLinear, scaleLog, type ScaleLinear, type ScaleLogarithmic } from 'd3-scale'
+import { useMemo } from 'react'
 
-import { useCanvasRenderer, useDepthScale, useValueScale } from '@/hooks'
+import { useCanvasRenderer, useDepthScale } from '@/hooks'
 import { drawCurve, drawDepthGridlines, drawLinearGrid } from '@/renderers'
 import type { CurveConfig, CurveData, TrackConfig } from '@/types'
 import { useViewStore } from '@/stores'
@@ -99,31 +100,51 @@ export function DataTrack({ config, curves, width, height }: DataTrackProps) {
   )
 
   const { scale: depthScale } = useDepthScale(visibleDepthRange, height)
-  const primaryStyle = config.curves[0]
-  const { scale: valueScale } = useValueScale(
-    primaryStyle?.scaleMin ?? 0,
-    primaryStyle?.scaleMax ?? 150,
-    width,
-    config.scaleType,
-    primaryStyle?.scaleReversed ?? false,
-  )
+
+  // One value scale per curve — each curve may have different scaleMin/scaleMax/reversed.
+  const curveScales = useMemo(() => {
+    return new Map<string, ScaleLinear<number, number> | ScaleLogarithmic<number, number>>(
+      config.curves.map((c) => {
+        const range: [number, number] = c.scaleReversed ? [width, 0] : [0, width]
+        const domain: [number, number] = [c.scaleMin, c.scaleMax]
+        const scale =
+          config.scaleType === 'logarithmic'
+            ? scaleLog().domain(domain).range(range)
+            : scaleLinear().domain(domain).range(range)
+        return [c.mnemonic, scale]
+      }),
+    )
+  }, [config.curves, config.scaleType, width])
 
   const canvasRef = useCanvasRenderer(
     (ctx, canvasWidth, canvasHeight) => {
       ctx.fillStyle = '#ffffff'
       ctx.fillRect(0, 0, canvasWidth, canvasHeight)
 
-      if (config.showGrid) {
-        drawLinearGrid(ctx, valueScale, config.gridDivisions, canvasWidth, canvasHeight, '#d5e1ec')
+      if (config.showGrid && config.scaleType === 'linear') {
+        const primaryMnemonic = config.curves[0]?.mnemonic
+        const primaryScale = primaryMnemonic ? curveScales.get(primaryMnemonic) : undefined
+        if (primaryScale) {
+          drawLinearGrid(
+            ctx,
+            primaryScale as ScaleLinear<number, number>,
+            config.gridDivisions,
+            canvasWidth,
+            canvasHeight,
+            '#d5e1ec',
+          )
+        }
       }
 
       drawDepthGridlines(ctx, depthScale, canvasWidth, 100, 10)
 
       clippedCurves.forEach(({ curve, style }) => {
+        const valueScale = curveScales.get(style.mnemonic)
+        if (!valueScale) return
         drawCurve(ctx, curve.depths, curve.values, depthScale, valueScale, style, curve.null_value)
       })
     },
-    [clippedCurves, config.gridDivisions, config.showGrid, depthScale, valueScale],
+    [clippedCurves, config.gridDivisions, config.showGrid, config.scaleType, config.curves, curveScales, depthScale],
   )
 
   return <canvas ref={canvasRef} className="data-track" style={{ width, height }} />
