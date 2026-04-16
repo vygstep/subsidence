@@ -11,7 +11,7 @@
 | Step 1 | done | ILD track shows 4-decade log grid at 0.2 · 2 · 20 · 200 · 2000 | pending |
 | Step 2 | done | GR track shows GR+CALI; Porosity shows RHOB+reversed NPHI | pending |
 | Step 3 | done | `npx tsc --noEmit` passes with zero errors | pending |
-| Step 4 | pending | - | - |
+| Step 4 | done | fillRenderer builds cleanly and renderers contain zero React imports | pending |
 | Step 5 | pending | - | - |
 | Step 6 | pending | - | - |
 | Step 7 | pending | - | - |
@@ -38,10 +38,10 @@
 - [x] 3.3 Verify: `npx tsc --noEmit` passes with zero errors
 
 ### Step 4 - fillRenderer.ts
-- [ ] 4.1 Write `src/renderers/fillRenderer.ts`: `drawFillToBaseline`
-- [ ] 4.2 Write `drawFillBetweenCurves` with crossover detection in `fillRenderer.ts`
-- [ ] 4.3 Export from `src/renderers/index.ts`
-- [ ] 4.4 Verify: renderers are pure functions (no React imports); crossover detection switches fill colour at intersection points
+- [x] 4.1 Write `src/renderers/fillRenderer.ts`: `drawFillToBaseline`
+- [x] 4.2 Write `drawFillBetweenCurves` with crossover detection in `fillRenderer.ts`
+- [x] 4.3 Export from `src/renderers/index.ts`
+- [x] 4.4 Verify: renderers are pure functions (no React imports); crossover detection switches fill colour at intersection points
 
 ### Step 5 - Wire fills in DataTrack
 - [ ] 5.1 Update `DataTrack.tsx`: before drawing curves, call fill renderers for any `CurveConfig` with `fill` defined
@@ -157,7 +157,12 @@ fill?: CurveFillConfig
 
 ### Step 4 - fillRenderer.ts
 
-Create `src/renderers/fillRenderer.ts`:
+Status: done
+Verification: 
+px tsc --noEmit passes, build passes, and renderer files contain zero React imports
+Commit: pending
+
+Create src/renderers/fillRenderer.ts:
 
 ```ts
 export function drawFillToBaseline(
@@ -417,6 +422,7 @@ Step 8 (track resize)         ← can run parallel with Step 7
 - `1:200` / `1:500` / `1:1000` buttons in topbar snap to the correct scale
 - Track width resizable by drag; header and canvas resize together; minimum 80 px
 - `npx tsc --noEmit` — zero errors
+
 
 
 

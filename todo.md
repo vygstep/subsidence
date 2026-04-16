@@ -28,7 +28,7 @@ Primary references:
 - [x] C14 Execute Phase 2 Step 1: logarithmic grid renderer
 - [x] C15 Execute Phase 2 Step 2: multi-curve track configs
 - [x] C16 Execute Phase 2 Step 3: CurveFillConfig type
-- [ ] C17 Execute Phase 2 Step 4: fill renderer
+- [x] C17 Execute Phase 2 Step 4: fill renderer
 - [ ] C18 Execute Phase 2 Step 5: wire fills in DataTrack
 - [ ] C19 Execute Phase 2 Step 6: FormationColumn
 - [ ] C20 Execute Phase 2 Step 7: depth scale presets
@@ -36,7 +36,8 @@ Primary references:
 
 ## Immediate Next Step
 
-Execute Phase 2 Step 4: fill renderer.
+Execute Phase 2 Step 5: wire fills in DataTrack.
+
 
 
 

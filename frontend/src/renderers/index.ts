@@ -1,3 +1,4 @@
-﻿export * from './curveRenderer'
+export * from './curveRenderer'
 export * from './depthLabelsRenderer'
+export * from './fillRenderer'
 export * from './gridRenderer'
