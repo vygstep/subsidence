@@ -42,7 +42,7 @@ textarea {
 }
 
 .app-card {
-  width: min(680px, 100%);
+  width: min(820px, 100%);
   padding: 40px;
   border: 1px solid #d6e0eb;
   border-radius: 24px;
@@ -102,8 +102,59 @@ textarea {
   color: #17212b;
 }
 
+.wave-panel {
+  margin-top: 24px;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(320px, 520px);
+  gap: 20px;
+  align-items: center;
+}
+
+.wave-panel__copy {
+  min-width: 0;
+}
+
+.wave-panel__eyebrow {
+  margin: 0 0 10px;
+  font-size: 0.74rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: #6a7d90;
+}
+
+.wave-panel__title {
+  margin: 0;
+  font-size: 1.35rem;
+}
+
+.wave-panel__text {
+  margin: 12px 0 0;
+  color: #43586d;
+  line-height: 1.6;
+}
+
+.wave-canvas {
+  width: 100%;
+  height: 180px;
+  display: block;
+  border-radius: 18px;
+  background: #ffffff;
+}
+
 .app-error {
   margin: 20px 0 0;
   color: #b42318;
   font-weight: 600;
+}
+
+@media (max-width: 760px) {
+  .app-card {
+    padding: 28px;
+  }
+
+  .app-status-grid,
+  .wave-panel {
+    grid-template-columns: 1fr;
+  }
 }
