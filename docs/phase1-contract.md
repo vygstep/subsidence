@@ -27,9 +27,9 @@ Each step ends with a `вњ“` verification task. Do not move to the next step 
 - [x] 3.вњ“ **Verify**: `curl http://localhost:8000/api/wells/sample` returns JSON with at least one curve
 
 ### Step 4 вЂ” Zustand stores
-- [ ] 4.1 Write `src/stores/wellDataStore.ts` with `loadWell` (fetch + Float32Array conversion)
-- [ ] 4.2 Write `src/stores/viewStore.ts` with `scrollDepth`, `depthPerPixel`, `visibleDepthRange`
-- [ ] 4.вњ“ **Verify**: `loadWell("sample")` logs curves as `Float32Array` in browser console
+- [x] 4.1 Write `src/stores/wellDataStore.ts` with `loadWell` (fetch + Float32Array conversion)
+- [x] 4.2 Write `src/stores/viewStore.ts` with `scrollDepth`, `depthPerPixel`, `visibleDepthRange`
+- [x] 4.вњ“ **Verify**: `loadWell("sample")` logs curves as `Float32Array` in browser console
 
 ### Step 5 вЂ” Canvas hooks
 - [ ] 5.1 Write `src/hooks/useCanvasRenderer.ts`: RAF + `devicePixelRatio` + `ResizeObserver`
@@ -320,6 +320,7 @@ Steps 1вЂ“3 are independent of each other. Step 4 requires both Step 2 (type
 - Sticky track headers visible at all scroll positions
 - Mouse-wheel scrolls all tracks in sync, 60 fps, no visual artifacts
 - `npx tsc --noEmit` вЂ” zero type errors
+
 
 
 

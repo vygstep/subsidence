@@ -17,7 +17,7 @@ Primary references:
 - [x] C4 Execute Phase 1 Step 1: frontend scaffold
 - [x] C5 Execute Phase 1 Step 2: TypeScript types
 - [x] C6 Execute Phase 1 Step 3: FastAPI well endpoint
-- [ ] C7 Execute Phase 1 Step 4: Zustand stores
+- [x] C7 Execute Phase 1 Step 4: Zustand stores
 - [ ] C8 Execute Phase 1 Step 5: Canvas hooks
 - [ ] C9 Execute Phase 1 Step 6: pure renderers
 - [ ] C10 Execute Phase 1 Step 7: DepthTrack
@@ -27,4 +27,4 @@ Primary references:
 
 ## Immediate Next Step
 
-Execute Phase 1 Step 4: Zustand stores.
+Execute Phase 1 Step 5: Canvas hooks.

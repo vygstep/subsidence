@@ -71,3 +71,39 @@ textarea {
   line-height: 1.65;
   color: #43586d;
 }
+
+.app-status-grid {
+  margin: 28px 0 0;
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 16px;
+}
+
+.app-status-grid div {
+  padding: 16px 18px;
+  border: 1px solid #d6e0eb;
+  border-radius: 16px;
+  background: #f8fbfe;
+}
+
+.app-status-grid dt {
+  margin: 0;
+  font-size: 0.74rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: #6a7d90;
+}
+
+.app-status-grid dd {
+  margin: 8px 0 0;
+  font-size: 1.05rem;
+  font-weight: 600;
+  color: #17212b;
+}
+
+.app-error {
+  margin: 20px 0 0;
+  color: #b42318;
+  font-weight: 600;
+}
