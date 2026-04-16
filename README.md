@@ -33,5 +33,7 @@ Out of scope for the current phase:
 - [Compass Strategy](docs/app_compass.md)
 - [Phase 1 Contract](docs/phase1-contract.md)
 - [Current Truth](docs/current-truth.md)
+- [Reference Sources](docs/reference-sources.md)
 - [Decision ADR](docs/decisions/ADR-001-compass-phase1-reset.md)
 - [Execution Backlog](todo.md)
+

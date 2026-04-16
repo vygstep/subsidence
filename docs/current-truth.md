@@ -27,6 +27,7 @@ This document defines what is currently treated as true for the active project.
 
 - `docs/app_compass.md` is the strategy document.
 - `docs/phase1-contract.md` is the implementation contract.
+- `docs/reference-sources.md` defines the active knowledge sources.
 - `docs/decisions/` holds current architectural decisions.
 - `todo.md` holds the ordered execution backlog.
 - `subsidence_archive/` holds legacy reference material.
