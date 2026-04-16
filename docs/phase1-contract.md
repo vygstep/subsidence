@@ -16,10 +16,9 @@ Each step ends with a `вњ“` verification task. Do not move to the next step 
 - [x] 1.5 Create full `src/` directory tree + empty `index.ts` barrel files
 - [x] 1.вњ“ **Verify**: `npm run dev` serves blank app with no console errors
 ### Step 2 вЂ” TypeScript types
-- [ ] 2.1 Write `src/types/well.ts`: `Well`, `CurveData`, `FormationTop`, `LithologyType`
-- [ ] 2.2 Write `src/types/tracks.ts`: `TrackConfig`, `CurveConfig`
-- [ ] 2.вњ“ **Verify**: `npx tsc --noEmit` passes with zero errors
-
+- [x] 2.1 Write `src/types/well.ts`: `Well`, `CurveData`, `FormationTop`, `LithologyType`
+- [x] 2.2 Write `src/types/tracks.ts`: `TrackConfig`, `CurveConfig`
+- [x] 2.вњ“ **Verify**: `npx tsc --noEmit` passes with zero errors
 ### Step 3 вЂ” FastAPI well data endpoint
 - [ ] 3.1 Add sample LAS file to `app/data/sample.las`
 - [ ] 3.2 Add CORS middleware to `app/src/subsidence/api/main.py`
@@ -66,71 +65,9 @@ Each step ends with a `вњ“` verification task. Do not move to the next step 
 - [x] 1.5 Create full `src/` directory tree + empty `index.ts` barrel files
 - [x] 1.вњ“ **Verify**: `npm run dev` serves blank app with no console errors
 ### Step 2 вЂ” TypeScript types
-
-**`src/types/well.ts`** вЂ” field names in `snake_case` to match the Python models:
-
-```ts
-interface Well {
-  well_id: string;
-  well_name: string;
-  kb_elev: number;
-  td_md: number;
-  x: number;
-  y: number;
-  crs: string;
-}
-
-interface CurveData {
-  mnemonic: string;
-  unit: string;
-  depths: Float32Array;
-  values: Float32Array;
-  null_value: number;
-}
-
-interface FormationTop {
-  id: string;
-  name: string;
-  depth_md: number;
-  age_ma?: number;
-  color: string;
-  is_locked: boolean;
-  lithology?: LithologyType;
-}
-
-type LithologyType =
-  | 'sandstone' | 'shale' | 'limestone' | 'dolomite'
-  | 'evaporite' | 'igneous' | 'metamorphic' | 'coal' | 'conglomerate';
-```
-
-**`src/types/tracks.ts`** вЂ” exactly as in app_compass.md:
-
-```ts
-interface TrackConfig {
-  id: string;
-  title: string;
-  width: number;
-  curves: CurveConfig[];
-  scaleType: 'linear' | 'logarithmic';
-  gridDivisions: number;
-  showGrid: boolean;
-}
-
-interface CurveConfig {
-  mnemonic: string;
-  color: string;
-  lineWidth: number;
-  lineStyle: 'solid' | 'dashed' | 'dotted';
-  scaleMin: number;
-  scaleMax: number;
-  scaleReversed: boolean;
-}
-```
-
-**Acceptance criteria:** `npx tsc --noEmit` passes with zero errors.
-
----
-
+- [x] 2.1 Write `src/types/well.ts`: `Well`, `CurveData`, `FormationTop`, `LithologyType`
+- [x] 2.2 Write `src/types/tracks.ts`: `TrackConfig`, `CurveConfig`
+- [x] 2.вњ“ **Verify**: `npx tsc --noEmit` passes with zero errors
 ### Step 3 вЂ” FastAPI: well data endpoint
 
 **`app/src/subsidence/api/main.py`** вЂ” add CORS + mount the wells router:
@@ -383,6 +320,7 @@ Steps 1вЂ“3 are independent of each other. Step 4 requires both Step 2 (type
 - Sticky track headers visible at all scroll positions
 - Mouse-wheel scrolls all tracks in sync, 60 fps, no visual artifacts
 - `npx tsc --noEmit` вЂ” zero type errors
+
 
 
 
