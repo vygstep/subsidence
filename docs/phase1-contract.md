@@ -14,8 +14,8 @@
 | Step 4 | done | `loadWell("sample")` logs curves as `Float32Array` in browser console | `40f0847` |
 | Step 5 | done | test component renders sine wave; no flicker on window resize | `e02d07c` |
 | Step 6 | done | renderers have zero React imports and build passes | `577bb81` |
-| Step 7 | done | depth labels preview shows 1000 m, 1100 m, 1200 m at the expected range | pending |
-| Step 8 | pending | - | - |
+| Step 7 | done | depth labels preview shows 1000 m, 1100 m, 1200 m at the expected range | `afe9034` |
+| Step 8 | done | GR data track preview renders 0-150 API; no crash past data end | pending |
 | Step 9 | pending | - | - |
 | Step 10 | pending | - | - |
 
@@ -302,7 +302,7 @@ interface ViewStore {
 
 Status: done
 Verification: sine-wave canvas renders and remains stable on window resize
-Commit: pending
+Commit: `e02d07c`
 
 Implement:
 
@@ -319,7 +319,11 @@ Requirements:
 
 ---
 
-## Step 6 - Renderers (pure functions, no React)`r`n`r`nStatus: done`r`nVerification: renderers have zero React imports and draw via plain function calls`r`nCommit: pending
+## Step 6 - Renderers (pure functions, no React)
+
+Status: done
+Verification: renderers have zero React imports and draw via plain function calls
+Commit: `577bb81`
 
 Implement:
 
@@ -361,7 +365,11 @@ drawDepthLabels(ctx, depthScale, width, majorInterval): void
 
 ---
 
-## Step 7 - DepthTrack`r`n`r`nStatus: done`r`nVerification: with `scrollDepth=1000` and `depthPerPixel=0.2`, labels align correctly`r`nCommit: pending
+## Step 7 - DepthTrack
+
+Status: done
+Verification: with `scrollDepth=1000` and `depthPerPixel=0.2`, labels align correctly
+Commit: `afe9034`
 
 Implement `src/components/logview/DepthTrack.tsx`.
 
@@ -378,9 +386,9 @@ Requirements:
 
 ## Step 8 - DataTrack
 
-Status: pending
+Status: done
 Verification: GR track renders correctly and disappears cleanly outside data bounds
-Commit: -
+Commit: pending
 
 Implement `src/components/logview/DataTrack.tsx`.
 
@@ -490,5 +498,6 @@ Step 10 (LogViewPanel + scroll)
 - sticky track headers visible at all scroll positions
 - mouse-wheel scrolls all tracks in sync at 60 fps with no visual artifacts
 - `npx tsc --noEmit` reports zero type errors
+
 
 

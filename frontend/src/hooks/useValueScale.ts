@@ -1,4 +1,5 @@
 ﻿import { scaleLinear, scaleLog, type ScaleLinear, type ScaleLogarithmic } from 'd3-scale'
+import { useMemo } from 'react'
 
 interface ValueScaleResult {
   valueToPixel: (value: number) => number
@@ -13,12 +14,14 @@ export function useValueScale(
   scaleType: 'linear' | 'logarithmic',
   reversed = false,
 ): ValueScaleResult {
-  const range: [number, number] = reversed ? [trackWidth, 0] : [0, trackWidth]
-  const domain: [number, number] = [scaleMin, scaleMax]
+  const scale = useMemo(() => {
+    const range: [number, number] = reversed ? [trackWidth, 0] : [0, trackWidth]
+    const domain: [number, number] = [scaleMin, scaleMax]
 
-  const scale = scaleType === 'logarithmic'
-    ? scaleLog().domain(domain).range(range)
-    : scaleLinear().domain(domain).range(range)
+    return scaleType === 'logarithmic'
+      ? scaleLog().domain(domain).range(range)
+      : scaleLinear().domain(domain).range(range)
+  }, [reversed, scaleMax, scaleMin, scaleType, trackWidth])
 
   return {
     valueToPixel: (value) => scale(value),

@@ -1,9 +1,30 @@
 ﻿import { useEffect } from 'react'
 
-import { DepthTrack } from '@/components'
+import { DataTrack, DepthTrack } from '@/components'
 import { useCanvasRenderer, useDepthScale, useValueScale } from '@/hooks'
 import { drawCurve, drawDepthGridlines, drawDepthLabels, drawLinearGrid } from '@/renderers'
 import { useViewStore, useWellDataStore } from '@/stores'
+import type { TrackConfig } from '@/types'
+
+const grTrackConfig: TrackConfig = {
+  id: 'gr-track',
+  title: 'Gamma Ray',
+  width: 420,
+  scaleType: 'linear',
+  gridDivisions: 3,
+  showGrid: true,
+  curves: [
+    {
+      mnemonic: 'GR',
+      color: '#1f9d55',
+      lineWidth: 2,
+      lineStyle: 'solid',
+      scaleMin: 0,
+      scaleMax: 150,
+      scaleReversed: false,
+    },
+  ],
+}
 
 function SineWavePreview() {
   const { scale: yScale } = useDepthScale({ min: 0, max: 1 }, 180)
@@ -56,6 +77,36 @@ function DepthTrackPreview() {
       </div>
       <div className="depth-proof__trackWrap">
         <DepthTrack />
+      </div>
+    </section>
+  )
+}
+
+function DataTrackPreview() {
+  const setScroll = useViewStore((state) => state.setScroll)
+  const setScale = useViewStore((state) => state.setScale)
+  const visibleDepthRange = useViewStore((state) => state.visibleDepthRange)
+  const curves = useWellDataStore((state) => state.curves)
+
+  useEffect(() => {
+    setScroll(1000)
+    setScale(0.2)
+  }, [setScale, setScroll])
+
+  return (
+    <section className="data-proof">
+      <div className="data-proof__copy">
+        <p className="wave-panel__eyebrow">Data Track Proof</p>
+        <h2 className="wave-panel__title">GR Data Track Preview</h2>
+        <p className="wave-panel__text">
+          Step 8 verification track. It clips `GR` by visible depth, draws linear gridlines first, then renders the curve in green on a 0-150 API scale.
+        </p>
+        <p className="depth-proof__range">
+          Visible range: {visibleDepthRange.min.toFixed(0)} m - {visibleDepthRange.max.toFixed(0)} m
+        </p>
+      </div>
+      <div className="data-proof__trackWrap">
+        <DataTrack config={grTrackConfig} curves={curves} width={grTrackConfig.width} height={1000} />
       </div>
     </section>
   )
@@ -117,6 +168,7 @@ function App() {
           <SineWavePreview />
         </section>
         <DepthTrackPreview />
+        <DataTrackPreview />
         {error ? <p className="app-error">{error}</p> : null}
       </section>
     </main>

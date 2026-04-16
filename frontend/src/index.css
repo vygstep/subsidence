@@ -103,7 +103,8 @@ textarea {
 }
 
 .wave-panel,
-.depth-proof {
+.depth-proof,
+.data-proof {
   margin-top: 24px;
   display: grid;
   grid-template-columns: minmax(0, 1fr) minmax(320px, 520px);
@@ -112,7 +113,8 @@ textarea {
 }
 
 .wave-panel__copy,
-.depth-proof__copy {
+.depth-proof__copy,
+.data-proof__copy {
   min-width: 0;
 }
 
@@ -144,7 +146,8 @@ textarea {
   background: #ffffff;
 }
 
-.depth-proof__trackWrap {
+.depth-proof__trackWrap,
+.data-proof__trackWrap {
   display: flex;
   justify-content: center;
   padding: 16px;
@@ -157,6 +160,11 @@ textarea {
 
 .depth-track {
   width: 60px;
+  display: block;
+  background: #ffffff;
+}
+
+.data-track {
   display: block;
   background: #ffffff;
 }
@@ -180,7 +188,8 @@ textarea {
 
   .app-status-grid,
   .wave-panel,
-  .depth-proof {
+  .depth-proof,
+  .data-proof {
     grid-template-columns: 1fr;
   }
 }
