@@ -274,6 +274,26 @@ textarea {
   overflow: hidden;
 }
 
+/* ── LogViewPanel ──────────────────────────────────────── */
+
+.log-view-panel {
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  height: 100%;
+  background: #ffffff;
+  border: 1px solid #d6e0eb;
+  border-radius: 12px;
+  user-select: none;
+}
+
+.log-view-panel__tracks {
+  display: flex;
+  flex-direction: row;
+  flex: 1;
+  overflow: hidden;
+}
+
 @media (max-width: 760px) {
   .app-card {
     padding: 28px;

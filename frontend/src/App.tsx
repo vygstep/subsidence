@@ -1,11 +1,12 @@
-﻿import { useEffect } from 'react'
+﻿import { useEffect, useMemo } from 'react'
 
-import { DataTrack, DepthTrack, TrackHeaderRow } from '@/components'
+import { DataTrack, DepthTrack, LogViewPanel, TrackHeaderRow } from '@/components'
 import { useCanvasRenderer, useDepthScale, useValueScale } from '@/hooks'
 import { drawCurve, drawDepthGridlines, drawDepthLabels, drawLinearGrid } from '@/renderers'
 import { useViewStore, useWellDataStore } from '@/stores'
 import type { TrackConfig } from '@/types'
 
+// ── Step 9/10 preview: single GR track ─────────────────────────────────────
 const grTrackConfig: TrackConfig = {
   id: 'gr-track',
   title: 'Gamma Ray',
@@ -26,6 +27,37 @@ const grTrackConfig: TrackConfig = {
     },
   ],
 }
+
+// ── Step 10: default 4-track layout (Depth + GR + ILD + RHOB) ──────────────
+const DEFAULT_TRACKS: TrackConfig[] = [
+  {
+    id: 'gr',
+    title: 'Gamma Ray',
+    width: 200,
+    scaleType: 'linear',
+    gridDivisions: 3,
+    showGrid: true,
+    curves: [{ mnemonic: 'GR', unit: 'API', color: '#22c55e', lineWidth: 1.5, lineStyle: 'solid', scaleMin: 0, scaleMax: 150, scaleReversed: false }],
+  },
+  {
+    id: 'res',
+    title: 'Resistivity',
+    width: 200,
+    scaleType: 'logarithmic',
+    gridDivisions: 4,
+    showGrid: false,
+    curves: [{ mnemonic: 'ILD', unit: 'ohm.m', color: '#ef4444', lineWidth: 1.5, lineStyle: 'solid', scaleMin: 0.2, scaleMax: 2000, scaleReversed: false }],
+  },
+  {
+    id: 'por',
+    title: 'Porosity',
+    width: 200,
+    scaleType: 'linear',
+    gridDivisions: 3,
+    showGrid: true,
+    curves: [{ mnemonic: 'RHOB', unit: 'g/cc', color: '#ef4444', lineWidth: 1.5, lineStyle: 'solid', scaleMin: 1.95, scaleMax: 2.95, scaleReversed: false }],
+  },
+]
 
 function SineWavePreview() {
   const { scale: yScale } = useDepthScale({ min: 0, max: 1 }, 180)
@@ -139,6 +171,42 @@ function HeaderRowPreview() {
   )
 }
 
+function LogViewPanelPreview() {
+  const curves = useWellDataStore((state) => state.curves)
+
+  const { minDepth, maxDepth } = useMemo(() => {
+    if (curves.length === 0) return { minDepth: 0, maxDepth: 1000 }
+    let min = Infinity
+    let max = -Infinity
+    for (const c of curves) {
+      if (c.depths.length > 0) {
+        min = Math.min(min, c.depths[0])
+        max = Math.max(max, c.depths[c.depths.length - 1])
+      }
+    }
+    return { minDepth: min, maxDepth: max }
+  }, [curves])
+
+  return (
+    <section style={{ marginTop: 32 }}>
+      <p className="wave-panel__eyebrow">Log View Panel Proof</p>
+      <h2 className="wave-panel__title">Step 10 — Synchronized Scroll</h2>
+      <p className="wave-panel__text" style={{ marginBottom: 16 }}>
+        Four tracks (Depth · GR · ILD · RHOB) scroll in sync via mouse wheel.
+        Headers stay fixed. Scroll is clamped to data bounds.
+      </p>
+      <div style={{ height: 560 }}>
+        <LogViewPanel
+          tracks={DEFAULT_TRACKS}
+          curves={curves}
+          minDepth={minDepth}
+          maxDepth={maxDepth}
+        />
+      </div>
+    </section>
+  )
+}
+
 function App() {
   const loadWell = useWellDataStore((state) => state.loadWell)
   const well = useWellDataStore((state) => state.well)
@@ -197,6 +265,7 @@ function App() {
         <DepthTrackPreview />
         <DataTrackPreview />
         <HeaderRowPreview />
+        <LogViewPanelPreview />
         {error ? <p className="app-error">{error}</p> : null}
       </section>
     </main>

@@ -1,5 +1,6 @@
 ﻿export * from './CurveScaleBar'
 export * from './DataTrack'
 export * from './DepthTrack'
+export * from './LogViewPanel'
 export * from './TrackHeader'
 export * from './TrackHeaderRow'
