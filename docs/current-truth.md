@@ -5,8 +5,9 @@ This document defines what is currently treated as true for the active project.
 ## Active Scope
 
 - The project is now oriented around `docs/app_compass.md`.
-- The current build scope is defined by `docs/phase2-contract.md`.
-- The active goal is to complete Phase 2 before any Phase 3 persistence or editing work.
+- `Phase 2` is complete.
+- The current pre-Phase-3 scope is defined by `docs/data-contract-questions.md`.
+- The active goal is to resolve persistence and project-structure decisions before starting `Phase 3`.
 
 ## Active Architecture
 
@@ -20,7 +21,7 @@ This document defines what is currently treated as true for the active project.
 
 - Build the new version as the primary product path.
 - Keep the legacy version only as a knowledge source in `subsidence_archive/`.
-- Make decisions based on the current strategy and current phase contract.
+- Make decisions based on the current strategy and current active contract documents.
 - Prefer small checkpoints with explicit review before moving to the next implementation slice.
 - Use only the repository-local environment for active work: local `.venv` for Python and local system `node`/`npm` for frontend work.
 - Do not use the `ds` environment for SUBSIDENCE.
@@ -28,8 +29,8 @@ This document defines what is currently treated as true for the active project.
 ## Active Repository Landmarks
 
 - `docs/app_compass.md` is the strategy document.
-- `docs/phase2-contract.md` is the implementation contract.
-- `docs/data-contract-questions.md` defines the persistence questions that must be resolved after Phase 2 and before Phase 3.
+- `docs/phase2-contract.md` is the completed implementation contract for the current viewer baseline.
+- `docs/data-contract-questions.md` defines the active decision scope before `Phase 3`.
 - `docs/reference-sources.md` defines the active knowledge sources.
 - `docs/decisions/` holds current architectural decisions.
 - `todo.md` holds the ordered execution backlog.

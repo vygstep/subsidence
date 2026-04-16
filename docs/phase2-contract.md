@@ -2,6 +2,8 @@
 
 **Goal**: Multiple curves per track, logarithmic grid, reversed scales, area fills between curves, stratigraphy column, depth scale zoom presets, and track resize by drag.
 
+**Status**: Complete.
+
 ---
 
 ## Progress
@@ -15,7 +17,7 @@
 | Step 5 | done | Porosity shows crossover fill; GR track shows baseline shading | pending |
 | Step 6 | done | Formation column shows aligned lithology blocks with readable names | pending |
 | Step 7 | done | Ctrl+Wheel zooms depth axis; preset buttons snap to 1:200 / 1:500 / 1:1000 | pending |
-| Step 8 | done | Dragging a handle resizes the track and header together; minimum width stays at 80 px | pending |
+| Step 8 | done | Dragging a handle resizes the track and header together; minimum width stays at 80 px | `0fcac70` |
 
 ---
 
@@ -434,6 +436,7 @@ Step 8 (track resize)         < can run parallel with Step 7
 - `1:200` / `1:500` / `1:1000` buttons in topbar snap to the correct scale
 - Track width resizable by drag; header and canvas resize together; minimum 80 px
 - `npx tsc --noEmit` — zero errors
+
 
 
 

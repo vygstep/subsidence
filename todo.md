@@ -2,12 +2,13 @@
 
 ## Current Program
 
-Current program: Compass reset and Phase 2 multi-curve tracks and grids.
+Current program: post-Phase-2 data contract decisions before Phase 3.
 
 Primary references:
 
 - `docs/app_compass.md`
 - `docs/phase2-contract.md`
+- `docs/data-contract-questions.md`
 
 ## Checkpoints
 
@@ -34,14 +35,8 @@ Primary references:
 - [x] C20 Execute Phase 2 Step 7: depth scale presets
 - [x] C21 Execute Phase 2 Step 8: track resize via drag
 
+- [ ] C22 Resolve persistence and project-structure decisions for Phase 3
+
 ## Immediate Next Step
 
-Close Phase 2 and transition the active scope to post-Phase-2 data contract work.
-
-
-
-
-
-
-
-
+Answer the open persistence questions and record the Phase 3 storage contract.
