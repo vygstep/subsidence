@@ -12,8 +12,8 @@
 | Step 2 | done | `npx tsc --noEmit` passes with zero errors | `ce3a984` |
 | Step 3 | done | `curl http://localhost:8000/api/wells/sample` returns valid JSON with curves | `bd72ea3` |
 | Step 4 | done | `loadWell("sample")` logs curves as `Float32Array` in browser console | `40f0847` |
-| Step 5 | done | test component renders sine wave; no flicker on window resize | pending |
-| Step 6 | pending | - | - |
+| Step 5 | done | test component renders sine wave; no flicker on window resize | `e02d07c` |
+| Step 6 | done | renderers have zero React imports and build passes | pending |
 | Step 7 | pending | - | - |
 | Step 8 | pending | - | - |
 | Step 9 | pending | - | - |
@@ -55,10 +55,10 @@
 - [x] 5.4 Verify: test component renders sine wave; no flicker on window resize
 
 ### Step 6 - Renderers (pure functions)
-- [ ] 6.1 Write `src/renderers/gridRenderer.ts`: `drawLinearGrid` + `drawDepthGridlines`
-- [ ] 6.2 Write `src/renderers/curveRenderer.ts`: `drawCurve` with `Path2D`, null gap handling
-- [ ] 6.3 Write `src/renderers/depthLabelsRenderer.ts`: `drawDepthLabels`
-- [ ] 6.4 Verify: renderers have zero React imports; callable as plain functions
+- [x] 6.1 Write `src/renderers/gridRenderer.ts`: `drawLinearGrid` + `drawDepthGridlines`
+- [x] 6.2 Write `src/renderers/curveRenderer.ts`: `drawCurve` with `Path2D`, null gap handling
+- [x] 6.3 Write `src/renderers/depthLabelsRenderer.ts`: `drawDepthLabels`
+- [x] 6.4 Verify: renderers have zero React imports; callable as plain functions
 
 ### Step 7 - DepthTrack
 - [ ] 7.1 Write `src/components/logview/DepthTrack.tsx`: 60 px wide, depth labels + gridlines
@@ -319,11 +319,7 @@ Requirements:
 
 ---
 
-## Step 6 - Renderers (pure functions, no React)
-
-Status: pending
-Verification: renderers have zero React imports and draw via plain function calls
-Commit: -
+## Step 6 - Renderers (pure functions, no React)`r`n`r`nStatus: done`r`nVerification: renderers have zero React imports and draw via plain function calls`r`nCommit: pending
 
 Implement:
 
@@ -498,3 +494,4 @@ Step 10 (LogViewPanel + scroll)
 - sticky track headers visible at all scroll positions
 - mouse-wheel scrolls all tracks in sync at 60 fps with no visual artifacts
 - `npx tsc --noEmit` reports zero type errors
+

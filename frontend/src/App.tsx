@@ -1,37 +1,31 @@
 ﻿import { useEffect } from 'react'
 
 import { useCanvasRenderer, useDepthScale, useValueScale } from '@/hooks'
+import { drawCurve, drawDepthGridlines, drawDepthLabels, drawLinearGrid } from '@/renderers'
 import { useWellDataStore } from '@/stores'
 
 function SineWavePreview() {
   const { scale: yScale } = useDepthScale({ min: 0, max: 1 }, 180)
   const { scale: xScale } = useValueScale(-1, 1, 520, 'linear')
 
+  const depths = new Float32Array(Array.from({ length: 241 }, (_, index) => index / 240))
+  const values = new Float32Array(Array.from({ length: 241 }, (_, index) => Math.sin((index / 240) * Math.PI * 4)))
+
   const canvasRef = useCanvasRenderer(
     (ctx, width, height) => {
       ctx.fillStyle = '#ffffff'
       ctx.fillRect(0, 0, width, height)
 
-      ctx.strokeStyle = '#d6e0eb'
-      ctx.lineWidth = 1
-      ctx.strokeRect(0.5, 0.5, width - 1, height - 1)
-
-      ctx.beginPath()
-      for (let index = 0; index <= 240; index += 1) {
-        const t = index / 240
-        const x = xScale(Math.sin(t * Math.PI * 4))
-        const y = yScale(t)
-        if (index === 0) {
-          ctx.moveTo(x, y)
-        } else {
-          ctx.lineTo(x, y)
-        }
-      }
-      ctx.strokeStyle = '#2d6ca3'
-      ctx.lineWidth = 2
-      ctx.stroke()
+      drawLinearGrid(ctx, xScale, 4, width, height, '#e2e8f0')
+      drawDepthGridlines(ctx, yScale, width, 0.25, 0.125)
+      drawCurve(ctx, depths, values, yScale, xScale, {
+        color: '#2d6ca3',
+        lineWidth: 2,
+        lineStyle: 'solid',
+      })
+      drawDepthLabels(ctx, yScale, width, 0.25)
     },
-    [xScale, yScale],
+    [depths, values, xScale, yScale],
   )
 
   return <canvas ref={canvasRef} className="wave-canvas" />
@@ -87,7 +81,7 @@ function App() {
             <p className="wave-panel__eyebrow">Canvas Proof</p>
             <h2 className="wave-panel__title">Sine Wave Preview</h2>
             <p className="wave-panel__text">
-              Step 5 verification canvas. It exercises the shared canvas renderer and scale hooks before log tracks land.
+              Step 6 verification uses pure renderer functions. The preview now draws through `gridRenderer`, `curveRenderer`, and `depthLabelsRenderer`.
             </p>
           </div>
           <SineWavePreview />
