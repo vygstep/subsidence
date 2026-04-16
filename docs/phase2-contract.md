@@ -24,51 +24,51 @@
 ### Step 1 - Logarithmic grid renderer
 - [ ] 1.1 Add `drawLogarithmicGrid(ctx, xScale, decades, width, height, color)` to `src/renderers/gridRenderer.ts`
 - [ ] 1.2 Update `DataTrack.tsx`: call `drawLogarithmicGrid` when `config.scaleType === 'logarithmic'`
-- [ ] 1.✓ Verify: ILD (Resistivity) track shows 4-decade log grid lines at 0.2 · 2 · 20 · 200 · 2000
+- [ ] 1.3 Verify: ILD (Resistivity) track shows 4-decade log grid lines at 0.2 · 2 · 20 · 200 · 2000
 
 ### Step 2 - Multi-curve track configs
 - [ ] 2.1 Add `CALI` curve to GR track config (`GR` green + `CALI` black dashed, 6–16 in)
 - [ ] 2.2 Add `NPHI` curve to Porosity track config (`RHOB` red + `NPHI` blue dashed, reversed 0.45 → -0.15)
 - [ ] 2.3 Verify each curve in `DataTrack` uses its own scale (confirm via visual: NPHI runs right-to-left)
-- [ ] 2.✓ Verify: GR track shows two curves; Porosity track shows two curves with correct reversed NPHI
+- [ ] 2.4 Verify: GR track shows two curves; Porosity track shows two curves with correct reversed NPHI
 
 ### Step 3 - CurveFillConfig type
 - [ ] 3.1 Add `CurveFillConfig` interface to `src/types/tracks.ts`
 - [ ] 3.2 Add optional `fill?: CurveFillConfig` field to `CurveConfig`
-- [ ] 3.✓ Verify: `npx tsc --noEmit` passes with zero errors
+- [ ] 3.3 Verify: `npx tsc --noEmit` passes with zero errors
 
 ### Step 4 - fillRenderer.ts
 - [ ] 4.1 Write `src/renderers/fillRenderer.ts`: `drawFillToBaseline`
 - [ ] 4.2 Write `drawFillBetweenCurves` with crossover detection in `fillRenderer.ts`
 - [ ] 4.3 Export from `src/renderers/index.ts`
-- [ ] 4.✓ Verify: renderers are pure functions (no React imports); crossover detection switches fill colour at intersection points
+- [ ] 4.4 Verify: renderers are pure functions (no React imports); crossover detection switches fill colour at intersection points
 
 ### Step 5 - Wire fills in DataTrack
 - [ ] 5.1 Update `DataTrack.tsx`: before drawing curves, call fill renderers for any `CurveConfig` with `fill` defined
 - [ ] 5.2 Add crossover fill config to Porosity track: NPHI > RHOB → yellow (gas), NPHI < RHOB → grey
 - [ ] 5.3 Add baseline fill config to GR track: left of 75 API → sand-yellow, right → grey-green
-- [ ] 5.✓ Verify: Porosity track shows yellow crossover fill; GR track shows baseline shading
+- [ ] 5.4 Verify: Porosity track shows yellow crossover fill; GR track shows baseline shading
 
 ### Step 6 - FormationColumn
 - [ ] 6.1 Write `src/renderers/lithologyRenderer.ts`: `drawLithologyBlock(ctx, pattern, x, y, w, h)` for sandstone, shale, limestone, dolomite
 - [ ] 6.2 Write `src/components/logview/FormationColumn.tsx`: reads `formations` from `wellDataStore`, draws coloured depth blocks + names
 - [ ] 6.3 Export from `src/components/logview/index.ts`
 - [ ] 6.4 Add `FormationColumn` to `LogViewPanel` as the rightmost track
-- [ ] 6.✓ Verify: formation column shows coloured blocks aligned with the correct depth range; names are readable
+- [ ] 6.5 Verify: formation column shows coloured blocks aligned with the correct depth range; names are readable
 
 ### Step 7 - Depth scale presets (zoom)
 - [ ] 7.1 Extend `useSynchronizedScroll`: if `e.ctrlKey` → adjust `depthPerPixel` instead of scrolling (zoom in/out around cursor depth)
 - [ ] 7.2 Write `src/components/layout/ZoomControl.tsx`: three buttons `1:200` · `1:500` · `1:1000`, active state on current scale
 - [ ] 7.3 Add `ZoomControl` to `app-topbar` in `App.tsx`
 - [ ] 7.4 Export from `src/components/index.ts`
-- [ ] 7.✓ Verify: Ctrl+Wheel zooms the depth axis; clicking preset buttons snaps to the correct scale
+- [ ] 7.5 Verify: Ctrl+Wheel zooms the depth axis; clicking preset buttons snaps to the correct scale
 
 ### Step 8 - Track resize via drag
 - [ ] 8.1 Add `setTrackWidth(id: string, width: number)` action to `viewStore.ts`
 - [ ] 8.2 Write `src/components/logview/TrackResizeHandle.tsx`: thin drag handle rendered between adjacent tracks
 - [ ] 8.3 Update `LogViewPanel.tsx`: read track widths from `viewStore.trackWidths`, render `TrackResizeHandle` between each `DataTrack`
 - [ ] 8.4 Update `TrackHeaderRow.tsx`: track header widths also read from `viewStore.trackWidths`
-- [ ] 8.✓ Verify: dragging a handle resizes the track and its header simultaneously; minimum track width 80 px
+- [ ] 8.5 Verify: dragging a handle resizes the track and its header simultaneously; minimum track width 80 px
 
 ---
 
@@ -394,7 +394,7 @@ Step 8 (track resize)         ← can run parallel with Step 7
 
 ---
 
-## Definition of done for Phase 2
+## Definition of Done for Phase 2
 
 - GR track: `GR` (green solid) + `CALI` (grey dashed) with GR baseline fill
 - Resistivity track: `ILD` (red) on 4-decade log grid with correct minor subdivisions

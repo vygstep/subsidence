@@ -1,4 +1,4 @@
-﻿# Phase 1: Foundation - Implementation Contract
+# Phase 1: Foundation - Implementation Contract
 
 **Goal**: Render static well log curves from a LAS file in the browser with synchronized scrolling across all tracks. No calculations yet.
 
@@ -412,9 +412,9 @@ Requirements:
 
 ## Step 9 - Track headers
 
-Status: pending
+Status: done
 Verification: GR header remains visible while tracks scroll
-Commit: -
+Commit: `3d066d2`
 
 Implement:
 
@@ -432,9 +432,9 @@ Requirements:
 
 ## Step 10 - LogViewPanel + synchronized scroll
 
-Status: pending
+Status: done
 Verification: all four tracks scroll together smoothly and remain within valid bounds
-Commit: -
+Commit: `dfadae7`
 
 Implement:
 
@@ -498,7 +498,3 @@ Step 10 (LogViewPanel + scroll)
 - sticky track headers visible at all scroll positions
 - mouse-wheel scrolls all tracks in sync at 60 fps with no visual artifacts
 - `npx tsc --noEmit` reports zero type errors
-
-
-
-

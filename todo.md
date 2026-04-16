@@ -1,13 +1,13 @@
-﻿# SUBSIDENCE TODO
+# SUBSIDENCE TODO
 
 ## Current Program
 
-Current program: Compass reset and Phase 1 foundation.
+Current program: Compass reset and Phase 2 multi-curve tracks and grids.
 
 Primary references:
 
 - `docs/app_compass.md`
-- `docs/phase1-contract.md`
+- `docs/phase2-contract.md`
 
 ## Checkpoints
 
@@ -22,13 +22,18 @@ Primary references:
 - [x] C9 Execute Phase 1 Step 6: pure renderers
 - [x] C10 Execute Phase 1 Step 7: DepthTrack
 - [x] C11 Execute Phase 1 Step 8: DataTrack
-- [ ] C12 Execute Phase 1 Step 9: track headers
-- [ ] C13 Execute Phase 1 Step 10: LogViewPanel and synchronized scroll
+- [x] C12 Execute Phase 1 Step 9: track headers
+- [x] C13 Execute Phase 1 Step 10: LogViewPanel and synchronized scroll
+
+- [ ] C14 Execute Phase 2 Step 1: logarithmic grid renderer
+- [ ] C15 Execute Phase 2 Step 2: multi-curve track configs
+- [ ] C16 Execute Phase 2 Step 3: CurveFillConfig type
+- [ ] C17 Execute Phase 2 Step 4: fill renderer
+- [ ] C18 Execute Phase 2 Step 5: wire fills in DataTrack
+- [ ] C19 Execute Phase 2 Step 6: FormationColumn
+- [ ] C20 Execute Phase 2 Step 7: depth scale presets
+- [ ] C21 Execute Phase 2 Step 8: track resize via drag
 
 ## Immediate Next Step
 
-Execute Phase 1 Step 9: track headers.
-
-
-
-
+Execute Phase 2 Step 1: logarithmic grid renderer.

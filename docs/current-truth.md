@@ -1,12 +1,12 @@
-﻿# Current Truth
+# Current Truth
 
 This document defines what is currently treated as true for the active project.
 
 ## Active Scope
 
 - The project is now oriented around `docs/app_compass.md`.
-- The current build scope is defined by `docs/phase1-contract.md`.
-- The active goal is to complete Phase 1 foundation before any later-phase feature work.
+- The current build scope is defined by `docs/phase2-contract.md`.
+- The active goal is to complete Phase 2 before any Phase 3 persistence or editing work.
 
 ## Active Architecture
 
@@ -28,7 +28,8 @@ This document defines what is currently treated as true for the active project.
 ## Active Repository Landmarks
 
 - `docs/app_compass.md` is the strategy document.
-- `docs/phase1-contract.md` is the implementation contract.
+- `docs/phase2-contract.md` is the implementation contract.
+- `docs/data-contract-questions.md` defines the persistence questions that must be resolved after Phase 2 and before Phase 3.
 - `docs/reference-sources.md` defines the active knowledge sources.
 - `docs/decisions/` holds current architectural decisions.
 - `todo.md` holds the ordered execution backlog.
