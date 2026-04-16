@@ -13,8 +13,8 @@ Primary references:
 
 - [x] C1 Archive the legacy project into `subsidence_archive/legacy_reset_2026-04-16/`
 - [x] C2 Recreate the active project scaffold and restore the active strategy/contract docs
-- [ ] C3 Review the new scaffold and approve the execution order for Phase 1
-- [ ] C4 Execute Phase 1 Step 1: frontend scaffold
+- [x] C3 Review the new scaffold and approve the execution order for Phase 1
+- [x] C4 Execute Phase 1 Step 1: frontend scaffold
 - [ ] C5 Execute Phase 1 Step 2: TypeScript types
 - [ ] C6 Execute Phase 1 Step 3: FastAPI well endpoint
 - [ ] C7 Execute Phase 1 Step 4: Zustand stores
@@ -27,4 +27,4 @@ Primary references:
 
 ## Immediate Next Step
 
-Review the new active scaffold and confirm the first implementation checkpoint.
+Execute Phase 1 Step 2: TypeScript types.

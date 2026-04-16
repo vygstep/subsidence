@@ -37,3 +37,25 @@ Out of scope for the current phase:
 - [Decision ADR](docs/decisions/ADR-001-compass-phase1-reset.md)
 - [Execution Backlog](todo.md)
 
+## Environment Rule
+
+- The active project environment is local to this repository.
+- Python backend work uses the local `.venv`.
+- Frontend work uses the local system `node` and `npm`.
+- The `ds` environment is not used for SUBSIDENCE.
+
+## Frontend Run
+
+From the project root:
+
+```powershell
+cd d:\github\subsidence\frontend
+$env:Path = "C:\Program Files\nodejs;" + $env:Path
+npm run dev -- --host 127.0.0.1
+```
+
+Then open:
+
+```text
+http://127.0.0.1:5173
+```

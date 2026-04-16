@@ -22,6 +22,8 @@ This document defines what is currently treated as true for the active project.
 - Keep the legacy version only as a knowledge source in `subsidence_archive/`.
 - Make decisions based on the current strategy and current phase contract.
 - Prefer small checkpoints with explicit review before moving to the next implementation slice.
+- Use only the repository-local environment for active work: local `.venv` for Python and local system `node`/`npm` for frontend work.
+- Do not use the `ds` environment for SUBSIDENCE.
 
 ## Active Repository Landmarks
 
