@@ -6,6 +6,7 @@ import type { CurveData, TrackConfig } from '@/types'
 
 import { DataTrack } from './DataTrack'
 import { DepthTrack } from './DepthTrack'
+import { FormationColumn } from './FormationColumn'
 import { TrackHeaderRow } from './TrackHeaderRow'
 
 interface LogViewPanelProps {
@@ -20,14 +21,13 @@ export function LogViewPanel({ tracks, curves, minDepth, maxDepth }: LogViewPane
   const [trackHeight, setTrackHeight] = useState(600)
   const setViewportHeight = useViewStore((state) => state.setViewportHeight)
 
-  // Wire wheel → synchronized depth scroll.
   useSynchronizedScroll(containerRef, minDepth, maxDepth)
 
-  // Measure the panel's rendered height and keep viewStore in sync.
-  // LogViewPanel owns viewportHeight — not individual tracks.
   useEffect(() => {
-    const el = containerRef.current
-    if (!el) return
+    const element = containerRef.current
+    if (!element) {
+      return
+    }
 
     const observer = new ResizeObserver((entries) => {
       const height = entries[0]?.contentRect.height ?? 600
@@ -37,7 +37,7 @@ export function LogViewPanel({ tracks, curves, minDepth, maxDepth }: LogViewPane
       }
     })
 
-    observer.observe(el)
+    observer.observe(element)
     return () => observer.disconnect()
   }, [setViewportHeight])
 
@@ -55,6 +55,7 @@ export function LogViewPanel({ tracks, curves, minDepth, maxDepth }: LogViewPane
             height={trackHeight}
           />
         ))}
+        <FormationColumn height={trackHeight} maxDepth={maxDepth} />
       </div>
     </div>
   )

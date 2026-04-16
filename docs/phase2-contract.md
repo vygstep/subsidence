@@ -13,7 +13,7 @@
 | Step 3 | done | `npx tsc --noEmit` passes with zero errors | pending |
 | Step 4 | done | fillRenderer builds cleanly and renderers contain zero React imports | pending |
 | Step 5 | done | Porosity shows crossover fill; GR track shows baseline shading | pending |
-| Step 6 | pending | - | - |
+| Step 6 | done | Formation column shows aligned lithology blocks with readable names | pending |
 | Step 7 | pending | - | - |
 | Step 8 | pending | - | - |
 
@@ -50,11 +50,11 @@
 - [x] 5.4 Verify: Porosity track shows yellow crossover fill; GR track shows baseline shading
 
 ### Step 6 - FormationColumn
-- [ ] 6.1 Write `src/renderers/lithologyRenderer.ts`: `drawLithologyBlock(ctx, pattern, x, y, w, h)` for sandstone, shale, limestone, dolomite
-- [ ] 6.2 Write `src/components/logview/FormationColumn.tsx`: reads `formations` from `wellDataStore`, draws coloured depth blocks + names
-- [ ] 6.3 Export from `src/components/logview/index.ts`
-- [ ] 6.4 Add `FormationColumn` to `LogViewPanel` as the rightmost track
-- [ ] 6.5 Verify: formation column shows coloured blocks aligned with the correct depth range; names are readable
+- [x] 6.1 Write `src/renderers/lithologyRenderer.ts`: `drawLithologyBlock(ctx, pattern, x, y, w, h)` for sandstone, shale, limestone, dolomite
+- [x] 6.2 Write `src/components/logview/FormationColumn.tsx`: reads `formations` from `wellDataStore`, draws coloured depth blocks + names
+- [x] 6.3 Export from `src/components/logview/index.ts`
+- [x] 6.4 Add `FormationColumn` to `LogViewPanel` as the rightmost track
+- [x] 6.5 Verify: formation column shows coloured blocks aligned with the correct depth range; names are readable
 
 ### Step 7 - Depth scale presets (zoom)
 - [ ] 7.1 Extend `useSynchronizedScroll`: if `e.ctrlKey` → adjust `depthPerPixel` instead of scrolling (zoom in/out around cursor depth)
@@ -250,7 +250,11 @@ Update `DEFAULT_TRACKS` in `App.tsx` to add fill configs:
 
 ### Step 6 - FormationColumn
 
-**`src/renderers/lithologyRenderer.ts`:**
+Status: done
+Verification: formation column shows aligned lithology blocks with readable names from the sample API
+Commit: pending
+
+**src/renderers/lithologyRenderer.ts:**
 
 ```ts
 export type LithologyPattern = 'sandstone' | 'shale' | 'limestone' | 'dolomite'
@@ -426,6 +430,7 @@ Step 8 (track resize)         ← can run parallel with Step 7
 - `1:200` / `1:500` / `1:1000` buttons in topbar snap to the correct scale
 - Track width resizable by drag; header and canvas resize together; minimum 80 px
 - `npx tsc --noEmit` — zero errors
+
 
 
 

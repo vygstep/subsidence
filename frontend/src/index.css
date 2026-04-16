@@ -1,4 +1,4 @@
-﻿:root {
+:root {
   font-family: 'Segoe UI', sans-serif;
   color: #17212b;
   background: #eef3f8;
@@ -25,8 +25,6 @@ select,
 textarea {
   font: inherit;
 }
-
-/* ── App layout ────────────────────────────────────────── */
 
 .app-layout {
   display: flex;
@@ -77,20 +75,17 @@ textarea {
   font-weight: 600;
 }
 
-/* ── Track canvas elements ─────────────────────────────── */
-
 .depth-track {
   width: 60px;
   display: block;
   background: #ffffff;
 }
 
-.data-track {
+.data-track,
+.formation-column {
   display: block;
   background: #ffffff;
 }
-
-/* ── Track header row ──────────────────────────────────── */
 
 .track-header-row {
   position: sticky;
@@ -103,12 +98,24 @@ textarea {
   flex-shrink: 0;
 }
 
-.track-header-row__depth-spacer {
+.track-header-row__depth-spacer,
+.track-header-row__formation-header {
   flex-shrink: 0;
   border-right: 1px solid #c4d0dc;
 }
 
-/* ── Single track header ───────────────────────────────── */
+.track-header-row__formation-header {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 6px 8px;
+  font-size: 0.68rem;
+  font-weight: 700;
+  letter-spacing: 0.07em;
+  text-transform: uppercase;
+  color: #43586d;
+  min-height: 80px;
+}
 
 .track-header {
   flex-shrink: 0;
@@ -132,8 +139,6 @@ textarea {
   text-overflow: ellipsis;
   text-align: center;
 }
-
-/* ── Curve scale bar ───────────────────────────────────── */
 
 .curve-scale-bar {
   display: flex;
@@ -188,8 +193,6 @@ textarea {
   height: 480px;
   min-width: 0;
 }
-
-/* ── LogViewPanel ──────────────────────────────────────── */
 
 .log-view-panel {
   display: flex;
