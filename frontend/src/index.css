@@ -63,6 +63,29 @@ textarea {
   margin-left: auto;
 }
 
+.zoom-control {
+  display: inline-flex;
+  gap: 6px;
+}
+
+.zoom-control__button {
+  border: 1px solid rgba(124, 184, 232, 0.28);
+  background: rgba(255, 255, 255, 0.06);
+  color: #d7e8f7;
+  font-size: 0.72rem;
+  font-weight: 600;
+  line-height: 1;
+  padding: 6px 10px;
+  border-radius: 999px;
+  cursor: pointer;
+}
+
+.zoom-control__button--active {
+  background: #7cb8e8;
+  border-color: #7cb8e8;
+  color: #0f1720;
+}
+
 .app-main {
   flex: 1;
   min-height: 0;
@@ -213,14 +236,19 @@ textarea {
 }
 
 @media (max-width: 760px) {
-  .app-card {
-    padding: 28px;
+  .app-topbar {
+    gap: 10px;
+    padding: 0 10px;
+    flex-wrap: wrap;
+    height: auto;
+    min-height: 52px;
+    align-content: center;
   }
 
-  .app-status-grid,
-  .wave-panel,
-  .depth-proof,
-  .data-proof {
-    grid-template-columns: 1fr;
+  .zoom-control {
+    order: 3;
+    width: 100%;
+    justify-content: flex-start;
+    padding-bottom: 6px;
   }
 }

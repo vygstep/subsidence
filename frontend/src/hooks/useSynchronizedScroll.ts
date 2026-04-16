@@ -2,23 +2,14 @@ import { useEffect, useRef } from 'react'
 
 import { useViewStore } from '@/stores'
 
-/**
- * Attaches a wheel listener to `containerRef` that converts deltaY to a
- * depth delta and writes it to viewStore. The listener is passive:false so
- * we can call preventDefault and prevent the page from scrolling.
- *
- * Uses internal refs for scrollDepth and depthPerPixel so the wheel handler
- * never needs to re-bind when those values change at 60 fps.
- */
 export function useSynchronizedScroll(
   containerRef: React.RefObject<HTMLElement | null>,
   minDepth: number,
   maxDepth: number,
 ): void {
   const setScroll = useViewStore((state) => state.setScroll)
+  const setScale = useViewStore((state) => state.setScale)
 
-  // Mirror high-frequency store values into refs so the wheel handler stays
-  // bound to the same function for the lifetime of minDepth/maxDepth.
   const stateRef = useRef({ scrollDepth: 0, depthPerPixel: 0.2 })
 
   useEffect(() => {
@@ -31,20 +22,40 @@ export function useSynchronizedScroll(
   }, [])
 
   useEffect(() => {
-    const el = containerRef.current
-    if (!el) return
+    const element = containerRef.current
+    if (!element) {
+      return
+    }
 
-    const handleWheel = (e: WheelEvent) => {
-      e.preventDefault()
+    const handleWheel = (event: WheelEvent) => {
+      event.preventDefault()
       const { scrollDepth, depthPerPixel } = stateRef.current
-      const depthDelta = e.deltaY * depthPerPixel
-      const next = scrollDepth + depthDelta
-      setScroll(Math.max(minDepth, Math.min(maxDepth, next)))
+
+      if (event.ctrlKey) {
+        const zoomFactor = event.deltaY > 0 ? 1.15 : 1 / 1.15
+        const newDepthPerPixel = Math.max(0.05, Math.min(5.0, depthPerPixel * zoomFactor))
+        const bounds = element.getBoundingClientRect()
+        const offsetY = event.clientY - bounds.top
+        const cursorDepth = scrollDepth + offsetY * depthPerPixel
+        const span = newDepthPerPixel * bounds.height
+        const unclampedScrollDepth = cursorDepth - offsetY * newDepthPerPixel
+        const maxScrollDepth = Math.max(minDepth, maxDepth - span)
+        const nextScrollDepth = Math.max(minDepth, Math.min(maxScrollDepth, unclampedScrollDepth))
+
+        setScale(newDepthPerPixel)
+        setScroll(nextScrollDepth)
+        return
+      }
+
+      const depthDelta = event.deltaY * depthPerPixel
+      const nextScrollDepth = scrollDepth + depthDelta
+      const maxScrollDepth = Math.max(minDepth, maxDepth - depthPerPixel * element.clientHeight)
+      setScroll(Math.max(minDepth, Math.min(maxScrollDepth, nextScrollDepth)))
     }
 
-    el.addEventListener('wheel', handleWheel, { passive: false })
+    element.addEventListener('wheel', handleWheel, { passive: false })
     return () => {
-      el.removeEventListener('wheel', handleWheel)
+      element.removeEventListener('wheel', handleWheel)
     }
-  }, [containerRef, minDepth, maxDepth, setScroll])
+  }, [containerRef, maxDepth, minDepth, setScale, setScroll])
 }

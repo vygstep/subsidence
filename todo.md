@@ -1,4 +1,4 @@
-﻿# SUBSIDENCE TODO
+# SUBSIDENCE TODO
 
 ## Current Program
 
@@ -31,12 +31,13 @@ Primary references:
 - [x] C17 Execute Phase 2 Step 4: fill renderer
 - [x] C18 Execute Phase 2 Step 5: wire fills in DataTrack
 - [x] C19 Execute Phase 2 Step 6: FormationColumn
-- [ ] C20 Execute Phase 2 Step 7: depth scale presets
+- [x] C20 Execute Phase 2 Step 7: depth scale presets
 - [ ] C21 Execute Phase 2 Step 8: track resize via drag
 
 ## Immediate Next Step
 
-Execute Phase 2 Step 7: depth scale presets.
+Execute Phase 2 Step 8: track resize via drag.
+
 
 
 

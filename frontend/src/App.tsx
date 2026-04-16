@@ -1,6 +1,6 @@
 import { useEffect, useMemo } from 'react'
 
-import { LogViewPanel } from '@/components'
+import { LogViewPanel, ZoomControl } from '@/components'
 import { useWellDataStore } from '@/stores'
 import type { TrackConfig } from '@/types'
 
@@ -109,6 +109,7 @@ function App() {
         <span className="app-topbar__well">
           {isLoading ? 'Loading...' : error ? 'Error loading well' : (well?.well_name ?? '-')}
         </span>
+        <ZoomControl />
         {curves.length > 0 && (
           <span className="app-topbar__meta">
             {curves.length} curves | {curves[0].depths.length.toLocaleString()} samples

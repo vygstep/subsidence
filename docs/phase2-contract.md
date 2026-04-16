@@ -1,4 +1,4 @@
-﻿# Phase 2: Multi-Curve Tracks and Grids — Implementation Contract
+# Phase 2: Multi-Curve Tracks and Grids � Implementation Contract
 
 **Goal**: Multiple curves per track, logarithmic grid, reversed scales, area fills between curves, stratigraphy column, depth scale zoom presets, and track resize by drag.
 
@@ -8,13 +8,13 @@
 
 | Step | Status | Verification | Commit |
 |---|---|---|---|
-| Step 1 | done | ILD track shows 4-decade log grid at 0.2 · 2 · 20 · 200 · 2000 | pending |
+| Step 1 | done | ILD track shows 4-decade log grid at 0.2 � 2 � 20 � 200 � 2000 | pending |
 | Step 2 | done | GR track shows GR+CALI; Porosity shows RHOB+reversed NPHI | pending |
 | Step 3 | done | `npx tsc --noEmit` passes with zero errors | pending |
 | Step 4 | done | fillRenderer builds cleanly and renderers contain zero React imports | pending |
 | Step 5 | done | Porosity shows crossover fill; GR track shows baseline shading | pending |
 | Step 6 | done | Formation column shows aligned lithology blocks with readable names | pending |
-| Step 7 | pending | - | - |
+| Step 7 | done | Ctrl+Wheel zooms depth axis; preset buttons snap to 1:200 / 1:500 / 1:1000 | pending |
 | Step 8 | pending | - | - |
 
 ---
@@ -24,11 +24,11 @@
 ### Step 1 - Logarithmic grid renderer
 - [x] 1.1 Add `drawLogarithmicGrid(ctx, xScale, decades, width, height, color)` to `src/renderers/gridRenderer.ts`
 - [x] 1.2 Update `DataTrack.tsx`: call `drawLogarithmicGrid` when `config.scaleType === 'logarithmic'`
-- [x] 1.3 Verify: ILD (Resistivity) track shows 4-decade log grid lines at 0.2 · 2 · 20 · 200 · 2000
+- [x] 1.3 Verify: ILD (Resistivity) track shows 4-decade log grid lines at 0.2 � 2 � 20 � 200 � 2000
 
 ### Step 2 - Multi-curve track configs
-- [x] 2.1 Add `CALI` curve to GR track config (`GR` green + `CALI` black dashed, 6–16 in)
-- [x] 2.2 Add `NPHI` curve to Porosity track config (`RHOB` red + `NPHI` blue dashed, reversed 0.45 → -0.15)
+- [x] 2.1 Add `CALI` curve to GR track config (`GR` green + `CALI` black dashed, 6�16 in)
+- [x] 2.2 Add `NPHI` curve to Porosity track config (`RHOB` red + `NPHI` blue dashed, reversed 0.45 > -0.15)
 - [x] 2.3 Verify each curve in `DataTrack` uses its own scale (confirm via visual: NPHI runs right-to-left)
 - [x] 2.4 Verify: GR track shows two curves; Porosity track shows two curves with correct reversed NPHI
 
@@ -45,8 +45,8 @@
 
 ### Step 5 - Wire fills in DataTrack
 - [x] 5.1 Update `DataTrack.tsx`: before drawing curves, call fill renderers for any `CurveConfig` with `fill` defined
-- [x] 5.2 Add crossover fill config to Porosity track: NPHI > RHOB → yellow (gas), NPHI < RHOB → grey
-- [x] 5.3 Add baseline fill config to GR track: left of 75 API → sand-yellow, right → grey-green
+- [x] 5.2 Add crossover fill config to Porosity track: NPHI > RHOB > yellow (gas), NPHI < RHOB > grey
+- [x] 5.3 Add baseline fill config to GR track: left of 75 API > sand-yellow, right > grey-green
 - [x] 5.4 Verify: Porosity track shows yellow crossover fill; GR track shows baseline shading
 
 ### Step 6 - FormationColumn
@@ -57,11 +57,11 @@
 - [x] 6.5 Verify: formation column shows coloured blocks aligned with the correct depth range; names are readable
 
 ### Step 7 - Depth scale presets (zoom)
-- [ ] 7.1 Extend `useSynchronizedScroll`: if `e.ctrlKey` → adjust `depthPerPixel` instead of scrolling (zoom in/out around cursor depth)
-- [ ] 7.2 Write `src/components/layout/ZoomControl.tsx`: three buttons `1:200` · `1:500` · `1:1000`, active state on current scale
-- [ ] 7.3 Add `ZoomControl` to `app-topbar` in `App.tsx`
-- [ ] 7.4 Export from `src/components/index.ts`
-- [ ] 7.5 Verify: Ctrl+Wheel zooms the depth axis; clicking preset buttons snaps to the correct scale
+- [x] 7.1 Extend `useSynchronizedScroll`: if `e.ctrlKey` > adjust `depthPerPixel` instead of scrolling (zoom in/out around cursor depth)
+- [x] 7.2 Write `src/components/layout/ZoomControl.tsx`: three buttons `1:200` � `1:500` � `1:1000`, active state on current scale
+- [x] 7.3 Add `ZoomControl` to `app-topbar` in `App.tsx`
+- [x] 7.4 Export from `src/components/index.ts`
+- [x] 7.5 Verify: Ctrl+Wheel zooms the depth axis; clicking preset buttons snaps to the correct scale
 
 ### Step 8 - Track resize via drag
 - [ ] 8.1 Add `setTrackWidth(id: string, width: number)` action to `viewStore.ts`
@@ -93,11 +93,11 @@ export function drawLogarithmicGrid(
 ): void
 ```
 
-Algorithm: walk `10^n` values from domain start to end (e.g. 0.2 → 2 → 20 → 200 → 2000). For each decade, draw the major gridline at `10^n` plus 8 minor lines at `2×10^n … 9×10^n`. Major lines darker than minor.
+Algorithm: walk `10^n` values from domain start to end (e.g. 0.2 > 2 > 20 > 200 > 2000). For each decade, draw the major gridline at `10^n` plus 8 minor lines at `2?10^n � 9?10^n`. Major lines darker than minor.
 
 Update `DataTrack.tsx` draw sequence:
 ```
-clear → grid (linear or log) → depth gridlines → fills → curves
+clear > grid (linear or log) > depth gridlines > fills > curves
 ```
 
 **Acceptance criteria:** ILD track displays vertical lines at 0.2, 2, 20, 200, 2000 with minor subdivisions between each decade.
@@ -122,7 +122,7 @@ Update `DEFAULT_TRACKS` in `App.tsx`:
   scaleMin: 0.45, scaleMax: -0.15, scaleReversed: true }
 ```
 
-`DataTrack` already computes per-curve scales — this step only requires updating config. No component changes needed.
+`DataTrack` already computes per-curve scales � this step only requires updating config. No component changes needed.
 
 **Acceptance criteria:** GR track renders `GR` (green solid) + `CALI` (grey dashed). Porosity track renders `RHOB` (red solid) + `NPHI` (blue dashed, right-to-left).
 
@@ -144,7 +144,7 @@ export interface CurveFillConfig {
   pairedCurve?: string       // mnemonic; used with 'between-curves' and 'crossover'
   colorPositive: string      // fill colour when curve > baseline or paired curve
   colorNegative: string      // fill colour when curve < baseline or paired curve
-  opacity: number            // 0–1
+  opacity: number            // 0�1
 }
 ```
 
@@ -196,8 +196,8 @@ export function drawFillBetweenCurves(
 Crossover algorithm for `drawFillBetweenCurves`:
 1. Walk depth samples in pairs `[i, i+1]`
 2. For each pair, compute `x1_a, x1_b` (pixel-x for curve1 at i and i+1) and `x2_a, x2_b` (same for curve2)
-3. If both points are same side → fill one rectangle segment with that colour
-4. If sides differ → compute the crossover pixel-x via linear interpolation, fill two triangular segments with different colours
+3. If both points are same side > fill one rectangle segment with that colour
+4. If sides differ > compute the crossover pixel-x via linear interpolation, fill two triangular segments with different colours
 5. Use `ctx.beginPath()` per filled polygon; `ctx.fill()` immediately
 
 This approach handles smooth crossover transitions without gaps or overlaps.
@@ -210,7 +210,7 @@ Status: done
 Verification: Porosity track shows yellow crossover fill, and GR track shows baseline shading
 Commit: pending
 
-Update DataTrack.tsx draw callback — before drawing curves, iterate clippedCurves and call fill renderers for any curve with style.fill defined:
+Update DataTrack.tsx draw callback � before drawing curves, iterate clippedCurves and call fill renderers for any curve with style.fill defined:
 
 ```ts
 // Fill pass (before curve lines)
@@ -269,11 +269,11 @@ export function drawLithologyBlock(
 ```
 
 Each lithology uses a repeating Canvas pattern:
-- `sandstone` — stippled dots
-- `shale` — horizontal lines
-- `limestone` — brick pattern
-- `dolomite` — rhombus hatch
-- Others — solid fill with colour tint
+- `sandstone` � stippled dots
+- `shale` � horizontal lines
+- `limestone` � brick pattern
+- `dolomite` � rhombus hatch
+- Others � solid fill with colour tint
 
 **`src/components/logview/FormationColumn.tsx`:**
 
@@ -297,6 +297,10 @@ Add `FormationColumn` to `LogViewPanel` between the last `DataTrack` and the rig
 ---
 
 ### Step 7 - Depth scale presets (zoom)
+
+Status: done
+Verification: Ctrl+Wheel zoom keeps cursor depth fixed, and preset buttons switch between 1:200 / 1:500 / 1:1000 with active highlight
+Commit: pending
 
 **Ctrl+Wheel zoom in `useSynchronizedScroll`:**
 
@@ -335,7 +339,7 @@ Add to `app-topbar` in `App.tsx` between the well name and meta info.
 
 ### Step 8 - Track resize via drag
 
-**`viewStore.ts`** — add action:
+**`viewStore.ts`** � add action:
 ```ts
 setTrackWidth: (id: string, width: number) => void
 ```
@@ -353,7 +357,7 @@ interface TrackResizeHandleProps {
 
 Renders a 6px wide vertical divider. On `mousedown`, attaches `mousemove` and `mouseup` to `document`. On `mousemove`, computes `dx` from `mousedown` origin and calls `viewStore.setTrackWidth(trackId, initialWidth + dx)`. Releases on `mouseup`.
 
-**`LogViewPanel.tsx`** — interleave handles between tracks:
+**`LogViewPanel.tsx`** � interleave handles between tracks:
 ```tsx
 {tracks.map((track, i) => (
   <>
@@ -365,9 +369,9 @@ Renders a 6px wide vertical divider. On `mousedown`, attaches `mousemove` and `m
 ))}
 ```
 
-**`TrackHeaderRow.tsx`** — read widths from `viewStore.trackWidths`, fall back to `track.width`.
+**`TrackHeaderRow.tsx`** � read widths from `viewStore.trackWidths`, fall back to `track.width`.
 
-**Acceptance criteria:** Drag a handle right/left — the track and its header resize together in real time. Cannot drag below 80px. Releasing the mouse stops the resize.
+**Acceptance criteria:** Drag a handle right/left � the track and its header resize together in real time. Cannot drag below 80px. Releasing the mouse stops the resize.
 
 ---
 
@@ -375,27 +379,27 @@ Renders a 6px wide vertical divider. On `mousedown`, attaches `mousemove` and `m
 
 ```
 frontend/src/
-├── types/
-│   └── tracks.ts              MODIFIED — CurveFillConfig, fill field on CurveConfig
-├── renderers/
-│   ├── gridRenderer.ts        MODIFIED — drawLogarithmicGrid
-│   ├── fillRenderer.ts        NEW — drawFillToBaseline, drawFillBetweenCurves
-│   ├── lithologyRenderer.ts   NEW — drawLithologyBlock
-│   └── index.ts               MODIFIED — export fillRenderer, lithologyRenderer
-├── components/
-│   ├── layout/
-│   │   ├── ZoomControl.tsx    NEW
-│   │   └── index.ts           NEW
-│   └── logview/
-│       ├── DataTrack.tsx      MODIFIED — fill pass before curve pass
-│       ├── FormationColumn.tsx NEW
-│       ├── LogViewPanel.tsx   MODIFIED — FormationColumn, TrackResizeHandle
-│       ├── TrackHeaderRow.tsx MODIFIED — read widths from viewStore
-│       ├── TrackResizeHandle.tsx NEW
-│       └── index.ts           MODIFIED — export new components
-├── stores/
-│   └── viewStore.ts           MODIFIED — setTrackWidth action
-└── App.tsx                    MODIFIED — multi-curve configs, fill configs, ZoomControl
++-- types/
+�   L-- tracks.ts              MODIFIED � CurveFillConfig, fill field on CurveConfig
++-- renderers/
+�   +-- gridRenderer.ts        MODIFIED � drawLogarithmicGrid
+�   +-- fillRenderer.ts        NEW � drawFillToBaseline, drawFillBetweenCurves
+�   +-- lithologyRenderer.ts   NEW � drawLithologyBlock
+�   L-- index.ts               MODIFIED � export fillRenderer, lithologyRenderer
++-- components/
+�   +-- layout/
+�   �   +-- ZoomControl.tsx    NEW
+�   �   L-- index.ts           NEW
+�   L-- logview/
+�       +-- DataTrack.tsx      MODIFIED � fill pass before curve pass
+�       +-- FormationColumn.tsx NEW
+�       +-- LogViewPanel.tsx   MODIFIED � FormationColumn, TrackResizeHandle
+�       +-- TrackHeaderRow.tsx MODIFIED � read widths from viewStore
+�       +-- TrackResizeHandle.tsx NEW
+�       L-- index.ts           MODIFIED � export new components
++-- stores/
+�   L-- viewStore.ts           MODIFIED � setTrackWidth action
+L-- App.tsx                    MODIFIED � multi-curve configs, fill configs, ZoomControl
 ```
 
 ---
@@ -404,18 +408,18 @@ frontend/src/
 
 ```
 Step 1 (log grid)
-Step 2 (multi-curve configs)  ← can run parallel with Step 1
-        ↓
+Step 2 (multi-curve configs)  < can run parallel with Step 1
+        v
 Step 3 (fill types)
-        ↓
+        v
 Step 4 (fillRenderer)
-        ↓
+        v
 Step 5 (wire fills in DataTrack)
-        ↓
-Step 6 (FormationColumn)      ← can run parallel with Step 5
-        ↓
+        v
+Step 6 (FormationColumn)      < can run parallel with Step 5
+        v
 Step 7 (zoom)
-Step 8 (track resize)         ← can run parallel with Step 7
+Step 8 (track resize)         < can run parallel with Step 7
 ```
 
 ---
@@ -429,7 +433,9 @@ Step 8 (track resize)         ← can run parallel with Step 7
 - Ctrl+Wheel zooms depth axis; cursor depth stays fixed during zoom
 - `1:200` / `1:500` / `1:1000` buttons in topbar snap to the correct scale
 - Track width resizable by drag; header and canvas resize together; minimum 80 px
-- `npx tsc --noEmit` — zero errors
+- `npx tsc --noEmit` � zero errors
+
+
 
 
 
