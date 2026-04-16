@@ -20,11 +20,11 @@ Each step ends with a `вњ“` verification task. Do not move to the next step 
 - [x] 2.2 Write `src/types/tracks.ts`: `TrackConfig`, `CurveConfig`
 - [x] 2.вњ“ **Verify**: `npx tsc --noEmit` passes with zero errors
 ### Step 3 вЂ” FastAPI well data endpoint
-- [ ] 3.1 Add sample LAS file to `app/data/sample.las`
-- [ ] 3.2 Add CORS middleware to `app/src/subsidence/api/main.py`
-- [ ] 3.3 Write `app/src/subsidence/api/wells.py`: `GET /api/wells/sample`
-- [ ] 3.4 Wire `wells.py` to existing `loaders.load_las_curves()`
-- [ ] 3.вњ“ **Verify**: `curl http://localhost:8000/api/wells/sample` returns JSON with at least one curve
+- [x] 3.1 Add sample LAS file to `app/data/sample.las`
+- [x] 3.2 Add CORS middleware to `app/src/subsidence/api/main.py`
+- [x] 3.3 Write `app/src/subsidence/api/wells.py`: `GET /api/wells/sample`
+- [x] 3.4 Wire `wells.py` to existing `loaders.load_las_curves()`
+- [x] 3.вњ“ **Verify**: `curl http://localhost:8000/api/wells/sample` returns JSON with at least one curve
 
 ### Step 4 вЂ” Zustand stores
 - [ ] 4.1 Write `src/stores/wellDataStore.ts` with `loadWell` (fetch + Float32Array conversion)
@@ -320,6 +320,7 @@ Steps 1вЂ“3 are independent of each other. Step 4 requires both Step 2 (type
 - Sticky track headers visible at all scroll positions
 - Mouse-wheel scrolls all tracks in sync, 60 fps, no visual artifacts
 - `npx tsc --noEmit` вЂ” zero type errors
+
 
 
 

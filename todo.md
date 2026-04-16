@@ -16,7 +16,7 @@ Primary references:
 - [x] C3 Review the new scaffold and approve the execution order for Phase 1
 - [x] C4 Execute Phase 1 Step 1: frontend scaffold
 - [x] C5 Execute Phase 1 Step 2: TypeScript types
-- [ ] C6 Execute Phase 1 Step 3: FastAPI well endpoint
+- [x] C6 Execute Phase 1 Step 3: FastAPI well endpoint
 - [ ] C7 Execute Phase 1 Step 4: Zustand stores
 - [ ] C8 Execute Phase 1 Step 5: Canvas hooks
 - [ ] C9 Execute Phase 1 Step 6: pure renderers
@@ -27,4 +27,4 @@ Primary references:
 
 ## Immediate Next Step
 
-Execute Phase 1 Step 3: FastAPI well data endpoint.
+Execute Phase 1 Step 4: Zustand stores.

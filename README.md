@@ -59,3 +59,28 @@ Then open:
 ```text
 http://127.0.0.1:5173
 ```
+
+## Backend Run
+
+From the project root:
+
+```powershell
+cd d:\github\subsidence
+Set-ExecutionPolicy -Scope Process -ExecutionPolicy RemoteSigned
+& .\.venv\Scripts\Activate.ps1
+$env:PYTHONPATH = "d:\github\subsidence\app\src"
+python -m uvicorn subsidence.api.main:app --host 127.0.0.1 --port 8000
+```
+
+Then open:
+
+```text
+http://127.0.0.1:8000/health
+http://127.0.0.1:8000/docs
+```
+
+Direct API check:
+
+```powershell
+curl http://127.0.0.1:8000/api/wells/sample
+```
