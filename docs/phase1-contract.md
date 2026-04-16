@@ -16,7 +16,7 @@
 | Step 6 | done | renderers have zero React imports and build passes | `577bb81` |
 | Step 7 | done | depth labels preview shows 1000 m, 1100 m, 1200 m at the expected range | `afe9034` |
 | Step 8 | done | GR data track preview renders 0-150 API; no crash past data end | `195b64d` |
-| Step 9 | pending | - | - |
+| Step 9 | done | GR header: `══ GR API ══` with `0` left / `150` right, full track width | `3d066d2` |
 | Step 10 | pending | - | - |
 
 ---
@@ -69,10 +69,10 @@
 - [x] 8.2 Verify: GR (green, 0-150 API) renders correctly; no crash when scrolling past data end
 
 ### Step 9 - Track headers
-- [ ] 9.1 Write `src/components/logview/CurveScaleBar.tsx`: mnemonic + unit + color bar
-- [ ] 9.2 Write `src/components/logview/TrackHeader.tsx`: 80 px tall, stacked `CurveScaleBar`s
-- [ ] 9.3 Write `src/components/logview/TrackHeaderRow.tsx`: `position: sticky; top: 0` flex row
-- [ ] 9.4 Verify: GR header reads `GR / API / 0 <-> 150` in green and stays visible while track area scrolls
+- [x] 9.1 Write `src/components/logview/CurveScaleBar.tsx`: mnemonic + unit + color bar
+- [x] 9.2 Write `src/components/logview/TrackHeader.tsx`: 80 px tall, stacked `CurveScaleBar`s
+- [x] 9.3 Write `src/components/logview/TrackHeaderRow.tsx`: `position: sticky; top: 0` flex row
+- [x] 9.4 Verify: GR header reads `══ GR API ══` with `0` left / `150` right, full track width
 
 ### Step 10 - LogViewPanel + synchronized scroll
 - [ ] 10.1 Write `src/hooks/useSynchronizedScroll.ts`: wheel -> depth delta -> `viewStore`
