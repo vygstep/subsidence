@@ -2,25 +2,38 @@ import type { LithologyType } from '@/types'
 
 export type LithologyPattern = Exclude<LithologyType, 'metamorphic'>
 
-function createPattern(
+const patternCaches = new WeakMap<CanvasRenderingContext2D, Map<string, CanvasPattern | null>>()
+
+function getCachedPattern(
   ctx: CanvasRenderingContext2D,
+  key: string,
   draw: (patternCtx: CanvasRenderingContext2D, size: number) => void,
 ): CanvasPattern | null {
-  if (typeof document === 'undefined') {
-    return null
+  let cache = patternCaches.get(ctx)
+  if (!cache) {
+    cache = new Map()
+    patternCaches.set(ctx, cache)
   }
 
-  const size = 12
-  const patternCanvas = document.createElement('canvas')
-  patternCanvas.width = size
-  patternCanvas.height = size
-  const patternCtx = patternCanvas.getContext('2d')
-  if (!patternCtx) {
-    return null
+  if (cache.has(key)) {
+    return cache.get(key) ?? null
   }
 
-  draw(patternCtx, size)
-  return ctx.createPattern(patternCanvas, 'repeat')
+  let pattern: CanvasPattern | null = null
+  if (typeof document !== 'undefined') {
+    const size = 12
+    const patternCanvas = document.createElement('canvas')
+    patternCanvas.width = size
+    patternCanvas.height = size
+    const patternCtx = patternCanvas.getContext('2d')
+    if (patternCtx) {
+      draw(patternCtx, size)
+      pattern = ctx.createPattern(patternCanvas, 'repeat')
+    }
+  }
+
+  cache.set(key, pattern)
+  return pattern
 }
 
 function overlayPattern(
@@ -35,7 +48,7 @@ function overlayPattern(
 
   switch (lithology) {
     case 'sandstone':
-      pattern = createPattern(ctx, (patternCtx, size) => {
+      pattern = getCachedPattern(ctx, 'sandstone', (patternCtx, size) => {
         patternCtx.fillStyle = 'rgba(112, 77, 24, 0.28)'
         patternCtx.beginPath()
         patternCtx.arc(size * 0.3, size * 0.3, 1.1, 0, Math.PI * 2)
@@ -44,7 +57,7 @@ function overlayPattern(
       })
       break
     case 'shale':
-      pattern = createPattern(ctx, (patternCtx, size) => {
+      pattern = getCachedPattern(ctx, 'shale', (patternCtx, size) => {
         patternCtx.strokeStyle = 'rgba(56, 68, 77, 0.22)'
         patternCtx.lineWidth = 1
         for (let row = 2; row < size; row += 4) {
@@ -56,7 +69,7 @@ function overlayPattern(
       })
       break
     case 'limestone':
-      pattern = createPattern(ctx, (patternCtx, size) => {
+      pattern = getCachedPattern(ctx, 'limestone', (patternCtx, size) => {
         patternCtx.strokeStyle = 'rgba(52, 91, 78, 0.24)'
         patternCtx.lineWidth = 1
         patternCtx.strokeRect(1, 1, size - 2, size / 2 - 1)
@@ -65,7 +78,7 @@ function overlayPattern(
       })
       break
     case 'dolomite':
-      pattern = createPattern(ctx, (patternCtx, size) => {
+      pattern = getCachedPattern(ctx, 'dolomite', (patternCtx, size) => {
         patternCtx.strokeStyle = 'rgba(101, 54, 145, 0.22)'
         patternCtx.lineWidth = 1
         patternCtx.beginPath()

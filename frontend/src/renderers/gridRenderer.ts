@@ -42,6 +42,7 @@ export function drawLogarithmicGrid(
   width: number,
   height: number,
   color: string,
+  majorColor = '#8ea3b5',
 ): void {
   if (decades <= 0) {
     return
@@ -63,7 +64,7 @@ export function drawLogarithmicGrid(
     if (majorValue >= domainStart && majorValue <= domainEnd) {
       const x = xScale(majorValue)
       ctx.beginPath()
-      ctx.strokeStyle = '#8ea3b5'
+      ctx.strokeStyle = majorColor
       ctx.lineWidth = 1.1
       ctx.moveTo(x, 0)
       ctx.lineTo(x, height)

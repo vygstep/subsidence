@@ -9,7 +9,7 @@ export interface TrackConfig {
 }
 
 export interface CurveFillConfig {
-  type: 'to-baseline' | 'between-curves' | 'crossover'
+  type: 'to-baseline' | 'crossover'
   baseline?: number
   pairedCurve?: string
   colorPositive: string
