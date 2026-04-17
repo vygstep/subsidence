@@ -19,7 +19,7 @@ first write operation). No new UI panels; all changes are backend + stores + wir
 | Step 7  | done | `import_tops_csv()` imports 32 tops for `PLESHET 01`; ICS color lookup works; unconformity age bounds load from `unconformities.csv` | `d3153a3` |
 | Step 8  | done | `import_deviation_csv()` detects `MD+INCL_AZIM`, writes Parquet, and `load_deviation_from_parquet()` returns a valid `DeviationSurvey` | `a728620` |
 | Step 9  | done | `UndoStack` executes `push/undo/redo`; `ImportWell` undo removes the well and redo restores DB rows + Parquet; `mark_clean()` and undo update `is_clean` correctly | `bbb5d33` |
-| Step 10 | done | `create_checkpoint()` writes a DB snapshot + row; `restore_checkpoint()` reverts working state and creates `before-restore`; `delete_checkpoint()` removes file + row | pending |
+| Step 10 | done | `create_checkpoint()` writes a DB snapshot + row; `restore_checkpoint()` reverts working state and creates `before-restore`; `delete_checkpoint()` removes file + row | `22af478` |
 | Step 11 | pending | - | - |
 | Step 12 | pending | - | - |
 | Step 13 | pending | - | - |
@@ -754,7 +754,7 @@ def import_las_file(session: Session, project_path: Path, las_path: Path) -> Wel
 
 Status: done
 Verification: `sample_data/tops.csv` imports 32 rows for `PLESHET 01`; `sample_data/unconformities.csv` updates age bounds on the matching unconformity rows; ICS color lookup resolves `K2m_GHAREB` to `#F2FA8C`
-Commit: pending
+Commit: `22af478`
 
 **CSV format for `import_tops_csv`:**
 
