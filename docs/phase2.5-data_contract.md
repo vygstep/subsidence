@@ -11,6 +11,7 @@ first write operation). No new UI panels; all changes are backend + stores + wir
 | Step | Status | Verification | Commit |
 |---|---|---|---|
 | Step 1  | done | `Base.metadata.tables` returns 12 schema tables | `144656e` |
+| Step 2  | pending | - | - |
 | Step 3  | pending | - | - |
 | Step 4  | pending | - | - |
 | Step 5  | pending | - | - |
