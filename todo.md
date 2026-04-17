@@ -38,7 +38,8 @@ Primary references:
 - [x] C25 Execute Phase 2.5 Step 4: save and autosave
 - [x] C26 Execute Phase 2.5 Step 5: dictionary bootstrap
 - [x] C27 Execute Phase 2.5 Step 6: LAS import into project
+- [x] C28 Execute Phase 2.5 Step 7: tops and unconformities CSV import
 
 ## Immediate Next Step
 
-Execute Phase 2.5 Step 7: tops and unconformities CSV import.
+Execute Phase 2.5 Step 8: deviation CSV import.

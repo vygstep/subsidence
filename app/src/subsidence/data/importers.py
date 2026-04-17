@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import csv
 import hashlib
 import json
 from pathlib import Path
@@ -9,13 +10,15 @@ import lasio
 import pandas as pd
 import pyarrow as pa
 import pyarrow.parquet as pq
+from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from .dict_resolver import load_curve_alias_rules, resolve_curve_alias
-from .schema import CurveMetadata, WellModel
+from .schema import CurveMetadata, FormationTopModel, WellModel
 from .unit_conversion import canonicalize_gamma_unit, convert_curve_units, convert_depth_to_meters, normalize_unit_name
 
 _DEPTH_CANDIDATES = {'DEPT', 'DEPTH', 'MD', 'TVD', 'TVDSS'}
+_DEFAULT_TOP_COLOR = '#4b5563'
 
 
 def _sha256(path: Path) -> str:
@@ -92,6 +95,149 @@ def _create_well_from_las(session: Session, las: lasio.LASFile, original_relativ
     session.add(well)
     session.flush()
     return well
+
+
+def _read_csv_rows(path: Path | str) -> tuple[list[str], list[dict[str, str]]]:
+    csv_path = Path(path)
+    with csv_path.open('r', encoding='utf-8-sig', newline='') as handle:
+        sample = handle.read(4096)
+        handle.seek(0)
+        delimiter = ','
+        try:
+            dialect = csv.Sniffer().sniff(sample, delimiters=',;')
+            delimiter = dialect.delimiter
+        except csv.Error:
+            pass
+        reader = csv.DictReader(handle, delimiter=delimiter)
+        fieldnames = [str(name or '').strip() for name in (reader.fieldnames or [])]
+        rows: list[dict[str, str]] = []
+        for row in reader:
+            rows.append({str(key or '').strip(): value for key, value in dict(row).items()})
+        return fieldnames, rows
+
+
+def _repo_sample_data_dir() -> Path:
+    return Path(__file__).resolve().parents[4] / 'sample_data'
+
+
+def _default_ics_paths() -> tuple[Path, Path]:
+    sample_dir = _repo_sample_data_dir()
+    return sample_dir / 'ics_chart2023_units.csv', sample_dir / 'ics_chart2023_ranks.csv'
+
+
+def _normalize_text(value: str | None) -> str:
+    return (value or '').strip().casefold()
+
+
+def _extract_text(row: dict[str, str], *candidates: str) -> str | None:
+    for key in candidates:
+        value = (row.get(key) or '').strip()
+        if value:
+            return value
+    return None
+
+
+def _extract_float(row: dict[str, str], *candidates: str) -> float | None:
+    for key in candidates:
+        value = _extract_text(row, key)
+        if value is not None:
+            return _coerce_float(value)
+    return None
+
+
+def _resolve_well(session: Session, well_id: str) -> WellModel:
+    well = session.get(WellModel, well_id)
+    if well is None:
+        raise ValueError(f'Well not found: {well_id}')
+    return well
+
+
+def _ensure_row_targets_well(row: dict[str, str], well: WellModel, csv_path: Path) -> None:
+    row_well_name = _normalize_text(row.get('well_name'))
+    accepted = {_normalize_text(well.name), _normalize_text(well.uwi)}
+    accepted.discard('')
+    if row_well_name and row_well_name not in accepted:
+        raise ValueError(f'{csv_path}: row well_name {row.get("well_name")!r} does not match target well {well.name!r}')
+
+
+def _load_ics_units(units_path: Path | None = None, ranks_path: Path | None = None) -> list[dict[str, object]]:
+    resolved_units, resolved_ranks = units_path, ranks_path
+    if resolved_units is None or resolved_ranks is None:
+        default_units, default_ranks = _default_ics_paths()
+        resolved_units = resolved_units or default_units
+        resolved_ranks = resolved_ranks or default_ranks
+
+    if not resolved_units.exists() or not resolved_ranks.exists():
+        return []
+
+    _, rank_rows = _read_csv_rows(resolved_ranks)
+    rank_order = {int(row['rank_id']): index for index, row in enumerate(rank_rows)}
+
+    _, unit_rows = _read_csv_rows(resolved_units)
+    units: list[dict[str, object]] = []
+    for row in unit_rows:
+        start_age = _extract_float(row, 'start_age_ma')
+        end_age = _extract_float(row, 'end_age_ma')
+        rank_id = int(row['rank_id']) if (row.get('rank_id') or '').strip() else 0
+        color_hex = _extract_text(row, 'html_rgb_hash')
+        if start_age is None or end_age is None or color_hex is None:
+            continue
+        units.append(
+            {
+                'name': _extract_text(row, 'unit_name') or '',
+                'rank_id': rank_id,
+                'rank_order': rank_order.get(rank_id, 999),
+                'start_age_ma': start_age,
+                'end_age_ma': end_age,
+                'interval_width': end_age - start_age,
+                'standard_sort': int(row['standard_sort']) if (row.get('standard_sort') or '').strip() else 0,
+                'color_hex': color_hex,
+            }
+        )
+    return units
+
+
+def _resolve_ics_color(age_ma: float | None, units: list[dict[str, object]]) -> str | None:
+    if age_ma is None:
+        return None
+    matches = [
+        unit for unit in units
+        if float(unit['start_age_ma']) <= age_ma <= float(unit['end_age_ma'])
+    ]
+    if not matches:
+        return None
+    matches.sort(
+        key=lambda unit: (
+            -int(unit['rank_id']),
+            float(unit['interval_width']),
+            int(unit['rank_order']),
+            int(unit['standard_sort']),
+        )
+    )
+    return str(matches[0]['color_hex'])
+
+
+def _merge_note(note: str | None, unconformity_ref: str | None) -> str | None:
+    base = (note or '').strip()
+    if not unconformity_ref:
+        return base or None
+    ref_note = f'unconformity_ref={unconformity_ref}'
+    if not base:
+        return ref_note
+    if ref_note in base:
+        return base
+    return f'{base} | {ref_note}'
+
+
+def _extract_note_unconformity_ref(note: str | None) -> str | None:
+    if not note:
+        return None
+    for chunk in note.split('|'):
+        chunk = chunk.strip()
+        if chunk.startswith('unconformity_ref='):
+            value = chunk.split('=', 1)[1].strip()
+            return value or None
+    return None
 
 
 def import_las_file(session: Session, project_path: Path | str, las_path: Path | str) -> WellModel:
@@ -177,3 +323,160 @@ def import_las_file(session: Session, project_path: Path | str, las_path: Path |
     pq.write_table(table, parquet_path, compression='snappy')
     session.flush()
     return well
+
+
+def import_tops_csv(
+    session: Session,
+    well_id: str,
+    csv_path: Path | str,
+    depth_ref: str = 'MD',
+    *,
+    strat_units_path: Path | str | None = None,
+    strat_ranks_path: Path | str | None = None,
+) -> list[FormationTopModel]:
+    del depth_ref
+    well = _resolve_well(session, well_id)
+    path = Path(csv_path)
+    fieldnames, rows = _read_csv_rows(path)
+    required = {'well_name', 'top_name', 'depth_md'}
+    missing = required.difference(set(fieldnames))
+    if missing:
+        raise ValueError(f'{path}: missing required columns: {sorted(missing)}')
+
+    ics_units = _load_ics_units(Path(strat_units_path) if strat_units_path else None, Path(strat_ranks_path) if strat_ranks_path else None)
+    imported: list[FormationTopModel] = []
+    for row in rows:
+        _ensure_row_targets_well(row, well, path)
+        top_name = _extract_text(row, 'top_name')
+        depth_md = _extract_float(row, 'depth_md', 'depth')
+        if top_name is None or depth_md is None:
+            raise ValueError(f'{path}: top_name and depth_md are required')
+
+        boundary_type = (_extract_text(row, 'boundary_type') or 'conformable').strip().lower()
+        is_unconformity = boundary_type == 'unconformity'
+        strat_age = _extract_float(row, 'strat_age_ma')
+        explicit_color = _extract_text(row, 'color')
+        color = explicit_color or _resolve_ics_color(strat_age, ics_units) or _DEFAULT_TOP_COLOR
+        note = _merge_note(_extract_text(row, 'note'), _extract_text(row, 'unconformity_ref'))
+
+        top = FormationTopModel(
+            well_id=well.id,
+            name=top_name,
+            kind='unconformity' if is_unconformity else 'strat',
+            depth_md=depth_md,
+            depth_tvd=None,
+            age_top_ma=None if is_unconformity else strat_age,
+            age_base_ma=None,
+            confidence=None,
+            color=color,
+            is_locked=False,
+            note=note,
+        )
+        session.add(top)
+        imported.append(top)
+
+    session.flush()
+    return imported
+
+
+def import_unconformities_csv(
+    session: Session,
+    well_id: str,
+    csv_path: Path | str,
+    *,
+    strat_units_path: Path | str | None = None,
+    strat_ranks_path: Path | str | None = None,
+) -> list[FormationTopModel]:
+    well = _resolve_well(session, well_id)
+    path = Path(csv_path)
+    fieldnames, rows = _read_csv_rows(path)
+    required = {'well_name', 'unc_name', 'depth_md', 'end_age_ma', 'start_age_ma'}
+    missing = required.difference(set(fieldnames))
+    if missing:
+        raise ValueError(f'{path}: missing required columns: {sorted(missing)}')
+
+    existing = session.scalars(
+        select(FormationTopModel).where(
+            FormationTopModel.well_id == well.id,
+            FormationTopModel.kind == 'unconformity',
+        )
+    ).all()
+    by_name = {_normalize_text(row.name): row for row in existing}
+    ics_units = _load_ics_units(Path(strat_units_path) if strat_units_path else None, Path(strat_ranks_path) if strat_ranks_path else None)
+
+    imported_or_updated: list[FormationTopModel] = []
+    for row in rows:
+        _ensure_row_targets_well(row, well, path)
+        unc_name = _extract_text(row, 'unc_name')
+        depth_md = _extract_float(row, 'depth_md', 'md')
+        younger_age = _extract_float(row, 'end_age_ma')
+        older_age = _extract_float(row, 'start_age_ma', 'base_age_ma')
+        if unc_name is None or depth_md is None or younger_age is None or older_age is None:
+            raise ValueError(f'{path}: unconformity rows require unc_name, depth_md, end_age_ma, start_age_ma')
+        if older_age < younger_age:
+            raise ValueError(f'{path}: start_age_ma must be >= end_age_ma for unconformity {unc_name!r}')
+
+        explicit_color = _extract_text(row, 'color')
+        color = explicit_color or _resolve_ics_color(younger_age, ics_units) or _DEFAULT_TOP_COLOR
+        note = _merge_note(_extract_text(row, 'note'), unc_name)
+        target = by_name.get(_normalize_text(unc_name))
+        if target is None:
+            target = FormationTopModel(
+                well_id=well.id,
+                name=unc_name,
+                kind='unconformity',
+                depth_md=depth_md,
+                depth_tvd=None,
+                age_top_ma=younger_age,
+                age_base_ma=older_age,
+                confidence=None,
+                color=color,
+                is_locked=False,
+                note=note,
+            )
+            session.add(target)
+            by_name[_normalize_text(unc_name)] = target
+        else:
+            target.depth_md = depth_md
+            target.age_top_ma = younger_age
+            target.age_base_ma = older_age
+            target.color = color
+            target.note = note
+        imported_or_updated.append(target)
+
+    session.flush()
+    return imported_or_updated
+
+
+def link_tops_to_unconformities(
+    session: Session,
+    well_id: str,
+    *,
+    depth_tolerance_m: float = 0.1,
+) -> list[FormationTopModel]:
+    tops = session.scalars(
+        select(FormationTopModel).where(FormationTopModel.well_id == well_id).order_by(FormationTopModel.depth_md)
+    ).all()
+    unconformities = [top for top in tops if top.kind == 'unconformity']
+    updated: list[FormationTopModel] = []
+
+    for top in tops:
+        if top.kind != 'strat':
+            continue
+        if _extract_note_unconformity_ref(top.note):
+            continue
+
+        nearest = None
+        nearest_delta = None
+        for unconformity in unconformities:
+            delta = abs(top.depth_md - unconformity.depth_md)
+            if delta <= depth_tolerance_m and (nearest_delta is None or delta < nearest_delta):
+                nearest = unconformity
+                nearest_delta = delta
+
+        if nearest is not None:
+            top.note = _merge_note(top.note, nearest.name)
+            updated.append(top)
+
+    session.flush()
+    return updated

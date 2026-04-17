@@ -16,7 +16,7 @@ first write operation). No new UI panels; all changes are backend + stores + wir
 | Step 4  | done | write -> save -> close -> reopen persists; close without save reverts; crash recovery is detected | pending |
 | Step 5  | done | `create_project()` seeds 17 curve rows and 9 lithology rows; `resolve_curve_alias("GR_1", rules)` -> `gamma_ray` | pending |
 | Step 6  | done | `import_las_file()` writes Parquet + DB rows; `GR` resolves to `gamma_ray`; `load_curves_from_parquet()` returns float32 arrays | pending |
-| Step 7  | pending | - | - |
+| Step 7  | done | `import_tops_csv()` imports 32 tops for `PLESHET 01`; ICS color lookup works; unconformity age bounds load from `unconformities.csv` | pending |
 | Step 8  | pending | - | - |
 | Step 9  | pending | - | - |
 | Step 10 | pending | - | - |
@@ -238,28 +238,28 @@ MyProject.subsidence/
 
 ### Step 7 вЂ” Tops and unconformities CSV import
 
-- [ ] 7.1 Add `import_tops_csv(session, well_id, csv_path, depth_ref="MD")`
+- [x] 7.1 Add `import_tops_csv(session, well_id, csv_path, depth_ref="MD")`
           to `importers.py`
-- [ ] 7.2 Required CSV columns: `top_name, depth`
+- [x] 7.2 Required CSV columns: `well_name, top_name, depth_md`
           Optional: `strat_age_ma, boundary_type, unconformity_ref, color, note`
           `boundary_type` values: `conformable` (default) | `unconformity`
-          вЂ” rows with `boundary_type=conformable` в†’ `kind="strat"`,
-          otherwise в†’ `kind="unconformity"`
-- [ ] 7.3 Insert `FormationTopModel` rows: set `age_top_ma = strat_age_ma` for strat
+          ? rows with `boundary_type=conformable` ? `kind="strat"`,
+          otherwise ? `kind="unconformity"`
+- [x] 7.3 Insert `FormationTopModel` rows: set `age_top_ma = strat_age_ma` for strat
           rows; set `age_top_ma = NULL, age_base_ma = NULL` initially for unconformity
           rows (age bounds come from the unconformities file, Step 7.5)
-- [ ] 7.4 Add `import_unconformities_csv(session, well_id, csv_path)` to `importers.py`
-- [ ] 7.5 Required CSV columns: `unc_name, md, start_age_ma, base_age_ma`
-          вЂ” match by name to existing `FormationTopModel` rows with
-          `kind="unconformity"` and set `age_top_ma = start_age_ma`,
-          `age_base_ma = base_age_ma`; create a new row if no match
-- [ ] 7.6 Add `link_tops_to_unconformities(session, well_id, depth_tolerance_m=0.1)`:
+- [x] 7.4 Add `import_unconformities_csv(session, well_id, csv_path)` to `importers.py`
+- [x] 7.5 Required CSV columns: `well_name, unc_name, depth_md, end_age_ma, start_age_ma`
+          ? match by name to existing `FormationTopModel` rows with
+          `kind="unconformity"` and set `age_top_ma = end_age_ma`,
+          `age_base_ma = start_age_ma`; create a new row if no match
+- [x] 7.6 Add `link_tops_to_unconformities(session, well_id, depth_tolerance_m=0.1)`:
           for strat tops without an explicit `unconformity_ref`, find the nearest
           unconformity within `depth_tolerance_m` and set `unconformity_ref` via note
-          вЂ” migrated from legacy `link_strat_tops_to_unconformities()`
-- [ ] 7.вњ“ Verify: import a CSV with 3 strat + 1 unconformity row в†’
-          4 `FormationTopModel` rows, unconformity row has `kind="unconformity"`,
-          `age_top_ma` and `age_base_ma` populated after unconformities CSV import
+          ? migrated from legacy `link_strat_tops_to_unconformities()`
+- [x] 7.? Verify: import tops + unconformities CSV for `PLESHET 01` ?
+          32 `FormationTopModel` rows, unconformity rows have `kind="unconformity"`,
+          `age_top_ma`/`age_base_ma` populated after unconformities CSV import
 
 ### Step 8 вЂ” Deviation CSV import
 
@@ -752,34 +752,42 @@ def import_las_file(session: Session, project_path: Path, las_path: Path) -> Wel
 
 ---
 
-### Step 7 вЂ” Tops and unconformities CSV import
+### Step 7 ? Tops and unconformities CSV import
+
+Status: done
+Verification: `sample_data/tops.csv` imports 32 rows for `PLESHET 01`; `sample_data/unconformities.csv` updates age bounds on the matching unconformity rows; ICS color lookup resolves `K2m_GHAREB` to `#F2FA8C`
+Commit: pending
 
 **CSV format for `import_tops_csv`:**
 
 ```
-top_name,depth,strat_age_ma,boundary_type,color,note
-Wilcox,2450.0,55.8,conformable,#F2C98A,
-Top Paleocene Unconformity,2230.0,,unconformity,#E0E0E0,
+well_name,top_name,depth_md,strat_age_ma,boundary_type,color,note
+PLESHET 01,Wilcox,2450.0,55.8,conformable,#F2C98A,
+PLESHET 01,Top Paleocene Unconformity,2230.0,,unconformity,#E0E0E0,
 ```
 
-- `depth` is in the project's configured depth reference (default MD, metres)
-- `boundary_type`: `conformable` в†’ `kind="strat"` | anything else в†’ `kind="unconformity"`
-- Missing `color` в†’ assign from `lithology_dict_entries` or a default palette
+- `well_name` must match the target well being imported
+- `depth_md` is measured depth in metres
+- `boundary_type`: `conformable` ? `kind="strat"` | anything else ? `kind="unconformity"`
+- Color priority: explicit `color` in CSV ? ICS color by `strat_age_ma` using `ics_chart2023_units.csv` and `ics_chart2023_ranks.csv` ? dark gray fallback
 
 **CSV format for `import_unconformities_csv`:**
 
 ```
-unc_name,md,start_age_ma,base_age_ma
-Top Paleocene Unconformity,2230.0,55.8,66.0
+well_name,unc_name,depth_md,end_age_ma,start_age_ma
+PLESHET 01,Top Paleocene Unconformity,2230.0,55.8,66.0
 ```
 
 `import_unconformities_csv` matches by `unc_name` to existing `FormationTopModel` rows
-(case-insensitive, stripped). If a match is found, updates `age_top_ma = start_age_ma`,
-`age_base_ma = base_age_ma`. If no match, creates a new row with `kind="unconformity"`.
+(case-insensitive, stripped). If a match is found, updates `age_top_ma = end_age_ma`
+(younger, stratigraphically above) and `age_base_ma = start_age_ma`
+(older, stratigraphically below). If no match, creates a new row with `kind="unconformity"`.
 
-This two-file approach (tops first, then unconformities for age bounds) mirrors the legacy
-`loaders.py` pattern and keeps the tops CSV simple for common cases where age data is not
-yet available.
+This two-file approach keeps tops and unconformity age bounds separate while still letting
+the importer assign project-ready colors and update the same `formation_tops` table.
+
+---
+
 
 ---
 
