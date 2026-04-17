@@ -41,7 +41,8 @@ Primary references:
 - [x] C28 Execute Phase 2.5 Step 7: tops and unconformities CSV import
 - [x] C29 Execute Phase 2.5 Step 8: deviation CSV import
 - [x] C30 Execute Phase 2.5 Step 9: undo/redo stack
+- [x] C31 Execute Phase 2.5 Step 10: checkpoints
 
 ## Immediate Next Step
 
-Execute Phase 2.5 Step 10: checkpoints.
+Execute Phase 2.5 Step 11: API endpoints.

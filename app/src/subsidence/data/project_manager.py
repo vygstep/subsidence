@@ -1,8 +1,10 @@
 ﻿from __future__ import annotations
 
 import asyncio
+import hashlib
 import json
 import os
+import re
 import shutil
 import tempfile
 from dataclasses import dataclass
@@ -17,13 +19,13 @@ except ImportError:
     def user_cache_dir(app_name: str) -> str:
         return str(Path(tempfile.gettempdir()) / app_name)
 
-from sqlalchemy import text
+from sqlalchemy import select, text
 from sqlalchemy.orm import Session
 
 from .undo import UndoStack, Command
 
 from .engine import create_all_tables, create_engine_for_project, validate_project_db
-from .schema import ProjectMeta, SCHEMA_VERSION, UserModel
+from .schema import CheckpointModel, ProjectMeta, SCHEMA_VERSION, UserModel
 
 if os.name == 'nt':
     import msvcrt
@@ -219,6 +221,85 @@ class ProjectManager:
         os.replace(tmp_path, recovery_path)
         return recovery_path
 
+    def create_checkpoint(self, name: str, description: str = '') -> dict[str, Any]:
+        state = self._require_open_state()
+        slug = self._slugify(name) or 'checkpoint'
+        timestamp = datetime.now(tz=timezone.utc).replace(microsecond=0)
+        filename = f"{timestamp.strftime('%Y%m%d_%H%M%S')}__{slug}.db"
+        relative_path = Path('checkpoints') / filename
+        checkpoint_path = state.project_path / relative_path
+
+        self._checkpoint_and_vacuum(state.engine, checkpoint_path)
+        sha256 = self._sha256(checkpoint_path)
+        byte_size = checkpoint_path.stat().st_size
+
+        with self.get_session() as session:
+            row = CheckpointModel(
+                name=name,
+                description=description,
+                timestamp=timestamp.replace(tzinfo=None),
+                file_path=relative_path.as_posix(),
+                byte_size=byte_size,
+                sha256=sha256,
+                app_version=APP_VERSION,
+                schema_version=SCHEMA_VERSION,
+            )
+            session.add(row)
+            session.commit()
+            session.refresh(row)
+            return self._checkpoint_to_dict(row)
+
+    def list_checkpoints(self) -> list[dict[str, Any]]:
+        with self.get_session() as session:
+            rows = session.scalars(select(CheckpointModel).order_by(CheckpointModel.timestamp.desc(), CheckpointModel.id.desc())).all()
+            return [self._checkpoint_to_dict(row) for row in rows]
+
+    def restore_checkpoint(self, checkpoint_id: int) -> dict[str, Any]:
+        state = self._require_open_state()
+        target = self._get_checkpoint_by_id(checkpoint_id)
+        before_restore = self.create_checkpoint(f'before-restore-{checkpoint_id}', f'Auto checkpoint before restoring {target["name"]}')
+
+        checkpoint_path = state.project_path / target['file_path']
+        if not checkpoint_path.exists():
+            raise FileNotFoundError(f'Checkpoint file is missing: {checkpoint_path}')
+
+        state.engine.dispose()
+        shutil.copy2(checkpoint_path, state.working_db_path)
+        state.engine = create_engine_for_project(state.working_db_path)
+        self.undo_stack.clear()
+        self.mark_dirty()
+
+        with self.get_session() as session:
+            row = session.get(CheckpointModel, before_restore['id'])
+            if row is None:
+                row = CheckpointModel(
+                    id=before_restore['id'],
+                    name=before_restore['name'],
+                    description=before_restore['description'],
+                    timestamp=datetime.fromisoformat(before_restore['timestamp']).replace(tzinfo=None),
+                    file_path=before_restore['file_path'],
+                    byte_size=before_restore['byte_size'],
+                    sha256=before_restore['sha256'],
+                    app_version=before_restore['app_version'],
+                    schema_version=before_restore['schema_version'],
+                )
+                session.add(row)
+                session.commit()
+
+        return before_restore
+
+    def delete_checkpoint(self, checkpoint_id: int) -> None:
+        state = self._require_open_state()
+        with self.get_session() as session:
+            row = session.get(CheckpointModel, checkpoint_id)
+            if row is None:
+                raise ValueError(f'Checkpoint not found: {checkpoint_id}')
+            checkpoint_path = state.project_path / row.file_path
+            session.delete(row)
+            session.commit()
+        if checkpoint_path.exists():
+            checkpoint_path.unlink()
+
     def get_session(self) -> Session:
         return Session(self._require_open_state().engine)
 
@@ -285,11 +366,42 @@ class ProjectManager:
         return recovery_path.exists() and recovery_path.stat().st_mtime >= canonical_db.stat().st_mtime
 
     def _checkpoint_and_vacuum(self, engine: Any, destination: Path) -> None:
+        destination.parent.mkdir(parents=True, exist_ok=True)
         if destination.exists():
             destination.unlink()
         with engine.connect() as conn:
             conn.execute(text('PRAGMA wal_checkpoint(TRUNCATE)'))
             conn.execute(text(f"VACUUM INTO '{destination.as_posix()}'"))
+
+    def _checkpoint_to_dict(self, row: CheckpointModel) -> dict[str, Any]:
+        return {
+            'id': row.id,
+            'name': row.name,
+            'description': row.description,
+            'timestamp': row.timestamp.replace(tzinfo=timezone.utc).isoformat(),
+            'file_path': row.file_path,
+            'byte_size': row.byte_size,
+            'sha256': row.sha256,
+            'app_version': row.app_version,
+            'schema_version': row.schema_version,
+        }
+
+    def _get_checkpoint_by_id(self, checkpoint_id: int) -> dict[str, Any]:
+        with self.get_session() as session:
+            row = session.get(CheckpointModel, checkpoint_id)
+            if row is None:
+                raise ValueError(f'Checkpoint not found: {checkpoint_id}')
+            return self._checkpoint_to_dict(row)
+
+    def _slugify(self, value: str) -> str:
+        return re.sub(r'[^a-z0-9]+', '-', value.lower()).strip('-')
+
+    def _sha256(self, path: Path) -> str:
+        digest = hashlib.sha256()
+        with path.open('rb') as handle:
+            for chunk in iter(lambda: handle.read(1024 * 1024), b''):
+                digest.update(chunk)
+        return digest.hexdigest()
 
     def _fsync_file(self, path: Path) -> None:
         if os.name == 'nt':

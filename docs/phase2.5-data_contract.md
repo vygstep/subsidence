@@ -19,7 +19,7 @@ first write operation). No new UI panels; all changes are backend + stores + wir
 | Step 7  | done | `import_tops_csv()` imports 32 tops for `PLESHET 01`; ICS color lookup works; unconformity age bounds load from `unconformities.csv` | `d3153a3` |
 | Step 8  | done | `import_deviation_csv()` detects `MD+INCL_AZIM`, writes Parquet, and `load_deviation_from_parquet()` returns a valid `DeviationSurvey` | `a728620` |
 | Step 9  | done | `UndoStack` executes `push/undo/redo`; `ImportWell` undo removes the well and redo restores DB rows + Parquet; `mark_clean()` and undo update `is_clean` correctly | `bbb5d33` |
-| Step 10 | pending | - | - |
+| Step 10 | done | `create_checkpoint()` writes a DB snapshot + row; `restore_checkpoint()` reverts working state and creates `before-restore`; `delete_checkpoint()` removes file + row | pending |
 | Step 11 | pending | - | - |
 | Step 12 | pending | - | - |
 | Step 13 | pending | - | - |
@@ -296,15 +296,14 @@ MyProject.subsidence/
 
 ### Step 10 — Checkpoints
 
-- [ ] 10.1 Implement `create_checkpoint(name, description)`: `VACUUM INTO
+- [x] 10.1 Implement `create_checkpoint(name, description)`: `VACUUM INTO
            checkpoints/<ts>__<slug>.db`, compute sha256, insert `CheckpointModel` row
-- [ ] 10.2 Implement `list_checkpoints()`: query `CheckpointModel`
-- [ ] 10.3 Implement `restore_checkpoint(checkpoint_id)`: auto-create `before-restore`
+- [x] 10.2 Implement `list_checkpoints()`: query `CheckpointModel`
+- [x] 10.3 Implement `restore_checkpoint(checkpoint_id)`: auto-create `before-restore`
            checkpoint first, then close working DB, copy checkpoint → working DB, reopen,
            reset undo stack, mark dirty
-- [ ] 10.4 Implement `delete_checkpoint(checkpoint_id)`: remove file + DB row
-- [ ] 10.✓ Verify: create checkpoint → listed. Modify data → restore → reverted.
-           `before-restore` checkpoint exists.
+- [x] 10.4 Implement `delete_checkpoint(checkpoint_id)`: remove file + DB row
+- [x] 10.5 Verify: create checkpoint -> listed. Modify data -> restore -> reverted. `before-restore` checkpoint exists.
 
 ### Step 11 — API endpoints
 
@@ -857,6 +856,11 @@ intermediate positions into a single `UpdateFormationDepth` on drag-end.
 ---
 
 ### Step 10 — Checkpoints
+
+Status: done
+Verification: `create_checkpoint()` writes a snapshot into `checkpoints/`; `list_checkpoints()` returns it; restoring a modified working DB reverts state and auto-creates `before-restore`; `delete_checkpoint()` removes both the file and the DB row
+Commit: pending
+
 
 ```python
 def create_checkpoint(self, name: str, description: str = ""):
