@@ -1,16 +1,18 @@
 from __future__ import annotations
 
-from pathlib import Path
-
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, HTTPException, Request
 from pydantic import BaseModel
+from sqlalchemy import select
 
-from subsidence.data import load_las_curves
+from subsidence.data import load_curves_from_parquet
+from subsidence.data.schema import CurveMetadata, FormationTopModel, WellModel
 
 router = APIRouter(tags=['wells'])
-_SAMPLE_WELL_ID = 'sample'
-_SAMPLE_WELL_NAME = 'SAMPLE-1'
-_SAMPLE_PATH = Path(__file__).resolve().parents[3] / 'data' / 'sample.las'
+
+
+class WellListItem(BaseModel):
+    well_id: str
+    well_name: str
 
 
 class CurveResponse(BaseModel):
@@ -44,74 +46,85 @@ class WellResponse(BaseModel):
     formations: list[FormationResponse]
 
 
-_SAMPLE_FORMATIONS = [
-    FormationResponse(
-        id='fm-1000',
-        name='Coastal Sand',
-        depth_md=1000.0,
-        age_ma=12.0,
-        color='#f4c26b',
-        is_locked=False,
-        lithology='sandstone',
-    ),
-    FormationResponse(
-        id='fm-1003',
-        name='Marine Shale',
-        depth_md=1003.0,
-        age_ma=18.0,
-        color='#90a4ae',
-        is_locked=False,
-        lithology='shale',
-    ),
-    FormationResponse(
-        id='fm-1006',
-        name='Platform Lime',
-        depth_md=1006.0,
-        age_ma=24.0,
-        color='#8fd3b6',
-        is_locked=False,
-        lithology='limestone',
-    ),
-    FormationResponse(
-        id='fm-1008',
-        name='Tight Dolomite',
-        depth_md=1008.0,
-        age_ma=28.0,
-        color='#d8b4fe',
-        is_locked=False,
-        lithology='dolomite',
-    ),
-]
+
+def _manager(request: Request):
+    return request.app.state.project_manager
 
 
-@router.get('/wells/sample', response_model=WellResponse)
-def get_sample_well() -> WellResponse:
-    if not _SAMPLE_PATH.exists():
-        raise HTTPException(status_code=404, detail='Sample LAS file is missing')
 
-    curves = load_las_curves(_SAMPLE_PATH)
-    if not curves:
-        raise HTTPException(status_code=500, detail='Sample LAS file contains no valid curves')
+def _require_open_project(request: Request):
+    manager = _manager(request)
+    if not manager.is_open:
+        raise HTTPException(status_code=400, detail='No project is currently open')
+    return manager
 
-    td_md = max(depth for curve in curves for depth in curve.depths)
-    return WellResponse(
-        well_id=_SAMPLE_WELL_ID,
-        well_name=_SAMPLE_WELL_NAME,
-        kb_elev=10.0,
-        td_md=td_md,
-        x=0.0,
-        y=0.0,
-        crs='unset',
-        depth_reference='MD',
-        curves=[
-            CurveResponse(
-                mnemonic=curve.mnemonic,
-                unit=curve.unit,
-                depths=curve.depths,
-                values=curve.values,
-                null_value=curve.null_value,
+
+@router.get('/wells', response_model=list[WellListItem])
+def list_wells(request: Request) -> list[WellListItem]:
+    manager = _require_open_project(request)
+    with manager.get_session() as session:
+        rows = session.scalars(select(WellModel).order_by(WellModel.name.asc(), WellModel.id.asc())).all()
+        return [WellListItem(well_id=row.id, well_name=row.name) for row in rows]
+
+
+@router.get('/wells/{well_id}', response_model=WellResponse)
+def get_well(well_id: str, request: Request) -> WellResponse:
+    manager = _require_open_project(request)
+    with manager.get_session() as session:
+        if well_id == 'sample':
+            well = session.scalar(select(WellModel).order_by(WellModel.name.asc(), WellModel.id.asc()))
+        else:
+            well = session.get(WellModel, well_id)
+        if well is None:
+            raise HTTPException(status_code=404, detail=f'Well not found: {well_id}')
+
+        curve_rows = list(session.scalars(select(CurveMetadata).where(CurveMetadata.well_id == well.id).order_by(CurveMetadata.id.asc())))
+        if not curve_rows:
+            raise HTTPException(status_code=404, detail=f'No curves found for well: {well.id}')
+
+        curve_map = load_curves_from_parquet(manager.project_path, curve_rows[0].data_uri)
+        curves: list[CurveResponse] = []
+        td_md = well.td_md or 0.0
+        for row in curve_rows:
+            values = curve_map.get(row.mnemonic)
+            if values is None:
+                continue
+            depths, curve_values = values
+            if depths.size > 0:
+                td_md = max(td_md, float(depths[-1]))
+            curves.append(
+                CurveResponse(
+                    mnemonic=row.mnemonic,
+                    unit=row.unit,
+                    depths=depths.tolist(),
+                    values=curve_values.tolist(),
+                    null_value=-999.25,
+                )
             )
-            for curve in curves
-        ],
-        formations=_SAMPLE_FORMATIONS,
-    )
+
+        formation_rows = list(session.scalars(select(FormationTopModel).where(FormationTopModel.well_id == well.id).order_by(FormationTopModel.depth_md.asc())))
+        formations = [
+            FormationResponse(
+                id=str(row.id),
+                name=row.name,
+                depth_md=row.depth_md,
+                age_ma=row.age_top_ma,
+                color=row.color,
+                is_locked=row.is_locked,
+                lithology=row.strat_unit.lithology if row.strat_unit is not None else None,
+            )
+            for row in formation_rows
+        ]
+
+        return WellResponse(
+            well_id=well.id,
+            well_name=well.name,
+            kb_elev=well.kb_elev,
+            td_md=td_md,
+            x=well.lon or 0.0,
+            y=well.lat or 0.0,
+            crs=well.crs,
+            depth_reference='MD',
+            curves=curves,
+            formations=formations,
+        )

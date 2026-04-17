@@ -21,6 +21,7 @@ export interface WellDataStore {
   formations: FormationTop[]
   isLoading: boolean
   error: string | null
+  reset: () => void
   loadWell: (wellId: string) => Promise<void>
 }
 
@@ -28,12 +29,19 @@ function toFloat32Array(values: number[]): Float32Array {
   return new Float32Array(values)
 }
 
-export const useWellDataStore = create<WellDataStore>((set) => ({
+const emptyState = {
   well: null,
   curves: [],
   formations: [],
   isLoading: false,
   error: null,
+}
+
+export const useWellDataStore = create<WellDataStore>((set) => ({
+  ...emptyState,
+  reset() {
+    set(emptyState)
+  },
   async loadWell(wellId: string) {
     set({ isLoading: true, error: null })
 
@@ -61,10 +69,7 @@ export const useWellDataStore = create<WellDataStore>((set) => ({
       })
     } catch (error) {
       set({
-        well: null,
-        curves: [],
-        formations: [],
-        isLoading: false,
+        ...emptyState,
         error: error instanceof Error ? error.message : 'Unknown error',
       })
     }

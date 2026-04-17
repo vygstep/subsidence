@@ -52,6 +52,12 @@ textarea {
   color: #7cb8e8;
 }
 
+.app-topbar__project {
+  font-size: 0.84rem;
+  font-weight: 700;
+  color: #d7e8f7;
+}
+
 .app-topbar__well {
   font-size: 0.88rem;
   font-weight: 600;

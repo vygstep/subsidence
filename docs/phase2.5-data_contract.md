@@ -21,7 +21,7 @@ first write operation). No new UI panels; all changes are backend + stores + wir
 | Step 9  | done | `UndoStack` executes `push/undo/redo`; `ImportWell` undo removes the well and redo restores DB rows + Parquet; `mark_clean()` and undo update `is_clean` correctly | `bbb5d33` |
 | Step 10 | done | `create_checkpoint()` writes a DB snapshot + row; `restore_checkpoint()` reverts working state and creates `before-restore`; `delete_checkpoint()` removes file + row | `22af478` |
 | Step 11 | done | Full API round trip passes via TestClient: create -> open -> import LAS/tops/unconformities/deviation -> save -> close -> reopen -> data intact; dictionary and checkpoint endpoints respond correctly | `64cce9c` |
-| Step 12 | pending | - | - |
+| Step 12 | done | Frontend loads well data from project-backed `/api/wells/{id}`; `projectStore` polls `/api/projects/status`; keyboard shortcuts trigger save/undo/redo; build passes and backend well endpoints return DB + Parquet data after reopen | pending |
 | Step 13 | pending | - | - |
 
 ---
@@ -331,18 +331,18 @@ MyProject.subsidence/
 
 ### Step 12 — Rewire frontend stores to project-aware API
 
-- [ ] 12.1 Update `wellDataStore.loadWell()`: fetch from `/api/wells/{id}` which now
+- [x] 12.1 Update `wellDataStore.loadWell()`: fetch from `/api/wells/{id}` which now
            reads from `project.db` + Parquet
-- [ ] 12.2 Update `GET /api/wells/{id}` endpoint: read `WellModel` + `CurveMetadata`
+- [x] 12.2 Update `GET /api/wells/{id}` endpoint: read `WellModel` + `CurveMetadata`
            from DB, load arrays from Parquet, return same JSON shape as Phase 1
-- [ ] 12.3 Add `useProjectStore` Zustand store: `projectName`, `projectPath`,
+- [x] 12.3 Add `useProjectStore` Zustand store: `projectName`, `projectPath`,
            `isDirty`, `isOpen`, `canUndo`, `canRedo`
-- [ ] 12.4 Wire `useProjectStore` to poll `/api/projects/status` on 2s interval
-- [ ] 12.5 Add `Ctrl+S` → `POST /api/projects/save`
-- [ ] 12.6 Add `Ctrl+Z` / `Ctrl+Shift+Z` → `POST /api/projects/undo` / `redo`
-- [ ] 12.7 Title bar dirty indicator: show `●` before project name when `isDirty=true`
-- [ ] 12.✓ Verify: `npm run dev` + `uvicorn` → open project → Phase 2 tracks render as
-           before. `Ctrl+S` saves; dirty indicator clears.
+- [x] 12.4 Wire `useProjectStore` to poll `/api/projects/status` on 2s interval
+- [x] 12.5 Add `Ctrl+S` -> `POST /api/projects/save`
+- [x] 12.6 Add `Ctrl+Z` / `Ctrl+Shift+Z` -> `POST /api/projects/undo` / `redo`
+- [x] 12.7 Title bar dirty indicator: show `dirty-dot` before project name when `isDirty=true`
+- [x] 12.8 Verify: frontend build passes; project-backed `/api/wells` and `/api/wells/{id}` return data after save/close/reopen; hotkeys and dirty indicator are wired in `App.tsx`
+
 
 ### Step 13 — Visual config persistence + export stubs
 

@@ -1,7 +1,7 @@
 import { useEffect, useMemo } from 'react'
 
 import { LogViewPanel, ZoomControl } from '@/components'
-import { useWellDataStore } from '@/stores'
+import { useProjectStore, useWellDataStore } from '@/stores'
 import type { TrackConfig } from '@/types'
 
 const DEFAULT_TRACKS: TrackConfig[] = [
@@ -74,16 +74,110 @@ const DEFAULT_TRACKS: TrackConfig[] = [
   },
 ]
 
+interface WellListItem {
+  well_id: string
+  well_name: string
+}
+
+async function fetchWellList(): Promise<WellListItem[]> {
+  const response = await fetch('/api/wells')
+  if (!response.ok) {
+    throw new Error(`Failed to list wells (${response.status})`)
+  }
+  return (await response.json()) as WellListItem[]
+}
+
 function App() {
   const loadWell = useWellDataStore((state) => state.loadWell)
+  const resetWell = useWellDataStore((state) => state.reset)
   const well = useWellDataStore((state) => state.well)
   const curves = useWellDataStore((state) => state.curves)
   const isLoading = useWellDataStore((state) => state.isLoading)
   const error = useWellDataStore((state) => state.error)
 
+  const isProjectOpen = useProjectStore((state) => state.isOpen)
+  const projectName = useProjectStore((state) => state.projectName)
+  const isDirty = useProjectStore((state) => state.isDirty)
+  const canUndo = useProjectStore((state) => state.canUndo)
+  const canRedo = useProjectStore((state) => state.canRedo)
+  const pollStatus = useProjectStore((state) => state.pollStatus)
+  const saveProject = useProjectStore((state) => state.saveProject)
+  const undoProject = useProjectStore((state) => state.undo)
+  const redoProject = useProjectStore((state) => state.redo)
+
   useEffect(() => {
-    void loadWell('sample')
-  }, [loadWell])
+    void pollStatus()
+    const timer = window.setInterval(() => {
+      void pollStatus()
+    }, 2000)
+    return () => window.clearInterval(timer)
+  }, [pollStatus])
+
+  useEffect(() => {
+    if (!isProjectOpen) {
+      resetWell()
+      return
+    }
+
+    let cancelled = false
+    const loadFirstWell = async () => {
+      try {
+        const wells = await fetchWellList()
+        if (cancelled) {
+          return
+        }
+        if (wells.length === 0) {
+          resetWell()
+          return
+        }
+        if (well?.well_id === wells[0].well_id) {
+          return
+        }
+        await loadWell(wells[0].well_id)
+      } catch {
+        resetWell()
+      }
+    }
+
+    void loadFirstWell()
+    return () => {
+      cancelled = true
+    }
+  }, [isProjectOpen, loadWell, resetWell, well?.well_id])
+
+  useEffect(() => {
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (!isProjectOpen || !event.ctrlKey) {
+        return
+      }
+
+      if (event.key.toLowerCase() === 's') {
+        event.preventDefault()
+        void saveProject()
+        return
+      }
+
+      if (event.key.toLowerCase() === 'z' && event.shiftKey) {
+        if (!canRedo) {
+          return
+        }
+        event.preventDefault()
+        void redoProject()
+        return
+      }
+
+      if (event.key.toLowerCase() === 'z') {
+        if (!canUndo) {
+          return
+        }
+        event.preventDefault()
+        void undoProject()
+      }
+    }
+
+    window.addEventListener('keydown', onKeyDown)
+    return () => window.removeEventListener('keydown', onKeyDown)
+  }, [canRedo, canUndo, isProjectOpen, redoProject, saveProject, undoProject])
 
   const { minDepth, maxDepth } = useMemo(() => {
     if (curves.length === 0) {
@@ -102,13 +196,20 @@ function App() {
     return { minDepth: min, maxDepth: max }
   }, [curves])
 
+  const topbarTitle = !isProjectOpen
+    ? 'No project open'
+    : isLoading
+      ? 'Loading well...'
+      : error
+        ? 'Error loading well'
+        : (well?.well_name ?? 'No wells in project')
+
   return (
     <div className="app-layout">
       <header className="app-topbar">
         <span className="app-topbar__brand">SUBSIDENCE</span>
-        <span className="app-topbar__well">
-          {isLoading ? 'Loading...' : error ? 'Error loading well' : (well?.well_name ?? '-')}
-        </span>
+        <span className="app-topbar__project">{isDirty ? '? ' : ''}{projectName ?? '-'}</span>
+        <span className="app-topbar__well">{topbarTitle}</span>
         <ZoomControl />
         {curves.length > 0 && (
           <span className="app-topbar__meta">
@@ -117,8 +218,12 @@ function App() {
         )}
       </header>
       <main className="app-main">
-        {error ? (
+        {!isProjectOpen ? (
+          <p className="app-error-banner">Open a project through the API before loading the viewer.</p>
+        ) : error ? (
           <p className="app-error-banner">{error}</p>
+        ) : curves.length === 0 ? (
+          <p className="app-error-banner">No wells are available in the open project.</p>
         ) : (
           <LogViewPanel
             tracks={DEFAULT_TRACKS}
