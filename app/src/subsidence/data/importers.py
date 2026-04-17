@@ -14,7 +14,7 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from .dict_resolver import load_curve_alias_rules, resolve_curve_alias
-from .schema import CurveMetadata, FormationTopModel, WellModel
+from .schema import CurveMetadata, DeviationSurveyModel, FormationTopModel, WellModel
 from .unit_conversion import canonicalize_gamma_unit, convert_curve_units, convert_depth_to_meters, normalize_unit_name
 
 _DEPTH_CANDIDATES = {'DEPT', 'DEPTH', 'MD', 'TVD', 'TVDSS'}
@@ -240,6 +240,50 @@ def _extract_note_unconformity_ref(note: str | None) -> str | None:
     return None
 
 
+_DEVIATION_MODE_COLUMNS = {
+    'INCL_AZIM': ('incl_deg', 'azim_deg'),
+    'X_Y': ('x', 'y'),
+    'DX_DY': ('dx', 'dy'),
+}
+
+
+def _detect_deviation_reference(fieldnames: list[str]) -> tuple[str, str]:
+    normalized = {name.strip().casefold(): name for name in fieldnames}
+    if 'md' in normalized:
+        return 'MD', normalized['md']
+    if 'tvdss' in normalized:
+        return 'TVDSS', normalized['tvdss']
+    if 'tvd' in normalized:
+        return 'TVD', normalized['tvd']
+    raise ValueError('Deviation CSV must contain one depth column: md, tvd, or tvdss')
+
+
+def _detect_deviation_mode(fieldnames: list[str]) -> tuple[str, tuple[str, str]]:
+    normalized = {name.strip().casefold() for name in fieldnames}
+    if {'incl_deg', 'azim_deg'} <= normalized:
+        return 'INCL_AZIM', ('incl_deg', 'azim_deg')
+    if {'x', 'y'} <= normalized:
+        return 'X_Y', ('x', 'y')
+    if {'dx', 'dy'} <= normalized:
+        return 'DX_DY', ('dx', 'dy')
+    raise ValueError('Deviation CSV must contain incl_deg/azim_deg, x/y, or dx/dy columns')
+
+
+def _validate_strictly_increasing_depth(rows: list[dict[str, str]], depth_column: str, csv_path: Path) -> list[float]:
+    depths: list[float] = []
+    previous = None
+    for row_index, row in enumerate(rows, start=2):
+        raw_value = row.get(depth_column)
+        depth = _coerce_float(raw_value)
+        if depth is None:
+            raise ValueError(f'{csv_path}: invalid depth value at row {row_index}: {raw_value!r}')
+        if previous is not None and depth <= previous:
+            raise ValueError(f'{csv_path}: depth values must be strictly increasing at row {row_index}')
+        depths.append(depth)
+        previous = depth
+    return depths
+
+
 def import_las_file(session: Session, project_path: Path | str, las_path: Path | str) -> WellModel:
     bundle_path = Path(project_path)
     source_path = Path(las_path)
@@ -334,7 +378,10 @@ def import_tops_csv(
     strat_units_path: Path | str | None = None,
     strat_ranks_path: Path | str | None = None,
 ) -> list[FormationTopModel]:
-    del depth_ref
+    if depth_ref.upper() not in ('MD',):
+        raise NotImplementedError(
+            f'depth_ref={depth_ref!r} is not yet supported; only MD is implemented'
+        )
     well = _resolve_well(session, well_id)
     path = Path(csv_path)
     fieldnames, rows = _read_csv_rows(path)
@@ -480,3 +527,59 @@ def link_tops_to_unconformities(
 
     session.flush()
     return updated
+
+
+def import_deviation_csv(session: Session, project_path: Path | str, well_id: str, csv_path: Path | str) -> DeviationSurveyModel:
+    bundle_path = Path(project_path)
+    path = Path(csv_path)
+    deviation_dir = bundle_path / 'deviation'
+    deviation_dir.mkdir(parents=True, exist_ok=True)
+
+    well = _resolve_well(session, well_id)
+    fieldnames, rows = _read_csv_rows(path)
+    if not rows:
+        raise ValueError(f'{path}: deviation CSV is empty')
+
+    reference, depth_column = _detect_deviation_reference(fieldnames)
+    mode, value_columns = _detect_deviation_mode(fieldnames)
+    depths = _validate_strictly_increasing_depth(rows, depth_column, path)
+
+    frame_data: dict[str, list[float]] = {depth_column: depths}
+    for column in value_columns:
+        values: list[float] = []
+        for row_index, row in enumerate(rows, start=2):
+            raw_value = row.get(column)
+            value = _coerce_float(raw_value)
+            if value is None:
+                raise ValueError(f'{path}: invalid {column} value at row {row_index}: {raw_value!r}')
+            values.append(value)
+        frame_data[column] = values
+
+    frame = pd.DataFrame(frame_data)
+    for column in frame.columns:
+        frame[column] = frame[column].astype('float32')
+
+    relative_path = f'deviation/{well.id}__deviation.parquet'
+    parquet_path = bundle_path / relative_path
+    table = pa.Table.from_pandas(frame, preserve_index=False)
+    pq.write_table(table, parquet_path, compression='snappy')
+    source_hash = _sha256(path)
+
+    survey = session.scalar(select(DeviationSurveyModel).where(DeviationSurveyModel.well_id == well.id))
+    if survey is None:
+        survey = DeviationSurveyModel(
+            well_id=well.id,
+            reference=reference,
+            mode=mode,
+            data_uri=relative_path,
+            source_hash=source_hash,
+        )
+        session.add(survey)
+    else:
+        survey.reference = reference
+        survey.mode = mode
+        survey.data_uri = relative_path
+        survey.source_hash = source_hash
+
+    session.flush()
+    return survey

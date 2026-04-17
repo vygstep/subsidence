@@ -7,7 +7,7 @@ import lasio
 import numpy as np
 import pandas as pd
 
-from .models import DepthReference, LogCurve
+from .models import DeviationPoint, DeviationSurvey, DepthReference, LogCurve, SurveyMode
 from .unit_conversion import convert_depth_to_meters
 
 _DEPTH_MNEMONICS = {'DEPT', 'DEPTH', 'MD', 'TVD', 'TVDSS'}
@@ -93,3 +93,47 @@ def load_curves_from_parquet(project_path: str | Path, data_uri: str) -> dict[st
         curves[str(column)] = (depths, values)
 
     return curves
+
+
+def load_deviation_from_parquet(project_path: str | Path, data_uri: str) -> DeviationSurvey:
+    parquet_path = Path(project_path) / data_uri
+    frame = pd.read_parquet(parquet_path)
+    columns = {str(column).strip().casefold(): str(column) for column in frame.columns}
+
+    if 'md' in columns:
+        reference = DepthReference.MD
+        depth_column = columns['md']
+        depth_attr = 'md'
+    elif 'tvdss' in columns:
+        reference = DepthReference.TVDSS
+        depth_column = columns['tvdss']
+        depth_attr = 'tvdss'
+    elif 'tvd' in columns:
+        reference = DepthReference.TVD
+        depth_column = columns['tvd']
+        depth_attr = 'tvd'
+    else:
+        raise ValueError(f'Deviation Parquet is missing depth column: {parquet_path}')
+
+    if {'incl_deg', 'azim_deg'} <= set(columns):
+        mode = SurveyMode.INCL_AZIM
+        value_columns = ('incl_deg', 'azim_deg')
+    elif {'x', 'y'} <= set(columns):
+        mode = SurveyMode.XY
+        value_columns = ('x', 'y')
+    elif {'dx', 'dy'} <= set(columns):
+        mode = SurveyMode.DX_DY
+        value_columns = ('dx', 'dy')
+    else:
+        raise ValueError(f'Deviation Parquet is missing mode columns: {parquet_path}')
+
+    points: list[DeviationPoint] = []
+    for row in frame.to_dict(orient='records'):
+        kwargs = {depth_attr: float(row[depth_column])}
+        for column in value_columns:
+            kwargs[column] = float(row[columns[column]])
+        points.append(DeviationPoint(**kwargs))
+
+    survey = DeviationSurvey(reference=reference, mode=mode, points=points)
+    survey.validate()
+    return survey

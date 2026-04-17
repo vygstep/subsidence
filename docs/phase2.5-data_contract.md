@@ -17,7 +17,7 @@ first write operation). No new UI panels; all changes are backend + stores + wir
 | Step 5  | done | `create_project()` seeds 17 curve rows and 9 lithology rows; `resolve_curve_alias("GR_1", rules)` -> `gamma_ray` | pending |
 | Step 6  | done | `import_las_file()` writes Parquet + DB rows; `GR` resolves to `gamma_ray`; `load_curves_from_parquet()` returns float32 arrays | pending |
 | Step 7  | done | `import_tops_csv()` imports 32 tops for `PLESHET 01`; ICS color lookup works; unconformity age bounds load from `unconformities.csv` | pending |
-| Step 8  | pending | - | - |
+| Step 8  | done | `import_deviation_csv()` detects `MD+INCL_AZIM`, writes Parquet, and `load_deviation_from_parquet()` returns a valid `DeviationSurvey` | pending |
 | Step 9  | pending | - | - |
 | Step 10 | pending | - | - |
 | Step 11 | pending | - | - |
@@ -263,21 +263,21 @@ MyProject.subsidence/
 
 ### Step 8 вЂ” Deviation CSV import
 
-- [ ] 8.1 Add `import_deviation_csv(session, project_path, well_id, csv_path)` to
+- [x] 8.1 Add `import_deviation_csv(session, project_path, well_id, csv_path)` to
           `importers.py`
-- [ ] 8.2 Auto-detect mode from column headers:
+- [x] 8.2 Auto-detect mode from column headers:
           presence of `incl_deg`/`azim` в†’ `INCL_AZIM`;
           `x`/`y` в†’ `X_Y`; `dx`/`dy` в†’ `DX_DY`
-- [ ] 8.3 Auto-detect depth reference from column headers:
+- [x] 8.3 Auto-detect depth reference from column headers:
           `md` в†’ `MD`; `tvd` (no `md`) в†’ `TVD`; `tvdss` в†’ `TVDSS`
-- [ ] 8.4 Validate strictly increasing depth column; raise on duplicates or
+- [x] 8.4 Validate strictly increasing depth column; raise on duplicates or
           non-monotone values
-- [ ] 8.5 Write Parquet to `deviation/<well_id>__deviation.parquet`
-- [ ] 8.6 Create `DeviationSurveyModel` row: well_id, reference, mode, data_uri,
+- [x] 8.5 Write Parquet to `deviation/<well_id>__deviation.parquet`
+- [x] 8.6 Create `DeviationSurveyModel` row: well_id, reference, mode, data_uri,
           source_hash
-- [ ] 8.7 Add `load_deviation_from_parquet(project_path, data_uri)` to `loaders.py`
+- [x] 8.7 Add `load_deviation_from_parquet(project_path, data_uri)` to `loaders.py`
           в†’ `DeviationSurvey` domain object (reuse legacy `models.py` dataclass)
-- [ ] 8.вњ“ Verify: import a CSV with columns `md, incl_deg, azim_deg` в†’
+- [x] 8.8 Verify: import a CSV with columns `md, incl_deg, azim_deg` ->
           Parquet exists, `DeviationSurveyModel` row with `mode="INCL_AZIM"`,
           `load_deviation_from_parquet` returns a valid `DeviationSurvey`
 
