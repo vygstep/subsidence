@@ -22,7 +22,7 @@ first write operation). No new UI panels; all changes are backend + stores + wir
 | Step 10 | done | `create_checkpoint()` writes a DB snapshot + row; `restore_checkpoint()` reverts working state and creates `before-restore`; `delete_checkpoint()` removes file + row | `22af478` |
 | Step 11 | done | Full API round trip passes via TestClient: create -> open -> import LAS/tops/unconformities/deviation -> save -> close -> reopen -> data intact; dictionary and checkpoint endpoints respond correctly | `64cce9c` |
 | Step 12 | done | Frontend loads well data from project-backed `/api/wells/{id}`; `projectStore` polls `/api/projects/status`; keyboard shortcuts trigger save/undo/redo; build passes and backend well endpoints return DB + Parquet data after reopen | `c9bd17e` |
-| Step 13 | done | Config endpoints persist project visual config; debounced frontend save restores track widths and zoom after reopen; export LAS/CSV endpoints return valid files | pending |
+| Step 13 | done | Config endpoints persist project visual config; debounced frontend save restores track widths and zoom after reopen; export LAS/CSV endpoints return valid files | `b43cdad` |
 
 ---
 
@@ -897,7 +897,7 @@ All endpoints access `ProjectManager` via `request.app.state.project_manager`.
 
 Status: done
 Verification: `GET/PUT /api/projects/config/project` persists `depthPerPixel` and `trackWidths`; frontend hydrates config on project open and writes it back with 1s debounce; `POST /api/projects/export/las` and `POST /api/projects/export/csv` return valid files in TestClient round trip
-Commit: pending
+Commit: `b43cdad`
 
 
 **Project lifecycle:**
