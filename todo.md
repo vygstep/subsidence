@@ -36,7 +36,8 @@ Primary references:
 - [x] C23 Execute Phase 2.5 Step 2: engine and connection management
 - [x] C24 Execute Phase 2.5 Step 3: project bundle create / open / close
 - [x] C25 Execute Phase 2.5 Step 4: save and autosave
+- [x] C26 Execute Phase 2.5 Step 5: dictionary bootstrap
 
 ## Immediate Next Step
 
-Execute Phase 2.5 Step 5: dictionary bootstrap.
+Execute Phase 2.5 Step 6: LAS import into project.

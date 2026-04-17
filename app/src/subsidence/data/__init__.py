@@ -1,3 +1,4 @@
+from .dict_resolver import CurveMatchResult, load_curve_alias_rules, load_lithology_entries, resolve_curve_alias
 from .engine import create_all_tables, create_engine_for_project, get_session, validate_project_db
 from .loaders import load_las_curves
 from .models import DepthReference, LogCurve
@@ -5,10 +6,14 @@ from .project_manager import ProjectManager
 from .undo import UndoStack
 
 __all__ = [
+    "CurveMatchResult",
     "DepthReference",
     "LogCurve",
     "ProjectManager",
     "UndoStack",
+    "load_curve_alias_rules",
+    "load_lithology_entries",
+    "resolve_curve_alias",
     "create_all_tables",
     "create_engine_for_project",
     "get_session",

@@ -14,7 +14,7 @@ first write operation). No new UI panels; all changes are backend + stores + wir
 | Step 2  | done | `PRAGMA application_id` returns `0x53554253` on a temp DB | `fbe43df` |
 | Step 3  | done | `create_project()` creates bundle dirs + seeded dictionaries; `open_project()` creates `working.db`; `close_project()` removes the session dir | `9d4e7d6` |
 | Step 4  | done | write -> save -> close -> reopen persists; close without save reverts; crash recovery is detected | pending |
-| Step 5  | pending | - | - |
+| Step 5  | done | `create_project()` seeds 17 curve rows and 9 lithology rows; `resolve_curve_alias("GR_1", rules)` -> `gamma_ray` | pending |
 | Step 6  | pending | - | - |
 | Step 7  | pending | - | - |
 | Step 8  | pending | - | - |
@@ -187,29 +187,29 @@ MyProject.subsidence/
 
 ### Step 5 вЂ” Dictionary bootstrap
 
-- [ ] 5.1 Create `app/src/subsidence/data/dictionaries/` directory with seed files:
+- [x] 5.1 Create `app/src/subsidence/data/dictionaries/` directory with seed files:
           `curve_families.csv` and `lithology_defaults.csv`
-- [ ] 5.2 `curve_families.csv` columns:
+- [x] 5.2 `curve_families.csv` columns:
           `scope, pattern, is_regex, priority, family_code, canonical_mnemonic, canonical_unit`
           вЂ” include base rules for GR/CALI, ILD/ILM/LLD, RHOB/DRHOB, NPHI/TNPH/CNCF,
           DT/DTC, CALI, SP; mark all as `scope=base`
-- [ ] 5.3 `lithology_defaults.csv` columns:
+- [x] 5.3 `lithology_defaults.csv` columns:
           `lithology_code, display_name, color_hex, pattern_id, sort_order`
           вЂ” cover all `LithologyPattern` values from `lithologyRenderer.ts`:
           sandstone, shale, limestone, dolomite, evaporite, igneous, coal,
           conglomerate, metamorphic (pattern_id=null for metamorphic)
-- [ ] 5.4 Create `app/src/subsidence/data/dict_seeder.py` with
+- [x] 5.4 Create `app/src/subsidence/data/dict_seeder.py` with
           `seed_dictionaries(session, db_path)`:
           read both CSVs, insert rows only if `CurveDictEntry`/`LithologyDictEntry`
           tables are empty (idempotent)
-- [ ] 5.5 Create `app/src/subsidence/data/dict_resolver.py` with
+- [x] 5.5 Create `app/src/subsidence/data/dict_resolver.py` with
           `load_curve_alias_rules(session)` and `resolve_curve_alias(mnemonic, rules)` вЂ”
           migrated from legacy `curve_dictionary.py` but reading from the ORM session
           instead of a raw SQLite connection; sort order: scope rank
           (user > project > base) then priority then pattern length (descending)
-- [ ] 5.6 Create `app/src/subsidence/data/dict_resolver.py` with
+- [x] 5.6 Create `app/src/subsidence/data/dict_resolver.py` with
           `load_lithology_entries(session)` в†’ dict `{code: LithologyDictEntry}`
-- [ ] 5.вњ“ Verify: `create_project` в†’ query `curve_dict_entries` в†’ at least one row
+- [x] 5.? Verify: `create_project` ? query `curve_dict_entries` ? at least one row
           per family code. Query `lithology_dict_entries` в†’ 9 rows.
           `resolve_curve_alias("GR_1", rules)` в†’ `family_code="gamma_ray"`.
 
@@ -595,9 +595,14 @@ Autosave (every 5 min if dirty): `VACUUM INTO recovery.db.new` ??? `os.replace` 
 
 ---
 
-### Step 5 вЂ” Dictionary bootstrap
+### Step 5 ? Dictionary bootstrap
+
+Status: done
+Verification: `create_project()` seeds 17 curve rows and 9 lithology rows; `load_lithology_entries(session)` returns 9 entries; `resolve_curve_alias("GR_1", rules)` returns `family_code="gamma_ray"`
+Commit: pending
 
 Create `app/src/subsidence/data/dictionaries/`.
+
 
 **`curve_families.csv`** вЂ” minimum required entries (extend before Phase 4):
 
