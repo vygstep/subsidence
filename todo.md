@@ -2,13 +2,12 @@
 
 ## Current Program
 
-Current program: post-Phase-2 data contract decisions before Phase 3.
+Current program: Phase 2.5 data persistence layer.
 
 Primary references:
 
 - `docs/app_compass.md`
-- `docs/phase2-contract.md`
-- `docs/data-contract-questions.md`
+- `docs/phase2.5-data_contract.md`
 
 ## Checkpoints
 
@@ -25,7 +24,6 @@ Primary references:
 - [x] C11 Execute Phase 1 Step 8: DataTrack
 - [x] C12 Execute Phase 1 Step 9: track headers
 - [x] C13 Execute Phase 1 Step 10: LogViewPanel and synchronized scroll
-
 - [x] C14 Execute Phase 2 Step 1: logarithmic grid renderer
 - [x] C15 Execute Phase 2 Step 2: multi-curve track configs
 - [x] C16 Execute Phase 2 Step 3: CurveFillConfig type
@@ -34,9 +32,10 @@ Primary references:
 - [x] C19 Execute Phase 2 Step 6: FormationColumn
 - [x] C20 Execute Phase 2 Step 7: depth scale presets
 - [x] C21 Execute Phase 2 Step 8: track resize via drag
-
-- [ ] C22 Resolve persistence and project-structure decisions for Phase 3
+- [x] C22 Execute Phase 2.5 Step 1: SQLAlchemy models and schema
+- [x] C23 Execute Phase 2.5 Step 2: engine and connection management
+- [ ] C24 Execute Phase 2.5 Step 3: project bundle create / open / close
 
 ## Immediate Next Step
 
-Answer the open persistence questions and record the Phase 3 storage contract.
+Execute Phase 2.5 Step 3: project bundle create / open / close.

@@ -11,8 +11,8 @@ first write operation). No new UI panels; all changes are backend + stores + wir
 | Step | Status | Verification | Commit |
 |---|---|---|---|
 | Step 1  | done | `Base.metadata.tables` returns 12 schema tables | `144656e` |
-| Step 2  | pending | - | - |
-| Step 3  | pending | - | - |
+| Step 1  | done | `Base.metadata.tables` returns 12 schema tables | `144656e` |
+| Step 2  | done | `PRAGMA application_id` returns `0x53554253` on a temp DB | pending |
 | Step 4  | pending | - | - |
 | Step 5  | pending | - | - |
 | Step 6  | pending | - | - |
@@ -144,14 +144,14 @@ MyProject.subsidence/
 
 ### Step 2 вЂ” Database engine and connection management
 
-- [ ] 2.1 Create `app/src/subsidence/data/engine.py`: `create_engine_for_project(db_path)`
+- [x] 2.1 Create `app/src/subsidence/data/engine.py`: `create_engine_for_project(db_path)`
           with PRAGMA block (WAL, foreign_keys, synchronous=NORMAL, application_id,
           user_version, mmap_size, busy_timeout)
-- [ ] 2.2 Add `get_session` dependency for FastAPI
-- [ ] 2.3 Add `create_all_tables(engine)` function
-- [ ] 2.4 Add `validate_project_db(db_path)` function: checks `application_id` and
+- [x] 2.2 Add `get_session` dependency for FastAPI
+- [x] 2.3 Add `create_all_tables(engine)` function
+- [x] 2.4 Add `validate_project_db(db_path)` function: checks `application_id` and
           `user_version`
-- [ ] 2.вњ“ Verify: create a temp DB, call `create_all_tables`, run `PRAGMA application_id`
+- [x] 2.вњ“ Verify: create a temp DB, call `create_all_tables`, run `PRAGMA application_id`
           в†’ returns `0x53554253`
 
 ### Step 3 вЂ” Project bundle create / open / close
@@ -516,6 +516,10 @@ using `color_hex`.
 ---
 
 ### Step 2 вЂ” Database engine and connection management
+
+Status: done
+Verification: create a temp DB, run `create_all_tables`, then `PRAGMA application_id` returns `0x53554253` and `validate_project_db()` passes
+Commit: pending
 
 Create `app/src/subsidence/data/engine.py`.
 

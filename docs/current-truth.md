@@ -6,8 +6,9 @@ This document defines what is currently treated as true for the active project.
 
 - The project is now oriented around `docs/app_compass.md`.
 - `Phase 2` is complete.
-- The current pre-Phase-3 scope is defined by `docs/data-contract-questions.md`.
-- The active goal is to resolve persistence and project-structure decisions before starting `Phase 3`.
+- The active implementation scope is now `docs/phase2.5-data_contract.md`.
+- `Phase 2.5 Step 1` and `Step 2` are complete.
+- The active goal is to finish the data persistence layer before starting `Phase 3` interaction work.
 
 ## Active Architecture
 
@@ -15,6 +16,7 @@ This document defines what is currently treated as true for the active project.
 - Visualization: Canvas-first log rendering
 - State management: Zustand
 - Backend: FastAPI in `app/`
+- Persistence target: project bundle with SQLite metadata plus sidecar Parquet files
 - Well data loading: Python loaders under `app/src/subsidence/data/`
 
 ## Active Working Rules
@@ -30,7 +32,7 @@ This document defines what is currently treated as true for the active project.
 
 - `docs/app_compass.md` is the strategy document.
 - `docs/phase2-contract.md` is the completed implementation contract for the current viewer baseline.
-- `docs/data-contract-questions.md` defines the active decision scope before `Phase 3`.
+- `docs/phase2.5-data_contract.md` is the active implementation contract for the persistence layer.
 - `docs/reference-sources.md` defines the active knowledge sources.
 - `docs/decisions/` holds current architectural decisions.
 - `todo.md` holds the ordered execution backlog.
