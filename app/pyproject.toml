@@ -13,6 +13,10 @@ dependencies = [
     "fastapi>=0.111",
     "uvicorn[standard]>=0.29",
     "lasio>=0.31",
+    "sqlalchemy>=2.0",
+    "pyarrow>=15.0",
+    "platformdirs>=4.0",
+    "pandas>=2.0",
 ]
 
 [project.optional-dependencies]
