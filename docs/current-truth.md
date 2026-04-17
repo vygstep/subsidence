@@ -7,7 +7,7 @@ This document defines what is currently treated as true for the active project.
 - The project is now oriented around `docs/app_compass.md`.
 - `Phase 2` is complete.
 - The active implementation scope is now `docs/phase2.5-data_contract.md`.
-- `Phase 2.5 Step 1` and `Step 2` are complete.
+- `Phase 2.5 Step 1`, `Step 2`, and `Step 3` are complete.
 - The active goal is to finish the data persistence layer before starting `Phase 3` interaction work.
 
 ## Active Architecture

@@ -34,8 +34,9 @@ Primary references:
 - [x] C21 Execute Phase 2 Step 8: track resize via drag
 - [x] C22 Execute Phase 2.5 Step 1: SQLAlchemy models and schema
 - [x] C23 Execute Phase 2.5 Step 2: engine and connection management
-- [ ] C24 Execute Phase 2.5 Step 3: project bundle create / open / close
+- [x] C24 Execute Phase 2.5 Step 3: project bundle create / open / close
+- [ ] C25 Execute Phase 2.5 Step 4: save and autosave
 
 ## Immediate Next Step
 
-Execute Phase 2.5 Step 3: project bundle create / open / close.
+Execute Phase 2.5 Step 4: save and autosave.

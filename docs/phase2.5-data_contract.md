@@ -156,19 +156,19 @@ MyProject.subsidence/
 
 ### Step 3 вЂ” Project bundle create / open / close
 
-- [ ] 3.1 Create `app/src/subsidence/data/project_manager.py` with `ProjectManager` class
-- [ ] 3.2 Implement `create_project(name, path)`: create folder structure
+- [x] 3.1 Create `app/src/subsidence/data/project_manager.py` with `ProjectManager` class
+- [x] 3.2 Implement `create_project(name, path)`: create folder structure
           (`curves/`, `deviation/`, `results/`, `originals/`, `checkpoints/`),
           init `project.db`, insert `ProjectMeta` + default `UserModel`,
           call `seed_dictionaries()` (Step 5), write `manifest.json`
-- [ ] 3.3 Implement `open_project(path)`: validate manifest + application_id,
+- [x] 3.3 Implement `open_project(path)`: validate manifest + application_id,
           acquire advisory lock, copy `project.db` в†’ session working copy, open engine
-- [ ] 3.4 Implement `close_project()`: checkpoint WAL, optimize, dispose engine,
+- [x] 3.4 Implement `close_project()`: checkpoint WAL, optimize, dispose engine,
           release lock, clean up session directory
-- [ ] 3.5 Implement lock mechanism: `fcntl.flock` (POSIX) / `msvcrt.locking` (Windows)
-- [ ] 3.6 Store session working directory in
+- [x] 3.5 Implement lock mechanism: `fcntl.flock` (POSIX) / `msvcrt.locking` (Windows)
+- [x] 3.6 Store session working directory in
           `platformdirs.user_cache_dir("SUBSIDENCE") / "sessions" / <uuid>`
-- [ ] 3.вњ“ Verify: `create_project` в†’ folder with all subdirs + `project.db` + seeded
+- [x] 3.вњ“ Verify: `create_project` в†’ folder with all subdirs + `project.db` + seeded
           dictionaries; `open_project` в†’ `working.db` in session dir; `close_project` в†’
           session dir cleaned up
 
@@ -547,6 +547,10 @@ schema version newer than the running app.
 ---
 
 ### Step 3 вЂ” Project bundle create / open / close
+
+Status: done
+Verification: `create_project()` creates bundle dirs + `project.db` + seeded dictionaries; `open_project()` creates `working.db`; `close_project()` removes the session dir
+Commit: pending
 
 `ProjectManager` is a singleton held in `app.state`. Only one project open at a time.
 
