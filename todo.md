@@ -40,7 +40,8 @@ Primary references:
 - [x] C27 Execute Phase 2.5 Step 6: LAS import into project
 - [x] C28 Execute Phase 2.5 Step 7: tops and unconformities CSV import
 - [x] C29 Execute Phase 2.5 Step 8: deviation CSV import
+- [x] C30 Execute Phase 2.5 Step 9: undo/redo stack
 
 ## Immediate Next Step
 
-Execute Phase 2.5 Step 9: undo/redo stack.
+Execute Phase 2.5 Step 10: checkpoints.

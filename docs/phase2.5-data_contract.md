@@ -13,12 +13,12 @@ first write operation). No new UI panels; all changes are backend + stores + wir
 | Step 1  | done | `Base.metadata.tables` returns 12 schema tables | `144656e` |
 | Step 2  | done | `PRAGMA application_id` returns `0x53554253` on a temp DB | `fbe43df` |
 | Step 3  | done | `create_project()` creates bundle dirs + seeded dictionaries; `open_project()` creates `working.db`; `close_project()` removes the session dir | `9d4e7d6` |
-| Step 4  | done | write -> save -> close -> reopen persists; close without save reverts; crash recovery is detected | pending |
-| Step 5  | done | `create_project()` seeds 17 curve rows and 9 lithology rows; `resolve_curve_alias("GR_1", rules)` -> `gamma_ray` | pending |
-| Step 6  | done | `import_las_file()` writes Parquet + DB rows; `GR` resolves to `gamma_ray`; `load_curves_from_parquet()` returns float32 arrays | pending |
-| Step 7  | done | `import_tops_csv()` imports 32 tops for `PLESHET 01`; ICS color lookup works; unconformity age bounds load from `unconformities.csv` | pending |
-| Step 8  | done | `import_deviation_csv()` detects `MD+INCL_AZIM`, writes Parquet, and `load_deviation_from_parquet()` returns a valid `DeviationSurvey` | pending |
-| Step 9  | pending | - | - |
+| Step 4  | done | write -> save -> close -> reopen persists; close without save reverts; crash recovery is detected | `011cb45` |
+| Step 5  | done | `create_project()` seeds 17 curve rows and 9 lithology rows; `resolve_curve_alias("GR_1", rules)` -> `gamma_ray` | `d422901` |
+| Step 6  | done | `import_las_file()` writes Parquet + DB rows; `GR` resolves to `gamma_ray`; `load_curves_from_parquet()` returns float32 arrays | `ca4a80c` |
+| Step 7  | done | `import_tops_csv()` imports 32 tops for `PLESHET 01`; ICS color lookup works; unconformity age bounds load from `unconformities.csv` | `d3153a3` |
+| Step 8  | done | `import_deviation_csv()` detects `MD+INCL_AZIM`, writes Parquet, and `load_deviation_from_parquet()` returns a valid `DeviationSurvey` | `a728620` |
+| Step 9  | done | `UndoStack` executes `push/undo/redo`; `ImportWell` undo removes the well and redo restores DB rows + Parquet; `mark_clean()` and undo update `is_clean` correctly | pending |
 | Step 10 | pending | - | - |
 | Step 11 | pending | - | - |
 | Step 12 | pending | - | - |
@@ -283,17 +283,16 @@ MyProject.subsidence/
 
 ### Step 9 вЂ” Undo/redo stack
 
-- [ ] 9.1  Create `app/src/subsidence/data/undo.py` with `Command` ABC:
+- [x] 9.1  Create `app/src/subsidence/data/undo.py` with `Command` ABC:
            `apply(session)`, `revert(session)`, `description: str`
-- [ ] 9.2  Implement `UndoStack`: `push(cmd, session)`, `undo(session)`, `redo(session)`,
+- [x] 9.2  Implement `UndoStack`: `push(cmd, session)`, `undo(session)`, `redo(session)`,
            `mark_clean()`, `is_clean`, `can_undo`, `can_redo`, bounded size (200)
-- [ ] 9.3  Implement `UpdateFormationDepth(top_id, old_depth, new_depth)` command
-- [ ] 9.4  Implement `UpdateVisualConfig(scope, scope_id, old_config, new_config)` command
-- [ ] 9.5  Implement `ImportWell(well_id)` command вЂ” revert deletes well + curves + Parquet
-- [ ] 9.6  Wire `UndoStack` into `ProjectManager`; `save_project()` calls
+- [x] 9.3  Implement `UpdateFormationDepth(top_id, old_depth, new_depth)` command
+- [x] 9.4  Implement `UpdateVisualConfig(scope, scope_id, old_config, new_config)` command
+- [x] 9.5  Implement `ImportWell(well_id)` command - revert deletes well + curves + Parquet
+- [x] 9.6  Wire `UndoStack` into `ProjectManager`; `save_project()` calls
            `undo_stack.mark_clean()`
-- [ ] 9.вњ“  Verify: push 3 commands в†’ undo twice в†’ redo once в†’ state matches after
-           first command. `mark_clean()` в†’ `is_clean=True` в†’ undo в†’ `is_clean=False`
+- [x] 9.7  Verify: push 3 commands -> undo twice -> redo once preserves indexed state; `mark_clean()` -> `is_clean=True` -> undo -> `is_clean=False`
 
 ### Step 10 вЂ” Checkpoints
 
@@ -821,6 +820,11 @@ see Out of Scope table). This step only imports and stores the raw survey data.
 ---
 
 ### Step 9 вЂ” Undo/redo stack
+
+Status: done
+Verification: `UpdateFormationDepth`, `UpdateVisualConfig`, and `ImportWell` execute through `ProjectManager`; push 3 commands -> undo twice -> redo once preserves expected indexed state; `save_project()` marks clean and a later undo flips `is_clean` back to false
+Commit: pending
+
 
 ```python
 class Command(ABC):

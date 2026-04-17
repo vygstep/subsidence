@@ -20,9 +20,10 @@ except ImportError:
 from sqlalchemy import text
 from sqlalchemy.orm import Session
 
+from .undo import UndoStack, Command
+
 from .engine import create_all_tables, create_engine_for_project, validate_project_db
 from .schema import ProjectMeta, SCHEMA_VERSION, UserModel
-from .undo import UndoStack
 
 if os.name == 'nt':
     import msvcrt
@@ -65,6 +66,14 @@ class ProjectManager:
     @property
     def is_dirty(self) -> bool:
         return not self.undo_stack.is_clean
+
+    @property
+    def can_undo(self) -> bool:
+        return self.undo_stack.can_undo
+
+    @property
+    def can_redo(self) -> bool:
+        return self.undo_stack.can_redo
 
     @property
     def project_path(self) -> Path | None:
@@ -155,6 +164,7 @@ class ProjectManager:
             engine=engine,
             autosave_task=autosave_task,
         )
+        self.undo_stack.clear()
         self._mark_clean()
 
         return {
@@ -183,6 +193,7 @@ class ProjectManager:
             state.lock_handle.close()
             shutil.rmtree(state.session_dir, ignore_errors=True)
             self._state = None
+            self.undo_stack.clear()
             self._mark_clean()
 
     def save_project(self) -> Path:
@@ -207,6 +218,27 @@ class ProjectManager:
         self._checkpoint_and_vacuum(state.engine, tmp_path)
         os.replace(tmp_path, recovery_path)
         return recovery_path
+
+    def get_session(self) -> Session:
+        return Session(self._require_open_state().engine)
+
+    def execute_command(self, command: Command) -> Command:
+        with self.get_session() as session:
+            self.undo_stack.push(command, session)
+            session.commit()
+        return command
+
+    def undo(self) -> Command:
+        with self.get_session() as session:
+            command = self.undo_stack.undo(session)
+            session.commit()
+        return command
+
+    def redo(self) -> Command:
+        with self.get_session() as session:
+            command = self.undo_stack.redo(session)
+            session.commit()
+        return command
 
     def mark_dirty(self) -> None:
         self.undo_stack.mark_dirty()

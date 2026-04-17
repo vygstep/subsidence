@@ -4,14 +4,18 @@ from .importers import import_deviation_csv, import_las_file, import_tops_csv, i
 from .loaders import load_curves_from_parquet, load_deviation_from_parquet, load_las_curves
 from .models import DepthReference, LogCurve
 from .project_manager import ProjectManager
-from .undo import UndoStack
+from .undo import Command, ImportWell, UndoStack, UpdateFormationDepth, UpdateVisualConfig
 
 __all__ = [
     "CurveMatchResult",
     "DepthReference",
     "LogCurve",
     "ProjectManager",
+    "Command",
+    "ImportWell",
     "UndoStack",
+    "UpdateFormationDepth",
+    "UpdateVisualConfig",
     "load_curve_alias_rules",
     "load_lithology_entries",
     "resolve_curve_alias",
