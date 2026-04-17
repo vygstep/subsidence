@@ -2,12 +2,12 @@
 
 ## Current Program
 
-Current program: Post-Phase-2.5 transition into Phase 3 planning.
+Current program: Phase 3 interaction work.
 
 Primary references:
 
 - `docs/app_compass.md`
-- `docs/phase2.5-data_contract.md`
+- `docs/phase3-contract.md`
 
 ## Checkpoints
 
@@ -45,7 +45,8 @@ Primary references:
 - [x] C32 Execute Phase 2.5 Step 11: API endpoints
 - [x] C33 Execute Phase 2.5 Step 12: rewire frontend stores to project-aware API
 - [x] C34 Execute Phase 2.5 Step 13: visual config persistence and export stubs
+- [x] C35 Execute Phase 3 Step 1: visual config persistence and export integration
 
 ## Immediate Next Step
 
-Review `docs/data-contract-questions.md` and define the Phase 3 start contract.
+Execute Phase 3 Step 2: project selector UI.

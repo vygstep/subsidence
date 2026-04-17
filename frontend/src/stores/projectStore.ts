@@ -1,5 +1,8 @@
 import { create } from 'zustand'
 
+import { useViewStore } from './viewStore'
+import { useWellDataStore } from './wellDataStore'
+
 export interface ProjectStore {
   isOpen: boolean
   projectName: string | null
@@ -7,10 +10,26 @@ export interface ProjectStore {
   isDirty: boolean
   canUndo: boolean
   canRedo: boolean
+  visualConfig: Record<string, unknown>
   pollStatus: () => Promise<void>
+  loadVisualConfig: () => Promise<void>
+  saveVisualConfig: (patch: Record<string, unknown>) => Promise<void>
   saveProject: () => Promise<void>
   undo: () => Promise<void>
   redo: () => Promise<void>
+}
+
+
+interface VisualConfigResponse {
+  scope: string
+  scope_id: string
+  config: Record<string, unknown>
+}
+
+interface VisualConfigPayload {
+  depthPerPixel?: number
+  trackWidths?: Record<string, number>
+  curveColors?: Record<string, string>
 }
 
 interface ProjectStatusResponse {
@@ -37,13 +56,43 @@ async function postAction(path: string): Promise<void> {
   }
 }
 
-export const useProjectStore = create<ProjectStore>((set) => ({
+async function fetchVisualConfig(): Promise<VisualConfigResponse> {
+  const response = await fetch('/api/projects/visual-config?scope=project')
+  if (!response.ok) {
+    throw new Error(`Failed to read visual config (${response.status})`)
+  }
+  return (await response.json()) as VisualConfigResponse
+}
+
+async function patchVisualConfig(patch: Record<string, unknown>): Promise<VisualConfigResponse> {
+  const response = await fetch('/api/projects/visual-config', {
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ scope: 'project', config: patch }),
+  })
+  if (!response.ok) {
+    throw new Error(`Failed to save visual config (${response.status})`)
+  }
+  return (await response.json()) as VisualConfigResponse
+}
+
+function applyVisualConfigPayload(config: Record<string, unknown>): void {
+  const payload = config as VisualConfigPayload
+  useViewStore.getState().applyVisualConfig({
+    depthPerPixel: payload.depthPerPixel,
+    trackWidths: payload.trackWidths,
+  })
+  useWellDataStore.getState().setColorOverrides(payload.curveColors ?? {})
+}
+
+export const useProjectStore = create<ProjectStore>((set, get) => ({
   isOpen: false,
   projectName: null,
   projectPath: null,
   isDirty: false,
   canUndo: false,
   canRedo: false,
+  visualConfig: {},
   async pollStatus() {
     try {
       const payload = await fetchStatus()
@@ -63,8 +112,22 @@ export const useProjectStore = create<ProjectStore>((set) => ({
         isDirty: false,
         canUndo: false,
         canRedo: false,
+        visualConfig: {},
       })
+      applyVisualConfigPayload({})
     }
+  },
+  async loadVisualConfig() {
+    const payload = await fetchVisualConfig()
+    set({ visualConfig: payload.config })
+    applyVisualConfigPayload(payload.config)
+  },
+  async saveVisualConfig(patch) {
+    const current = get().visualConfig
+    const next = { ...current, ...patch }
+    const payload = await patchVisualConfig(patch)
+    set({ visualConfig: payload.config ?? next })
+    applyVisualConfigPayload(payload.config ?? next)
   },
   async saveProject() {
     await postAction('/api/projects/save')

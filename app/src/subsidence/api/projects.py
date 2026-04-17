@@ -82,6 +82,12 @@ class ConfigUpdateRequest(BaseModel):
     config: dict
 
 
+class VisualConfigPatchRequest(BaseModel):
+    scope: str = 'project'
+    scope_id: str | None = None
+    config: dict
+
+
 class ExportRequest(BaseModel):
     well_id: str | None = None
 
@@ -422,6 +428,28 @@ def update_lithology(code: str, payload: UpdateLithologyRequest, request: Reques
         response = LithologyResponse(id=row.id, lithology_code=row.lithology_code, display_name=row.display_name, color_hex=row.color_hex, pattern_id=row.pattern_id, description=row.description, sort_order=row.sort_order)
     manager.mark_dirty()
     return response
+
+
+@router.get('/visual-config', response_model=VisualConfigResponse)
+def get_visual_config_alias(request: Request, scope: str = 'project', scope_id: str | None = None) -> VisualConfigResponse:
+    manager = _require_open_project(request)
+    with manager.get_session() as session:
+        resolved_scope_id = _resolve_scope_id(session, scope, scope_id)
+        row = session.scalar(select(VisualConfig).where(VisualConfig.scope == scope, VisualConfig.scope_id == resolved_scope_id))
+        config = json.loads(row.config) if row is not None else {}
+        return VisualConfigResponse(scope=scope, scope_id=resolved_scope_id, config=config)
+
+
+@router.patch('/visual-config', response_model=VisualConfigResponse)
+def patch_visual_config(payload: VisualConfigPatchRequest, request: Request) -> VisualConfigResponse:
+    manager = _require_open_project(request)
+    with manager.get_session() as session:
+        resolved_scope_id = _resolve_scope_id(session, payload.scope, payload.scope_id)
+        existing = session.scalar(select(VisualConfig).where(VisualConfig.scope == payload.scope, VisualConfig.scope_id == resolved_scope_id))
+        old_config = json.loads(existing.config) if existing is not None else {}
+        merged_config = {**old_config, **payload.config}
+    manager.execute_command(UpdateVisualConfig(payload.scope, resolved_scope_id, old_config, merged_config))
+    return VisualConfigResponse(scope=payload.scope, scope_id=resolved_scope_id, config=merged_config)
 
 
 @router.get('/config/{scope}', response_model=VisualConfigResponse)

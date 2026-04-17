@@ -79,15 +79,6 @@ interface WellListItem {
   well_name: string
 }
 
-interface VisualConfigResponse {
-  scope: string
-  scope_id: string
-  config: {
-    depthPerPixel?: number
-    trackWidths?: Record<string, number>
-  }
-}
-
 async function fetchWellList(): Promise<WellListItem[]> {
   const response = await fetch('/api/wells')
   if (!response.ok) {
@@ -96,30 +87,12 @@ async function fetchWellList(): Promise<WellListItem[]> {
   return (await response.json()) as WellListItem[]
 }
 
-async function fetchProjectConfig(): Promise<VisualConfigResponse> {
-  const response = await fetch('/api/projects/config/project')
-  if (!response.ok) {
-    throw new Error(`Failed to load project config (${response.status})`)
-  }
-  return (await response.json()) as VisualConfigResponse
-}
-
-async function saveProjectConfig(config: VisualConfigResponse['config']): Promise<void> {
-  const response = await fetch('/api/projects/config/project', {
-    method: 'PUT',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ config }),
-  })
-  if (!response.ok) {
-    throw new Error(`Failed to save project config (${response.status})`)
-  }
-}
-
 function App() {
   const loadWell = useWellDataStore((state) => state.loadWell)
   const resetWell = useWellDataStore((state) => state.reset)
   const well = useWellDataStore((state) => state.well)
   const curves = useWellDataStore((state) => state.curves)
+  const colorOverrides = useWellDataStore((state) => state.colorOverrides)
   const isLoading = useWellDataStore((state) => state.isLoading)
   const error = useWellDataStore((state) => state.error)
 
@@ -129,13 +102,14 @@ function App() {
   const canUndo = useProjectStore((state) => state.canUndo)
   const canRedo = useProjectStore((state) => state.canRedo)
   const pollStatus = useProjectStore((state) => state.pollStatus)
+  const loadVisualConfig = useProjectStore((state) => state.loadVisualConfig)
+  const saveVisualConfig = useProjectStore((state) => state.saveVisualConfig)
   const saveProject = useProjectStore((state) => state.saveProject)
   const undoProject = useProjectStore((state) => state.undo)
   const redoProject = useProjectStore((state) => state.redo)
 
   const depthPerPixel = useViewStore((state) => state.depthPerPixel)
   const trackWidths = useViewStore((state) => state.trackWidths)
-  const applyVisualConfig = useViewStore((state) => state.applyVisualConfig)
   const resetVisualConfig = useViewStore((state) => state.resetVisualConfig)
 
   const configHydratedRef = useRef(false)
@@ -159,11 +133,7 @@ function App() {
     let cancelled = false
     const hydrate = async () => {
       try {
-        const payload = await fetchProjectConfig()
-        if (cancelled) {
-          return
-        }
-        applyVisualConfig(payload.config)
+        await loadVisualConfig()
       } catch {
         if (!cancelled) {
           resetVisualConfig()
@@ -179,7 +149,7 @@ function App() {
     return () => {
       cancelled = true
     }
-  }, [applyVisualConfig, isProjectOpen, resetVisualConfig, resetWell])
+  }, [isProjectOpen, loadVisualConfig, resetVisualConfig, resetWell])
 
   useEffect(() => {
     if (!isProjectOpen || !configHydratedRef.current) {
@@ -187,14 +157,14 @@ function App() {
     }
 
     const timer = window.setTimeout(() => {
-      void saveProjectConfig({
+      void saveVisualConfig({
         depthPerPixel,
         trackWidths,
       })
     }, 1000)
 
     return () => window.clearTimeout(timer)
-  }, [depthPerPixel, isProjectOpen, trackWidths])
+  }, [depthPerPixel, isProjectOpen, saveVisualConfig, trackWidths])
 
   useEffect(() => {
     if (!isProjectOpen) {
@@ -279,6 +249,16 @@ function App() {
     return { minDepth: min, maxDepth: max }
   }, [curves])
 
+  const tracks = useMemo(() => (
+    DEFAULT_TRACKS.map((track) => ({
+      ...track,
+      curves: track.curves.map((curve) => ({
+        ...curve,
+        color: colorOverrides[curve.mnemonic] ?? curve.color,
+      })),
+    }))
+  ), [colorOverrides])
+
   const topbarTitle = !isProjectOpen
     ? 'No project open'
     : isLoading
@@ -309,7 +289,7 @@ function App() {
           <p className="app-error-banner">No wells are available in the open project.</p>
         ) : (
           <LogViewPanel
-            tracks={DEFAULT_TRACKS}
+            tracks={tracks}
             curves={curves}
             minDepth={minDepth}
             maxDepth={maxDepth}

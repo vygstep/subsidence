@@ -19,9 +19,11 @@ export interface WellDataStore {
   well: Well | null
   curves: CurveData[]
   formations: FormationTop[]
+  colorOverrides: Record<string, string>
   isLoading: boolean
   error: string | null
   reset: () => void
+  setColorOverrides: (overrides: Record<string, string>) => void
   loadWell: (wellId: string) => Promise<void>
 }
 
@@ -33,6 +35,7 @@ const emptyState = {
   well: null,
   curves: [],
   formations: [],
+  colorOverrides: {},
   isLoading: false,
   error: null,
 }
@@ -41,6 +44,9 @@ export const useWellDataStore = create<WellDataStore>((set) => ({
   ...emptyState,
   reset() {
     set(emptyState)
+  },
+  setColorOverrides(overrides) {
+    set({ colorOverrides: overrides })
   },
   async loadWell(wellId: string) {
     set({ isLoading: true, error: null })

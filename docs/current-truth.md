@@ -6,9 +6,10 @@ This document defines what is currently treated as true for the active project.
 
 - The project is now oriented around `docs/app_compass.md`.
 - `Phase 2` is complete.
-- The active implementation scope is now `docs/phase2.5-data_contract.md`.
-- `Phase 2.5 Step 1`, `Step 2`, `Step 3`, `Step 4`, `Step 5`, `Step 6`, `Step 7`, `Step 8`, `Step 9`, `Step 10`, `Step 11`, `Step 12`, and `Step 13` are complete.
-- Phase 2.5 is complete. The active goal is to resolve the post-persistence data-contract questions before starting `Phase 3` interaction work.
+- The active implementation scope is now `docs/phase3-contract.md`.
+- `Phase 2.5` is complete.
+- `Phase 3 Step 1` is complete.
+- The active goal is to continue `Phase 3` interaction work from `Step 2`.
 
 ## Active Architecture
 
@@ -32,7 +33,8 @@ This document defines what is currently treated as true for the active project.
 
 - `docs/app_compass.md` is the strategy document.
 - `docs/phase2-contract.md` is the completed implementation contract for the current viewer baseline.
-- `docs/phase2.5-data_contract.md` is the active implementation contract for the persistence layer.
+- `docs/phase2.5-data_contract.md` is the completed persistence-layer contract.
+- `docs/phase3-contract.md` is the active implementation contract for interaction work.
 - `docs/reference-sources.md` defines the active knowledge sources.
 - `docs/decisions/` holds current architectural decisions.
 - `todo.md` holds the ordered execution backlog.

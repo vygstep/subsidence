@@ -30,18 +30,18 @@ React panels communicating through Zustand stores and the Phase 2.5 REST API.
 ## Task Checklist
 
 ### Step 1 - Visual config persistence and export integration
-- [ ] 1.1 Add canonical visual-config endpoints to `app/src/subsidence/api/projects.py`:
+- [x] 1.1 Add canonical visual-config endpoints to `app/src/subsidence/api/projects.py`:
           `GET /api/projects/visual-config` and `PATCH /api/projects/visual-config`
-- [ ] 1.2 Keep working export endpoints:
+- [x] 1.2 Keep working export endpoints:
           `POST /api/projects/export/las` and `POST /api/projects/export/csv`
           Both must return valid files generated from project data; no frontend export UI yet
-- [ ] 1.3 Add `visualConfig`, `loadVisualConfig()`, and `saveVisualConfig(patch)`
+- [x] 1.3 Add `visualConfig`, `loadVisualConfig()`, and `saveVisualConfig(patch)`
           to `src/stores/projectStore.ts`
-- [ ] 1.4 When a project becomes active, load visual config and hydrate:
+- [x] 1.4 When a project becomes active, load visual config and hydrate:
           `viewStore.trackWidths`, `viewStore.depthPerPixel`, and curve color overrides
-- [ ] 1.5 After track-width or depth-scale changes, debounce-flush
+- [x] 1.5 After track-width or depth-scale changes, debounce-flush
           `saveVisualConfig(...)` (500 ms)
-- [ ] 1.6 Verify: resize a track -> close project -> reopen -> width preserved;
+- [x] 1.6 Verify: resize a track -> close project -> reopen -> width preserved;
           change zoom -> close project -> reopen -> scale preserved;
           if a curve color override exists in visual config, it is restored on reopen
 
@@ -126,7 +126,7 @@ React panels communicating through Zustand stores and the Phase 2.5 REST API.
 
 ### Step 1 — Visual config persistence
 
-Status: pending
+Status: done
 Verification: resize a track → close project → reopen → track width matches what was set
 Commit: —
 
