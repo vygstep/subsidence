@@ -20,7 +20,7 @@ first write operation). No new UI panels; all changes are backend + stores + wir
 | Step 8  | done | `import_deviation_csv()` detects `MD+INCL_AZIM`, writes Parquet, and `load_deviation_from_parquet()` returns a valid `DeviationSurvey` | `a728620` |
 | Step 9  | done | `UndoStack` executes `push/undo/redo`; `ImportWell` undo removes the well and redo restores DB rows + Parquet; `mark_clean()` and undo update `is_clean` correctly | `bbb5d33` |
 | Step 10 | done | `create_checkpoint()` writes a DB snapshot + row; `restore_checkpoint()` reverts working state and creates `before-restore`; `delete_checkpoint()` removes file + row | `22af478` |
-| Step 11 | done | Full API round trip passes via TestClient: create -> open -> import LAS/tops/unconformities/deviation -> save -> close -> reopen -> data intact; dictionary and checkpoint endpoints respond correctly | pending |
+| Step 11 | done | Full API round trip passes via TestClient: create -> open -> import LAS/tops/unconformities/deviation -> save -> close -> reopen -> data intact; dictionary and checkpoint endpoints respond correctly | `64cce9c` |
 | Step 12 | pending | - | - |
 | Step 13 | pending | - | - |
 
@@ -822,7 +822,7 @@ see Out of Scope table). This step only imports and stores the raw survey data.
 
 Status: done
 Verification: `UpdateFormationDepth`, `UpdateVisualConfig`, and `ImportWell` execute through `ProjectManager`; push 3 commands -> undo twice -> redo once preserves expected indexed state; `save_project()` marks clean and a later undo flips `is_clean` back to false
-Commit: pending
+Commit: `64cce9c`
 
 
 ```python
