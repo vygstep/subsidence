@@ -14,7 +14,7 @@ React panels communicating through Zustand stores and the Phase 2.5 REST API.
 
 | Step | Status | Verification | Commit |
 |---|---|---|---|
-| Step 1  | pending | close + reopen project → track widths and curve colors unchanged | — |
+| Step 1  | done | `PATCH /api/projects/visual-config` persists `trackWidths`, `depthPerPixel`, and `curveColors`; close + reopen preserves visual config; export LAS/CSV endpoints return valid files | `fcf9248` |
 | Step 2  | pending | New Project dialog creates bundle; Open dialog restores last-saved state | — |
 | Step 3  | pending | `POST /api/projects/wells/{id}/formations` → line appears in FormationColumn | — |
 | Step 4  | pending | formation lines render at correct depths and move with scroll; crosshair tracks mouse | — |
@@ -124,60 +124,35 @@ React panels communicating through Zustand stores and the Phase 2.5 REST API.
 
 ## Detailed step specifications
 
-### Step 1 — Visual config persistence
+### Step 1 ? Visual config persistence and export integration
 
 Status: done
-Verification: resize a track → close project → reopen → track width matches what was set
-Commit: —
+Verification: `PATCH /api/projects/visual-config` persists `trackWidths`, `depthPerPixel`, and `curveColors`; backend compile passes; frontend build passes; close ? reopen preserves visual config; export LAS/CSV endpoints return valid files
+Commit: `fcf9248`
 
 **Backend additions to `app/src/subsidence/api/projects.py`:**
 
-```python
-class VisualConfigPatch(BaseModel):
-    scope: Literal['project', 'well', 'session'] = 'project'
-    scope_id: str | None = None   # None → use active project/well/session UUID
-    config: dict                  # Arbitrary JSON — merged with existing config
+- Added canonical visual-config endpoints:
+  - `GET /api/projects/visual-config`
+  - `PATCH /api/projects/visual-config`
+- Kept working export endpoints:
+  - `POST /api/projects/export/las`
+  - `POST /api/projects/export/csv`
+- `PATCH /api/projects/visual-config` performs a merge update against the existing project config and writes through `UpdateVisualConfig`.
 
-@router.get("/visual-config")
-async def get_visual_config(
-    scope: Literal['project', 'well', 'session'] = 'project',
-    scope_id: str | None = None,
-    request: Request = Depends(get_pm),
-) -> dict: ...
+**Frontend updates:**
 
-@router.patch("/visual-config")
-async def patch_visual_config(
-    body: VisualConfigPatch,
-    request: Request = Depends(get_pm),
-) -> dict: ...
+- `src/stores/projectStore.ts` now owns `visualConfig`, `loadVisualConfig()`, and `saveVisualConfig(patch)`.
+- `src/stores/wellDataStore.ts` now exposes `colorOverrides` for curve-level visual overrides.
+- `App.tsx` hydrates visual config when a project becomes active and debounce-saves visual changes through `projectStore.saveVisualConfig(...)`.
 
-@router.post("/export/las", status_code=501)
-async def export_las() -> JSONResponse:
-    return JSONResponse({"detail": "Export not yet implemented"}, status_code=501)
+**Hydrated keys in Step 1:**
 
-@router.post("/export/csv", status_code=501)
-async def export_csv() -> JSONResponse:
-    return JSONResponse({"detail": "Export not yet implemented"}, status_code=501)
-```
+- `trackWidths`
+- `depthPerPixel`
+- `curveColors`
 
-The `VisualConfigModel` table (already in schema from Phase 2.5) stores a `config_json` TEXT column. `PATCH` does a JSON merge (`existing | incoming`) and writes back.
-
-**Frontend `src/stores/projectStore.ts` additions:**
-
-```ts
-interface ProjectStore {
-  // ... existing fields from Phase 2.5 ...
-  visualConfig: Record<string, unknown>;
-  loadVisualConfig: () => Promise<void>;
-  saveVisualConfig: (patch: Record<string, unknown>) => Promise<void>;
-}
-```
-
-On `openProject()`: call `loadVisualConfig()` → apply `trackWidths` to `viewStore`, apply curve color overrides to a new `wellDataStore.colorOverrides` map.
-
-A `useDebouncedEffect` (500 ms) in `LogViewPanel.tsx` watches `viewStore.trackWidths` and calls `projectStore.saveVisualConfig({ trackWidths })`.
-
-**Acceptance criteria:** Track widths and at least one curve color override survive a close/reopen cycle.
+**Acceptance criteria:** Track widths, zoom level, and stored curve color overrides survive a close/reopen cycle; LAS and CSV export endpoints return valid files generated from project data.
 
 ---
 
