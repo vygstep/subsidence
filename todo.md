@@ -37,7 +37,8 @@ Primary references:
 - [x] C24 Execute Phase 2.5 Step 3: project bundle create / open / close
 - [x] C25 Execute Phase 2.5 Step 4: save and autosave
 - [x] C26 Execute Phase 2.5 Step 5: dictionary bootstrap
+- [x] C27 Execute Phase 2.5 Step 6: LAS import into project
 
 ## Immediate Next Step
 
-Execute Phase 2.5 Step 6: LAS import into project.
+Execute Phase 2.5 Step 7: tops and unconformities CSV import.

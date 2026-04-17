@@ -1,23 +1,25 @@
 from __future__ import annotations
 
+from pathlib import Path
+
 
 def normalize_unit_name(unit: str) -> str:
-    return unit.strip().lower().replace(" ", "")
+    return unit.strip().lower().replace(' ', '')
 
 
 def convert_depth_to_meters(values: list[float], unit: str) -> list[float]:
     u = normalize_unit_name(unit)
-    if u in {"m", "meter", "meters", "metre", "metres", ""}:
+    if u in {'m', 'meter', 'meters', 'metre', 'metres', ''}:
         return values
-    if u in {"ft", "feet", "foot"}:
+    if u in {'ft', 'feet', 'foot'}:
         return [v * 0.3048 for v in values]
-    raise ValueError(f"Unsupported depth unit: {unit!r}")
+    raise ValueError(f'Unsupported depth unit: {unit!r}')
 
 
 def canonicalize_gamma_unit(unit: str) -> str:
     u = normalize_unit_name(unit)
-    if u in {"", "api", "gapi"}:
-        return "gAPI"
+    if u in {'', 'api', 'gapi'}:
+        return 'gAPI'
     return unit
 
 
@@ -26,11 +28,11 @@ def _convert_slowness(values: list[float], from_unit: str, to_unit: str) -> list
     dst = normalize_unit_name(to_unit)
     if src == dst:
         return values
-    if src == "us/ft" and dst == "us/m":
+    if src == 'us/ft' and dst == 'us/m':
         return [v * 3.280839895 for v in values]
-    if src == "us/m" and dst == "us/ft":
+    if src == 'us/m' and dst == 'us/ft':
         return [v * 0.3048 for v in values]
-    raise ValueError(f"Unsupported slowness conversion: {from_unit!r} -> {to_unit!r}")
+    raise ValueError(f'Unsupported slowness conversion: {from_unit!r} -> {to_unit!r}')
 
 
 def convert_curve_units(
@@ -44,11 +46,20 @@ def convert_curve_units(
     if not src or not dst or src == dst:
         return values
 
-    family = (family_code or "").lower()
-    if "slowness" in family or family in {"acoustic", "sonic", "sonic_p", "sonic_s"}:
+    if {src, dst} <= {'ohmm', 'ohm.m'}:
+        return values
+    if {src, dst} <= {'g/cm3', 'g/cc'}:
+        return values
+    if src == '%' and dst == 'v/v':
+        return [v / 100.0 for v in values]
+    if src == 'v/v' and dst == '%':
+        return [v * 100.0 for v in values]
+
+    family = (family_code or '').lower()
+    if 'slowness' in family or family in {'acoustic', 'sonic', 'sonic_p', 'sonic_s'}:
         return _convert_slowness(values, from_unit, to_unit)
 
     raise ValueError(
-        f"Unsupported unit conversion for family {family_code!r}: "
-        f"{from_unit!r} -> {to_unit!r}"
+        f'Unsupported unit conversion for family {family_code!r}: '
+        f'{from_unit!r} -> {to_unit!r}'
     )

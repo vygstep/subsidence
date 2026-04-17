@@ -15,7 +15,7 @@ first write operation). No new UI panels; all changes are backend + stores + wir
 | Step 3  | done | `create_project()` creates bundle dirs + seeded dictionaries; `open_project()` creates `working.db`; `close_project()` removes the session dir | `9d4e7d6` |
 | Step 4  | done | write -> save -> close -> reopen persists; close without save reverts; crash recovery is detected | pending |
 | Step 5  | done | `create_project()` seeds 17 curve rows and 9 lithology rows; `resolve_curve_alias("GR_1", rules)` -> `gamma_ray` | pending |
-| Step 6  | pending | - | - |
+| Step 6  | done | `import_las_file()` writes Parquet + DB rows; `GR` resolves to `gamma_ray`; `load_curves_from_parquet()` returns float32 arrays | pending |
 | Step 7  | pending | - | - |
 | Step 8  | pending | - | - |
 | Step 9  | pending | - | - |
@@ -215,21 +215,21 @@ MyProject.subsidence/
 
 ### Step 6 вЂ” LAS import into project
 
-- [ ] 6.1 Create `app/src/subsidence/data/importers.py` with
+- [x] 6.1 Create `app/src/subsidence/data/importers.py` with
           `import_las_file(session, project_path, las_path)`
-- [ ] 6.2 Implement: copy LAS to `originals/`, compute sha256, parse with `lasio`
-- [ ] 6.3 Create `WellModel` row from LAS header (WELL, UWI, COMP, FLD, LOC, STRT,
+- [x] 6.2 Implement: copy LAS to `originals/`, compute sha256, parse with `lasio`
+- [x] 6.3 Create `WellModel` row from LAS header (WELL, UWI, COMP, FLD, LOC, STRT,
           STOP, NULL, KB, GL)
-- [ ] 6.4 Apply dictionary: call `load_curve_alias_rules(session)` and
+- [x] 6.4 Apply dictionary: call `load_curve_alias_rules(session)` and
           `resolve_curve_alias(mnemonic, rules)` for each curve; populate
           `standard_mnemonic`, `family_code`, `canonical_unit` in `CurveMetadata`;
           apply unit conversion via legacy `unit_conversion.py` helpers
-- [ ] 6.5 Build a pandas DataFrame: `DEPT` + one column per curve; write to
+- [x] 6.5 Build a pandas DataFrame: `DEPT` + one column per curve; write to
           `curves/<well_id>.parquet` with snappy compression
-- [ ] 6.6 Create one `CurveMetadata` row per curve: mnemonic, standard_mnemonic,
+- [x] 6.6 Create one `CurveMetadata` row per curve: mnemonic, standard_mnemonic,
           family_code, unit (post-conversion), original_unit (from LAS), curve_type
           (`continuous`), depth_min, depth_max, n_samples, data_uri, source_hash
-- [ ] 6.7 Create `app/src/subsidence/data/loaders.py` with
+- [x] 6.7 Create `app/src/subsidence/data/loaders.py` with
           `load_curves_from_parquet(project_path, data_uri)` в†’ dict
           `{mnemonic: (depths, values)}` as numpy float32
 - [ ] 6.вњ“ Verify: import `sample.las` в†’ Parquet exists, `WellModel` + `CurveMetadata`
