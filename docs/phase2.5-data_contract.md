@@ -21,7 +21,7 @@ first write operation). No new UI panels; all changes are backend + stores + wir
 | Step 9  | done | `UndoStack` executes `push/undo/redo`; `ImportWell` undo removes the well and redo restores DB rows + Parquet; `mark_clean()` and undo update `is_clean` correctly | `bbb5d33` |
 | Step 10 | done | `create_checkpoint()` writes a DB snapshot + row; `restore_checkpoint()` reverts working state and creates `before-restore`; `delete_checkpoint()` removes file + row | `22af478` |
 | Step 11 | done | Full API round trip passes via TestClient: create -> open -> import LAS/tops/unconformities/deviation -> save -> close -> reopen -> data intact; dictionary and checkpoint endpoints respond correctly | `64cce9c` |
-| Step 12 | done | Frontend loads well data from project-backed `/api/wells/{id}`; `projectStore` polls `/api/projects/status`; keyboard shortcuts trigger save/undo/redo; build passes and backend well endpoints return DB + Parquet data after reopen | pending |
+| Step 12 | done | Frontend loads well data from project-backed `/api/wells/{id}`; `projectStore` polls `/api/projects/status`; keyboard shortcuts trigger save/undo/redo; build passes and backend well endpoints return DB + Parquet data after reopen | `c9bd17e` |
 | Step 13 | pending | - | - |
 
 ---
@@ -859,7 +859,7 @@ intermediate positions into a single `UpdateFormationDepth` on drag-end.
 
 Status: done
 Verification: `create_checkpoint()` writes a snapshot into `checkpoints/`; `list_checkpoints()` returns it; restoring a modified working DB reverts state and auto-creates `before-restore`; `delete_checkpoint()` removes both the file and the DB row
-Commit: pending
+Commit: `c9bd17e`
 
 
 ```python
