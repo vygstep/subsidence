@@ -2,7 +2,7 @@
 
 ## Current Program
 
-Current program: Phase 2.5 data persistence layer.
+Current program: Post-Phase-2.5 transition into Phase 3 planning.
 
 Primary references:
 
@@ -44,7 +44,8 @@ Primary references:
 - [x] C31 Execute Phase 2.5 Step 10: checkpoints
 - [x] C32 Execute Phase 2.5 Step 11: API endpoints
 - [x] C33 Execute Phase 2.5 Step 12: rewire frontend stores to project-aware API
+- [x] C34 Execute Phase 2.5 Step 13: visual config persistence and export stubs
 
 ## Immediate Next Step
 
-Execute Phase 2.5 Step 13: visual config persistence and export stubs.
+Review `docs/data-contract-questions.md` and define the Phase 3 start contract.

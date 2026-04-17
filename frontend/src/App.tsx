@@ -1,7 +1,7 @@
-import { useEffect, useMemo } from 'react'
+import { useEffect, useMemo, useRef } from 'react'
 
 import { LogViewPanel, ZoomControl } from '@/components'
-import { useProjectStore, useWellDataStore } from '@/stores'
+import { useProjectStore, useViewStore, useWellDataStore } from '@/stores'
 import type { TrackConfig } from '@/types'
 
 const DEFAULT_TRACKS: TrackConfig[] = [
@@ -79,12 +79,40 @@ interface WellListItem {
   well_name: string
 }
 
+interface VisualConfigResponse {
+  scope: string
+  scope_id: string
+  config: {
+    depthPerPixel?: number
+    trackWidths?: Record<string, number>
+  }
+}
+
 async function fetchWellList(): Promise<WellListItem[]> {
   const response = await fetch('/api/wells')
   if (!response.ok) {
     throw new Error(`Failed to list wells (${response.status})`)
   }
   return (await response.json()) as WellListItem[]
+}
+
+async function fetchProjectConfig(): Promise<VisualConfigResponse> {
+  const response = await fetch('/api/projects/config/project')
+  if (!response.ok) {
+    throw new Error(`Failed to load project config (${response.status})`)
+  }
+  return (await response.json()) as VisualConfigResponse
+}
+
+async function saveProjectConfig(config: VisualConfigResponse['config']): Promise<void> {
+  const response = await fetch('/api/projects/config/project', {
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ config }),
+  })
+  if (!response.ok) {
+    throw new Error(`Failed to save project config (${response.status})`)
+  }
 }
 
 function App() {
@@ -105,6 +133,13 @@ function App() {
   const undoProject = useProjectStore((state) => state.undo)
   const redoProject = useProjectStore((state) => state.redo)
 
+  const depthPerPixel = useViewStore((state) => state.depthPerPixel)
+  const trackWidths = useViewStore((state) => state.trackWidths)
+  const applyVisualConfig = useViewStore((state) => state.applyVisualConfig)
+  const resetVisualConfig = useViewStore((state) => state.resetVisualConfig)
+
+  const configHydratedRef = useRef(false)
+
   useEffect(() => {
     void pollStatus()
     const timer = window.setInterval(() => {
@@ -112,6 +147,54 @@ function App() {
     }, 2000)
     return () => window.clearInterval(timer)
   }, [pollStatus])
+
+  useEffect(() => {
+    if (!isProjectOpen) {
+      configHydratedRef.current = false
+      resetWell()
+      resetVisualConfig()
+      return
+    }
+
+    let cancelled = false
+    const hydrate = async () => {
+      try {
+        const payload = await fetchProjectConfig()
+        if (cancelled) {
+          return
+        }
+        applyVisualConfig(payload.config)
+      } catch {
+        if (!cancelled) {
+          resetVisualConfig()
+        }
+      } finally {
+        if (!cancelled) {
+          configHydratedRef.current = true
+        }
+      }
+    }
+
+    void hydrate()
+    return () => {
+      cancelled = true
+    }
+  }, [applyVisualConfig, isProjectOpen, resetVisualConfig, resetWell])
+
+  useEffect(() => {
+    if (!isProjectOpen || !configHydratedRef.current) {
+      return
+    }
+
+    const timer = window.setTimeout(() => {
+      void saveProjectConfig({
+        depthPerPixel,
+        trackWidths,
+      })
+    }, 1000)
+
+    return () => window.clearTimeout(timer)
+  }, [depthPerPixel, isProjectOpen, trackWidths])
 
   useEffect(() => {
     if (!isProjectOpen) {
@@ -208,7 +291,7 @@ function App() {
     <div className="app-layout">
       <header className="app-topbar">
         <span className="app-topbar__brand">SUBSIDENCE</span>
-        <span className="app-topbar__project">{isDirty ? '? ' : ''}{projectName ?? '-'}</span>
+        <span className="app-topbar__project">{isDirty ? '* ' : ''}{projectName ?? '-'}</span>
         <span className="app-topbar__well">{topbarTitle}</span>
         <ZoomControl />
         {curves.length > 0 && (

@@ -22,7 +22,7 @@ first write operation). No new UI panels; all changes are backend + stores + wir
 | Step 10 | done | `create_checkpoint()` writes a DB snapshot + row; `restore_checkpoint()` reverts working state and creates `before-restore`; `delete_checkpoint()` removes file + row | `22af478` |
 | Step 11 | done | Full API round trip passes via TestClient: create -> open -> import LAS/tops/unconformities/deviation -> save -> close -> reopen -> data intact; dictionary and checkpoint endpoints respond correctly | `64cce9c` |
 | Step 12 | done | Frontend loads well data from project-backed `/api/wells/{id}`; `projectStore` polls `/api/projects/status`; keyboard shortcuts trigger save/undo/redo; build passes and backend well endpoints return DB + Parquet data after reopen | `c9bd17e` |
-| Step 13 | pending | - | - |
+| Step 13 | done | Config endpoints persist project visual config; debounced frontend save restores track widths and zoom after reopen; export LAS/CSV endpoints return valid files | pending |
 
 ---
 
@@ -344,17 +344,16 @@ MyProject.subsidence/
 - [x] 12.8 Verify: frontend build passes; project-backed `/api/wells` and `/api/wells/{id}` return data after save/close/reopen; hotkeys and dirty indicator are wired in `App.tsx`
 
 
-### Step 13 — Visual config persistence + export stubs
+### Step 13 - Visual config persistence + export stubs
 
-- [ ] 13.1 Add `GET /api/projects/config/{scope}` and `PUT /api/projects/config/{scope}`
+- [x] 13.1 Add `GET /api/projects/config/{scope}` and `PUT /api/projects/config/{scope}`
            endpoints
-- [ ] 13.2 On `LogViewPanel` mount: load visual config → apply track widths, zoom level
-- [ ] 13.3 On track resize / zoom change (debounced 1s): write config back
-- [ ] 13.4 Add `POST /api/projects/export/las` stub: build `lasio.LASFile` from Parquet
-- [ ] 13.5 Add `POST /api/projects/export/csv` stub: result Parquet → CSV with metadata
-           header lines
-- [ ] 13.✓ Verify: resize track → save → close → reopen → width preserved.
-           Export LAS returns valid file.
+- [x] 13.2 On `LogViewPanel` mount: load visual config and apply track widths / zoom level
+- [x] 13.3 On track resize / zoom change (debounced 1s): write config back
+- [x] 13.4 Add `POST /api/projects/export/las` stub: export LAS text from project Parquet
+- [x] 13.5 Add `POST /api/projects/export/csv` stub: export CSV with metadata header lines
+- [x] 13.6 Verify: resize track -> save -> close -> reopen -> width preserved.
+           Export LAS and CSV return valid files.
 
 ---
 
@@ -889,10 +888,17 @@ resets undo stack, marks session dirty.
 
 Status: done
 Verification: `projects` router is mounted in FastAPI; lifecycle/import/undo/checkpoint/dictionary endpoints respond over HTTP; round trip `create -> open -> import LAS/tops/unconformities/deviation -> save -> close -> reopen` preserves data and `curve_metadata.family_code` stays populated
-Commit: pending
+Commit: `64cce9c`
 
 
 All endpoints access `ProjectManager` via `request.app.state.project_manager`.
+
+### Step 13 - Visual config persistence + export stubs
+
+Status: done
+Verification: `GET/PUT /api/projects/config/project` persists `depthPerPixel` and `trackWidths`; frontend hydrates config on project open and writes it back with 1s debounce; `POST /api/projects/export/las` and `POST /api/projects/export/csv` return valid files in TestClient round trip
+Commit: pending
+
 
 **Project lifecycle:**
 ```

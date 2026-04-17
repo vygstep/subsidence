@@ -5,6 +5,11 @@ interface VisibleDepthRange {
   max: number
 }
 
+interface VisualConfigPayload {
+  depthPerPixel?: number
+  trackWidths?: Record<string, number>
+}
+
 export interface ViewStore {
   scrollDepth: number
   depthPerPixel: number
@@ -17,6 +22,8 @@ export interface ViewStore {
   setCursorDepth: (depth: number | null) => void
   setViewportHeight: (height: number) => void
   setTrackWidth: (id: string, width: number) => void
+  applyVisualConfig: (config: VisualConfigPayload) => void
+  resetVisualConfig: () => void
 }
 
 function deriveVisibleDepthRange(scrollDepth: number, depthPerPixel: number, viewportHeight: number): VisibleDepthRange {
@@ -31,6 +38,15 @@ const initialScrollDepth = 0
 const initialDepthPerPixel = 0.2
 const initialViewportHeight = 800
 const minimumTrackWidth = 80
+
+function normalizeTrackWidths(trackWidths: Record<string, number> | undefined): Record<string, number> {
+  if (!trackWidths) {
+    return {}
+  }
+  return Object.fromEntries(
+    Object.entries(trackWidths).map(([id, width]) => [id, Math.max(minimumTrackWidth, Math.round(width))]),
+  )
+}
 
 export const useViewStore = create<ViewStore>((set) => ({
   scrollDepth: initialScrollDepth,
@@ -66,6 +82,23 @@ export const useViewStore = create<ViewStore>((set) => ({
         ...state.trackWidths,
         [id]: Math.max(minimumTrackWidth, Math.round(width)),
       },
+    }))
+  },
+  applyVisualConfig(config) {
+    set((state) => {
+      const nextDepthPerPixel = config.depthPerPixel ?? state.depthPerPixel
+      return {
+        depthPerPixel: nextDepthPerPixel,
+        trackWidths: normalizeTrackWidths(config.trackWidths),
+        visibleDepthRange: deriveVisibleDepthRange(state.scrollDepth, nextDepthPerPixel, state.viewportHeight),
+      }
+    })
+  },
+  resetVisualConfig() {
+    set((state) => ({
+      depthPerPixel: initialDepthPerPixel,
+      trackWidths: {},
+      visibleDepthRange: deriveVisibleDepthRange(state.scrollDepth, initialDepthPerPixel, state.viewportHeight),
     }))
   },
 }))
