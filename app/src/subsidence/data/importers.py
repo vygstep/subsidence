@@ -3,6 +3,7 @@ from __future__ import annotations
 import csv
 import hashlib
 import json
+import math
 from pathlib import Path
 from uuid import uuid4
 
@@ -17,7 +18,7 @@ from .dict_resolver import load_curve_alias_rules, resolve_curve_alias
 from .schema import CurveMetadata, DeviationSurveyModel, FormationTopModel, WellModel
 from .unit_conversion import canonicalize_gamma_unit, convert_curve_units, convert_depth_to_meters, normalize_unit_name
 
-_DEPTH_CANDIDATES = {'DEPT', 'DEPTH', 'MD', 'TVD', 'TVDSS'}
+_DEPTH_MNEMONICS = {'DEPT', 'DEPTH', 'MD', 'TVD', 'TVDSS'}
 _DEFAULT_TOP_COLOR = '#4b5563'
 
 
@@ -54,7 +55,7 @@ def _header_float(las: lasio.LASFile, name: str, default: float | None = None) -
 
 
 def _is_valid_sample(depth: float, value: float, null_value: float | None) -> bool:
-    if pd.isna(depth) or pd.isna(value):
+    if not math.isfinite(depth) or not math.isfinite(value):
         return False
     if null_value is not None and value == null_value:
         return False
@@ -309,7 +310,7 @@ def import_las_file(session: Session, project_path: Path | str, las_path: Path |
 
     for curve in las.curves:
         mnemonic = curve.mnemonic.strip()
-        if mnemonic.upper() in _DEPTH_CANDIDATES:
+        if mnemonic.upper() in _DEPTH_MNEMONICS:
             continue
 
         raw_values = [float(value) for value in las[curve.mnemonic]]
