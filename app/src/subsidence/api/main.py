@@ -1,6 +1,9 @@
-﻿from fastapi import FastAPI
+from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
+from subsidence.data import ProjectManager
+
+from .projects import router as projects_router
 from .wells import router as wells_router
 
 app = FastAPI(
@@ -8,6 +11,8 @@ app = FastAPI(
     description="Backend for well log visualization and subsidence curve calculation",
     version="0.1.0",
 )
+
+app.state.project_manager = ProjectManager()
 
 app.add_middleware(
     CORSMiddleware,
@@ -18,6 +23,7 @@ app.add_middleware(
 )
 
 app.include_router(wells_router, prefix="/api")
+app.include_router(projects_router, prefix="/api/projects")
 
 
 @app.get("/health")

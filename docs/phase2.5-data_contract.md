@@ -20,7 +20,7 @@ first write operation). No new UI panels; all changes are backend + stores + wir
 | Step 8  | done | `import_deviation_csv()` detects `MD+INCL_AZIM`, writes Parquet, and `load_deviation_from_parquet()` returns a valid `DeviationSurvey` | `a728620` |
 | Step 9  | done | `UndoStack` executes `push/undo/redo`; `ImportWell` undo removes the well and redo restores DB rows + Parquet; `mark_clean()` and undo update `is_clean` correctly | `bbb5d33` |
 | Step 10 | done | `create_checkpoint()` writes a DB snapshot + row; `restore_checkpoint()` reverts working state and creates `before-restore`; `delete_checkpoint()` removes file + row | `22af478` |
-| Step 11 | pending | - | - |
+| Step 11 | done | Full API round trip passes via TestClient: create -> open -> import LAS/tops/unconformities/deviation -> save -> close -> reopen -> data intact; dictionary and checkpoint endpoints respond correctly | pending |
 | Step 12 | pending | - | - |
 | Step 13 | pending | - | - |
 
@@ -307,25 +307,25 @@ MyProject.subsidence/
 
 ### Step 11 — API endpoints
 
-- [ ] 11.1  Create `app/src/subsidence/api/projects.py` router
-- [ ] 11.2  Project lifecycle: `POST /api/projects`, `POST /api/projects/open`,
+- [x] 11.1  Create `app/src/subsidence/api/projects.py` router
+- [x] 11.2  Project lifecycle: `POST /api/projects`, `POST /api/projects/open`,
             `POST /api/projects/close`, `POST /api/projects/save`,
             `GET /api/projects/status`
-- [ ] 11.3  Import: `POST /api/projects/import-las` (LAS file)
-- [ ] 11.4  Import: `POST /api/projects/import-tops` (tops CSV, body: well_id + file)
-- [ ] 11.5  Import: `POST /api/projects/import-unconformities` (body: well_id + file)
-- [ ] 11.6  Import: `POST /api/projects/import-deviation` (body: well_id + file)
-- [ ] 11.7  Undo/redo: `POST /api/projects/undo`, `POST /api/projects/redo`
+- [x] 11.3  Import: `POST /api/projects/import-las` (LAS file)
+- [x] 11.4  Import: `POST /api/projects/import-tops` (tops CSV, body: well_id + file)
+- [x] 11.5  Import: `POST /api/projects/import-unconformities` (body: well_id + file)
+- [x] 11.6  Import: `POST /api/projects/import-deviation` (body: well_id + file)
+- [x] 11.7  Undo/redo: `POST /api/projects/undo`, `POST /api/projects/redo`
             → `{ description, can_undo, can_redo, is_dirty }`
-- [ ] 11.8  Checkpoints: `POST /api/projects/checkpoints`,
+- [x] 11.8  Checkpoints: `POST /api/projects/checkpoints`,
             `GET /api/projects/checkpoints`,
             `POST /api/projects/checkpoints/{id}/restore`,
             `DELETE /api/projects/checkpoints/{id}`
-- [ ] 11.9  Dictionary: `GET /api/projects/dictionary/curves` — list all active rules
+- [x] 11.9  Dictionary: `GET /api/projects/dictionary/curves` - list all active rules
             `POST /api/projects/dictionary/curves` — add project-scope rule
             `GET /api/projects/dictionary/lithology` — list lithology entries
             `PUT /api/projects/dictionary/lithology/{code}` — update color/display name
-- [ ] 11.✓  Verify: full round trip via `curl`: create → open → import LAS → check
+- [x] 11.10 Verify: full round trip via TestClient: create -> open -> import LAS -> check `curve_metadata.family_code` -> import tops CSV -> check `formation_tops` rows -> save -> close -> reopen -> data intact
             `curve_metadata` has `family_code` populated → import tops CSV → check
             `formation_tops` rows → save → close → reopen → data intact
 
@@ -886,6 +886,11 @@ resets undo stack, marks session dirty.
 ---
 
 ### Step 11 — API endpoints
+
+Status: done
+Verification: `projects` router is mounted in FastAPI; lifecycle/import/undo/checkpoint/dictionary endpoints respond over HTTP; round trip `create -> open -> import LAS/tops/unconformities/deviation -> save -> close -> reopen` preserves data and `curve_metadata.family_code` stays populated
+Commit: pending
+
 
 All endpoints access `ProjectManager` via `request.app.state.project_manager`.
 

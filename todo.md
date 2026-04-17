@@ -42,7 +42,8 @@ Primary references:
 - [x] C29 Execute Phase 2.5 Step 8: deviation CSV import
 - [x] C30 Execute Phase 2.5 Step 9: undo/redo stack
 - [x] C31 Execute Phase 2.5 Step 10: checkpoints
+- [x] C32 Execute Phase 2.5 Step 11: API endpoints
 
 ## Immediate Next Step
 
-Execute Phase 2.5 Step 11: API endpoints.
+Execute Phase 2.5 Step 12: rewire frontend stores to project-aware API.
