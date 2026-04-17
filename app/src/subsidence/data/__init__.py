@@ -2,11 +2,13 @@ from .engine import create_all_tables, create_engine_for_project, get_session, v
 from .loaders import load_las_curves
 from .models import DepthReference, LogCurve
 from .project_manager import ProjectManager
+from .undo import UndoStack
 
 __all__ = [
     "DepthReference",
     "LogCurve",
     "ProjectManager",
+    "UndoStack",
     "create_all_tables",
     "create_engine_for_project",
     "get_session",

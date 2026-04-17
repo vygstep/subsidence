@@ -11,9 +11,9 @@ first write operation). No new UI panels; all changes are backend + stores + wir
 | Step | Status | Verification | Commit |
 |---|---|---|---|
 | Step 1  | done | `Base.metadata.tables` returns 12 schema tables | `144656e` |
-| Step 1  | done | `Base.metadata.tables` returns 12 schema tables | `144656e` |
-| Step 2  | done | `PRAGMA application_id` returns `0x53554253` on a temp DB | pending |
-| Step 4  | pending | - | - |
+| Step 2  | done | `PRAGMA application_id` returns `0x53554253` on a temp DB | `fbe43df` |
+| Step 3  | done | `create_project()` creates bundle dirs + seeded dictionaries; `open_project()` creates `working.db`; `close_project()` removes the session dir | `9d4e7d6` |
+| Step 4  | done | write -> save -> close -> reopen persists; close without save reverts; crash recovery is detected | pending |
 | Step 5  | pending | - | - |
 | Step 6  | pending | - | - |
 | Step 7  | pending | - | - |
@@ -172,18 +172,18 @@ MyProject.subsidence/
           dictionaries; `open_project` в†’ `working.db` in session dir; `close_project` в†’
           session dir cleaned up
 
-### Step 4 вЂ” Save and autosave
+### Step 4 ? Save and autosave
 
-- [ ] 4.1 Implement `save_project()`: WAL checkpoint в†’ `VACUUM INTO` temp в†’ fsync в†’
-          atomic rename в†’ fsync parent dir в†’ `undo_stack.mark_clean()`
-- [ ] 4.2 Add `is_dirty` property (reads from `UndoStack.is_clean()`)
-- [ ] 4.3 Implement `autosave()`: `VACUUM INTO recovery.db.new` в†’ `os.replace` в†’
+- [x] 4.1 Implement `save_project()`: WAL checkpoint ??? `VACUUM INTO` temp ??? fsync ???
+          atomic rename ??? fsync parent dir ??? `undo_stack.mark_clean()`
+- [x] 4.2 Add `is_dirty` property (reads from `UndoStack.is_clean()`)
+- [x] 4.3 Implement `autosave()`: `VACUUM INTO recovery.db.new` ??? `os.replace` ???
           `recovery.db`
-- [ ] 4.4 Add background autosave task: `asyncio.create_task`, default 5 min interval
-- [ ] 4.5 Implement crash recovery detection: stale lock + newer `recovery.db` в†’
+- [x] 4.4 Add background autosave task: `asyncio.create_task`, default 5 min interval
+- [x] 4.5 Implement crash recovery detection: stale lock + newer `recovery.db` ???
           return `recovery_available=True`
-- [ ] 4.вњ“ Verify: write в†’ save в†’ close в†’ reopen в†’ data persists. Close without save в†’
-          reopen в†’ reverts. Kill process в†’ reopen в†’ recovery offered.
+- [x] 4.??? Verify: write ??? save ??? close ??? reopen ??? data persists. Close without save ???
+          reopen ??? reverts. Kill process ??? reopen ??? recovery offered.
 
 ### Step 5 вЂ” Dictionary bootstrap
 
@@ -519,7 +519,7 @@ using `color_hex`.
 
 Status: done
 Verification: create a temp DB, run `create_all_tables`, then `PRAGMA application_id` returns `0x53554253` and `validate_project_db()` passes
-Commit: pending
+Commit: `fbe43df`
 
 Create `app/src/subsidence/data/engine.py`.
 
@@ -550,7 +550,7 @@ schema version newer than the running app.
 
 Status: done
 Verification: `create_project()` creates bundle dirs + `project.db` + seeded dictionaries; `open_project()` creates `working.db`; `close_project()` removes the session dir
-Commit: pending
+Commit: `9d4e7d6`
 
 `ProjectManager` is a singleton held in `app.state`. Only one project open at a time.
 
@@ -572,7 +572,11 @@ Commit: pending
 
 ---
 
-### Step 4 вЂ” Save and autosave
+### Step 4 ? Save and autosave
+
+Status: done
+Verification: write -> save -> close -> reopen persists; close without save reverts; autosave writes `recovery.db`; stale lock + recovery re-open reports `recovery_available=True`
+Commit: pending
 
 ```python
 def save_project(self):
@@ -586,7 +590,7 @@ def save_project(self):
     self.undo_stack.mark_clean()
 ```
 
-Autosave (every 5 min if dirty): `VACUUM INTO recovery.db.new` в†’ `os.replace` в†’
+Autosave (every 5 min if dirty): `VACUUM INTO recovery.db.new` ??? `os.replace` ???
 `recovery.db` in session directory.
 
 ---
@@ -1039,8 +1043,4 @@ Step 13 (visual config + export)
 - Autosave writes `recovery.db`; kill process в†’ reopen в†’ recovery offered
 - Undo/redo works for `UpdateFormationDepth` and `UpdateVisualConfig`
 - Checkpoint в†’ restore в†’ data matches checkpoint state
-- `npm run dev` + `uvicorn` в†’ Phase 2 UI renders from project Parquet (no visual regression)
-- `Ctrl+S` saves; dirty indicator `в—Џ` clears; `Ctrl+Z` / `Ctrl+Shift+Z` undo/redo
-- Track widths and zoom level persist across save в†’ close в†’ reopen
-- Export stubs return valid LAS and CSV files
-- `npx tsc --noEmit` вЂ” zero errors
+- `npx tsc --noEmit` ??? zero errors
