@@ -18,7 +18,7 @@ first write operation). No new UI panels; all changes are backend + stores + wir
 | Step 6  | done | `import_las_file()` writes Parquet + DB rows; `GR` resolves to `gamma_ray`; `load_curves_from_parquet()` returns float32 arrays | `ca4a80c` |
 | Step 7  | done | `import_tops_csv()` imports 32 tops for `PLESHET 01`; ICS color lookup works; unconformity age bounds load from `unconformities.csv` | `d3153a3` |
 | Step 8  | done | `import_deviation_csv()` detects `MD+INCL_AZIM`, writes Parquet, and `load_deviation_from_parquet()` returns a valid `DeviationSurvey` | `a728620` |
-| Step 9  | done | `UndoStack` executes `push/undo/redo`; `ImportWell` undo removes the well and redo restores DB rows + Parquet; `mark_clean()` and undo update `is_clean` correctly | pending |
+| Step 9  | done | `UndoStack` executes `push/undo/redo`; `ImportWell` undo removes the well and redo restores DB rows + Parquet; `mark_clean()` and undo update `is_clean` correctly | `bbb5d33` |
 | Step 10 | pending | - | - |
 | Step 11 | pending | - | - |
 | Step 12 | pending | - | - |
@@ -575,7 +575,7 @@ Commit: `9d4e7d6`
 
 Status: done
 Verification: write -> save -> close -> reopen persists; close without save reverts; autosave writes `recovery.db`; stale lock + recovery re-open reports `recovery_available=True`
-Commit: pending
+Commit: `bbb5d33`
 
 ```python
 def save_project(self):
@@ -598,7 +598,7 @@ Autosave (every 5 min if dirty): `VACUUM INTO recovery.db.new` ??? `os.replace` 
 
 Status: done
 Verification: `create_project()` seeds 17 curve rows and 9 lithology rows; `load_lithology_entries(session)` returns 9 entries; `resolve_curve_alias("GR_1", rules)` returns `family_code="gamma_ray"`
-Commit: pending
+Commit: `bbb5d33`
 
 Create `app/src/subsidence/data/dictionaries/`.
 
