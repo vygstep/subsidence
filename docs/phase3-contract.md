@@ -61,12 +61,17 @@ React panels communicating through Zustand stores and the Phase 2.5 REST API.
 - [ ] 2.5.4 Add import actions: `Create well`, `Load LAS`, `Load tops`, `Load deviation`
 - [ ] 2.5.5 Add well navigation control: a `Well selector` bound to the currently loaded well
 - [ ] 2.5.6 Keep `Zoom presets` in the same header/toolbar composition so primary app actions live in one place
-- [ ] 2.5.7 `Create well` opens a dialog for well name and creates an empty well record in the current project
-- [ ] 2.5.8 `Load LAS` opens a dialog with LAS file path input and imports the file through `POST /api/projects/import-las`
-- [ ] 2.5.9 `Load tops` opens a dialog with well selector, CSV path, and depth reference, then calls `POST /api/projects/import-tops`
-- [ ] 2.5.10 `Load deviation` opens a dialog with well selector and CSV path, then calls `POST /api/projects/import-deviation`
-- [ ] 2.5.11 After each successful action, refresh project status / well list and hydrate the affected well into `wellDataStore`
-- [ ] 2.5.12 Verify: create/import flow can produce one usable well entirely from the frontend without manual API calls; project open/close/save and undo/redo are reachable from the toolbar
+- [ ] 2.5.7 `Create well` opens a metadata dialog and creates a valid empty well record even when no LAS, tops, or deviation data exist yet
+- [ ] 2.5.8 `Create well` dialog includes at minimum: `Well name`, `X`, `Y`, `KB`, `TD`, and `CRS`; defaults are explicit and user-editable
+- [ ] 2.5.9 `GET /api/wells/{id}` must return a well with `curves=[]` and `formations=[]` instead of `404` when the well exists but no data have been imported yet
+- [ ] 2.5.10 `Load LAS` opens a dialog with LAS file path input and imports through `POST /api/projects/import-las`; if the target well does not exist, the backend auto-creates it from LAS header metadata or defaults
+- [ ] 2.5.11 `Load tops` opens a dialog with well selector, CSV path, and depth reference, then calls `POST /api/projects/import-tops`; it must be valid to import tops before LAS
+- [ ] 2.5.12 `Load deviation` opens a dialog with well selector and CSV path, then calls `POST /api/projects/import-deviation`; it must be valid to import deviation before LAS
+- [ ] 2.5.13 All first-load flows are independent: `Create well`, `Load LAS`, `Load tops`, and `Load deviation` may be the first data action in a project
+- [ ] 2.5.14 Imports may update well metadata: for example, if imported LAS reaches deeper than current `TD`, the well `TD` is promoted to the LAS final depth
+- [ ] 2.5.15 Auto-created wells use deterministic defaults when file metadata are missing: `well-1`, `x=0`, `y=0`, `kb=10`, `td=final depth of LAS` (or source-derived depth when available)
+- [ ] 2.5.16 After each successful action, refresh project status / well list and hydrate the affected well into `wellDataStore`
+- [ ] 2.5.17 Verify: a user can create an empty well, import tops before LAS, import deviation before LAS, or import LAS first and have the well auto-created entirely from the frontend without manual API calls
 
 ### Step 3 — Formation tops API + store CRUD
 - [ ] 3.1 Write `app/src/subsidence/api/formations.py` with five endpoints (see spec)
@@ -247,7 +252,95 @@ Commit: —
 - Dialog errors are shown inline; success closes the dialog and refreshes project state.
 - Buttons that are not currently available (`Save`, `Undo`, `Redo`, `Close project`) are disabled when their action is not valid.
 
-**Backend/API usage in this step:**
+**Independent well-ingestion contract**
+
+Step 2.5 is not LAS-first. The product model is **well-first with independent imports**:
+
+- A `Well` is a valid project object even when it has no curves, no tops, and no deviation yet.
+- The first data action in a project may be any of:
+  - `Create well`
+  - `Load LAS`
+  - `Load tops`
+  - `Load deviation`
+- Importing one data type must not require that another data type already exists.
+
+This is the contract that the current code must evolve toward:
+
+1. `Create well` creates an empty well record that is immediately loadable in the UI.
+   This directly affects the current `POST /api/projects/wells` implementation in
+   `app/src/subsidence/api/projects.py` and the current `CreateWellDialog.tsx`, which today
+   only sends `name`.
+
+2. `GET /api/wells/{id}` must return `200` for an existing well even when:
+   - `curves=[]`
+   - `formations=[]`
+   - deviation data are absent
+
+   This directly affects `app/src/subsidence/api/wells.py`, where the current implementation
+   raises `404` when no curves exist.
+
+3. Tops and deviation imports must be valid before LAS import.
+   A newly created well may first receive:
+   - formation tops
+   - unconformities
+   - deviation survey
+
+4. LAS import may target an existing well or may auto-create a well when no explicit well exists yet.
+
+5. Metadata are mergeable and may be promoted by imports.
+   Example: if the current `TD` in the well record is shallower than the imported LAS final depth,
+   the well `TD` must be updated to the LAS final depth.
+
+6. Auto-created wells use deterministic defaults when source metadata are missing.
+   For the first implementation, defaults are:
+   - `Well name = well-1`
+   - `X = 0`
+   - `Y = 0`
+   - `KB = 10`
+   - `TD = final depth of LAS`
+
+   The same fallback principle applies to tops and deviation imports when they create a well and do
+   not provide complete metadata.
+
+**Create well dialog contract**
+
+The current `CreateWellDialog.tsx` is intentionally too small for the target workflow and must be
+expanded into a real metadata form. The dialog should collect at least:
+
+- `Well name`
+- `X`
+- `Y`
+- `KB`
+- `TD`
+- `CRS`
+
+Optional fields may follow later (`UWI`, `GL`, depth reference), but the fields above are enough to
+make the well object useful before any LAS is present.
+
+The backend request for `POST /api/projects/wells` should therefore evolve from:
+
+```ts
+{ name: string }
+```
+
+to a fuller payload shape that mirrors the existing `WellModel` fields already present in the
+backend schema:
+
+```ts
+{
+  name: string
+  x: number
+  y: number
+  kb: number
+  td: number
+  crs: string
+}
+```
+
+The exact request field names may follow backend conventions (`lat/lon` vs `x/y`, `kb_elev` vs
+`kb`), but the UI contract must expose these metadata fields from the first dialog.
+
+**Import contracts relative to existing endpoints**
 
 - `New project` reuses the existing create/open flow from Step 2
 - `Open project` reuses the existing recent/manual open flow from Step 2
@@ -255,19 +348,53 @@ Commit: —
 - `Save project` uses `POST /api/projects/save`
 - `Undo` uses `POST /api/projects/undo`
 - `Redo` uses `POST /api/projects/redo`
-- `Create well` may use a dedicated backend endpoint or a minimal project-scoped helper if one does not exist yet.
-- `Load LAS` uses `POST /api/projects/import-las`
-- `Load tops` uses `POST /api/projects/import-tops`
-- `Load deviation` uses `POST /api/projects/import-deviation`
+- `Create well` uses the existing project-scoped helper endpoint
+  `POST /api/projects/wells`, but the payload must grow from name-only to metadata-aware.
+- `Load LAS` uses `POST /api/projects/import-las`, but its behavior must support:
+  - importing into an existing selected well
+  - auto-creating a well from LAS header metadata when no well exists yet
+  - defaulting metadata when LAS header values are missing
+- `Load tops` uses `POST /api/projects/import-tops`, but must remain valid for a well with no
+  curves loaded yet.
+- `Load deviation` uses `POST /api/projects/import-deviation`, but must remain valid for a well
+  with no curves loaded yet.
+
+**Metadata promotion rules**
+
+To avoid losing useful file-derived metadata, Step 2.5 adopts these merge rules:
+
+- user-entered metadata from `Create well` establish the initial well object
+- later imports may fill missing metadata fields
+- later imports may promote derived depth fields when they are objectively stronger than the
+  current record
+- the first explicit rule to implement is:
+  - if LAS final depth > current `TD`, update `TD`
+
+Other promotion rules can be added later, but this one is required in Step 2.5 because it affects
+the basic well lifecycle immediately.
 
 **Frontend/store expectations:**
 
 - Toolbar state is driven from `projectStore` (`isOpen`, `isDirty`, `canUndo`, `canRedo`) plus the current well list.
 - After every successful action, refresh the well list used by the app header / selector.
 - If the imported or created well is the first well in the project, load it immediately into `wellDataStore`.
-- If the action targets the currently loaded well, refresh that well so new curves / formations / deviation data appear without a full page reload.
+- Loading a well must not fail only because the well has no curves yet.
+- If the action targets the currently loaded well, refresh that well so new curves / formations /
+  deviation data appear without a full page reload.
+- If a new well is auto-created by import, it should become selectable immediately through the
+  existing `Well selector`.
 
-**Acceptance criteria:** Starting from a freshly created project, the user can use only the frontend to save/close/reopen the project, create one well, import one LAS file, import tops, and import deviation data, then switch between available wells from the header without manual API calls.
+**Acceptance criteria:** Starting from a freshly created project, the user can use only the
+frontend to:
+
+- save / close / reopen the project
+- create an empty well with metadata
+- open that empty well successfully in the UI
+- import tops before LAS
+- import deviation before LAS
+- import LAS into an existing well and have `TD` update if the LAS goes deeper
+- import LAS first and have the well auto-created from file metadata or defaults
+- switch between available wells from the header without manual API calls
 
 ---
 
