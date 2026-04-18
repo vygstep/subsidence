@@ -127,7 +127,9 @@ export const useProjectStore = create<ProjectStore>((set, get) => ({
     const next = { ...current, ...patch }
     const payload = await patchVisualConfig(patch)
     set({ visualConfig: payload.config ?? next })
-    applyVisualConfigPayload(payload.config ?? next)
+    // Do not call applyVisualConfigPayload here: values are already live in the
+    // stores when the user changed them. Re-applying creates a new colorOverrides
+    // reference that triggers the save effect again (infinite loop).
   },
   async saveProject() {
     await postAction('/api/projects/save')
