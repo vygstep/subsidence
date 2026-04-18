@@ -15,7 +15,7 @@ React panels communicating through Zustand stores and the Phase 2.5 REST API.
 | Step | Status | Verification | Commit |
 |---|---|---|---|
 | Step 1  | done | `PATCH /api/projects/visual-config` persists `trackWidths`, `depthPerPixel`, and `curveColors`; close + reopen preserves visual config; export LAS/CSV endpoints return valid files | `c442f5e` |
-| Step 2  | pending | New Project dialog creates bundle; Open dialog restores last-saved state | — |
+| Step 2  | done | New Project dialog creates bundle; Open dialog restores last-saved state | `6b5cfa1` |
 | Step 3  | pending | `POST /api/projects/wells/{id}/formations` → line appears in FormationColumn | — |
 | Step 4  | pending | formation lines render at correct depths and move with scroll; crosshair tracks mouse | — |
 | Step 5  | pending | drag top 50 m → depth commits; Ctrl+Z reverts in one undo step | — |
@@ -47,11 +47,11 @@ React panels communicating through Zustand stores and the Phase 2.5 REST API.
 
 
 ### Step 2 — Project selector UI
-- [ ] 2.1 Write `src/components/layout/NewProjectDialog.tsx`: name + path `<input>` fields, calls `POST /api/projects` then `POST /api/projects/open`
-- [ ] 2.2 Write `src/components/layout/FileOpenDialog.tsx`: path `<input>`, "Recent projects" list from `GET /api/projects/recent`, calls `POST /api/projects/open`
-- [ ] 2.3 In `App.tsx`, show `FileOpenDialog` when `projectStore.isOpen === false` (replaces raw path wiring from Phase 2.5)
-- [ ] 2.4 Add `GET /api/projects/recent` backend endpoint returning the last 10 opened project paths (stored in a `recent_projects.json` next to the session dir)
-- [ ] 2.5 Verify: enter a valid `.subsidence` path in the dialog → project opens; title bar shows `project_name`; invalid path shows inline error
+- [x] 2.1 Write `src/components/layout/NewProjectDialog.tsx`: name + path `<input>` fields, calls `POST /api/projects` then `POST /api/projects/open`
+- [x] 2.2 Write `src/components/layout/FileOpenDialog.tsx`: path `<input>`, "Recent projects" list from `GET /api/projects/recent`, calls `POST /api/projects/open`
+- [x] 2.3 In `App.tsx`, show `FileOpenDialog` when `projectStore.isOpen === false` (replaces raw path wiring from Phase 2.5)
+- [x] 2.4 Add `GET /api/projects/recent` backend endpoint returning the last 10 opened project paths (stored in a `recent_projects.json` next to the session dir)
+- [x] 2.5 Verify: enter a valid `.subsidence` path in the dialog ? project opens; title bar shows `project_name`; invalid path shows inline error
 
 ### Step 3 — Formation tops API + store CRUD
 - [ ] 3.1 Write `app/src/subsidence/api/formations.py` with five endpoints (see spec)
@@ -158,9 +158,9 @@ Commit: `c442f5e`
 
 ### Step 2 — Project selector UI
 
-Status: pending
+Status: done
 Verification: enter valid project path → title bar shows project name; invalid path shows inline error
-Commit: —
+Commit: `6b5cfa1`
 
 **`src/components/layout/NewProjectDialog.tsx`:**
 
