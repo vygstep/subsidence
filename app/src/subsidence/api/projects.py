@@ -77,10 +77,6 @@ class UpdateLithologyRequest(BaseModel):
     color_hex: str | None = None
 
 
-class ConfigUpdateRequest(BaseModel):
-    scope_id: str | None = None
-    config: dict
-
 
 class VisualConfigPatchRequest(BaseModel):
     scope: str = 'project'
@@ -172,6 +168,15 @@ class CreateProjectResponse(BaseModel):
     project_path: str
 
 
+class OpenProjectResponse(BaseModel):
+    project_name: str
+    project_uuid: str
+    project_path: str
+    working_db_path: str
+    session_id: str
+    recovery_available: bool
+
+
 class SaveProjectResponse(BaseModel):
     project_path: str
 
@@ -254,11 +259,11 @@ def create_project(payload: CreateProjectRequest, request: Request) -> CreatePro
     return CreateProjectResponse(project_path=str(project_path))
 
 
-@router.post('/open')
-def open_project(payload: OpenProjectRequest, request: Request) -> dict:
+@router.post('/open', response_model=OpenProjectResponse)
+def open_project(payload: OpenProjectRequest, request: Request) -> OpenProjectResponse:
     manager = _manager(request)
     try:
-        return manager.open_project(payload.path)
+        return OpenProjectResponse(**manager.open_project(payload.path))
     except (RuntimeError, FileNotFoundError, ValueError) as error:
         raise HTTPException(status_code=400, detail=str(error)) from error
 
@@ -284,50 +289,62 @@ def project_status(request: Request) -> ProjectStatusResponse:
 @router.post('/import-las', response_model=ImportLasResponse)
 def import_las(payload: ImportLasRequest, request: Request) -> ImportLasResponse:
     manager = _require_open_project(request)
-    with manager.get_session() as session:
-        well = import_las_file(session, manager.project_path, Path(payload.las_path))
-        well_id = well.id
-        well_name = well.name
-        curve_count = len(list(session.scalars(select(CurveMetadata).where(CurveMetadata.well_id == well_id))))
-        session.commit()
-    manager.mark_dirty()
+    try:
+        with manager.get_session() as session:
+            well = import_las_file(session, manager.project_path, Path(payload.las_path))
+            well_id = well.id
+            well_name = well.name
+            curve_count = len(list(session.scalars(select(CurveMetadata).where(CurveMetadata.well_id == well_id))))
+            session.commit()
+        manager.mark_dirty()
+    except (ValueError, FileNotFoundError) as error:
+        raise HTTPException(status_code=400, detail=str(error)) from error
     return ImportLasResponse(well_id=well_id, well_name=well_name, curve_count=curve_count)
 
 
 @router.post('/import-tops', response_model=ImportTopsResponse)
 def import_tops(payload: ImportTopsRequest, request: Request) -> ImportTopsResponse:
     manager = _require_open_project(request)
-    with manager.get_session() as session:
-        import_tops_csv(session, payload.well_id, Path(payload.csv_path), payload.depth_ref)
-        linked = link_tops_to_unconformities(session, payload.well_id)
-        formation_count = len(list(session.scalars(select(FormationTopModel).where(FormationTopModel.well_id == payload.well_id))))
-        session.commit()
-    manager.mark_dirty()
+    try:
+        with manager.get_session() as session:
+            import_tops_csv(session, payload.well_id, Path(payload.csv_path), payload.depth_ref)
+            linked = link_tops_to_unconformities(session, payload.well_id)
+            formation_count = len(list(session.scalars(select(FormationTopModel).where(FormationTopModel.well_id == payload.well_id))))
+            session.commit()
+        manager.mark_dirty()
+    except (ValueError, FileNotFoundError, NotImplementedError) as error:
+        raise HTTPException(status_code=400, detail=str(error)) from error
     return ImportTopsResponse(well_id=payload.well_id, formation_count=formation_count, linked_count=len(linked))
 
 
 @router.post('/import-unconformities', response_model=ImportUnconformitiesResponse)
 def import_unconformities(payload: ImportUnconformitiesRequest, request: Request) -> ImportUnconformitiesResponse:
     manager = _require_open_project(request)
-    with manager.get_session() as session:
-        import_unconformities_csv(session, payload.well_id, Path(payload.csv_path))
-        linked = link_tops_to_unconformities(session, payload.well_id)
-        formation_count = len(list(session.scalars(select(FormationTopModel).where(FormationTopModel.well_id == payload.well_id))))
-        session.commit()
-    manager.mark_dirty()
+    try:
+        with manager.get_session() as session:
+            import_unconformities_csv(session, payload.well_id, Path(payload.csv_path))
+            linked = link_tops_to_unconformities(session, payload.well_id)
+            formation_count = len(list(session.scalars(select(FormationTopModel).where(FormationTopModel.well_id == payload.well_id))))
+            session.commit()
+        manager.mark_dirty()
+    except (ValueError, FileNotFoundError) as error:
+        raise HTTPException(status_code=400, detail=str(error)) from error
     return ImportUnconformitiesResponse(well_id=payload.well_id, formation_count=formation_count, linked_count=len(linked))
 
 
 @router.post('/import-deviation', response_model=ImportDeviationResponse)
 def import_deviation(payload: ImportDeviationRequest, request: Request) -> ImportDeviationResponse:
     manager = _require_open_project(request)
-    with manager.get_session() as session:
-        survey = import_deviation_csv(session, manager.project_path, payload.well_id, Path(payload.csv_path))
-        reference = survey.reference
-        mode = survey.mode
-        data_uri = survey.data_uri
-        session.commit()
-    manager.mark_dirty()
+    try:
+        with manager.get_session() as session:
+            survey = import_deviation_csv(session, manager.project_path, payload.well_id, Path(payload.csv_path))
+            reference = survey.reference
+            mode = survey.mode
+            data_uri = survey.data_uri
+            session.commit()
+        manager.mark_dirty()
+    except (ValueError, FileNotFoundError) as error:
+        raise HTTPException(status_code=400, detail=str(error)) from error
     return ImportDeviationResponse(well_id=payload.well_id, reference=reference, mode=mode, data_uri=data_uri)
 
 
@@ -451,26 +468,6 @@ def patch_visual_config(payload: VisualConfigPatchRequest, request: Request) -> 
     manager.execute_command(UpdateVisualConfig(payload.scope, resolved_scope_id, old_config, merged_config))
     return VisualConfigResponse(scope=payload.scope, scope_id=resolved_scope_id, config=merged_config)
 
-
-@router.get('/config/{scope}', response_model=VisualConfigResponse)
-def get_visual_config(scope: str, request: Request, scope_id: str | None = None) -> VisualConfigResponse:
-    manager = _require_open_project(request)
-    with manager.get_session() as session:
-        resolved_scope_id = _resolve_scope_id(session, scope, scope_id)
-        row = session.scalar(select(VisualConfig).where(VisualConfig.scope == scope, VisualConfig.scope_id == resolved_scope_id))
-        config = json.loads(row.config) if row is not None else {}
-        return VisualConfigResponse(scope=scope, scope_id=resolved_scope_id, config=config)
-
-
-@router.put('/config/{scope}', response_model=VisualConfigResponse)
-def put_visual_config(scope: str, payload: ConfigUpdateRequest, request: Request) -> VisualConfigResponse:
-    manager = _require_open_project(request)
-    with manager.get_session() as session:
-        resolved_scope_id = _resolve_scope_id(session, scope, payload.scope_id)
-        existing = session.scalar(select(VisualConfig).where(VisualConfig.scope == scope, VisualConfig.scope_id == resolved_scope_id))
-        old_config = json.loads(existing.config) if existing is not None else None
-    manager.execute_command(UpdateVisualConfig(scope, resolved_scope_id, old_config, payload.config))
-    return VisualConfigResponse(scope=scope, scope_id=resolved_scope_id, config=payload.config)
 
 
 @router.post('/export/las')

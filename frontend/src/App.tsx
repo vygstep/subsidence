@@ -160,11 +160,12 @@ function App() {
       void saveVisualConfig({
         depthPerPixel,
         trackWidths,
+        curveColors: colorOverrides,
       })
-    }, 1000)
+    }, 500)
 
     return () => window.clearTimeout(timer)
-  }, [depthPerPixel, isProjectOpen, saveVisualConfig, trackWidths])
+  }, [colorOverrides, depthPerPixel, isProjectOpen, saveVisualConfig, trackWidths])
 
   useEffect(() => {
     if (!isProjectOpen) {

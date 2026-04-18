@@ -3,6 +3,7 @@ from __future__ import annotations
 from fastapi import APIRouter, HTTPException, Request
 from pydantic import BaseModel
 from sqlalchemy import select
+from sqlalchemy.orm import selectinload
 
 from subsidence.data import load_curves_from_parquet
 from subsidence.data.schema import CurveMetadata, FormationTopModel, WellModel
@@ -71,10 +72,7 @@ def list_wells(request: Request) -> list[WellListItem]:
 def get_well(well_id: str, request: Request) -> WellResponse:
     manager = _require_open_project(request)
     with manager.get_session() as session:
-        if well_id == 'sample':
-            well = session.scalar(select(WellModel).order_by(WellModel.name.asc(), WellModel.id.asc()))
-        else:
-            well = session.get(WellModel, well_id)
+        well = session.get(WellModel, well_id)
         if well is None:
             raise HTTPException(status_code=404, detail=f'Well not found: {well_id}')
 
@@ -102,7 +100,12 @@ def get_well(well_id: str, request: Request) -> WellResponse:
                 )
             )
 
-        formation_rows = list(session.scalars(select(FormationTopModel).where(FormationTopModel.well_id == well.id).order_by(FormationTopModel.depth_md.asc())))
+        formation_rows = list(session.scalars(
+            select(FormationTopModel)
+            .where(FormationTopModel.well_id == well.id)
+            .order_by(FormationTopModel.depth_md.asc())
+            .options(selectinload(FormationTopModel.strat_unit))
+        ))
         formations = [
             FormationResponse(
                 id=str(row.id),
@@ -121,8 +124,8 @@ def get_well(well_id: str, request: Request) -> WellResponse:
             well_name=well.name,
             kb_elev=well.kb_elev,
             td_md=td_md,
-            x=well.lon or 0.0,
-            y=well.lat or 0.0,
+            x=well.lon if well.lon is not None else 0.0,
+            y=well.lat if well.lat is not None else 0.0,
             crs=well.crs,
             depth_reference='MD',
             curves=curves,
