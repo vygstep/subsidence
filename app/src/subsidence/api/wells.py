@@ -96,7 +96,7 @@ def get_well(well_id: str, request: Request) -> WellResponse:
                     unit=row.unit,
                     depths=depths.tolist(),
                     values=curve_values.tolist(),
-                    null_value=-999.25,
+                    null_value=row.null_value,
                 )
             )
 

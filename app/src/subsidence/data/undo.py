@@ -174,27 +174,72 @@ class UpdateVisualConfig(Command):
 
 
 class ImportWell(Command):
-    def __init__(self, project_path: Path | str, well_id: str) -> None:
+    """Undo command for a well import.
+
+    Snapshot is captured at import time (before the transaction commits) via
+    ``ImportWell.capture()``, so ``apply()`` is a pure idempotent restore and
+    carries no hidden first-call side-effects.
+    """
+
+    def __init__(self, project_path: Path | str, snapshot: dict[str, Any]) -> None:
         self.project_path = Path(project_path)
-        self.well_id = well_id
-        self._snapshot: dict[str, Any] | None = None
+        self._snapshot = snapshot
 
     @property
     def description(self) -> str:
-        return f'Import well {self.well_id}'
+        return f'Import well {self._snapshot["well"]["id"]}'
+
+    @classmethod
+    def capture(cls, session: Session, project_path: Path | str, well_id: str) -> 'ImportWell':
+        """Call inside the import transaction after flush, before commit."""
+        project_path = Path(project_path)
+        well = session.get(WellModel, well_id)
+        if well is None:
+            raise ValueError(f'Well not found: {well_id}')
+        curve_rows = list(session.scalars(select(CurveMetadata).where(CurveMetadata.well_id == well_id)))
+        deviation = session.scalar(select(DeviationSurveyModel).where(DeviationSurveyModel.well_id == well_id))
+        tops = list(session.scalars(select(FormationTopModel).where(FormationTopModel.well_id == well_id)))
+
+        files: dict[str, bytes] = {}
+        relative_paths: set[str] = {row.data_uri for row in curve_rows}
+        if deviation is not None:
+            relative_paths.add(deviation.data_uri)
+        if well.source_las_path:
+            relative_paths.add(well.source_las_path)
+        for relative_path in relative_paths:
+            file_path = project_path / relative_path
+            if file_path.exists():
+                files[relative_path] = file_path.read_bytes()
+
+        snapshot = {
+            'well': _model_to_dict(well),
+            'curve_metadata': [_model_to_dict(row) for row in curve_rows],
+            'deviation': _model_to_dict(deviation) if deviation is not None else None,
+            'formation_tops': [_model_to_dict(row) for row in tops],
+            'files': files,
+        }
+        return cls(project_path, snapshot)
 
     def apply(self, session: Session) -> None:
-        if self._snapshot is None:
-            self._snapshot = self._capture_snapshot(session)
+        """Restore the well from the pre-captured snapshot.  No-op if already present (first push)."""
+        if session.get(WellModel, self._snapshot['well']['id']) is not None:
             return
-        if session.get(WellModel, self.well_id) is not None:
-            return
-        self._restore_snapshot(session, self._snapshot)
+        for relative_path, payload in self._snapshot['files'].items():
+            file_path = self.project_path / relative_path
+            file_path.parent.mkdir(parents=True, exist_ok=True)
+            file_path.write_bytes(payload)
+        session.add(WellModel(**self._snapshot['well']))
+        session.flush()
+        for row in self._snapshot['curve_metadata']:
+            session.add(CurveMetadata(**row))
+        if self._snapshot['deviation'] is not None:
+            session.add(DeviationSurveyModel(**self._snapshot['deviation']))
+        for row in self._snapshot['formation_tops']:
+            session.add(FormationTopModel(**row))
 
     def revert(self, session: Session) -> None:
-        if self._snapshot is None:
-            self._snapshot = self._capture_snapshot(session)
-        well = session.get(WellModel, self.well_id)
+        well_id = self._snapshot['well']['id']
+        well = session.get(WellModel, well_id)
         if well is None:
             return
         session.delete(well)
@@ -203,45 +248,3 @@ class ImportWell(Command):
             file_path = self.project_path / relative_path
             if file_path.exists():
                 file_path.unlink()
-
-    def _capture_snapshot(self, session: Session) -> dict[str, Any]:
-        well = session.get(WellModel, self.well_id)
-        if well is None:
-            raise ValueError(f'Well not found: {self.well_id}')
-        curve_rows = list(session.scalars(select(CurveMetadata).where(CurveMetadata.well_id == self.well_id)))
-        deviation = session.scalar(select(DeviationSurveyModel).where(DeviationSurveyModel.well_id == self.well_id))
-        tops = list(session.scalars(select(FormationTopModel).where(FormationTopModel.well_id == self.well_id)))
-
-        files: dict[str, bytes] = {}
-        relative_paths = {row.data_uri for row in curve_rows}
-        if deviation is not None:
-            relative_paths.add(deviation.data_uri)
-        if well.source_las_path:
-            relative_paths.add(well.source_las_path)
-        for relative_path in relative_paths:
-            file_path = self.project_path / relative_path
-            if file_path.exists():
-                files[relative_path] = file_path.read_bytes()
-
-        return {
-            'well': _model_to_dict(well),
-            'curve_metadata': [_model_to_dict(row) for row in curve_rows],
-            'deviation': _model_to_dict(deviation) if deviation is not None else None,
-            'formation_tops': [_model_to_dict(row) for row in tops],
-            'files': files,
-        }
-
-    def _restore_snapshot(self, session: Session, snapshot: dict[str, Any]) -> None:
-        for relative_path, payload in snapshot['files'].items():
-            file_path = self.project_path / relative_path
-            file_path.parent.mkdir(parents=True, exist_ok=True)
-            file_path.write_bytes(payload)
-
-        session.add(WellModel(**snapshot['well']))
-        session.flush()
-        for row in snapshot['curve_metadata']:
-            session.add(CurveMetadata(**row))
-        if snapshot['deviation'] is not None:
-            session.add(DeviationSurveyModel(**snapshot['deviation']))
-        for row in snapshot['formation_tops']:
-            session.add(FormationTopModel(**row))

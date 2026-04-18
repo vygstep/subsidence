@@ -355,6 +355,7 @@ def import_las_file(session: Session, project_path: Path | str, las_path: Path |
                 n_samples=len(clean_depths),
                 data_uri=parquet_relative_path,
                 source_hash=source_hash,
+                null_value=null_value if null_value is not None else -999.25,
             )
         )
 

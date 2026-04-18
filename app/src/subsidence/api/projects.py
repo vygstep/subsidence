@@ -13,6 +13,7 @@ from pydantic import BaseModel
 from sqlalchemy import select
 
 from subsidence.data import (
+    ImportWell,
     ProjectManager,
     UpdateVisualConfig,
     import_deviation_csv,
@@ -292,10 +293,13 @@ def import_las(payload: ImportLasRequest, request: Request) -> ImportLasResponse
     try:
         with manager.get_session() as session:
             well = import_las_file(session, manager.project_path, Path(payload.las_path))
+            session.flush()
+            command = ImportWell.capture(session, manager.project_path, well.id)
             well_id = well.id
             well_name = well.name
             curve_count = len(list(session.scalars(select(CurveMetadata).where(CurveMetadata.well_id == well_id))))
             session.commit()
+        manager.execute_command(command)  # apply() is no-op: well already in DB
         manager.mark_dirty()
     except (ValueError, FileNotFoundError) as error:
         raise HTTPException(status_code=400, detail=str(error)) from error

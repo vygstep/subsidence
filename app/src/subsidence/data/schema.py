@@ -120,6 +120,7 @@ class CurveMetadata(Base, AuditMixin):
     n_samples: Mapped[int] = mapped_column(Integer)
     data_uri: Mapped[str] = mapped_column(Text)  # relative path to Parquet
     source_hash: Mapped[str] = mapped_column(String(64))  # sha256 of source file
+    null_value: Mapped[float] = mapped_column(Float, default=-999.25)
 
     well: Mapped[WellModel] = relationship(back_populates="curve_metadata")
 
