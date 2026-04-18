@@ -39,7 +39,10 @@ PROJECT_DB_NAME = 'project.db'
 MANIFEST_NAME = 'manifest.json'
 LOCK_NAME = '.subsidence.lock'
 RECOVERY_DB_NAME = 'recovery.db'
+RECENT_PROJECTS_NAME = 'recent_projects.json'
+RECENT_PROJECTS_LIMIT = 10
 SESSION_ROOT = Path(user_cache_dir(APP_NAME)) / 'sessions'
+RECENT_PROJECTS_PATH = SESSION_ROOT.parent / RECENT_PROJECTS_NAME
 BUNDLE_DIRS = ('curves', 'deviation', 'results', 'originals', 'checkpoints')
 
 
@@ -60,6 +63,9 @@ class ProjectManager:
         self._state: ProjectOpenState | None = None
         self.undo_stack = UndoStack()
         self._autosave_interval_seconds = autosave_interval_seconds
+
+    def list_recent_projects(self) -> list[dict[str, str]]:
+        return self._read_recent_projects()
 
     @property
     def is_open(self) -> bool:
@@ -169,8 +175,11 @@ class ProjectManager:
         self.undo_stack.clear()
         self._mark_clean()
 
+        project_name = manifest.get('project_name') or bundle_path.stem
+        self._record_recent_project(bundle_path, project_name)
+
         return {
-            'project_name': manifest.get('project_name') or bundle_path.stem,
+            'project_name': project_name,
             'project_uuid': manifest['uuid'],
             'project_path': str(bundle_path),
             'working_db_path': str(working_db_path),
@@ -344,6 +353,49 @@ class ProjectManager:
                     self.autosave()
         except asyncio.CancelledError:
             return
+
+    def _record_recent_project(self, project_path: Path, project_name: str) -> None:
+        entries = self._read_recent_projects()
+        target_path = str(project_path)
+        timestamp = self._utc_now_iso()
+        next_entries = [
+            entry
+            for entry in entries
+            if str(entry.get('path', '')).lower() != target_path.lower()
+        ]
+        next_entries.insert(0, {'name': project_name, 'path': target_path, 'last_opened': timestamp})
+        self._write_recent_projects(next_entries[:RECENT_PROJECTS_LIMIT])
+
+    def _read_recent_projects(self) -> list[dict[str, str]]:
+        try:
+            payload = json.loads(RECENT_PROJECTS_PATH.read_text(encoding='utf-8'))
+        except FileNotFoundError:
+            return []
+        except (OSError, json.JSONDecodeError):
+            return []
+
+        if not isinstance(payload, list):
+            return []
+
+        entries: list[dict[str, str]] = []
+        for item in payload:
+            if not isinstance(item, dict):
+                continue
+            name = str(item.get('name') or '').strip()
+            path = str(item.get('path') or '').strip()
+            last_opened = str(item.get('last_opened') or '').strip()
+            if not path:
+                continue
+            entries.append({
+                'name': name or Path(path).stem,
+                'path': path,
+                'last_opened': last_opened or self._utc_now_iso(),
+            })
+        return entries[:RECENT_PROJECTS_LIMIT]
+
+    def _write_recent_projects(self, entries: list[dict[str, str]]) -> None:
+        RECENT_PROJECTS_PATH.parent.mkdir(parents=True, exist_ok=True)
+        RECENT_PROJECTS_PATH.write_text(json.dumps(entries, indent=2), encoding='utf-8')
 
     def _detect_recovery(self, bundle_path: Path) -> bool:
         lock_path = bundle_path / LOCK_NAME

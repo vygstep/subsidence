@@ -3,6 +3,12 @@ import { create } from 'zustand'
 import { useViewStore } from './viewStore'
 import { useWellDataStore } from './wellDataStore'
 
+export interface RecentProject {
+  name: string
+  path: string
+  lastOpened: string
+}
+
 export interface ProjectStore {
   isOpen: boolean
   projectName: string | null
@@ -11,14 +17,17 @@ export interface ProjectStore {
   canUndo: boolean
   canRedo: boolean
   visualConfig: Record<string, unknown>
+  recentProjects: RecentProject[]
   pollStatus: () => Promise<void>
+  loadRecentProjects: () => Promise<void>
+  openProject: (path: string) => Promise<void>
+  createProject: (name: string, path: string) => Promise<void>
   loadVisualConfig: () => Promise<void>
   saveVisualConfig: (patch: Record<string, unknown>) => Promise<void>
   saveProject: () => Promise<void>
   undo: () => Promise<void>
   redo: () => Promise<void>
 }
-
 
 interface VisualConfigResponse {
   scope: string
@@ -41,6 +50,33 @@ interface ProjectStatusResponse {
   project_path: string | null
 }
 
+interface RecentProjectResponse {
+  name: string
+  path: string
+  last_opened: string
+}
+
+interface CreateProjectResponse {
+  project_path: string
+}
+
+interface OpenProjectResponse {
+  project_name: string
+  project_path: string
+}
+
+async function readError(response: Response, fallback: string): Promise<string> {
+  try {
+    const payload = (await response.json()) as { detail?: string }
+    if (payload.detail) {
+      return payload.detail
+    }
+  } catch {
+    // Ignore non-JSON error payloads.
+  }
+  return fallback
+}
+
 async function fetchStatus(): Promise<ProjectStatusResponse> {
   const response = await fetch('/api/projects/status')
   if (!response.ok) {
@@ -49,10 +85,42 @@ async function fetchStatus(): Promise<ProjectStatusResponse> {
   return (await response.json()) as ProjectStatusResponse
 }
 
+async function fetchRecentProjects(): Promise<RecentProjectResponse[]> {
+  const response = await fetch('/api/projects/recent')
+  if (!response.ok) {
+    throw new Error(await readError(response, `Failed to read recent projects (${response.status})`))
+  }
+  return (await response.json()) as RecentProjectResponse[]
+}
+
+async function createProjectRequest(name: string, path: string): Promise<CreateProjectResponse> {
+  const response = await fetch('/api/projects', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ name, path }),
+  })
+  if (!response.ok) {
+    throw new Error(await readError(response, `Failed to create project (${response.status})`))
+  }
+  return (await response.json()) as CreateProjectResponse
+}
+
+async function openProjectRequest(path: string): Promise<OpenProjectResponse> {
+  const response = await fetch('/api/projects/open', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ path }),
+  })
+  if (!response.ok) {
+    throw new Error(await readError(response, `Failed to open project (${response.status})`))
+  }
+  return (await response.json()) as OpenProjectResponse
+}
+
 async function postAction(path: string): Promise<void> {
   const response = await fetch(path, { method: 'POST' })
   if (!response.ok) {
-    throw new Error(`Request failed for ${path} (${response.status})`)
+    throw new Error(await readError(response, `Request failed for ${path} (${response.status})`))
   }
 }
 
@@ -85,6 +153,14 @@ function applyVisualConfigPayload(config: Record<string, unknown>): void {
   useWellDataStore.getState().setColorOverrides(payload.curveColors ?? {})
 }
 
+function mapRecentProjects(payload: RecentProjectResponse[]): RecentProject[] {
+  return payload.map((entry) => ({
+    name: entry.name,
+    path: entry.path,
+    lastOpened: entry.last_opened,
+  }))
+}
+
 export const useProjectStore = create<ProjectStore>((set, get) => ({
   isOpen: false,
   projectName: null,
@@ -93,6 +169,7 @@ export const useProjectStore = create<ProjectStore>((set, get) => ({
   canUndo: false,
   canRedo: false,
   visualConfig: {},
+  recentProjects: [],
   async pollStatus() {
     try {
       const payload = await fetchStatus()
@@ -116,6 +193,31 @@ export const useProjectStore = create<ProjectStore>((set, get) => ({
       })
       applyVisualConfigPayload({})
     }
+  },
+  async loadRecentProjects() {
+    const payload = await fetchRecentProjects()
+    set({ recentProjects: mapRecentProjects(payload) })
+  },
+  async openProject(path) {
+    const payload = await openProjectRequest(path)
+    set({
+      isOpen: true,
+      projectName: payload.project_name,
+      projectPath: payload.project_path,
+      isDirty: false,
+      canUndo: false,
+      canRedo: false,
+      visualConfig: {},
+    })
+    try {
+      await get().loadRecentProjects()
+    } catch {
+      // Do not fail project open because recent-project history could not refresh.
+    }
+  },
+  async createProject(name, path) {
+    const payload = await createProjectRequest(name, path)
+    await get().openProject(payload.project_path)
   },
   async loadVisualConfig() {
     const payload = await fetchVisualConfig()

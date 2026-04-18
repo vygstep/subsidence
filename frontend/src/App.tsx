@@ -1,6 +1,6 @@
-import { useEffect, useMemo, useRef } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 
-import { LogViewPanel, ZoomControl } from '@/components'
+import { FileOpenDialog, LogViewPanel, NewProjectDialog, ZoomControl } from '@/components'
 import { useProjectStore, useViewStore, useWellDataStore } from '@/stores'
 import type { TrackConfig } from '@/types'
 
@@ -88,6 +88,8 @@ async function fetchWellList(): Promise<WellListItem[]> {
 }
 
 function App() {
+  const [projectDialogMode, setProjectDialogMode] = useState<'open' | 'new'>('open')
+
   const loadWell = useWellDataStore((state) => state.loadWell)
   const resetWell = useWellDataStore((state) => state.reset)
   const well = useWellDataStore((state) => state.well)
@@ -121,6 +123,12 @@ function App() {
     }, 2000)
     return () => window.clearInterval(timer)
   }, [pollStatus])
+
+  useEffect(() => {
+    if (isProjectOpen) {
+      setProjectDialogMode('open')
+    }
+  }, [isProjectOpen])
 
   useEffect(() => {
     if (!isProjectOpen) {
@@ -281,20 +289,28 @@ function App() {
           </span>
         )}
       </header>
-      <main className="app-main">
-        {!isProjectOpen ? (
-          <p className="app-error-banner">Open a project through the API before loading the viewer.</p>
-        ) : error ? (
-          <p className="app-error-banner">{error}</p>
-        ) : curves.length === 0 ? (
-          <p className="app-error-banner">No wells are available in the open project.</p>
+      <main className={isProjectOpen ? 'app-main' : 'app-main app-main--gated'}>
+        {isProjectOpen ? (
+          error ? (
+            <p className="app-error-banner">{error}</p>
+          ) : curves.length === 0 ? (
+            <p className="app-error-banner">No wells are available in the open project.</p>
+          ) : (
+            <LogViewPanel
+              tracks={tracks}
+              curves={curves}
+              minDepth={minDepth}
+              maxDepth={maxDepth}
+            />
+          )
         ) : (
-          <LogViewPanel
-            tracks={tracks}
-            curves={curves}
-            minDepth={minDepth}
-            maxDepth={maxDepth}
-          />
+          <div className="project-dialog-overlay">
+            {projectDialogMode === 'open' ? (
+              <FileOpenDialog onSwitchToNew={() => setProjectDialogMode('new')} />
+            ) : (
+              <NewProjectDialog onSwitchToOpen={() => setProjectDialogMode('open')} />
+            )}
+          </div>
         )}
       </main>
     </div>
