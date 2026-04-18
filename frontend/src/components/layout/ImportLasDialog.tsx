@@ -1,6 +1,12 @@
 import { useState } from 'react'
 
+interface WellOption {
+  well_id: string
+  well_name: string
+}
+
 interface ImportLasDialogProps {
+  wells: WellOption[]
   onClose: () => void
   onSuccess: (wellId: string) => Promise<void> | void
 }
@@ -21,7 +27,8 @@ async function readError(response: Response, fallback: string): Promise<string> 
   return fallback
 }
 
-export function ImportLasDialog({ onClose, onSuccess }: ImportLasDialogProps) {
+export function ImportLasDialog({ wells, onClose, onSuccess }: ImportLasDialogProps) {
+  const [wellId, setWellId] = useState('')
   const [lasPath, setLasPath] = useState('')
   const [error, setError] = useState<string | null>(null)
   const [isSubmitting, setIsSubmitting] = useState(false)
@@ -40,7 +47,10 @@ export function ImportLasDialog({ onClose, onSuccess }: ImportLasDialogProps) {
       const response = await fetch('/api/projects/import-las', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ las_path: nextPath }),
+        body: JSON.stringify({
+          las_path: nextPath,
+          well_id: wellId || null,
+        }),
       })
       if (!response.ok) {
         throw new Error(await readError(response, `Failed to import LAS (${response.status})`))
@@ -70,6 +80,16 @@ export function ImportLasDialog({ onClose, onSuccess }: ImportLasDialogProps) {
 
       <form className="project-dialog__body" onSubmit={handleSubmit}>
         <label className="project-dialog__field">
+          <span>Target well</span>
+          <select value={wellId} onChange={(event) => setWellId(event.target.value)}>
+            <option value="">Create from LAS header/defaults</option>
+            {wells.map((well) => (
+              <option key={well.well_id} value={well.well_id}>{well.well_name}</option>
+            ))}
+          </select>
+        </label>
+
+        <label className="project-dialog__field">
           <span>LAS file path</span>
           <input
             type="text"
@@ -87,7 +107,7 @@ export function ImportLasDialog({ onClose, onSuccess }: ImportLasDialogProps) {
             Cancel
           </button>
           <button type="submit" className="project-dialog__button project-dialog__button--primary" disabled={isSubmitting}>
-            {isSubmitting ? 'Importing…' : 'Load LAS'}
+            {isSubmitting ? 'Importing...' : 'Load LAS'}
           </button>
         </div>
       </form>

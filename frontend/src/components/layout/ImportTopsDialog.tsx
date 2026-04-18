@@ -28,7 +28,7 @@ async function readError(response: Response, fallback: string): Promise<string> 
 }
 
 export function ImportTopsDialog({ wells, onClose, onSuccess }: ImportTopsDialogProps) {
-  const [wellId, setWellId] = useState(wells[0]?.well_id ?? '')
+  const [wellId, setWellId] = useState('')
   const [csvPath, setCsvPath] = useState('')
   const [depthRef, setDepthRef] = useState<'MD' | 'TVD' | 'TVDSS'>('MD')
   const [error, setError] = useState<string | null>(null)
@@ -37,10 +37,6 @@ export function ImportTopsDialog({ wells, onClose, onSuccess }: ImportTopsDialog
   const handleSubmit = async (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault()
     const nextPath = csvPath.trim()
-    if (!wellId) {
-      setError('Select a well first')
-      return
-    }
     if (!nextPath) {
       setError('CSV path is required')
       return
@@ -52,7 +48,11 @@ export function ImportTopsDialog({ wells, onClose, onSuccess }: ImportTopsDialog
       const response = await fetch('/api/projects/import-tops', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ well_id: wellId, csv_path: nextPath, depth_ref: depthRef }),
+        body: JSON.stringify({
+          well_id: wellId || null,
+          csv_path: nextPath,
+          depth_ref: depthRef,
+        }),
       })
       if (!response.ok) {
         throw new Error(await readError(response, `Failed to import tops (${response.status})`))
@@ -82,8 +82,9 @@ export function ImportTopsDialog({ wells, onClose, onSuccess }: ImportTopsDialog
 
       <form className="project-dialog__body" onSubmit={handleSubmit}>
         <label className="project-dialog__field">
-          <span>Well</span>
+          <span>Target well</span>
           <select value={wellId} onChange={(event) => setWellId(event.target.value)}>
+            <option value="">Create from file/defaults</option>
             {wells.map((well) => (
               <option key={well.well_id} value={well.well_id}>{well.well_name}</option>
             ))}
@@ -117,7 +118,7 @@ export function ImportTopsDialog({ wells, onClose, onSuccess }: ImportTopsDialog
             Cancel
           </button>
           <button type="submit" className="project-dialog__button project-dialog__button--primary" disabled={isSubmitting}>
-            {isSubmitting ? 'Importing…' : 'Load tops'}
+            {isSubmitting ? 'Importing...' : 'Load tops'}
           </button>
         </div>
       </form>

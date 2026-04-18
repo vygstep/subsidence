@@ -438,6 +438,12 @@ textarea {
   border-color: #2563eb;
 }
 
+.project-dialog__grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+}
+
 .project-dialog__hint {
   margin: -4px 0 0;
   font-size: 0.78rem;

@@ -28,7 +28,7 @@ async function readError(response: Response, fallback: string): Promise<string> 
 }
 
 export function ImportDeviationDialog({ wells, onClose, onSuccess }: ImportDeviationDialogProps) {
-  const [wellId, setWellId] = useState(wells[0]?.well_id ?? '')
+  const [wellId, setWellId] = useState('')
   const [csvPath, setCsvPath] = useState('')
   const [error, setError] = useState<string | null>(null)
   const [isSubmitting, setIsSubmitting] = useState(false)
@@ -36,10 +36,6 @@ export function ImportDeviationDialog({ wells, onClose, onSuccess }: ImportDevia
   const handleSubmit = async (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault()
     const nextPath = csvPath.trim()
-    if (!wellId) {
-      setError('Select a well first')
-      return
-    }
     if (!nextPath) {
       setError('CSV path is required')
       return
@@ -51,7 +47,10 @@ export function ImportDeviationDialog({ wells, onClose, onSuccess }: ImportDevia
       const response = await fetch('/api/projects/import-deviation', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ well_id: wellId, csv_path: nextPath }),
+        body: JSON.stringify({
+          well_id: wellId || null,
+          csv_path: nextPath,
+        }),
       })
       if (!response.ok) {
         throw new Error(await readError(response, `Failed to import deviation (${response.status})`))
@@ -81,8 +80,9 @@ export function ImportDeviationDialog({ wells, onClose, onSuccess }: ImportDevia
 
       <form className="project-dialog__body" onSubmit={handleSubmit}>
         <label className="project-dialog__field">
-          <span>Well</span>
+          <span>Target well</span>
           <select value={wellId} onChange={(event) => setWellId(event.target.value)}>
+            <option value="">Create from file/defaults</option>
             {wells.map((well) => (
               <option key={well.well_id} value={well.well_id}>{well.well_name}</option>
             ))}
@@ -107,7 +107,7 @@ export function ImportDeviationDialog({ wells, onClose, onSuccess }: ImportDevia
             Cancel
           </button>
           <button type="submit" className="project-dialog__button project-dialog__button--primary" disabled={isSubmitting}>
-            {isSubmitting ? 'Importing…' : 'Load deviation'}
+            {isSubmitting ? 'Importing...' : 'Load deviation'}
           </button>
         </div>
       </form>

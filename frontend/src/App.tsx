@@ -345,7 +345,7 @@ function App() {
       case 'create-well':
         return <CreateWellDialog onClose={() => setActiveDialog(null)} onSuccess={handleWellMutation} />
       case 'load-las':
-        return <ImportLasDialog onClose={() => setActiveDialog(null)} onSuccess={handleWellMutation} />
+        return <ImportLasDialog wells={wellOptions} onClose={() => setActiveDialog(null)} onSuccess={handleWellMutation} />
       case 'load-tops':
         return <ImportTopsDialog wells={wellOptions} onClose={() => setActiveDialog(null)} onSuccess={handleWellMutation} />
       case 'load-deviation':
@@ -375,8 +375,8 @@ function App() {
 
             <button type="button" className="app-action-button" onClick={() => setActiveDialog('create-well')}>Create well</button>
             <button type="button" className="app-action-button" onClick={() => setActiveDialog('load-las')}>Load LAS</button>
-            <button type="button" className="app-action-button" onClick={() => setActiveDialog('load-tops')} disabled={wellOptions.length === 0}>Load tops</button>
-            <button type="button" className="app-action-button" onClick={() => setActiveDialog('load-deviation')} disabled={wellOptions.length === 0}>Load deviation</button>
+            <button type="button" className="app-action-button" onClick={() => setActiveDialog('load-tops')}>Load tops</button>
+            <button type="button" className="app-action-button" onClick={() => setActiveDialog('load-deviation')}>Load deviation</button>
 
             <span className="app-topbar__divider" />
 
@@ -414,6 +414,8 @@ function App() {
         {isProjectOpen ? (
           error ? (
             <p className="app-error-banner">{error}</p>
+          ) : well && curves.length === 0 ? (
+            <p className="app-error-banner">Well loaded. No curves imported yet.</p>
           ) : curves.length === 0 ? (
             <p className="app-error-banner">No wells are available in the open project.</p>
           ) : (

@@ -20,6 +20,11 @@ from .unit_conversion import canonicalize_gamma_unit, convert_curve_units, conve
 
 _DEPTH_MNEMONICS = {'DEPT', 'DEPTH', 'MD', 'TVD', 'TVDSS'}
 _DEFAULT_TOP_COLOR = '#4b5563'
+DEFAULT_WELL_NAME = 'well-1'
+DEFAULT_WELL_X = 0.0
+DEFAULT_WELL_Y = 0.0
+DEFAULT_WELL_KB = 10.0
+DEFAULT_WELL_CRS = 'unset'
 
 
 def _sha256(path: Path) -> str:
@@ -54,6 +59,103 @@ def _header_float(las: lasio.LASFile, name: str, default: float | None = None) -
     return _coerce_float(getattr(item, 'value', None), default)
 
 
+def _normalize_well_name(name: str | None) -> str:
+    value = (name or '').strip()
+    return value or DEFAULT_WELL_NAME
+
+
+def _normalized_crs(crs: str | None) -> str:
+    value = (crs or '').strip()
+    return value or DEFAULT_WELL_CRS
+
+
+def create_empty_well(
+    session: Session,
+    *,
+    name: str | None = None,
+    x: float | None = None,
+    y: float | None = None,
+    kb: float | None = None,
+    td: float | None = None,
+    crs: str | None = None,
+    uwi: str | None = None,
+    source_las_path: str | None = None,
+    extra: dict[str, object] | None = None,
+) -> WellModel:
+    well = WellModel(
+        id=str(uuid4()),
+        uwi=(uwi or '').strip() or None,
+        name=_normalize_well_name(name),
+        kb_elev=kb if kb is not None else DEFAULT_WELL_KB,
+        gl_elev=0.0,
+        td_md=td,
+        lat=y if y is not None else DEFAULT_WELL_Y,
+        lon=x if x is not None else DEFAULT_WELL_X,
+        crs=_normalized_crs(crs),
+        source_las_path=source_las_path,
+        extra=json.dumps(extra, ensure_ascii=True) if extra else None,
+    )
+    session.add(well)
+    session.flush()
+    return well
+
+
+def _merge_extra_json(existing_json: str | None, patch: dict[str, object] | None) -> str | None:
+    if not patch:
+        return existing_json
+    existing: dict[str, object] = {}
+    if existing_json:
+        try:
+            loaded = json.loads(existing_json)
+            if isinstance(loaded, dict):
+                existing = loaded
+        except json.JSONDecodeError:
+            existing = {}
+    existing.update({key: value for key, value in patch.items() if value not in (None, '')})
+    return json.dumps(existing, ensure_ascii=True) if existing else None
+
+
+def apply_imported_well_metadata(
+    well: WellModel,
+    *,
+    name: str | None = None,
+    uwi: str | None = None,
+    x: float | None = None,
+    y: float | None = None,
+    kb: float | None = None,
+    td: float | None = None,
+    crs: str | None = None,
+    source_las_path: str | None = None,
+    extra: dict[str, object] | None = None,
+) -> WellModel:
+    imported_name = (name or '').strip()
+    if imported_name and (not well.name or well.name == DEFAULT_WELL_NAME):
+        well.name = imported_name
+
+    imported_uwi = (uwi or '').strip()
+    if imported_uwi and not well.uwi:
+        well.uwi = imported_uwi
+
+    if x is not None and (well.lon is None or well.lon == DEFAULT_WELL_X):
+        well.lon = x
+    if y is not None and (well.lat is None or well.lat == DEFAULT_WELL_Y):
+        well.lat = y
+    if kb is not None and (well.kb_elev in (0.0, DEFAULT_WELL_KB)):
+        well.kb_elev = kb
+    if td is not None and (well.td_md is None or td > well.td_md):
+        well.td_md = td
+
+    imported_crs = (crs or '').strip()
+    if imported_crs and well.crs in ('', DEFAULT_WELL_CRS):
+        well.crs = imported_crs
+
+    if source_las_path:
+        well.source_las_path = source_las_path
+
+    well.extra = _merge_extra_json(well.extra, extra)
+    return well
+
+
 def _is_valid_sample(depth: float, value: float, null_value: float | None) -> bool:
     if not math.isfinite(depth) or not math.isfinite(value):
         return False
@@ -62,40 +164,25 @@ def _is_valid_sample(depth: float, value: float, null_value: float | None) -> bo
     return True
 
 
-def _create_well_from_las(session: Session, las: lasio.LASFile, original_relative_path: str) -> WellModel:
-    name = _header_text(las, 'WELL') or _header_text(las, 'ORIGINALWELLNAME') or Path(original_relative_path).stem
-    kb_elev = _header_float(las, 'EREF', 0.0) or 0.0
-    td_md = _header_float(las, 'TD')
-    lat = _header_float(las, 'SLAT') or _header_float(las, 'LATI')
-    lon = _header_float(las, 'SLON') or _header_float(las, 'LONG')
-    crs = _header_text(las, 'HZCS') or 'unset'
-
-    extra = {
-        'company': _header_text(las, 'COMP'),
-        'field': _header_text(las, 'FLD'),
-        'location': _header_text(las, 'LOC'),
-        'api': _header_text(las, 'API'),
-        'country': _header_text(las, 'COUNTRY') or _header_text(las, 'CTRY'),
-        'original_well_name': _header_text(las, 'ORIGINALWELLNAME'),
+def _well_metadata_from_las(las: lasio.LASFile, original_relative_path: str, *, final_depth: float | None) -> dict[str, object]:
+    return {
+        'uwi': _header_text(las, 'UWI'),
+        'name': _header_text(las, 'WELL') or _header_text(las, 'ORIGINALWELLNAME') or DEFAULT_WELL_NAME,
+        'kb': _header_float(las, 'EREF', DEFAULT_WELL_KB) or DEFAULT_WELL_KB,
+        'td': _header_float(las, 'TD', final_depth) or final_depth,
+        'y': _header_float(las, 'SLAT') or _header_float(las, 'LATI'),
+        'x': _header_float(las, 'SLON') or _header_float(las, 'LONG'),
+        'crs': _header_text(las, 'HZCS') or DEFAULT_WELL_CRS,
+        'source_las_path': original_relative_path,
+        'extra': {
+            'company': _header_text(las, 'COMP'),
+            'field': _header_text(las, 'FLD'),
+            'location': _header_text(las, 'LOC'),
+            'api': _header_text(las, 'API'),
+            'country': _header_text(las, 'COUNTRY') or _header_text(las, 'CTRY'),
+            'original_well_name': _header_text(las, 'ORIGINALWELLNAME'),
+        },
     }
-    extra = {key: value for key, value in extra.items() if value not in (None, '')}
-
-    well = WellModel(
-        id=str(uuid4()),
-        uwi=_header_text(las, 'UWI'),
-        name=name,
-        kb_elev=kb_elev,
-        gl_elev=0.0,
-        td_md=td_md,
-        lat=lat,
-        lon=lon,
-        crs=crs,
-        source_las_path=original_relative_path,
-        extra=json.dumps(extra, ensure_ascii=True) if extra else None,
-    )
-    session.add(well)
-    session.flush()
-    return well
 
 
 def _read_csv_rows(path: Path | str) -> tuple[list[str], list[dict[str, str]]]:
@@ -151,6 +238,29 @@ def _resolve_well(session: Session, well_id: str) -> WellModel:
     if well is None:
         raise ValueError(f'Well not found: {well_id}')
     return well
+
+
+def _resolve_or_create_well_for_tops(session: Session, rows: list[dict[str, str]], well_id: str | None) -> WellModel:
+    if well_id:
+        return _resolve_well(session, well_id)
+
+    first_name = _extract_text(rows[0], 'well_name') if rows else None
+    td = max((_extract_float(row, 'depth_md', 'depth') or 0.0) for row in rows) if rows else None
+    return create_empty_well(session, name=first_name or DEFAULT_WELL_NAME, td=td, kb=DEFAULT_WELL_KB)
+
+
+def _resolve_or_create_well_for_deviation(
+    session: Session,
+    rows: list[dict[str, str]],
+    depth_column: str,
+    well_id: str | None,
+) -> WellModel:
+    if well_id:
+        return _resolve_well(session, well_id)
+
+    first_name = _extract_text(rows[0], 'well_name', 'well', 'well_name_header') if rows else None
+    td = _coerce_float(rows[-1].get(depth_column)) if rows else None
+    return create_empty_well(session, name=first_name or DEFAULT_WELL_NAME, td=td, kb=DEFAULT_WELL_KB)
 
 
 def _ensure_row_targets_well(row: dict[str, str], well: WellModel, csv_path: Path) -> None:
@@ -285,7 +395,13 @@ def _validate_strictly_increasing_depth(rows: list[dict[str, str]], depth_column
     return depths
 
 
-def import_las_file(session: Session, project_path: Path | str, las_path: Path | str) -> WellModel:
+def import_las_file(
+    session: Session,
+    project_path: Path | str,
+    las_path: Path | str,
+    *,
+    well_id: str | None = None,
+) -> WellModel:
     bundle_path = Path(project_path)
     source_path = Path(las_path)
     originals_dir = bundle_path / 'originals'
@@ -301,9 +417,37 @@ def import_las_file(session: Session, project_path: Path | str, las_path: Path |
     las = lasio.read(str(source_path))
     depth_unit = (las.curves[0].unit or 'm').strip()
     depth_values = convert_depth_to_meters([float(value) for value in las.index], depth_unit)
+    final_depth = max(depth_values) if depth_values else None
     null_value = _coerce_float(getattr(las.well.get('NULL'), 'value', None))
     rules = load_curve_alias_rules(session)
-    well = _create_well_from_las(session, las, original_relative_path)
+    metadata = _well_metadata_from_las(las, original_relative_path, final_depth=final_depth)
+    if well_id:
+        well = _resolve_well(session, well_id)
+        apply_imported_well_metadata(
+            well,
+            name=metadata['name'],
+            uwi=metadata['uwi'],
+            x=metadata['x'],
+            y=metadata['y'],
+            kb=metadata['kb'],
+            td=metadata['td'],
+            crs=metadata['crs'],
+            source_las_path=metadata['source_las_path'],
+            extra=metadata['extra'],
+        )
+    else:
+        well = create_empty_well(
+            session,
+            name=str(metadata['name']),
+            uwi=metadata['uwi'] if isinstance(metadata['uwi'], str) else None,
+            x=metadata['x'] if isinstance(metadata['x'], (int, float)) else None,
+            y=metadata['y'] if isinstance(metadata['y'], (int, float)) else None,
+            kb=metadata['kb'] if isinstance(metadata['kb'], (int, float)) else None,
+            td=metadata['td'] if isinstance(metadata['td'], (int, float)) else None,
+            crs=str(metadata['crs']),
+            source_las_path=str(metadata['source_las_path']),
+            extra=metadata['extra'] if isinstance(metadata['extra'], dict) else None,
+        )
 
     curve_series: dict[str, pd.Series] = {}
     parquet_relative_path = f'curves/{well.id}.parquet'
@@ -373,7 +517,7 @@ def import_las_file(session: Session, project_path: Path | str, las_path: Path |
 
 def import_tops_csv(
     session: Session,
-    well_id: str,
+    well_id: str | None,
     csv_path: Path | str,
     depth_ref: str = 'MD',
     *,
@@ -384,13 +528,16 @@ def import_tops_csv(
         raise NotImplementedError(
             f'depth_ref={depth_ref!r} is not yet supported; only MD is implemented'
         )
-    well = _resolve_well(session, well_id)
     path = Path(csv_path)
     fieldnames, rows = _read_csv_rows(path)
-    required = {'well_name', 'top_name', 'depth_md'}
+    required = {'top_name', 'depth_md'}
     missing = required.difference(set(fieldnames))
     if missing:
         raise ValueError(f'{path}: missing required columns: {sorted(missing)}')
+    well = _resolve_or_create_well_for_tops(session, rows, well_id)
+    max_depth = max((_extract_float(row, 'depth_md', 'depth') or 0.0) for row in rows) if rows else None
+    if max_depth is not None:
+        apply_imported_well_metadata(well, td=max_depth)
 
     ics_units = _load_ics_units(Path(strat_units_path) if strat_units_path else None, Path(strat_ranks_path) if strat_ranks_path else None)
     imported: list[FormationTopModel] = []
@@ -530,14 +677,12 @@ def link_tops_to_unconformities(
     session.flush()
     return updated
 
-
-def import_deviation_csv(session: Session, project_path: Path | str, well_id: str, csv_path: Path | str) -> DeviationSurveyModel:
+def import_deviation_csv(session: Session, project_path: Path | str, well_id: str | None, csv_path: Path | str) -> DeviationSurveyModel:
     bundle_path = Path(project_path)
     path = Path(csv_path)
     deviation_dir = bundle_path / 'deviation'
     deviation_dir.mkdir(parents=True, exist_ok=True)
 
-    well = _resolve_well(session, well_id)
     fieldnames, rows = _read_csv_rows(path)
     if not rows:
         raise ValueError(f'{path}: deviation CSV is empty')
@@ -545,6 +690,9 @@ def import_deviation_csv(session: Session, project_path: Path | str, well_id: st
     reference, depth_column = _detect_deviation_reference(fieldnames)
     mode, value_columns = _detect_deviation_mode(fieldnames)
     depths = _validate_strictly_increasing_depth(rows, depth_column, path)
+    well = _resolve_or_create_well_for_deviation(session, rows, depth_column, well_id)
+    if depths:
+        apply_imported_well_metadata(well, td=depths[-1])
 
     frame_data: dict[str, list[float]] = {depth_column: depths}
     for column in value_columns:

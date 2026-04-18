@@ -77,28 +77,26 @@ def get_well(well_id: str, request: Request) -> WellResponse:
             raise HTTPException(status_code=404, detail=f'Well not found: {well_id}')
 
         curve_rows = list(session.scalars(select(CurveMetadata).where(CurveMetadata.well_id == well.id).order_by(CurveMetadata.id.asc())))
-        if not curve_rows:
-            raise HTTPException(status_code=404, detail=f'No curves found for well: {well.id}')
-
-        curve_map = load_curves_from_parquet(manager.project_path, curve_rows[0].data_uri)
         curves: list[CurveResponse] = []
         td_md = well.td_md or 0.0
-        for row in curve_rows:
-            values = curve_map.get(row.mnemonic)
-            if values is None:
-                continue
-            depths, curve_values = values
-            if depths.size > 0:
-                td_md = max(td_md, float(depths[-1]))
-            curves.append(
-                CurveResponse(
-                    mnemonic=row.mnemonic,
-                    unit=row.unit,
-                    depths=depths.tolist(),
-                    values=curve_values.tolist(),
-                    null_value=row.null_value,
+        if curve_rows:
+            curve_map = load_curves_from_parquet(manager.project_path, curve_rows[0].data_uri)
+            for row in curve_rows:
+                values = curve_map.get(row.mnemonic)
+                if values is None:
+                    continue
+                depths, curve_values = values
+                if depths.size > 0:
+                    td_md = max(td_md, float(depths[-1]))
+                curves.append(
+                    CurveResponse(
+                        mnemonic=row.mnemonic,
+                        unit=row.unit,
+                        depths=depths.tolist(),
+                        values=curve_values.tolist(),
+                        null_value=row.null_value,
+                    )
                 )
-            )
 
         formation_rows = list(session.scalars(
             select(FormationTopModel)

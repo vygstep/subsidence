@@ -14,9 +14,15 @@ from pydantic import BaseModel
 from sqlalchemy import select
 
 from subsidence.data import (
+    DEFAULT_WELL_CRS,
+    DEFAULT_WELL_KB,
+    DEFAULT_WELL_NAME,
+    DEFAULT_WELL_X,
+    DEFAULT_WELL_Y,
     ImportWell,
     ProjectManager,
     UpdateVisualConfig,
+    create_empty_well,
     import_deviation_csv,
     import_las_file,
     import_tops_csv,
@@ -41,10 +47,11 @@ class OpenProjectRequest(BaseModel):
 
 class ImportLasRequest(BaseModel):
     las_path: str
+    well_id: str | None = None
 
 
 class ImportTopsRequest(BaseModel):
-    well_id: str
+    well_id: str | None = None
     csv_path: str
     depth_ref: str = 'MD'
 
@@ -55,7 +62,7 @@ class ImportUnconformitiesRequest(BaseModel):
 
 
 class ImportDeviationRequest(BaseModel):
-    well_id: str
+    well_id: str | None = None
     csv_path: str
 
 
@@ -172,6 +179,11 @@ class CreateProjectResponse(BaseModel):
 
 class CreateWellRequest(BaseModel):
     name: str
+    x: float = DEFAULT_WELL_X
+    y: float = DEFAULT_WELL_Y
+    kb: float = DEFAULT_WELL_KB
+    td: float | None = None
+    crs: str = DEFAULT_WELL_CRS
 
 
 class CreateWellResponse(BaseModel):
@@ -278,19 +290,15 @@ def create_well(payload: CreateWellRequest, request: Request) -> CreateWellRespo
         raise HTTPException(status_code=400, detail='Well name is required')
 
     with manager.get_session() as session:
-        row = WellModel(
-            id=str(uuid4()),
+        row = create_empty_well(
+            session,
             name=well_name,
-            kb_elev=0.0,
-            gl_elev=0.0,
-            td_md=None,
-            lat=None,
-            lon=None,
-            crs='unset',
-            source_las_path=None,
-            extra=None,
+            x=payload.x,
+            y=payload.y,
+            kb=payload.kb,
+            td=payload.td,
+            crs=payload.crs,
         )
-        session.add(row)
         session.commit()
         session.refresh(row)
 
@@ -330,7 +338,7 @@ def import_las(payload: ImportLasRequest, request: Request) -> ImportLasResponse
     manager = _require_open_project(request)
     try:
         with manager.get_session() as session:
-            well = import_las_file(session, manager.project_path, Path(payload.las_path))
+            well = import_las_file(session, manager.project_path, Path(payload.las_path), well_id=payload.well_id)
             session.flush()
             command = ImportWell.capture(session, manager.project_path, well.id)
             well_id = well.id
@@ -349,14 +357,17 @@ def import_tops(payload: ImportTopsRequest, request: Request) -> ImportTopsRespo
     manager = _require_open_project(request)
     try:
         with manager.get_session() as session:
-            import_tops_csv(session, payload.well_id, Path(payload.csv_path), payload.depth_ref)
-            linked = link_tops_to_unconformities(session, payload.well_id)
-            formation_count = len(list(session.scalars(select(FormationTopModel).where(FormationTopModel.well_id == payload.well_id))))
+            imported = import_tops_csv(session, payload.well_id, Path(payload.csv_path), payload.depth_ref)
+            target_well_id = imported[0].well_id if imported else payload.well_id
+            if target_well_id is None:
+                raise HTTPException(status_code=500, detail='Import created no well')
+            linked = link_tops_to_unconformities(session, target_well_id)
+            formation_count = len(list(session.scalars(select(FormationTopModel).where(FormationTopModel.well_id == target_well_id))))
             session.commit()
         manager.mark_dirty()
     except (ValueError, FileNotFoundError, NotImplementedError) as error:
         raise HTTPException(status_code=400, detail=str(error)) from error
-    return ImportTopsResponse(well_id=payload.well_id, formation_count=formation_count, linked_count=len(linked))
+    return ImportTopsResponse(well_id=target_well_id, formation_count=formation_count, linked_count=len(linked))
 
 
 @router.post('/import-unconformities', response_model=ImportUnconformitiesResponse)
@@ -380,6 +391,7 @@ def import_deviation(payload: ImportDeviationRequest, request: Request) -> Impor
     try:
         with manager.get_session() as session:
             survey = import_deviation_csv(session, manager.project_path, payload.well_id, Path(payload.csv_path))
+            target_well_id = survey.well_id
             reference = survey.reference
             mode = survey.mode
             data_uri = survey.data_uri
@@ -387,7 +399,7 @@ def import_deviation(payload: ImportDeviationRequest, request: Request) -> Impor
         manager.mark_dirty()
     except (ValueError, FileNotFoundError) as error:
         raise HTTPException(status_code=400, detail=str(error)) from error
-    return ImportDeviationResponse(well_id=payload.well_id, reference=reference, mode=mode, data_uri=data_uri)
+    return ImportDeviationResponse(well_id=target_well_id, reference=reference, mode=mode, data_uri=data_uri)
 
 
 @router.post('/undo', response_model=UndoRedoResponse)

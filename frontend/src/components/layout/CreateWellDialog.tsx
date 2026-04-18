@@ -24,6 +24,11 @@ async function readError(response: Response, fallback: string): Promise<string> 
 
 export function CreateWellDialog({ onClose, onSuccess }: CreateWellDialogProps) {
   const [name, setName] = useState('')
+  const [x, setX] = useState('0')
+  const [y, setY] = useState('0')
+  const [kb, setKb] = useState('10')
+  const [td, setTd] = useState('')
+  const [crs, setCrs] = useState('unset')
   const [error, setError] = useState<string | null>(null)
   const [isSubmitting, setIsSubmitting] = useState(false)
 
@@ -35,13 +40,29 @@ export function CreateWellDialog({ onClose, onSuccess }: CreateWellDialogProps) 
       return
     }
 
+    const parsedX = Number(x)
+    const parsedY = Number(y)
+    const parsedKb = Number(kb)
+    const parsedTd = td.trim() ? Number(td) : null
+    if (Number.isNaN(parsedX) || Number.isNaN(parsedY) || Number.isNaN(parsedKb) || (parsedTd !== null && Number.isNaN(parsedTd))) {
+      setError('Well metadata must contain valid numeric values')
+      return
+    }
+
     setIsSubmitting(true)
     setError(null)
     try {
       const response = await fetch('/api/projects/wells', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ name: nextName }),
+        body: JSON.stringify({
+          name: nextName,
+          x: parsedX,
+          y: parsedY,
+          kb: parsedKb,
+          td: parsedTd,
+          crs: crs.trim() || 'unset',
+        }),
       })
       if (!response.ok) {
         throw new Error(await readError(response, `Failed to create well (${response.status})`))
@@ -81,6 +102,30 @@ export function CreateWellDialog({ onClose, onSuccess }: CreateWellDialogProps) 
           />
         </label>
 
+        <div className="project-dialog__grid">
+          <label className="project-dialog__field">
+            <span>X</span>
+            <input type="number" value={x} onChange={(event) => setX(event.target.value)} />
+          </label>
+          <label className="project-dialog__field">
+            <span>Y</span>
+            <input type="number" value={y} onChange={(event) => setY(event.target.value)} />
+          </label>
+          <label className="project-dialog__field">
+            <span>KB</span>
+            <input type="number" value={kb} onChange={(event) => setKb(event.target.value)} />
+          </label>
+          <label className="project-dialog__field">
+            <span>TD</span>
+            <input type="number" value={td} onChange={(event) => setTd(event.target.value)} placeholder="Optional" />
+          </label>
+        </div>
+
+        <label className="project-dialog__field">
+          <span>CRS</span>
+          <input type="text" value={crs} onChange={(event) => setCrs(event.target.value)} placeholder="unset" />
+        </label>
+
         {error && <p className="project-dialog__error">{error}</p>}
 
         <div className="project-dialog__actions">
@@ -88,7 +133,7 @@ export function CreateWellDialog({ onClose, onSuccess }: CreateWellDialogProps) 
             Cancel
           </button>
           <button type="submit" className="project-dialog__button project-dialog__button--primary" disabled={isSubmitting}>
-            {isSubmitting ? 'Creating…' : 'Create well'}
+            {isSubmitting ? 'Creating...' : 'Create well'}
           </button>
         </div>
       </form>
