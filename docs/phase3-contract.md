@@ -14,7 +14,7 @@ React panels communicating through Zustand stores and the Phase 2.5 REST API.
 
 | Step | Status | Verification | Commit |
 |---|---|---|---|
-| Step 1  | done | `PATCH /api/projects/visual-config` persists `trackWidths`, `depthPerPixel`, and `curveColors`; close + reopen preserves visual config; export LAS/CSV endpoints return valid files | `fcf9248` |
+| Step 1  | done | `PATCH /api/projects/visual-config` persists `trackWidths`, `depthPerPixel`, and `curveColors`; close + reopen preserves visual config; export LAS/CSV endpoints return valid files | `c442f5e` |
 | Step 2  | pending | New Project dialog creates bundle; Open dialog restores last-saved state | — |
 | Step 3  | pending | `POST /api/projects/wells/{id}/formations` → line appears in FormationColumn | — |
 | Step 4  | pending | formation lines render at correct depths and move with scroll; crosshair tracks mouse | — |
@@ -55,7 +55,7 @@ React panels communicating through Zustand stores and the Phase 2.5 REST API.
 
 ### Step 3 — Formation tops API + store CRUD
 - [ ] 3.1 Write `app/src/subsidence/api/formations.py` with five endpoints (see spec)
-- [ ] 3.2 Register formations router in `app/src/subsidence/api/main.py` under `/api/projects/wells/{well_id}/formations`
+- [ ] 3.2 Register formations router in `app/src/subsidence/api/main.py` under `/api/wells/{well_id}/formations` (wells router is mounted at `/api`, not `/api/projects`)
 - [ ] 3.3 On `wellDataStore.loadWell(id)`, also fetch `GET .../formations` and populate `wellDataStore.formations`
 - [ ] 3.4 Wire `wellDataStore.addFormation` → `POST .../formations` + `ImportFormation` undo command
 - [ ] 3.5 Wire `wellDataStore.updateFormationDepth(id, depth)` → `PATCH .../formations/{id}` + `UpdateFormationDepth` undo command
@@ -115,7 +115,7 @@ React panels communicating through Zustand stores and the Phase 2.5 REST API.
 ### Step 10 — WellOverviewMinimap + well selector
 - [ ] 10.1 Write `src/components/logview/WellOverviewMinimap.tsx`: small Canvas (80 × full-height sidebar), renders all visible curves as 1 px lines at full-well depth range; draws a blue translucent viewport rect indicating current scroll position (see spec)
 - [ ] 10.2 Click or drag on minimap → `viewStore.setScroll(mappedDepth)`
-- [ ] 10.3 Add `GET /api/projects/wells` backend endpoint listing `{ id, name, td_md }` for all wells in the project
+- [ ] 10.3 Extend existing `GET /api/wells` to include `td_md` in the response (field already on `WellModel`; add it to `WellListItem`)
 - [ ] 10.4 Add well-selector `<select>` in `AppHeader.tsx` populated from `GET /api/projects/wells`; on change call `wellDataStore.loadWell(newId)`
 - [ ] 10.5 Add `WellOverviewMinimap` to `LogViewPanel.tsx` anchored to the right edge of the track area
 - [ ] 10.6 Verify: drag minimap viewport rect → main view scrolls to matching depth; import a second well → well selector lists both; switch → all tracks show new well's curves
@@ -124,11 +124,11 @@ React panels communicating through Zustand stores and the Phase 2.5 REST API.
 
 ## Detailed step specifications
 
-### Step 1 ? Visual config persistence and export integration
+### Step 1 — Visual config persistence and export integration
 
 Status: done
-Verification: `PATCH /api/projects/visual-config` persists `trackWidths`, `depthPerPixel`, and `curveColors`; backend compile passes; frontend build passes; close ? reopen preserves visual config; export LAS/CSV endpoints return valid files
-Commit: `fcf9248`
+Verification: `PATCH /api/projects/visual-config` persists `trackWidths`, `depthPerPixel`, and `curveColors`; backend compile passes; frontend build passes; close → reopen preserves visual config; export LAS/CSV endpoints return valid files
+Commit: `c442f5e`
 
 **Backend additions to `app/src/subsidence/api/projects.py`:**
 
@@ -170,7 +170,7 @@ interface NewProjectDialogProps {
 }
 ```
 
-Form fields: `Project name` (text), `Location` (text, full path to parent directory). On submit: `POST /api/projects { name, parent_dir }` then `POST /api/projects/open { path: result.path }` then `projectStore.loadVisualConfig()` → close dialog.
+Form fields: `Project name` (text), `Location` (text, full path to parent directory). On submit: `POST /api/projects { name, path }` (where `path` is the parent directory) then `POST /api/projects/open { path: result.project_path }` then `projectStore.loadVisualConfig()` → close dialog.
 
 **`src/components/layout/FileOpenDialog.tsx`:**
 
@@ -255,7 +255,7 @@ class RemoveFormation(Command):
 
 ```ts
 addFormation: async (top: Omit<FormationTop, 'id'>) => {
-  const res = await fetch(`/api/projects/wells/${wellId}/formations`, { method: 'POST', body: JSON.stringify(top) });
+  const res = await fetch(`/api/wells/${wellId}/formations`, { method: 'POST', body: JSON.stringify(top) });
   const created: FormationTop = await res.json();
   set(s => ({ formations: [...s.formations, created].sort((a,b) => a.depth_md - b.depth_md) }));
 }
@@ -265,7 +265,7 @@ updateFormationDepth: async (id: string, depth: number) => {
   await debouncedPatch(id, { depth_md: depth });   // 300 ms debounce
 }
 removeFormation: async (id: string) => {
-  await fetch(`/api/projects/wells/${wellId}/formations/${id}`, { method: 'DELETE' });
+  await fetch(`/api/wells/${wellId}/formations/${id}`, { method: 'DELETE' });
   set(s => ({ formations: s.formations.filter(f => f.id !== id) }));
 }
 ```
@@ -424,8 +424,7 @@ function interpolateAtDepth(depths: Float32Array, values: Float32Array, target: 
   const idx = bisectLeft(depths, target);
   if (idx === 0 || idx >= depths.length) return null;
   const t = (target - depths[idx-1]) / (depths[idx] - depths[idx-1]);
-  return depths[idx-1] + t * (values[idx] - values[idx-1]);
-  // (corrected: values[idx-1] + t * ...)
+  return values[idx-1] + t * (values[idx] - values[idx-1]);
 }
 ```
 
@@ -642,21 +641,29 @@ function handlePointerDown(e: React.PointerEvent<HTMLCanvasElement>) {
 }
 ```
 
-**Backend `GET /api/projects/wells`:**
+**Backend — extend `GET /api/wells` (in `app/src/subsidence/api/wells.py`):**
+
+Add `td_md: float` to `WellListItem` and include it in `list_wells`:
 
 ```python
-@router.get("/wells")
-async def list_wells(request: Request) -> list[WellSummary]:
-    with pm.session() as s:
-        return [WellSummary(id=w.id, name=w.well_name, td_md=w.td_md)
-                for w in s.query(WellModel).all()]
+class WellListItem(BaseModel):
+    well_id: str
+    well_name: str
+    td_md: float
+
+@router.get('/wells', response_model=list[WellListItem])
+def list_wells(request: Request) -> list[WellListItem]:
+    manager = _require_open_project(request)
+    with manager.get_session() as session:
+        rows = session.scalars(select(WellModel).order_by(WellModel.name.asc(), WellModel.id.asc())).all()
+        return [WellListItem(well_id=row.id, well_name=row.name, td_md=row.td_md or 0.0) for row in rows]
 ```
 
 **`AppHeader.tsx` well selector:**
 
 ```tsx
-<select value={wellDataStore.well?.id ?? ''} onChange={e => wellDataStore.loadWell(e.target.value)}>
-  {wells.map(w => <option key={w.id} value={w.id}>{w.name}</option>)}
+<select value={wellDataStore.well?.well_id ?? ''} onChange={e => wellDataStore.loadWell(e.target.value)}>
+  {wells.map(w => <option key={w.well_id} value={w.well_id}>{w.well_name}</option>)}
 </select>
 ```
 
@@ -673,8 +680,9 @@ The `loadWell` action already fetches curves + formations and replaces the store
 ```
 app/src/subsidence/
 ├── api/
-│   ├── formations.py         NEW — GET/POST/PATCH/DELETE /api/projects/wells/{id}/formations
-│   ├── projects.py           MODIFIED — visual-config GET/PATCH; export stubs; /wells list; /recent
+│   ├── formations.py         NEW — GET/POST/PATCH/DELETE /api/wells/{id}/formations
+│   ├── projects.py           MODIFIED — visual-config GET/PATCH; export stubs; /recent
+│   ├── wells.py              MODIFIED — add td_md to WellListItem for well selector
 │   └── main.py               MODIFIED — register formations router
 └── data/
     └── undo.py               MODIFIED — add RemoveFormation command
