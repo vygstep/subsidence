@@ -4,3 +4,6 @@ repos/
 __pycache__/
 *.egg-info/
 .venv/
+
+# Runtime lock files
+*.subsidence.lock
