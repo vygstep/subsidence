@@ -8,6 +8,7 @@ import {
   ImportTopsDialog,
   LogViewPanel,
   NewProjectDialog,
+  WellDataPanel,
   ZoomControl,
 } from '@/components'
 import { useProjectStore, useViewStore, useWellDataStore } from '@/stores'
@@ -89,6 +90,7 @@ interface WellListItem {
 }
 
 type DialogKind = 'project-open' | 'project-new' | 'create-well' | 'load-las' | 'load-tops' | 'load-deviation' | null
+type SidebarTab = 'wells' | 'models'
 
 async function fetchWellList(): Promise<WellListItem[]> {
   const response = await fetch('/api/wells')
@@ -100,12 +102,14 @@ async function fetchWellList(): Promise<WellListItem[]> {
 
 function App() {
   const [activeDialog, setActiveDialog] = useState<DialogKind>('project-open')
+  const [activeSidebarTab, setActiveSidebarTab] = useState<SidebarTab>('wells')
   const [wellOptions, setWellOptions] = useState<WellListItem[]>([])
 
   const loadWell = useWellDataStore((state) => state.loadWell)
   const resetWell = useWellDataStore((state) => state.reset)
   const well = useWellDataStore((state) => state.well)
   const curves = useWellDataStore((state) => state.curves)
+  const formations = useWellDataStore((state) => state.formations)
   const colorOverrides = useWellDataStore((state) => state.colorOverrides)
   const isLoading = useWellDataStore((state) => state.isLoading)
   const error = useWellDataStore((state) => state.error)
@@ -412,20 +416,53 @@ function App() {
       </header>
       <main className={isProjectOpen ? 'app-main' : 'app-main app-main--gated'}>
         {isProjectOpen ? (
-          error ? (
-            <p className="app-error-banner">{error}</p>
-          ) : well && curves.length === 0 ? (
-            <p className="app-error-banner">Well loaded. No curves imported yet.</p>
-          ) : curves.length === 0 ? (
-            <p className="app-error-banner">No wells are available in the open project.</p>
-          ) : (
-            <LogViewPanel
-              tracks={tracks}
-              curves={curves}
-              minDepth={minDepth}
-              maxDepth={maxDepth}
-            />
-          )
+          <div className="app-workspace">
+            <aside className="app-sidebar">
+              <section className="sidebar-panel">
+                <header className="sidebar-tabs">
+                  <button
+                    type="button"
+                    className={`sidebar-tab ${activeSidebarTab === 'wells' ? 'sidebar-tab--active' : ''}`}
+                    onClick={() => setActiveSidebarTab('wells')}
+                  >
+                    Wells
+                  </button>
+                  <button
+                    type="button"
+                    className={`sidebar-tab ${activeSidebarTab === 'models' ? 'sidebar-tab--active' : ''}`}
+                    onClick={() => setActiveSidebarTab('models')}
+                  >
+                    Models
+                  </button>
+                </header>
+
+                {activeSidebarTab === 'wells' ? (
+                  <WellDataPanel well={well} curves={curves} formations={formations} />
+                ) : (
+                  <div className="sidebar-panel__body">
+                    <p className="sidebar-panel__empty">Reserved for upcoming modelling workflows.</p>
+                  </div>
+                )}
+              </section>
+            </aside>
+
+            <section className="app-main-pane">
+              {error ? (
+                <p className="app-error-banner">{error}</p>
+              ) : well && curves.length === 0 ? (
+                <p className="app-error-banner">Well loaded. No curves imported yet.</p>
+              ) : curves.length === 0 ? (
+                <p className="app-error-banner">No wells are available in the open project.</p>
+              ) : (
+                <LogViewPanel
+                  tracks={tracks}
+                  curves={curves}
+                  minDepth={minDepth}
+                  maxDepth={maxDepth}
+                />
+              )}
+            </section>
+          </div>
         ) : null}
 
         {dialogContent && (

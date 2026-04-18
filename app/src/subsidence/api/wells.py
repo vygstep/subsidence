@@ -6,7 +6,7 @@ from sqlalchemy import select
 from sqlalchemy.orm import selectinload
 
 from subsidence.data import load_curves_from_parquet
-from subsidence.data.schema import CurveMetadata, FormationTopModel, WellModel
+from subsidence.data.schema import CurveMetadata, DeviationSurveyModel, FormationTopModel, WellModel
 
 router = APIRouter(tags=['wells'])
 
@@ -34,15 +34,24 @@ class FormationResponse(BaseModel):
     lithology: str | None = None
 
 
+class DeviationSummaryResponse(BaseModel):
+    reference: str
+    mode: str
+    fields: list[str]
+
+
 class WellResponse(BaseModel):
     well_id: str
     well_name: str
     kb_elev: float
+    gl_elev: float
     td_md: float
     x: float
     y: float
     crs: str
     depth_reference: str
+    source_las_path: str | None = None
+    deviation: DeviationSummaryResponse | None = None
     curves: list[CurveResponse]
     formations: list[FormationResponse]
 
@@ -58,6 +67,16 @@ def _require_open_project(request: Request):
     if not manager.is_open:
         raise HTTPException(status_code=400, detail='No project is currently open')
     return manager
+
+
+def _deviation_fields(mode: str) -> list[str]:
+    if mode == 'INCL_AZIM':
+        return ['MD', 'Inclination', 'Azimuth']
+    if mode == 'X_Y':
+        return ['X', 'Y']
+    if mode == 'DX_DY':
+        return ['dX', 'dY']
+    return []
 
 
 @router.get('/wells', response_model=list[WellListItem])
@@ -104,6 +123,7 @@ def get_well(well_id: str, request: Request) -> WellResponse:
             .order_by(FormationTopModel.depth_md.asc())
             .options(selectinload(FormationTopModel.strat_unit))
         ))
+        deviation = session.scalar(select(DeviationSurveyModel).where(DeviationSurveyModel.well_id == well.id))
         formations = [
             FormationResponse(
                 id=str(row.id),
@@ -121,11 +141,18 @@ def get_well(well_id: str, request: Request) -> WellResponse:
             well_id=well.id,
             well_name=well.name,
             kb_elev=well.kb_elev,
+            gl_elev=well.gl_elev,
             td_md=td_md,
             x=well.lon if well.lon is not None else 0.0,
             y=well.lat if well.lat is not None else 0.0,
             crs=well.crs,
             depth_reference='MD',
+            source_las_path=well.source_las_path,
+            deviation=DeviationSummaryResponse(
+                reference=deviation.reference,
+                mode=deviation.mode,
+                fields=_deviation_fields(deviation.mode),
+            ) if deviation is not None else None,
             curves=curves,
             formations=formations,
         )

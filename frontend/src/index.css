@@ -145,6 +145,141 @@ textarea {
   padding: 12px;
 }
 
+.app-workspace {
+  display: grid;
+  grid-template-columns: 280px minmax(0, 1fr);
+  gap: 12px;
+  height: 100%;
+  min-height: 0;
+}
+
+.app-sidebar {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  min-height: 0;
+}
+
+.app-main-pane {
+  min-width: 0;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+.sidebar-panel {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  background: #ffffff;
+  border: 1px solid #d6e0eb;
+  border-radius: 12px;
+  overflow: hidden;
+}
+
+.sidebar-panel__header {
+  padding: 12px 14px;
+  border-bottom: 1px solid #e2e8f0;
+  background: #f8fbff;
+}
+
+.sidebar-tabs {
+  display: flex;
+  align-items: stretch;
+  gap: 0;
+  padding: 0;
+  border-bottom: 1px solid #e2e8f0;
+  background: #f8fbff;
+}
+
+.sidebar-tab {
+  flex: 1;
+  border: 0;
+  border-right: 1px solid #e2e8f0;
+  background: transparent;
+  color: #64748b;
+  font-size: 0.78rem;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  padding: 12px 10px;
+  cursor: pointer;
+}
+
+.sidebar-tab:last-child {
+  border-right: 0;
+}
+
+.sidebar-tab--active {
+  background: #ffffff;
+  color: #17212b;
+}
+
+.sidebar-panel__title {
+  margin: 0;
+  font-size: 0.78rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: #43586d;
+}
+
+.sidebar-panel__body {
+  padding: 10px 12px;
+  overflow: auto;
+}
+
+.sidebar-panel__empty {
+  margin: 0;
+  font-size: 0.8rem;
+  color: #64748b;
+}
+
+.tree-node {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.tree-node + .tree-node,
+.tree-node__children > .tree-node,
+.tree-node__children > .tree-leaf,
+.tree-node__children > .sidebar-panel__empty {
+  margin-top: 4px;
+}
+
+.tree-node__summary {
+  cursor: pointer;
+  list-style: revert;
+  font-size: 0.82rem;
+  font-weight: 700;
+  color: #17212b;
+}
+
+.tree-node--root > .tree-node__summary {
+  font-size: 0.86rem;
+}
+
+.tree-node__children {
+  margin-left: 16px;
+}
+
+.tree-leaf {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  font-size: 0.78rem;
+  color: #314155;
+  padding: 2px 0;
+}
+
+.tree-leaf span:last-child {
+  color: #64748b;
+  text-align: right;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
 .app-error-banner {
   padding: 16px;
   color: #b42318;
@@ -333,6 +468,10 @@ textarea {
     width: 100%;
     justify-content: flex-start;
     padding-bottom: 6px;
+  }
+
+  .app-workspace {
+    grid-template-columns: 1fr;
   }
 }
 

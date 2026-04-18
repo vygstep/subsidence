@@ -72,6 +72,13 @@ React panels communicating through Zustand stores and the Phase 2.5 REST API.
 - [ ] 2.5.15 Auto-created wells use deterministic defaults when file metadata are missing: `well-1`, `x=0`, `y=0`, `kb=10`, `td=final depth of LAS` (or source-derived depth when available)
 - [ ] 2.5.16 After each successful action, refresh project status / well list and hydrate the affected well into `wellDataStore`
 - [ ] 2.5.17 Verify: a user can create an empty well, import tops before LAS, import deviation before LAS, or import LAS first and have the well auto-created entirely from the frontend without manual API calls
+- [ ] 2.5.18 Add a left-side `Well Data` panel that shows a collapsible tree for the currently loaded well
+- [ ] 2.5.19 `Well Data` tree includes `Well metadata`, `LAS`, `TOPS`, and `DEV` nodes; every branch can collapse to the well root
+- [ ] 2.5.20 `Well metadata` shows at minimum `Name`, `Location (X, Y)`, `KB / GL`, `TD`, and `CRS`
+- [ ] 2.5.21 `LAS` shows imported log source groups and their curves as child nodes; initial implementation may expose one source group if the backend currently stores one LAS source per well
+- [ ] 2.5.22 `TOPS` shows imported formation picks as child rows under one collapsible node
+- [ ] 2.5.23 `DEV` shows whether deviation exists and, when present, the stored deviation mode/reference summary as child rows
+- [ ] 2.5.24 Reserve a second left-side panel section named `Subsidence Models` below `Well Data`; placeholder content is acceptable in Step 2.5
 
 ### Step 3 — Formation tops API + store CRUD
 - [ ] 3.1 Write `app/src/subsidence/api/formations.py` with five endpoints (see spec)
@@ -384,6 +391,47 @@ the basic well lifecycle immediately.
 - If a new well is auto-created by import, it should become selectable immediately through the
   existing `Well selector`.
 
+**Well Data panel contract**
+
+Step 2.5 also introduces a left-side browser panel named `Well Data`. This is not yet an editor;
+it is a compact project-data navigator for the currently loaded well.
+
+The first implementation should render a collapsible tree with this logical structure:
+
+```text
+WELL
+├── Well metadata
+├── LAS
+├── TOPS
+└── DEV
+```
+
+Expected node semantics:
+
+- `WELL`
+  - root node for the currently loaded well
+  - collapse hides every child branch
+- `Well metadata`
+  - child rows for:
+    - `Name`
+    - `Location (X, Y)`
+    - `KB / GL`
+    - `TD`
+    - `CRS`
+- `LAS`
+  - child nodes for imported LAS source groups
+  - each source group may contain curve mnemonics as leaf nodes
+  - because the current backend stores one `source_las_path` per well, Step 2.5 may initially
+    expose a single source group rather than full multi-LAS provenance
+- `TOPS`
+  - one child row per imported top / formation pick
+- `DEV`
+  - deviation presence summary plus mode/reference child rows when survey data exist
+
+This panel must live specifically in the left-side `Well Data` window. A second window named
+`Subsidence Models` should be reserved below it for future work; placeholder content is acceptable
+for now.
+
 **Acceptance criteria:** Starting from a freshly created project, the user can use only the
 frontend to:
 
@@ -395,6 +443,8 @@ frontend to:
 - import LAS into an existing well and have `TD` update if the LAS goes deeper
 - import LAS first and have the well auto-created from file metadata or defaults
 - switch between available wells from the header without manual API calls
+- inspect the loaded well through a compact collapsible `Well Data` tree that lists metadata,
+  imported logs, tops, and deviation presence
 
 ---
 

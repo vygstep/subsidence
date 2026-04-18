@@ -2,11 +2,18 @@ export interface Well {
   well_id: string
   well_name: string
   kb_elev: number
+  gl_elev: number
   td_md: number
   x: number
   y: number
   crs: string
   depth_reference: 'MD' | 'TVD' | 'TVDSS'
+  source_las_path?: string | null
+  deviation?: {
+    reference: string
+    mode: string
+    fields: string[]
+  } | null
 }
 
 export interface CurveData {
