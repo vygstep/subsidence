@@ -16,6 +16,7 @@ React panels communicating through Zustand stores and the Phase 2.5 REST API.
 |---|---|---|---|
 | Step 1  | done | `PATCH /api/projects/visual-config` persists `trackWidths`, `depthPerPixel`, and `curveColors`; close + reopen preserves visual config; export LAS/CSV endpoints return valid files | `c442f5e` |
 | Step 2  | done | New Project dialog creates bundle; Open dialog restores last-saved state | `6b5cfa1` |
+| Step 2.5 | pending | Toolbar exposes project actions, import actions, undo/redo, and well selector; one well can be created/imported entirely from the frontend | — |
 | Step 3  | pending | `POST /api/projects/wells/{id}/formations` → line appears in FormationColumn | — |
 | Step 4  | pending | formation lines render at correct depths and move with scroll; crosshair tracks mouse | — |
 | Step 5  | pending | drag top 50 m → depth commits; Ctrl+Z reverts in one undo step | — |
@@ -52,6 +53,20 @@ React panels communicating through Zustand stores and the Phase 2.5 REST API.
 - [x] 2.3 In `App.tsx`, show `FileOpenDialog` when `projectStore.isOpen === false` (replaces raw path wiring from Phase 2.5)
 - [x] 2.4 Add `GET /api/projects/recent` backend endpoint returning the last 10 opened project paths (stored in a `recent_projects.json` next to the session dir)
 - [x] 2.5 Verify: enter a valid `.subsidence` path in the dialog ? project opens; title bar shows `project_name`; invalid path shows inline error
+
+### Step 2.5 — Well import actions UI
+- [ ] 2.5.1 Add a compact app toolbar visible when `projectStore.isOpen === true`
+- [ ] 2.5.2 Add project actions: `New project`, `Open project`, `Close project`, `Save project`
+- [ ] 2.5.3 Add history actions: `Undo`, `Redo`
+- [ ] 2.5.4 Add import actions: `Create well`, `Load LAS`, `Load tops`, `Load deviation`
+- [ ] 2.5.5 Add well navigation control: a `Well selector` bound to the currently loaded well
+- [ ] 2.5.6 Keep `Zoom presets` in the same header/toolbar composition so primary app actions live in one place
+- [ ] 2.5.7 `Create well` opens a dialog for well name and creates an empty well record in the current project
+- [ ] 2.5.8 `Load LAS` opens a dialog with LAS file path input and imports the file through `POST /api/projects/import-las`
+- [ ] 2.5.9 `Load tops` opens a dialog with well selector, CSV path, and depth reference, then calls `POST /api/projects/import-tops`
+- [ ] 2.5.10 `Load deviation` opens a dialog with well selector and CSV path, then calls `POST /api/projects/import-deviation`
+- [ ] 2.5.11 After each successful action, refresh project status / well list and hydrate the affected well into `wellDataStore`
+- [ ] 2.5.12 Verify: create/import flow can produce one usable well entirely from the frontend without manual API calls; project open/close/save and undo/redo are reachable from the toolbar
 
 ### Step 3 — Formation tops API + store CRUD
 - [ ] 3.1 Write `app/src/subsidence/api/formations.py` with five endpoints (see spec)
@@ -187,6 +202,72 @@ Shows `Recent projects` list (from `GET /api/projects/recent`) plus a manual pat
 **`App.tsx` gate:** if `!projectStore.isOpen`, render `<FileOpenDialog>` centered over a dark overlay. A "New project" link in the dialog header switches to `<NewProjectDialog>`.
 
 **Acceptance criteria:** Cold start with no open project → dialog shown; creating a new project via dialog makes a `.subsidence/` bundle on disk; opening an existing one loads its data.
+
+---
+
+### Step 2.5 — Well import actions UI
+
+Status: pending
+Verification: toolbar exposes project actions, import actions, undo/redo, and a well selector; one usable well can be created/imported entirely from the frontend
+Commit: —
+
+**Goal:** Close the current product gap between project selection and interactive work. A user who has opened a project must be able to manage the project, save/undo/redo, and create or populate a well from the UI before entering formation editing and overlay interaction steps.
+
+**Primary toolbar actions to add:**
+
+- `New project`
+- `Open project`
+- `Close project`
+- `Save project`
+- `Undo`
+- `Redo`
+- `Create well`
+- `Load LAS`
+- `Load tops`
+- `Load deviation`
+
+**Header controls to keep in the same action band:**
+
+- `Well selector`
+- `Zoom presets`
+
+**Behavior contract:**
+
+- `New project` reopens `NewProjectDialog`
+- `Open project` reopens `FileOpenDialog`
+- `Close project` calls `POST /api/projects/close`, clears app state, and returns to the gated project-selector view
+- `Save project` calls `POST /api/projects/save`
+- `Undo` / `Redo` call the existing project history endpoints and refresh status after completion
+- `Well selector` changes the loaded well in `wellDataStore` without leaving the current view
+
+**UI contract:**
+
+- Actions live in the main app toolbar and are visible only when a project is open.
+- Each action opens a lightweight dialog rather than navigating away from the current viewer.
+- Dialog errors are shown inline; success closes the dialog and refreshes project state.
+- Buttons that are not currently available (`Save`, `Undo`, `Redo`, `Close project`) are disabled when their action is not valid.
+
+**Backend/API usage in this step:**
+
+- `New project` reuses the existing create/open flow from Step 2
+- `Open project` reuses the existing recent/manual open flow from Step 2
+- `Close project` uses `POST /api/projects/close`
+- `Save project` uses `POST /api/projects/save`
+- `Undo` uses `POST /api/projects/undo`
+- `Redo` uses `POST /api/projects/redo`
+- `Create well` may use a dedicated backend endpoint or a minimal project-scoped helper if one does not exist yet.
+- `Load LAS` uses `POST /api/projects/import-las`
+- `Load tops` uses `POST /api/projects/import-tops`
+- `Load deviation` uses `POST /api/projects/import-deviation`
+
+**Frontend/store expectations:**
+
+- Toolbar state is driven from `projectStore` (`isOpen`, `isDirty`, `canUndo`, `canRedo`) plus the current well list.
+- After every successful action, refresh the well list used by the app header / selector.
+- If the imported or created well is the first well in the project, load it immediately into `wellDataStore`.
+- If the action targets the currently loaded well, refresh that well so new curves / formations / deviation data appear without a full page reload.
+
+**Acceptance criteria:** Starting from a freshly created project, the user can use only the frontend to save/close/reopen the project, create one well, import one LAS file, import tops, and import deviation data, then switch between available wells from the header without manual API calls.
 
 ---
 
@@ -730,6 +811,8 @@ frontend/src/
 ```
 Step 1 (visual config API + store)
 Step 2 (project dialogs)              ← parallel with Step 1
+        ↓
+Step 2.5 (project + import action toolbar)
         ↓
 Step 3 (formations API + store CRUD)
         ↓

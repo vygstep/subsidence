@@ -4,7 +4,16 @@ from .importers import import_deviation_csv, import_las_file, import_tops_csv, i
 from .loaders import load_curves_from_parquet, load_deviation_from_parquet, load_las_curves
 from .models import DepthReference, LogCurve
 from .project_manager import ProjectManager
-from .undo import Command, ImportWell, UndoStack, UpdateFormationDepth, UpdateVisualConfig
+from .undo import (
+    Command,
+    CreateFormation,
+    ImportWell,
+    RemoveFormation,
+    UndoStack,
+    UpdateFormation,
+    UpdateFormationDepth,
+    UpdateVisualConfig,
+)
 
 __all__ = [
     "CurveMatchResult",
@@ -12,8 +21,11 @@ __all__ = [
     "LogCurve",
     "ProjectManager",
     "Command",
+    "CreateFormation",
     "ImportWell",
+    "RemoveFormation",
     "UndoStack",
+    "UpdateFormation",
     "UpdateFormationDepth",
     "UpdateVisualConfig",
     "load_curve_alias_rules",

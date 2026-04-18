@@ -1,6 +1,15 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 
-import { FileOpenDialog, LogViewPanel, NewProjectDialog, ZoomControl } from '@/components'
+import {
+  CreateWellDialog,
+  FileOpenDialog,
+  ImportDeviationDialog,
+  ImportLasDialog,
+  ImportTopsDialog,
+  LogViewPanel,
+  NewProjectDialog,
+  ZoomControl,
+} from '@/components'
 import { useProjectStore, useViewStore, useWellDataStore } from '@/stores'
 import type { TrackConfig } from '@/types'
 
@@ -79,6 +88,8 @@ interface WellListItem {
   well_name: string
 }
 
+type DialogKind = 'project-open' | 'project-new' | 'create-well' | 'load-las' | 'load-tops' | 'load-deviation' | null
+
 async function fetchWellList(): Promise<WellListItem[]> {
   const response = await fetch('/api/wells')
   if (!response.ok) {
@@ -88,7 +99,8 @@ async function fetchWellList(): Promise<WellListItem[]> {
 }
 
 function App() {
-  const [projectDialogMode, setProjectDialogMode] = useState<'open' | 'new'>('open')
+  const [activeDialog, setActiveDialog] = useState<DialogKind>('project-open')
+  const [wellOptions, setWellOptions] = useState<WellListItem[]>([])
 
   const loadWell = useWellDataStore((state) => state.loadWell)
   const resetWell = useWellDataStore((state) => state.reset)
@@ -107,6 +119,7 @@ function App() {
   const loadVisualConfig = useProjectStore((state) => state.loadVisualConfig)
   const saveVisualConfig = useProjectStore((state) => state.saveVisualConfig)
   const saveProject = useProjectStore((state) => state.saveProject)
+  const closeProject = useProjectStore((state) => state.closeProject)
   const undoProject = useProjectStore((state) => state.undo)
   const redoProject = useProjectStore((state) => state.redo)
 
@@ -115,6 +128,28 @@ function App() {
   const resetVisualConfig = useViewStore((state) => state.resetVisualConfig)
 
   const configHydratedRef = useRef(false)
+
+  async function refreshWellList(preferredWellId?: string): Promise<void> {
+    const wells = await fetchWellList()
+    setWellOptions(wells)
+
+    if (wells.length === 0) {
+      resetWell()
+      return
+    }
+
+    const currentWellId = well?.well_id
+    const hasCurrent = currentWellId ? wells.some((item) => item.well_id == currentWellId) : false
+    const nextWellId = preferredWellId ?? (hasCurrent ? currentWellId : wells[0].well_id)
+    if (!nextWellId) {
+      resetWell()
+      return
+    }
+
+    if (preferredWellId || nextWellId !== currentWellId) {
+      await loadWell(nextWellId)
+    }
+  }
 
   useEffect(() => {
     void pollStatus()
@@ -125,10 +160,18 @@ function App() {
   }, [pollStatus])
 
   useEffect(() => {
-    if (isProjectOpen) {
-      setProjectDialogMode('open')
+    if (!isProjectOpen) {
+      setWellOptions([])
+      if (activeDialog === null) {
+        setActiveDialog('project-open')
+      }
+      return
     }
-  }, [isProjectOpen])
+
+    if (activeDialog === 'project-open' || activeDialog === 'project-new') {
+      setActiveDialog(null)
+    }
+  }, [activeDialog, isProjectOpen])
 
   useEffect(() => {
     if (!isProjectOpen) {
@@ -182,30 +225,37 @@ function App() {
     }
 
     let cancelled = false
-    const loadFirstWell = async () => {
+    const loadCurrentProject = async () => {
       try {
         const wells = await fetchWellList()
         if (cancelled) {
           return
         }
+        setWellOptions(wells)
         if (wells.length === 0) {
           resetWell()
           return
         }
-        if (well?.well_id === wells[0].well_id) {
-          return
+
+        const currentWellId = well?.well_id
+        const hasCurrent = currentWellId ? wells.some((item) => item.well_id == currentWellId) : false
+        const nextWellId = hasCurrent && currentWellId ? currentWellId : wells[0].well_id
+        if (nextWellId && nextWellId !== currentWellId) {
+          await loadWell(nextWellId)
         }
-        await loadWell(wells[0].well_id)
       } catch {
-        resetWell()
+        if (!cancelled) {
+          setWellOptions([])
+          resetWell()
+        }
       }
     }
 
-    void loadFirstWell()
+    void loadCurrentProject()
     return () => {
       cancelled = true
     }
-  }, [isProjectOpen, loadWell, resetWell, well?.well_id])
+  }, [isProjectOpen, loadWell, resetWell])
 
   useEffect(() => {
     const onKeyDown = (event: KeyboardEvent) => {
@@ -276,13 +326,84 @@ function App() {
         ? 'Error loading well'
         : (well?.well_name ?? 'No wells in project')
 
+  async function handleProjectClose(): Promise<void> {
+    await closeProject()
+    setWellOptions([])
+    setActiveDialog('project-open')
+  }
+
+  async function handleWellMutation(wellId: string): Promise<void> {
+    await refreshWellList(wellId)
+  }
+
+  function renderDialog() {
+    switch (activeDialog) {
+      case 'project-open':
+        return <FileOpenDialog onSwitchToNew={() => setActiveDialog('project-new')} onClose={isProjectOpen ? () => setActiveDialog(null) : undefined} />
+      case 'project-new':
+        return <NewProjectDialog onSwitchToOpen={() => setActiveDialog('project-open')} onClose={isProjectOpen ? () => setActiveDialog(null) : undefined} />
+      case 'create-well':
+        return <CreateWellDialog onClose={() => setActiveDialog(null)} onSuccess={handleWellMutation} />
+      case 'load-las':
+        return <ImportLasDialog onClose={() => setActiveDialog(null)} onSuccess={handleWellMutation} />
+      case 'load-tops':
+        return <ImportTopsDialog wells={wellOptions} onClose={() => setActiveDialog(null)} onSuccess={handleWellMutation} />
+      case 'load-deviation':
+        return <ImportDeviationDialog wells={wellOptions} onClose={() => setActiveDialog(null)} onSuccess={handleWellMutation} />
+      default:
+        return null
+    }
+  }
+
+  const dialogContent = renderDialog()
+
   return (
     <div className="app-layout">
       <header className="app-topbar">
         <span className="app-topbar__brand">SUBSIDENCE</span>
         <span className="app-topbar__project">{isDirty ? '* ' : ''}{projectName ?? '-'}</span>
         <span className="app-topbar__well">{topbarTitle}</span>
-        <ZoomControl />
+
+        {isProjectOpen && (
+          <div className="app-topbar__actions">
+            <button type="button" className="app-action-button" onClick={() => setActiveDialog('project-new')}>New project</button>
+            <button type="button" className="app-action-button" onClick={() => setActiveDialog('project-open')}>Open project</button>
+            <button type="button" className="app-action-button" onClick={() => void handleProjectClose()}>Close project</button>
+            <button type="button" className="app-action-button app-action-button--primary" onClick={() => void saveProject()} disabled={!isDirty}>Save project</button>
+
+            <span className="app-topbar__divider" />
+
+            <button type="button" className="app-action-button" onClick={() => setActiveDialog('create-well')}>Create well</button>
+            <button type="button" className="app-action-button" onClick={() => setActiveDialog('load-las')}>Load LAS</button>
+            <button type="button" className="app-action-button" onClick={() => setActiveDialog('load-tops')} disabled={wellOptions.length === 0}>Load tops</button>
+            <button type="button" className="app-action-button" onClick={() => setActiveDialog('load-deviation')} disabled={wellOptions.length === 0}>Load deviation</button>
+
+            <span className="app-topbar__divider" />
+
+            <button type="button" className="app-action-button" onClick={() => void undoProject()} disabled={!canUndo}>Undo</button>
+            <button type="button" className="app-action-button" onClick={() => void redoProject()} disabled={!canRedo}>Redo</button>
+
+            <span className="app-topbar__divider" />
+
+            <select
+              className="app-well-selector"
+              value={well?.well_id ?? ''}
+              onChange={(event) => void loadWell(event.target.value)}
+              disabled={wellOptions.length === 0}
+            >
+              {wellOptions.length === 0 ? (
+                <option value="">No wells</option>
+              ) : (
+                wellOptions.map((item) => (
+                  <option key={item.well_id} value={item.well_id}>{item.well_name}</option>
+                ))
+              )}
+            </select>
+
+            <ZoomControl />
+          </div>
+        )}
+
         {curves.length > 0 && (
           <span className="app-topbar__meta">
             {curves.length} curves | {curves[0].depths.length.toLocaleString()} samples
@@ -303,13 +424,11 @@ function App() {
               maxDepth={maxDepth}
             />
           )
-        ) : (
+        ) : null}
+
+        {dialogContent && (
           <div className="project-dialog-overlay">
-            {projectDialogMode === 'open' ? (
-              <FileOpenDialog onSwitchToNew={() => setProjectDialogMode('new')} />
-            ) : (
-              <NewProjectDialog onSwitchToOpen={() => setProjectDialogMode('open')} />
-            )}
+            {dialogContent}
           </div>
         )}
       </main>

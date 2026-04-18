@@ -3,6 +3,7 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from subsidence.data import ProjectManager
 
+from .formations import router as formations_router
 from .projects import router as projects_router
 from .wells import router as wells_router
 
@@ -23,6 +24,7 @@ app.add_middleware(
 )
 
 app.include_router(wells_router, prefix="/api")
+app.include_router(formations_router, prefix="/api")
 app.include_router(projects_router, prefix="/api/projects")
 
 

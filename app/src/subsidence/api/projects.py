@@ -4,6 +4,7 @@ import csv
 import io
 import json
 from pathlib import Path
+from uuid import uuid4
 
 import pandas as pd
 
@@ -169,6 +170,15 @@ class CreateProjectResponse(BaseModel):
     project_path: str
 
 
+class CreateWellRequest(BaseModel):
+    name: str
+
+
+class CreateWellResponse(BaseModel):
+    well_id: str
+    well_name: str
+
+
 class OpenProjectResponse(BaseModel):
     project_name: str
     project_uuid: str
@@ -258,6 +268,34 @@ def create_project(payload: CreateProjectRequest, request: Request) -> CreatePro
     except FileExistsError as error:
         raise HTTPException(status_code=409, detail=str(error)) from error
     return CreateProjectResponse(project_path=str(project_path))
+
+
+@router.post('/wells', response_model=CreateWellResponse)
+def create_well(payload: CreateWellRequest, request: Request) -> CreateWellResponse:
+    manager = _require_open_project(request)
+    well_name = payload.name.strip()
+    if not well_name:
+        raise HTTPException(status_code=400, detail='Well name is required')
+
+    with manager.get_session() as session:
+        row = WellModel(
+            id=str(uuid4()),
+            name=well_name,
+            kb_elev=0.0,
+            gl_elev=0.0,
+            td_md=None,
+            lat=None,
+            lon=None,
+            crs='unset',
+            source_las_path=None,
+            extra=None,
+        )
+        session.add(row)
+        session.commit()
+        session.refresh(row)
+
+    manager.mark_dirty()
+    return CreateWellResponse(well_id=row.id, well_name=row.name)
 
 
 @router.post('/open', response_model=OpenProjectResponse)

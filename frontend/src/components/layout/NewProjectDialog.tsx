@@ -4,9 +4,10 @@ import { useProjectStore } from '@/stores'
 
 interface NewProjectDialogProps {
   onSwitchToOpen: () => void
+  onClose?: () => void
 }
 
-export function NewProjectDialog({ onSwitchToOpen }: NewProjectDialogProps) {
+export function NewProjectDialog({ onSwitchToOpen, onClose }: NewProjectDialogProps) {
   const createProject = useProjectStore((state) => state.createProject)
 
   const [name, setName] = useState('')
@@ -33,6 +34,7 @@ export function NewProjectDialog({ onSwitchToOpen }: NewProjectDialogProps) {
     setError(null)
     try {
       await createProject(nextName, nextPath)
+      onClose?.()
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : 'Failed to create project')
     } finally {
@@ -79,8 +81,13 @@ export function NewProjectDialog({ onSwitchToOpen }: NewProjectDialogProps) {
         {error && <p className="project-dialog__error">{error}</p>}
 
         <div className="project-dialog__actions">
+          {onClose && (
+            <button type="button" className="project-dialog__button" onClick={onClose}>
+              Cancel
+            </button>
+          )}
           <button type="submit" className="project-dialog__button project-dialog__button--primary" disabled={isSubmitting}>
-            {isSubmitting ? 'Creating?' : 'Create project'}
+            {isSubmitting ? 'Creating…' : 'Create project'}
           </button>
         </div>
       </form>

@@ -22,6 +22,7 @@ export interface ProjectStore {
   loadRecentProjects: () => Promise<void>
   openProject: (path: string) => Promise<void>
   createProject: (name: string, path: string) => Promise<void>
+  closeProject: () => Promise<void>
   loadVisualConfig: () => Promise<void>
   saveVisualConfig: (patch: Record<string, unknown>) => Promise<void>
   saveProject: () => Promise<void>
@@ -199,6 +200,19 @@ export const useProjectStore = create<ProjectStore>((set, get) => ({
     set({ recentProjects: mapRecentProjects(payload) })
   },
   async openProject(path) {
+    if (get().isOpen) {
+      await postAction('/api/projects/close')
+      set({
+        isOpen: false,
+        projectName: null,
+        projectPath: null,
+        isDirty: false,
+        canUndo: false,
+        canRedo: false,
+        visualConfig: {},
+      })
+      applyVisualConfigPayload({})
+    }
     const payload = await openProjectRequest(path)
     set({
       isOpen: true,
@@ -218,6 +232,19 @@ export const useProjectStore = create<ProjectStore>((set, get) => ({
   async createProject(name, path) {
     const payload = await createProjectRequest(name, path)
     await get().openProject(payload.project_path)
+  },
+  async closeProject() {
+    await postAction('/api/projects/close')
+    set({
+      isOpen: false,
+      projectName: null,
+      projectPath: null,
+      isDirty: false,
+      canUndo: false,
+      canRedo: false,
+      visualConfig: {},
+    })
+    applyVisualConfigPayload({})
   },
   async loadVisualConfig() {
     const payload = await fetchVisualConfig()

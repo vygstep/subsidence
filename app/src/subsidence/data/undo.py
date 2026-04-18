@@ -130,6 +130,71 @@ class UpdateFormationDepth(Command):
         top.depth_md = self.old_depth
 
 
+class CreateFormation(Command):
+    def __init__(self, snapshot: dict[str, Any]) -> None:
+        self._snapshot = snapshot
+
+    @property
+    def description(self) -> str:
+        return f"Add formation {self._snapshot['name']!r}"
+
+    def apply(self, session: Session) -> None:
+        formation_id = self._snapshot['id']
+        if session.get(FormationTopModel, formation_id) is not None:
+            return
+        session.add(FormationTopModel(**self._snapshot))
+
+    def revert(self, session: Session) -> None:
+        formation = session.get(FormationTopModel, self._snapshot['id'])
+        if formation is None:
+            return
+        session.delete(formation)
+
+
+class UpdateFormation(Command):
+    def __init__(self, formation_id: int, old_values: dict[str, Any], new_values: dict[str, Any]) -> None:
+        self.formation_id = formation_id
+        self.old_values = old_values
+        self.new_values = new_values
+
+    @property
+    def description(self) -> str:
+        return f'Update formation {self.formation_id}'
+
+    def apply(self, session: Session) -> None:
+        self._apply_values(session, self.new_values)
+
+    def revert(self, session: Session) -> None:
+        self._apply_values(session, self.old_values)
+
+    def _apply_values(self, session: Session, values: dict[str, Any]) -> None:
+        formation = session.get(FormationTopModel, self.formation_id)
+        if formation is None:
+            raise ValueError(f'Formation top not found: {self.formation_id}')
+        for key, value in values.items():
+            setattr(formation, key, value)
+
+
+class RemoveFormation(Command):
+    def __init__(self, snapshot: dict[str, Any]) -> None:
+        self._snapshot = snapshot
+
+    @property
+    def description(self) -> str:
+        return f"Delete formation {self._snapshot['name']!r}"
+
+    def apply(self, session: Session) -> None:
+        formation = session.get(FormationTopModel, self._snapshot['id'])
+        if formation is None:
+            return
+        session.delete(formation)
+
+    def revert(self, session: Session) -> None:
+        if session.get(FormationTopModel, self._snapshot['id']) is not None:
+            return
+        session.add(FormationTopModel(**self._snapshot))
+
+
 class UpdateVisualConfig(Command):
     def __init__(self, scope: str, scope_id: str, old_config: Any, new_config: Any) -> None:
         self.scope = scope

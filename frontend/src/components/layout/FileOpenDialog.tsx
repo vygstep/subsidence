@@ -4,6 +4,7 @@ import { useProjectStore } from '@/stores'
 
 interface FileOpenDialogProps {
   onSwitchToNew: () => void
+  onClose?: () => void
 }
 
 function formatTimestamp(value: string): string | null {
@@ -14,7 +15,7 @@ function formatTimestamp(value: string): string | null {
   return parsed.toLocaleString()
 }
 
-export function FileOpenDialog({ onSwitchToNew }: FileOpenDialogProps) {
+export function FileOpenDialog({ onSwitchToNew, onClose }: FileOpenDialogProps) {
   const recentProjects = useProjectStore((state) => state.recentProjects)
   const loadRecentProjects = useProjectStore((state) => state.loadRecentProjects)
   const openProject = useProjectStore((state) => state.openProject)
@@ -54,6 +55,7 @@ export function FileOpenDialog({ onSwitchToNew }: FileOpenDialogProps) {
     setError(null)
     try {
       await openProject(nextPath)
+      onClose?.()
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : 'Failed to open project')
     } finally {
@@ -118,8 +120,13 @@ export function FileOpenDialog({ onSwitchToNew }: FileOpenDialogProps) {
         {error && <p className="project-dialog__error">{error}</p>}
 
         <div className="project-dialog__actions">
+          {onClose && (
+            <button type="button" className="project-dialog__button" onClick={onClose}>
+              Cancel
+            </button>
+          )}
           <button type="submit" className="project-dialog__button project-dialog__button--primary" disabled={isSubmitting}>
-            {isSubmitting ? 'Opening?' : 'Open project'}
+            {isSubmitting ? 'Opening…' : 'Open project'}
           </button>
         </div>
       </form>
