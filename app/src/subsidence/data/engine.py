@@ -4,7 +4,7 @@ from collections.abc import Generator
 from pathlib import Path
 from sqlite3 import Connection as SQLiteConnection
 
-from sqlalchemy import Engine, create_engine, event
+from sqlalchemy import Engine, create_engine, event, text
 from sqlalchemy.orm import Session, sessionmaker
 
 from .schema import Base, SCHEMA_VERSION, SUBSIDENCE_APP_ID
@@ -61,6 +61,18 @@ def get_session() -> Generator[Session, None, None]:
         yield session
     finally:
         session.close()
+
+
+def migrate_schema(engine: Engine) -> None:
+    with engine.connect() as conn:
+        strat_unit_cols = {row[1] for row in conn.execute(text("PRAGMA table_info(strat_units)"))}
+        if 'chart_id' not in strat_unit_cols:
+            conn.execute(text("ALTER TABLE strat_units ADD COLUMN chart_id INTEGER REFERENCES strat_charts(id)"))
+            conn.commit()
+        formation_cols = {row[1] for row in conn.execute(text("PRAGMA table_info(formation_tops)"))}
+        if 'strat_unit_id' in formation_cols:
+            # SQLite < 3.35 cannot DROP COLUMN; leave it as an orphan column (ORM ignores it)
+            pass
 
 
 def validate_project_db(db_path: Path | str) -> tuple[int, int]:

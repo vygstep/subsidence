@@ -16,7 +16,7 @@ from sqlalchemy.orm import Session
 
 from .dict_resolver import load_curve_alias_rules, resolve_curve_alias
 from .schema import CurveMetadata, DeviationSurveyModel, FormationTopModel, WellModel
-from .strat_link import auto_link_formation_to_strat_unit
+from .strat_link import auto_link_to_active_chart
 from .unit_conversion import canonicalize_gamma_unit, convert_curve_units, convert_depth_to_meters, normalize_unit_name
 
 _DEPTH_MNEMONICS = {'DEPT', 'DEPTH', 'MD', 'TVD', 'TVDSS'}
@@ -570,7 +570,7 @@ def import_tops_csv(
             note=note,
         )
         session.add(top)
-        auto_link_formation_to_strat_unit(session, top)
+        auto_link_to_active_chart(session, top)
         imported.append(top)
 
     session.flush()
@@ -634,14 +634,14 @@ def import_unconformities_csv(
             )
             session.add(target)
             by_name[_normalize_text(unc_name)] = target
-            auto_link_formation_to_strat_unit(session, target)
+            auto_link_to_active_chart(session, target)
         else:
             target.depth_md = depth_md
             target.age_top_ma = younger_age
             target.age_base_ma = older_age
             target.color = color
             target.note = note
-            auto_link_formation_to_strat_unit(session, target)
+            auto_link_to_active_chart(session, target)
         imported_or_updated.append(target)
 
     session.flush()

@@ -3,10 +3,10 @@ from __future__ import annotations
 import csv
 from pathlib import Path
 
-from sqlalchemy import select
+from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
-from .schema import CurveDictEntry, LithologyDictEntry, StratUnit
+from .schema import CurveDictEntry, LithologyDictEntry, StratChart, StratUnit
 
 
 def _seed_curve_entries(session: Session, csv_path: Path) -> None:
@@ -44,7 +44,7 @@ def _repo_sample_data_dir() -> Path:
     return Path(__file__).resolve().parents[4] / 'sample_data'
 
 
-def _seed_strat_units(session: Session, units_path: Path, ranks_path: Path) -> None:
+def _seed_strat_units(session: Session, units_path: Path, ranks_path: Path, chart: StratChart) -> None:
     rank_map: dict[int, str] = {}
     with ranks_path.open('r', encoding='utf-8', newline='') as handle:
         for row in csv.DictReader(handle):
@@ -83,6 +83,7 @@ def _seed_strat_units(session: Session, units_path: Path, ranks_path: Path) -> N
                     age_base_ma=float(row['end_age_ma']) if (row.get('end_age_ma') or '').strip() else None,
                     lithology=None,
                     color_hex=(row.get('html_rgb_hash') or '').strip() or None,
+                    chart_id=chart.id,
                 )
             )
             inserted_ids.add(unit_id)
@@ -91,6 +92,27 @@ def _seed_strat_units(session: Session, units_path: Path, ranks_path: Path) -> N
 
         if not inserted_in_pass:
             raise ValueError('Unable to seed strat_units due to unresolved parent references')
+
+
+def _migrate_orphan_strat_units(session: Session) -> None:
+    orphan_count = session.scalar(
+        select(func.count()).select_from(StratUnit).where(StratUnit.chart_id.is_(None))
+    ) or 0
+    if orphan_count == 0:
+        return
+
+    default_chart = session.scalar(select(StratChart).where(StratChart.name == 'ICS 2023'))
+    if default_chart is None:
+        no_charts = session.scalar(select(func.count()).select_from(StratChart)) == 0
+        default_chart = StratChart(name='ICS 2023', source_path=None, is_active=no_charts)
+        session.add(default_chart)
+        session.flush()
+
+    session.execute(
+        StratUnit.__table__.update()
+        .where(StratUnit.chart_id.is_(None))
+        .values(chart_id=default_chart.id)
+    )
 
 
 def seed_dictionaries(session: Session, db_path: Path) -> None:
@@ -110,4 +132,9 @@ def seed_dictionaries(session: Session, db_path: Path) -> None:
         units_path = sample_dir / 'ics_chart2023_units.csv'
         ranks_path = sample_dir / 'ics_chart2023_ranks.csv'
         if units_path.exists() and ranks_path.exists():
-            _seed_strat_units(session, units_path, ranks_path)
+            default_chart = StratChart(name='ICS 2023', source_path=str(units_path), is_active=True)
+            session.add(default_chart)
+            session.flush()
+            _seed_strat_units(session, units_path, ranks_path, default_chart)
+    else:
+        _migrate_orphan_strat_units(session)

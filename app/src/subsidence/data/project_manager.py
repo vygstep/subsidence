@@ -24,7 +24,7 @@ from sqlalchemy.orm import Session
 
 from .undo import UndoStack, Command
 
-from .engine import create_all_tables, create_engine_for_project, validate_project_db
+from .engine import create_all_tables, create_engine_for_project, migrate_schema, validate_project_db
 from .schema import CheckpointModel, ProjectMeta, SCHEMA_VERSION, UserModel
 
 if os.name == 'nt':
@@ -160,6 +160,8 @@ class ProjectManager:
         working_db_path = session_dir / 'working.db'
         shutil.copy2(canonical_db, working_db_path)
         engine = create_engine_for_project(working_db_path)
+        migrate_schema(engine)
+        create_all_tables(engine)
         with Session(engine) as session:
             self._seed_dictionaries(session, bundle_path)
             session.commit()

@@ -10,6 +10,7 @@ import {
   LoadStratChartDialog,
   LogViewPanel,
   NewProjectDialog,
+  StratChartTab,
   WellDataPanel,
   ZoomControl,
 } from '@/components'
@@ -22,7 +23,7 @@ interface WellListItem {
 }
 
 type DialogKind = 'project-open' | 'project-new' | 'create-well' | 'load-las' | 'load-tops' | 'load-deviation' | 'link-top' | 'load-strat-chart' | null
-type SidebarTab = 'wells' | 'models' | 'templates'
+type SidebarTab = 'wells' | 'models' | 'templates' | 'strat-charts'
 type ToolbarMode = 'project' | 'strat-chart' | 'wells' | 'tops'
 
 interface WellViewState {
@@ -133,6 +134,11 @@ function App() {
   const updateFormation = useWellDataStore((state) => state.updateFormation)
   const updateFormationDepth = useWellDataStore((state) => state.updateFormationDepth)
   const removeFormation = useWellDataStore((state) => state.removeFormation)
+  const linkFormationToChart = useWellDataStore((state) => state.linkFormationToChart)
+  const loadStratCharts = useWellDataStore((state) => state.loadStratCharts)
+  const activateChart = useWellDataStore((state) => state.activateChart)
+  const deleteChart = useWellDataStore((state) => state.deleteChart)
+  const stratCharts = useWellDataStore((state) => state.stratCharts)
   const well = useWellDataStore((state) => state.well)
   const curves = useWellDataStore((state) => state.curves)
   const formations = useWellDataStore((state) => state.formations)
@@ -245,6 +251,11 @@ function App() {
       cancelled = true
     }
   }, [isProjectOpen, loadVisualConfig, resetVisualConfig, resetWell])
+
+  useEffect(() => {
+    if (!isProjectOpen) return
+    void loadStratCharts()
+  }, [isProjectOpen, loadStratCharts])
 
   useEffect(() => {
     if (!isProjectOpen || !configHydratedRef.current) {
@@ -547,11 +558,11 @@ function App() {
   }
 
   async function handleLinkFormation(stratUnitId: number | null): Promise<void> {
-    if (!formationLinkTarget) {
-      return
+    if (!formationLinkTarget) return
+    const activeChart = stratCharts.find((c) => c.is_active) ?? null
+    if (stratUnitId !== null && activeChart) {
+      await linkFormationToChart(formationLinkTarget.id, activeChart.id, stratUnitId)
     }
-
-    await updateFormation(formationLinkTarget.id, { strat_unit_id: stratUnitId })
     setFormationLinkTarget(null)
     setActiveDialog(null)
   }
@@ -626,10 +637,15 @@ function App() {
   }
 
   async function handleDeleteStratChart(): Promise<void> {
-    if (!window.confirm('Delete the stratigraphic chart? Formation links will be cleared.')) return
+    if (!window.confirm('Delete all stratigraphic charts? Formation links will be cleared.')) return
     const response = await fetch('/api/strat-chart', { method: 'DELETE' })
     if (!response.ok) {
-      alert('Failed to delete stratigraphic chart')
+      alert('Failed to delete stratigraphic charts')
+      return
+    }
+    await loadStratCharts()
+    if (well?.well_id) {
+      await loadWell(well.well_id)
     }
   }
 
@@ -799,14 +815,25 @@ function App() {
         return (
           <LoadStratChartDialog
             onClose={() => setActiveDialog(null)}
-            onSuccess={(_count) => { setActiveDialog(null) }}
+            onSuccess={async (_count) => {
+              setActiveDialog(null)
+              await loadStratCharts()
+              if (well?.well_id) {
+                await loadWell(well.well_id)
+              }
+            }}
           />
         )
-      case 'link-top':
+      case 'link-top': {
+        const activeChart = stratCharts.find((c) => c.is_active) ?? null
+        const currentUnitId = formationLinkTarget
+          ? formationLinkTarget.strat_links.find((l) => l.chart_id === activeChart?.id)?.strat_unit_id
+          : undefined
         return formationLinkTarget ? (
           <LinkStratChartDialog
             formationName={formationLinkTarget.name}
-            currentUnitId={formationLinkTarget.strat_unit_id ?? undefined}
+            activeChartId={activeChart?.id ?? null}
+            currentUnitId={currentUnitId}
             onClose={() => {
               setFormationLinkTarget(null)
               setActiveDialog(null)
@@ -814,6 +841,7 @@ function App() {
             onSelect={handleLinkFormation}
           />
         ) : null
+      }
       default:
         return null
     }
@@ -917,6 +945,13 @@ function App() {
                   </button>
                   <button
                     type="button"
+                    className={`sidebar-tab ${activeSidebarTab === 'strat-charts' ? 'sidebar-tab--active' : ''}`}
+                    onClick={() => setActiveSidebarTab('strat-charts')}
+                  >
+                    StratCharts
+                  </button>
+                  <button
+                    type="button"
                     className={`sidebar-tab ${activeSidebarTab === 'models' ? 'sidebar-tab--active' : ''}`}
                     onClick={() => setActiveSidebarTab('models')}
                   >
@@ -931,7 +966,13 @@ function App() {
                   </button>
                 </header>
 
-                {activeSidebarTab === 'wells' ? (
+                {activeSidebarTab === 'strat-charts' ? (
+                  <StratChartTab
+                    charts={stratCharts}
+                    onActivate={(chartId) => void activateChart(chartId)}
+                    onDelete={(chartId) => void deleteChart(chartId)}
+                  />
+                ) : activeSidebarTab === 'wells' ? (
                   <WellDataPanel
                     wells={wellOptions}
                     activeWellId={well?.well_id ?? null}

@@ -53,7 +53,7 @@ function checkboxLeaf(
 }
 
 function topBackgroundColor(formation: FormationTop): string {
-  return formation.strat_color || '#9ca3af'
+  return formation.active_strat_color ?? '#9ca3af'
 }
 
 interface TriStateCheckboxProps {
@@ -209,8 +209,8 @@ export function WellDataPanel({
                             formatNumber(formation.depth_md),
                             (nextValue) => onToggleFormation(formation.id, nextValue),
                           )}
-                          {formation.strat_unit_name ? (
-                            <div className="top-leaf__link-state">Linked: {formation.strat_unit_name}</div>
+                          {formation.active_strat_unit_name ? (
+                            <div className="top-leaf__link-state">Linked: {formation.active_strat_unit_name}</div>
                           ) : (
                             <div className="top-leaf__link-state">Unlinked</div>
                           )}

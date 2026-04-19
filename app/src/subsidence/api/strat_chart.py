@@ -5,10 +5,11 @@ from pathlib import Path
 
 from fastapi import APIRouter, HTTPException, Request
 from pydantic import BaseModel
-from sqlalchemy import delete, select
+from sqlalchemy import delete, func, select
 
 from subsidence.data import ProjectManager
-from subsidence.data.schema import FormationTopModel, StratUnit
+from subsidence.data.schema import StratChart, StratUnit
+from subsidence.data.strat_link import auto_link_all_formations_to_chart
 
 router = APIRouter(tags=['strat-chart'])
 
@@ -32,14 +33,16 @@ class ImportStratChartResponse(BaseModel):
     units_imported: int
 
 
-def _import_ics_csv(session, csv_path: Path) -> int:
-    # Unlink all formations before replacing strat units.
-    session.execute(
-        FormationTopModel.__table__.update().values(strat_unit_id=None)
-    )
-    session.execute(delete(StratUnit))
-    session.flush()
+class StratChartInfo(BaseModel):
+    id: int
+    name: str
+    is_active: bool
+    unit_count: int
+    imported_at: str
+    source_path: str | None
 
+
+def _import_ics_csv(session, csv_path: Path) -> tuple[StratChart, int]:
     pending: dict[int, dict[str, str]] = {}
     with csv_path.open('r', encoding='utf-8-sig', newline='') as handle:
         for row in csv.DictReader(handle):
@@ -49,40 +52,107 @@ def _import_ics_csv(session, csv_path: Path) -> int:
                 continue
             pending[int(unit_id_raw)] = row
 
-    inserted_ids: set[int] = set()
+    existing_count = session.scalar(select(func.count()).select_from(StratChart)) or 0
+    is_first = existing_count == 0
+
+    chart = StratChart(
+        name=csv_path.stem,
+        source_path=str(csv_path),
+        is_active=is_first,
+    )
+    session.add(chart)
+    session.flush()
+
+    # Topological sort: track CSV unit_id → StratUnit object for parent resolution
+    csv_id_to_unit: dict[int, StratUnit] = {}
+    inserted_csv_ids: set[int] = set()
     count = 0
+
     while pending:
-        inserted_in_pass = False
-        for unit_id in list(pending):
-            row = pending[unit_id]
-            parent_id_raw = (row.get('parent_unit_id') or '').strip()
-            parent_id = int(parent_id_raw) if parent_id_raw else None
-            if parent_id is not None and parent_id not in inserted_ids:
-                continue
-
-            age_top_raw = (row.get('start_age_ma') or '').strip()
-            age_base_raw = (row.get('end_age_ma') or '').strip()
-            session.add(
-                StratUnit(
-                    id=unit_id,
-                    name=(row.get('unit_name') or '').strip(),
-                    rank=(row.get('rank_name') or '').strip() or None,
-                    parent_id=parent_id,
-                    age_top_ma=float(age_top_raw) if age_top_raw else None,
-                    age_base_ma=float(age_base_raw) if age_base_raw else None,
-                    lithology=None,
-                    color_hex=(row.get('html_rgb_hash') or '').strip() or None,
-                )
-            )
-            inserted_ids.add(unit_id)
-            pending.pop(unit_id)
-            inserted_in_pass = True
-            count += 1
-
-        if not inserted_in_pass:
+        ready = [
+            (csv_unit_id, row)
+            for csv_unit_id, row in list(pending.items())
+            if not (row.get('parent_unit_id') or '').strip()
+            or int(row['parent_unit_id'].strip()) in inserted_csv_ids
+        ]
+        if not ready:
             raise ValueError('Unresolved parent references in strat chart CSV')
 
-    return count
+        for csv_unit_id, row in ready:
+            parent_csv_id_raw = (row.get('parent_unit_id') or '').strip()
+            parent_csv_id = int(parent_csv_id_raw) if parent_csv_id_raw else None
+            parent_db_id = csv_id_to_unit[parent_csv_id].id if parent_csv_id is not None else None
+            age_top_raw = (row.get('start_age_ma') or '').strip()
+            age_base_raw = (row.get('end_age_ma') or '').strip()
+            unit = StratUnit(
+                name=(row.get('unit_name') or '').strip(),
+                rank=(row.get('rank_name') or '').strip() or None,
+                parent_id=parent_db_id,
+                age_top_ma=float(age_top_raw) if age_top_raw else None,
+                age_base_ma=float(age_base_raw) if age_base_raw else None,
+                lithology=None,
+                color_hex=(row.get('html_rgb_hash') or '').strip() or None,
+                chart_id=chart.id,
+            )
+            session.add(unit)
+            csv_id_to_unit[csv_unit_id] = unit
+            inserted_csv_ids.add(csv_unit_id)
+            del pending[csv_unit_id]
+
+        session.flush()
+        count += len(ready)
+
+    return chart, count
+
+
+def _chart_info(session, chart: StratChart) -> StratChartInfo:
+    unit_count = session.scalar(
+        select(func.count()).where(StratUnit.chart_id == chart.id)
+    ) or 0
+    return StratChartInfo(
+        id=chart.id,
+        name=chart.name,
+        is_active=chart.is_active,
+        unit_count=unit_count,
+        imported_at=chart.imported_at.isoformat(),
+        source_path=chart.source_path,
+    )
+
+
+@router.get('/strat-charts', response_model=list[StratChartInfo])
+def list_strat_charts(request: Request) -> list[StratChartInfo]:
+    manager = _require_open_project(request)
+    with manager.get_session() as session:
+        charts = session.scalars(select(StratChart).order_by(StratChart.id.asc())).all()
+        return [_chart_info(session, chart) for chart in charts]
+
+
+@router.patch('/strat-charts/{chart_id}/activate', response_model=StratChartInfo)
+def activate_strat_chart(chart_id: int, request: Request) -> StratChartInfo:
+    manager = _require_open_project(request)
+    with manager.get_session() as session:
+        chart = session.get(StratChart, chart_id)
+        if chart is None:
+            raise HTTPException(status_code=404, detail=f'Strat chart not found: {chart_id}')
+        session.execute(StratChart.__table__.update().values(is_active=False))
+        chart.is_active = True
+        session.flush()
+        session.commit()
+        manager.save_project()
+        return _chart_info(session, chart)
+
+
+@router.delete('/strat-charts/{chart_id}', status_code=204)
+def delete_strat_chart_by_id(chart_id: int, request: Request) -> None:
+    manager = _require_open_project(request)
+    with manager.get_session() as session:
+        chart = session.get(StratChart, chart_id)
+        if chart is None:
+            raise HTTPException(status_code=404, detail=f'Strat chart not found: {chart_id}')
+        session.delete(chart)
+        session.flush()
+        session.commit()
+    manager.save_project()
 
 
 @router.post('/strat-chart/import', response_model=ImportStratChartResponse)
@@ -96,18 +166,21 @@ def import_strat_chart(body: ImportStratChartRequest, request: Request) -> Impor
 
     with manager.get_session() as session:
         try:
-            count = _import_ics_csv(session, csv_path)
+            chart, count = _import_ics_csv(session, csv_path)
+            if chart.is_active:
+                auto_link_all_formations_to_chart(session, chart)
+            session.commit()
         except ValueError as exc:
             raise HTTPException(status_code=422, detail=str(exc)) from exc
 
+    manager.save_project()
     return ImportStratChartResponse(units_imported=count)
 
 
 @router.delete('/strat-chart', status_code=204)
-def delete_strat_chart(request: Request) -> None:
+def delete_all_strat_charts(request: Request) -> None:
     manager = _require_open_project(request)
     with manager.get_session() as session:
-        session.execute(
-            FormationTopModel.__table__.update().values(strat_unit_id=None)
-        )
-        session.execute(delete(StratUnit))
+        session.execute(delete(StratChart))
+        session.commit()
+    manager.save_project()

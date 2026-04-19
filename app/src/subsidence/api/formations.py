@@ -7,8 +7,8 @@ from sqlalchemy.orm import selectinload
 
 from subsidence.data import CreateFormation, ProjectManager, RemoveFormation, UpdateFormation, UpdateFormationDepth
 from subsidence.data.undo import _model_to_dict
-from subsidence.data.schema import FormationTopModel, StratUnit, WellModel
-from subsidence.data.strat_link import auto_link_formation_to_strat_unit, find_strat_unit_by_name
+from subsidence.data.schema import FormationStratLink, FormationTopModel, StratChart, StratUnit, WellModel
+from subsidence.data.strat_link import auto_link_to_active_chart, find_strat_unit_by_name
 
 router = APIRouter(tags=['formations'])
 
@@ -31,7 +31,14 @@ class FormationTopPatch(BaseModel):
     lithology: str | None = None
     age_ma: float | None = None
     is_locked: bool | None = None
-    strat_unit_id: int | None = None
+
+
+class FormationStratLinkResponse(BaseModel):
+    chart_id: int
+    chart_name: str
+    strat_unit_id: int
+    strat_unit_name: str
+    color_hex: str | None
 
 
 class FormationTopResponse(BaseModel):
@@ -40,12 +47,12 @@ class FormationTopResponse(BaseModel):
     depth_md: float
     color: str
     kind: str
-    strat_color: str | None
     lithology: str | None
     age_ma: float | None
     is_locked: bool
-    strat_unit_id: int | None
-    strat_unit_name: str | None
+    strat_links: list[FormationStratLinkResponse]
+    active_strat_color: str | None
+    active_strat_unit_name: str | None
 
 
 class StratUnitLookupResponse(BaseModel):
@@ -53,6 +60,11 @@ class StratUnitLookupResponse(BaseModel):
     name: str
     rank: str | None
     color_hex: str | None
+
+
+class StratLinkRequest(BaseModel):
+    chart_id: int
+    strat_unit_id: int
 
 
 def _manager(request: Request) -> ProjectManager:
@@ -73,38 +85,60 @@ def _require_well(session, well_id: str) -> WellModel:
     return well
 
 
+def _load_options():
+    return [
+        selectinload(FormationTopModel.strat_links).options(
+            selectinload(FormationStratLink.strat_unit),
+            selectinload(FormationStratLink.chart),
+        )
+    ]
+
+
 def _load_formation(session, formation_id: int) -> FormationTopModel | None:
     return session.scalar(
         select(FormationTopModel)
         .where(FormationTopModel.id == formation_id)
-        .options(selectinload(FormationTopModel.strat_unit))
+        .options(*_load_options())
     )
 
 
 def _to_response(row: FormationTopModel) -> FormationTopResponse:
+    links = [
+        FormationStratLinkResponse(
+            chart_id=link.chart_id,
+            chart_name=link.chart.name,
+            strat_unit_id=link.strat_unit_id,
+            strat_unit_name=link.strat_unit.name,
+            color_hex=link.strat_unit.color_hex,
+        )
+        for link in row.strat_links
+    ]
+    active_link = next((link for link in row.strat_links if link.chart.is_active), None)
     return FormationTopResponse(
         id=str(row.id),
         name=row.name,
         depth_md=row.depth_md,
         color=row.color,
         kind=row.kind,
-        strat_color=row.strat_unit.color_hex if row.strat_unit is not None else None,
-        lithology=row.strat_unit.lithology if row.strat_unit is not None else None,
+        lithology=None,
         age_ma=row.age_top_ma,
         is_locked=row.is_locked,
-        strat_unit_id=row.strat_unit_id,
-        strat_unit_name=row.strat_unit.name if row.strat_unit is not None else None,
+        strat_links=links,
+        active_strat_color=active_link.strat_unit.color_hex if active_link else None,
+        active_strat_unit_name=active_link.strat_unit.name if active_link else None,
     )
 
 
 @router.get('/strat-units', response_model=list[StratUnitLookupResponse])
-def list_strat_units(request: Request, q: str = '', limit: int = 20) -> list[StratUnitLookupResponse]:
+def list_strat_units(request: Request, q: str = '', limit: int = 20, chart_id: int | None = None) -> list[StratUnitLookupResponse]:
     manager = _require_open_project(request)
     with manager.get_session() as session:
         stmt = select(StratUnit).order_by(StratUnit.name.asc()).limit(max(1, min(limit, 100)))
         query = q.strip()
         if query:
             stmt = stmt.where(StratUnit.name.ilike(f'%{query}%'))
+        if chart_id is not None:
+            stmt = stmt.where(StratUnit.chart_id == chart_id)
 
         rows = session.scalars(stmt).all()
         return [
@@ -127,20 +161,8 @@ def list_formations(well_id: str, request: Request) -> list[FormationTopResponse
             select(FormationTopModel)
             .where(FormationTopModel.well_id == well_id)
             .order_by(FormationTopModel.depth_md.asc(), FormationTopModel.id.asc())
-            .options(selectinload(FormationTopModel.strat_unit))
+            .options(*_load_options())
         ).all()
-        changed = False
-        for row in rows:
-            changed = auto_link_formation_to_strat_unit(session, row) or changed
-        if changed:
-            session.flush()
-            session.commit()
-            rows = session.scalars(
-                select(FormationTopModel)
-                .where(FormationTopModel.well_id == well_id)
-                .order_by(FormationTopModel.depth_md.asc(), FormationTopModel.id.asc())
-                .options(selectinload(FormationTopModel.strat_unit))
-            ).all()
         return [_to_response(row) for row in rows]
 
 
@@ -159,9 +181,9 @@ def create_formation(well_id: str, body: FormationTopCreate, request: Request) -
             is_locked=body.is_locked,
         )
         session.add(row)
-        auto_link_formation_to_strat_unit(session, row)
         session.flush()
-        session.refresh(row)
+        auto_link_to_active_chart(session, row)
+        session.flush()
         manager.undo_stack.push(CreateFormation(_model_to_dict(row)), session)
         session.commit()
         created = _load_formation(session, row.id)
@@ -191,7 +213,7 @@ def update_formation(well_id: str, formation_id: int, body: FormationTopPatch, r
             'is_locked': ('is_locked', body.is_locked),
         }
 
-        for model_field, (response_field, value) in patch_map.items():
+        for model_field, (_, value) in patch_map.items():
             if value is None:
                 continue
             current_value = getattr(row, model_field)
@@ -199,22 +221,6 @@ def update_formation(well_id: str, formation_id: int, body: FormationTopPatch, r
                 continue
             old_values[model_field] = current_value
             new_values[model_field] = value
-
-        if 'strat_unit_id' in body.model_fields_set:
-            strat_unit_id = body.strat_unit_id
-            if strat_unit_id is not None and session.get(StratUnit, strat_unit_id) is None:
-                raise HTTPException(status_code=404, detail=f'Strat unit not found: {strat_unit_id}')
-            if row.strat_unit_id != strat_unit_id:
-                old_values['strat_unit_id'] = row.strat_unit_id
-                new_values['strat_unit_id'] = strat_unit_id
-        elif body.name is not None and row.strat_unit_id is None:
-            matched_unit = find_strat_unit_by_name(session, body.name)
-            if matched_unit is not None:
-                old_values['strat_unit_id'] = None
-                new_values['strat_unit_id'] = matched_unit.id
-                if 'color' not in body.model_fields_set and matched_unit.color_hex and (row.color or '').strip().lower() in {'', '#4b5563', '#808080', '#9ca3af', '#90a4ae'}:
-                    old_values['color'] = row.color
-                    new_values['color'] = matched_unit.color_hex
 
     if not new_values:
         with manager.get_session() as session:
@@ -232,6 +238,44 @@ def update_formation(well_id: str, formation_id: int, body: FormationTopPatch, r
         updated = _load_formation(session, formation_id)
         if updated is None:
             raise HTTPException(status_code=404, detail=f'Formation not found: {formation_id}')
+        return _to_response(updated)
+
+
+@router.put('/wells/{well_id}/formations/{formation_id}/strat-link', response_model=FormationTopResponse)
+def upsert_formation_strat_link(well_id: str, formation_id: int, body: StratLinkRequest, request: Request) -> FormationTopResponse:
+    manager = _require_open_project(request)
+    with manager.get_session() as session:
+        _require_well(session, well_id)
+        formation = _load_formation(session, formation_id)
+        if formation is None or formation.well_id != well_id:
+            raise HTTPException(status_code=404, detail=f'Formation not found: {formation_id}')
+
+        chart = session.get(StratChart, body.chart_id)
+        if chart is None:
+            raise HTTPException(status_code=404, detail=f'Strat chart not found: {body.chart_id}')
+        strat_unit = session.get(StratUnit, body.strat_unit_id)
+        if strat_unit is None:
+            raise HTTPException(status_code=404, detail=f'Strat unit not found: {body.strat_unit_id}')
+
+        existing_link = session.scalar(
+            select(FormationStratLink).where(
+                FormationStratLink.formation_id == formation_id,
+                FormationStratLink.chart_id == body.chart_id,
+            )
+        )
+        if existing_link is None:
+            session.add(FormationStratLink(
+                formation_id=formation_id,
+                strat_unit_id=body.strat_unit_id,
+                chart_id=body.chart_id,
+            ))
+        else:
+            existing_link.strat_unit_id = body.strat_unit_id
+
+        session.flush()
+        session.commit()
+
+        updated = _load_formation(session, formation_id)
         return _to_response(updated)
 
 

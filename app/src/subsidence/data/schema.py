@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from datetime import datetime, timezone
 
-from sqlalchemy import Boolean, Float, ForeignKey, Integer, String, Text
+from sqlalchemy import Boolean, DateTime, Float, ForeignKey, Integer, String, Text, UniqueConstraint
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column, relationship
 from sqlalchemy import MetaData
 
@@ -145,8 +145,20 @@ class DeviationSurveyModel(Base, AuditMixin):
 
 
 # ---------------------------------------------------------------------------
-# 6. strat_units (dictionary)
+# 6. strat_charts + strat_units (dictionary)
 # ---------------------------------------------------------------------------
+
+class StratChart(Base):
+    __tablename__ = "strat_charts"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    name: Mapped[str] = mapped_column(String(256))
+    source_path: Mapped[str | None] = mapped_column(Text, nullable=True)
+    is_active: Mapped[bool] = mapped_column(Boolean, default=False)
+    imported_at: Mapped[datetime] = mapped_column(default=_now)
+
+    units: Mapped[list["StratUnit"]] = relationship(back_populates="chart", cascade="all, delete-orphan")
+
 
 class StratUnit(Base):
     __tablename__ = "strat_units"
@@ -161,6 +173,11 @@ class StratUnit(Base):
     age_base_ma: Mapped[float | None] = mapped_column(Float, nullable=True)
     lithology: Mapped[str | None] = mapped_column(String(32), nullable=True)
     color_hex: Mapped[str | None] = mapped_column(String(9), nullable=True)
+    chart_id: Mapped[int | None] = mapped_column(
+        Integer, ForeignKey("strat_charts.id"), nullable=True
+    )
+
+    chart: Mapped[StratChart | None] = relationship(back_populates="units")
 
 
 # ---------------------------------------------------------------------------
@@ -173,9 +190,6 @@ class FormationTopModel(Base, AuditMixin):
     id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
     well_id: Mapped[str] = mapped_column(
         String(36), ForeignKey("wells.id"), nullable=False
-    )
-    strat_unit_id: Mapped[int | None] = mapped_column(
-        Integer, ForeignKey("strat_units.id"), nullable=True
     )
     name: Mapped[str] = mapped_column(String(256))
     kind: Mapped[str] = mapped_column(String(16), default="strat")
@@ -193,7 +207,9 @@ class FormationTopModel(Base, AuditMixin):
     note: Mapped[str | None] = mapped_column(Text, nullable=True)
 
     well: Mapped[WellModel] = relationship(back_populates="formation_tops")
-    strat_unit: Mapped[StratUnit | None] = relationship()
+    strat_links: Mapped[list["FormationStratLink"]] = relationship(
+        back_populates="formation", cascade="all, delete-orphan"
+    )
 
 
 # ---------------------------------------------------------------------------
@@ -284,3 +300,27 @@ class CheckpointModel(Base):
     sha256: Mapped[str] = mapped_column(String(64))
     app_version: Mapped[str] = mapped_column(String(32))
     schema_version: Mapped[int] = mapped_column(Integer)
+
+
+# ---------------------------------------------------------------------------
+# 13. formation_strat_links
+# ---------------------------------------------------------------------------
+
+class FormationStratLink(Base):
+    __tablename__ = "formation_strat_links"
+    __table_args__ = (UniqueConstraint("formation_id", "chart_id"),)
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    formation_id: Mapped[int] = mapped_column(
+        Integer, ForeignKey("formation_tops.id", ondelete="CASCADE"), nullable=False
+    )
+    strat_unit_id: Mapped[int] = mapped_column(
+        Integer, ForeignKey("strat_units.id", ondelete="CASCADE"), nullable=False
+    )
+    chart_id: Mapped[int] = mapped_column(
+        Integer, ForeignKey("strat_charts.id", ondelete="CASCADE"), nullable=False
+    )
+
+    formation: Mapped[FormationTopModel] = relationship(back_populates="strat_links")
+    strat_unit: Mapped[StratUnit] = relationship()
+    chart: Mapped[StratChart] = relationship()

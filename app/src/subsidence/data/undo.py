@@ -8,7 +8,7 @@ from typing import Any
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-from .schema import CurveMetadata, DeviationSurveyModel, FormationTopModel, VisualConfig, WellModel
+from .schema import CurveMetadata, DeviationSurveyModel, FormationStratLink, FormationTopModel, VisualConfig, WellModel
 
 
 class Command(ABC):
@@ -116,6 +116,10 @@ def _capture_well_snapshot(session: Session, project_path: Path | str, well_id: 
     curve_rows = list(session.scalars(select(CurveMetadata).where(CurveMetadata.well_id == well_id)))
     deviation = session.scalar(select(DeviationSurveyModel).where(DeviationSurveyModel.well_id == well_id))
     tops = list(session.scalars(select(FormationTopModel).where(FormationTopModel.well_id == well_id)))
+    top_ids = [t.id for t in tops]
+    links = list(session.scalars(
+        select(FormationStratLink).where(FormationStratLink.formation_id.in_(top_ids))
+    )) if top_ids else []
 
     files: dict[str, bytes] = {}
     relative_paths: set[str] = {row.data_uri for row in curve_rows}
@@ -133,6 +137,7 @@ def _capture_well_snapshot(session: Session, project_path: Path | str, well_id: 
         'curve_metadata': [_model_to_dict(row) for row in curve_rows],
         'deviation': _model_to_dict(deviation) if deviation is not None else None,
         'formation_tops': [_model_to_dict(row) for row in tops],
+        'formation_strat_links': [_model_to_dict(link) for link in links],
         'files': files,
     }
 
@@ -155,6 +160,9 @@ def _restore_well_snapshot(session: Session, project_path: Path | str, snapshot:
         session.add(DeviationSurveyModel(**snapshot['deviation']))
     for row in snapshot['formation_tops']:
         session.add(FormationTopModel(**row))
+    session.flush()
+    for row in snapshot.get('formation_strat_links', []):
+        session.add(FormationStratLink(**row))
 
 
 def _delete_well_snapshot(session: Session, project_path: Path | str, snapshot: dict[str, Any]) -> None:

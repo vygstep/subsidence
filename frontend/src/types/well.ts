@@ -24,6 +24,14 @@ export interface CurveData {
   null_value: number
 }
 
+export interface FormationStratLink {
+  chart_id: number
+  chart_name: string
+  strat_unit_id: number
+  strat_unit_name: string
+  color_hex: string | null
+}
+
 export interface FormationTop {
   id: string
   name: string
@@ -31,11 +39,20 @@ export interface FormationTop {
   age_ma?: number
   color: string
   kind: string
-  strat_color?: string | null
   is_locked: boolean
   lithology?: LithologyType
-  strat_unit_id?: number | null
-  strat_unit_name?: string | null
+  strat_links: FormationStratLink[]
+  active_strat_color: string | null
+  active_strat_unit_name: string | null
+}
+
+export interface StratChartInfo {
+  id: number
+  name: string
+  is_active: boolean
+  unit_count: number
+  imported_at: string
+  source_path: string | null
 }
 
 export interface StratUnitOption {

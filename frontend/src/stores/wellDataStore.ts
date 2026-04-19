@@ -1,6 +1,6 @@
 import { create } from 'zustand'
 
-import type { CurveData, FormationTop, Well } from '@/types'
+import type { CurveData, FormationTop, StratChartInfo, Well } from '@/types'
 
 interface CurveResponse {
   mnemonic: string
@@ -22,11 +22,11 @@ interface FormationResponse {
   age_ma?: number
   color: string
   kind: string
-  strat_color?: string | null
   is_locked: boolean
   lithology?: FormationTop['lithology']
-  strat_unit_id?: number | null
-  strat_unit_name?: string | null
+  strat_links: FormationTop['strat_links']
+  active_strat_color: string | null
+  active_strat_unit_name: string | null
 }
 
 interface FormationCreatePayload {
@@ -47,7 +47,6 @@ interface FormationPatchPayload {
   lithology?: FormationTop['lithology']
   age_ma?: number
   is_locked?: boolean
-  strat_unit_id?: number | null
 }
 
 export interface WellDataStore {
@@ -55,6 +54,7 @@ export interface WellDataStore {
   curves: CurveData[]
   formations: FormationTop[]
   colorOverrides: Record<string, string>
+  stratCharts: StratChartInfo[]
   isLoading: boolean
   error: string | null
   reset: () => void
@@ -64,6 +64,10 @@ export interface WellDataStore {
   updateFormation: (formationId: string, patch: FormationPatchPayload) => Promise<void>
   updateFormationDepth: (formationId: string, depth: number) => Promise<void>
   removeFormation: (formationId: string) => Promise<void>
+  loadStratCharts: () => Promise<void>
+  activateChart: (chartId: number) => Promise<void>
+  deleteChart: (chartId: number) => Promise<void>
+  linkFormationToChart: (formationId: string, chartId: number, stratUnitId: number) => Promise<void>
 }
 
 function toFloat32Array(values: number[]): Float32Array {
@@ -94,11 +98,11 @@ function mapFormation(row: FormationResponse): FormationTop {
     age_ma: row.age_ma,
     color: row.color,
     kind: row.kind,
-    strat_color: row.strat_color,
     is_locked: row.is_locked,
     lithology: row.lithology,
-    strat_unit_id: row.strat_unit_id,
-    strat_unit_name: row.strat_unit_name,
+    strat_links: row.strat_links ?? [],
+    active_strat_color: row.active_strat_color,
+    active_strat_unit_name: row.active_strat_unit_name,
   }
 }
 
@@ -117,6 +121,7 @@ const emptyState = {
   curves: [],
   formations: [],
   colorOverrides: {},
+  stratCharts: [],
   isLoading: false,
   error: null,
 }
@@ -278,6 +283,58 @@ export const useWellDataStore = create<WellDataStore>((set, get) => ({
     set((state) => ({
       formations: state.formations.filter((formation) => formation.id !== formationId),
       error: null,
+    }))
+  },
+  async loadStratCharts() {
+    const response = await fetch('/api/strat-charts')
+    if (!response.ok) return
+    const charts = (await response.json()) as StratChartInfo[]
+    set({ stratCharts: charts })
+  },
+  async activateChart(chartId) {
+    const response = await fetch(`/api/strat-charts/${chartId}/activate`, { method: 'PATCH' })
+    if (!response.ok) return
+    const updated = (await response.json()) as StratChartInfo
+    set((state) => ({
+      stratCharts: state.stratCharts.map((c) => ({
+        ...c,
+        is_active: c.id === updated.id,
+      })),
+    }))
+    // Refresh formations to pick up new active strat colors
+    const wellId = get().well?.well_id
+    if (wellId) {
+      const formations = await fetchFormations(wellId)
+      set({ formations: sortFormations(formations.map(mapFormation)) })
+    }
+  },
+  async deleteChart(chartId) {
+    const response = await fetch(`/api/strat-charts/${chartId}`, { method: 'DELETE' })
+    if (!response.ok) return
+    set((state) => ({ stratCharts: state.stratCharts.filter((c) => c.id !== chartId) }))
+    // Refresh formations
+    const wellId = get().well?.well_id
+    if (wellId) {
+      const formations = await fetchFormations(wellId)
+      set({ formations: sortFormations(formations.map(mapFormation)) })
+    }
+  },
+  async linkFormationToChart(formationId, chartId, stratUnitId) {
+    const wellId = get().well?.well_id
+    if (!wellId) return
+
+    const response = await fetch(`/api/wells/${wellId}/formations/${formationId}/strat-link`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ chart_id: chartId, strat_unit_id: stratUnitId }),
+    })
+    if (!response.ok) return
+
+    const updated = mapFormation((await response.json()) as FormationResponse)
+    set((state) => ({
+      formations: sortFormations(
+        state.formations.map((f) => (f.id === formationId ? updated : f)),
+      ),
     }))
   },
 }))
