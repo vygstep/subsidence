@@ -33,6 +33,18 @@ interface WellViewState {
 
 const TRACK_COLORS = ['#22c55e', '#ef4444', '#2563eb', '#f59e0b', '#8b5cf6', '#0f766e', '#dc2626', '#475569']
 
+async function readError(response: Response, fallback: string): Promise<string> {
+  try {
+    const payload = (await response.json()) as { detail?: string }
+    if (payload.detail) {
+      return payload.detail
+    }
+  } catch {
+    // Ignore non-JSON error payloads.
+  }
+  return fallback
+}
+
 function computeCurveBounds(curve: CurveData): { min: number; max: number } {
   let min = Number.POSITIVE_INFINITY
   let max = Number.NEGATIVE_INFINITY
@@ -408,6 +420,37 @@ function App() {
     await refreshWellList(wellId)
   }
 
+  async function handleDeleteWell(): Promise<void> {
+    if (!well) {
+      return
+    }
+
+    const confirmed = window.confirm(`Delete well "${well.well_name}"?`)
+    if (!confirmed) {
+      return
+    }
+
+    try {
+      const response = await fetch(`/api/projects/wells/${well.well_id}`, {
+        method: 'DELETE',
+      })
+      if (!response.ok) {
+        throw new Error(await readError(response, `Failed to delete well '${well.well_name}' (${response.status})`))
+      }
+
+      setWellViewStates((current) => {
+        const next = { ...current }
+        delete next[well.well_id]
+        return next
+      })
+      setSelectedFormationId(null)
+      selectTrack(null)
+      await refreshWellList()
+    } catch (error) {
+      window.alert(error instanceof Error ? error.message : 'Failed to delete well.')
+    }
+  }
+
   function handleSelectWell(wellId: string): void {
     selectTrack(null)
     void loadWell(wellId)
@@ -778,6 +821,7 @@ function App() {
       <button type="button" className="app-action-button" onClick={() => setActiveDialog('load-las')}>Load logs</button>
       <button type="button" className="app-action-button" onClick={() => setActiveDialog('load-tops')}>Load tops</button>
       <button type="button" className="app-action-button" onClick={() => setActiveDialog('load-deviation')}>Load deviation</button>
+      <button type="button" className="app-action-button" onClick={() => void handleDeleteWell()} disabled={!well}>Delete well</button>
     </>
   )
 

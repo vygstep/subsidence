@@ -107,6 +107,69 @@ def _normalize_config(config: Any) -> str | None:
     return json.dumps(config, sort_keys=True)
 
 
+def _capture_well_snapshot(session: Session, project_path: Path | str, well_id: str) -> dict[str, Any]:
+    project_path = Path(project_path)
+    well = session.get(WellModel, well_id)
+    if well is None:
+        raise ValueError(f'Well not found: {well_id}')
+
+    curve_rows = list(session.scalars(select(CurveMetadata).where(CurveMetadata.well_id == well_id)))
+    deviation = session.scalar(select(DeviationSurveyModel).where(DeviationSurveyModel.well_id == well_id))
+    tops = list(session.scalars(select(FormationTopModel).where(FormationTopModel.well_id == well_id)))
+
+    files: dict[str, bytes] = {}
+    relative_paths: set[str] = {row.data_uri for row in curve_rows}
+    if deviation is not None:
+        relative_paths.add(deviation.data_uri)
+    if well.source_las_path:
+        relative_paths.add(well.source_las_path)
+    for relative_path in relative_paths:
+        file_path = project_path / relative_path
+        if file_path.exists():
+            files[relative_path] = file_path.read_bytes()
+
+    return {
+        'well': _model_to_dict(well),
+        'curve_metadata': [_model_to_dict(row) for row in curve_rows],
+        'deviation': _model_to_dict(deviation) if deviation is not None else None,
+        'formation_tops': [_model_to_dict(row) for row in tops],
+        'files': files,
+    }
+
+
+def _restore_well_snapshot(session: Session, project_path: Path | str, snapshot: dict[str, Any]) -> None:
+    project_path = Path(project_path)
+    if session.get(WellModel, snapshot['well']['id']) is not None:
+        return
+
+    for relative_path, payload in snapshot['files'].items():
+        file_path = project_path / relative_path
+        file_path.parent.mkdir(parents=True, exist_ok=True)
+        file_path.write_bytes(payload)
+
+    session.add(WellModel(**snapshot['well']))
+    session.flush()
+    for row in snapshot['curve_metadata']:
+        session.add(CurveMetadata(**row))
+    if snapshot['deviation'] is not None:
+        session.add(DeviationSurveyModel(**snapshot['deviation']))
+    for row in snapshot['formation_tops']:
+        session.add(FormationTopModel(**row))
+
+
+def _delete_well_snapshot(session: Session, project_path: Path | str, snapshot: dict[str, Any]) -> None:
+    project_path = Path(project_path)
+    well = session.get(WellModel, snapshot['well']['id'])
+    if well is not None:
+        session.delete(well)
+        session.flush()
+
+    for relative_path in snapshot['files']:
+        file_path = project_path / relative_path
+        if file_path.exists():
+            file_path.unlink()
+
+
 class UpdateFormationDepth(Command):
     def __init__(self, top_id: int, old_depth: float, new_depth: float) -> None:
         self.top_id = top_id
@@ -257,59 +320,31 @@ class ImportWell(Command):
     @classmethod
     def capture(cls, session: Session, project_path: Path | str, well_id: str) -> 'ImportWell':
         """Call inside the import transaction after flush, before commit."""
-        project_path = Path(project_path)
-        well = session.get(WellModel, well_id)
-        if well is None:
-            raise ValueError(f'Well not found: {well_id}')
-        curve_rows = list(session.scalars(select(CurveMetadata).where(CurveMetadata.well_id == well_id)))
-        deviation = session.scalar(select(DeviationSurveyModel).where(DeviationSurveyModel.well_id == well_id))
-        tops = list(session.scalars(select(FormationTopModel).where(FormationTopModel.well_id == well_id)))
-
-        files: dict[str, bytes] = {}
-        relative_paths: set[str] = {row.data_uri for row in curve_rows}
-        if deviation is not None:
-            relative_paths.add(deviation.data_uri)
-        if well.source_las_path:
-            relative_paths.add(well.source_las_path)
-        for relative_path in relative_paths:
-            file_path = project_path / relative_path
-            if file_path.exists():
-                files[relative_path] = file_path.read_bytes()
-
-        snapshot = {
-            'well': _model_to_dict(well),
-            'curve_metadata': [_model_to_dict(row) for row in curve_rows],
-            'deviation': _model_to_dict(deviation) if deviation is not None else None,
-            'formation_tops': [_model_to_dict(row) for row in tops],
-            'files': files,
-        }
-        return cls(project_path, snapshot)
+        return cls(project_path, _capture_well_snapshot(session, project_path, well_id))
 
     def apply(self, session: Session) -> None:
         """Restore the well from the pre-captured snapshot.  No-op if already present (first push)."""
-        if session.get(WellModel, self._snapshot['well']['id']) is not None:
-            return
-        for relative_path, payload in self._snapshot['files'].items():
-            file_path = self.project_path / relative_path
-            file_path.parent.mkdir(parents=True, exist_ok=True)
-            file_path.write_bytes(payload)
-        session.add(WellModel(**self._snapshot['well']))
-        session.flush()
-        for row in self._snapshot['curve_metadata']:
-            session.add(CurveMetadata(**row))
-        if self._snapshot['deviation'] is not None:
-            session.add(DeviationSurveyModel(**self._snapshot['deviation']))
-        for row in self._snapshot['formation_tops']:
-            session.add(FormationTopModel(**row))
+        _restore_well_snapshot(session, self.project_path, self._snapshot)
 
     def revert(self, session: Session) -> None:
-        well_id = self._snapshot['well']['id']
-        well = session.get(WellModel, well_id)
-        if well is None:
-            return
-        session.delete(well)
-        session.flush()
-        for relative_path in self._snapshot['files']:
-            file_path = self.project_path / relative_path
-            if file_path.exists():
-                file_path.unlink()
+        _delete_well_snapshot(session, self.project_path, self._snapshot)
+
+
+class RemoveWell(Command):
+    def __init__(self, project_path: Path | str, snapshot: dict[str, Any]) -> None:
+        self.project_path = Path(project_path)
+        self._snapshot = snapshot
+
+    @property
+    def description(self) -> str:
+        return f"Delete well {self._snapshot['well']['name']!r}"
+
+    @classmethod
+    def capture(cls, session: Session, project_path: Path | str, well_id: str) -> 'RemoveWell':
+        return cls(project_path, _capture_well_snapshot(session, project_path, well_id))
+
+    def apply(self, session: Session) -> None:
+        _delete_well_snapshot(session, self.project_path, self._snapshot)
+
+    def revert(self, session: Session) -> None:
+        _restore_well_snapshot(session, self.project_path, self._snapshot)

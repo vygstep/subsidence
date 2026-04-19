@@ -21,6 +21,7 @@ from subsidence.data import (
     DEFAULT_WELL_Y,
     ImportWell,
     ProjectManager,
+    RemoveWell,
     UpdateVisualConfig,
     create_empty_well,
     import_deviation_csv,
@@ -304,6 +305,19 @@ def create_well(payload: CreateWellRequest, request: Request) -> CreateWellRespo
 
     manager.mark_dirty()
     return CreateWellResponse(well_id=row.id, well_name=row.name)
+
+
+@router.delete('/wells/{well_id}', response_model=DictionaryUpdateResponse)
+def delete_well(well_id: str, request: Request) -> DictionaryUpdateResponse:
+    manager = _require_open_project(request)
+    try:
+        with manager.get_session() as session:
+            command = RemoveWell.capture(session, manager.project_path, well_id)
+        manager.execute_command(command)
+        manager.mark_dirty()
+    except ValueError as error:
+        raise HTTPException(status_code=404, detail=str(error)) from error
+    return DictionaryUpdateResponse(status='ok')
 
 
 @router.post('/open', response_model=OpenProjectResponse)
