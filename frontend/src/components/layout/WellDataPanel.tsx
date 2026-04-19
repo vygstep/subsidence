@@ -16,8 +16,13 @@ interface WellDataPanelProps {
   onToggleCurve: (mnemonic: string, nextValue: boolean) => void
   onToggleFormation: (formationId: string, nextValue: boolean) => void
   onToggleAllFormations: (nextValue: boolean) => void
+  onToggleAllCurves: (nextValue: boolean) => void
   onToggleDeviation: (nextValue: boolean) => void
   onSelectFormation: (formationId: string) => void
+  selectedObject: { type: string; [key: string]: unknown } | null
+  onSelectLasGroup: () => void
+  onSelectCurve: (mnemonic: string) => void
+  onSelectTopsGroup: () => void
 }
 
 type ToggleState = 'none' | 'partial' | 'all'
@@ -27,15 +32,6 @@ function formatNumber(value: number | null | undefined): string {
     return '—'
   }
   return Number.isInteger(value) ? String(value) : value.toFixed(2)
-}
-
-function fileLabel(path: string | null | undefined): string {
-  if (!path) {
-    return 'Imported curves'
-  }
-  const normalized = path.replaceAll('\\', '/')
-  const parts = normalized.split('/')
-  return parts[parts.length - 1] || normalized
 }
 
 function topBackgroundColor(formation: FormationTop): string {
@@ -135,8 +131,13 @@ export function WellDataPanel({
   onToggleCurve,
   onToggleFormation,
   onToggleAllFormations,
+  onToggleAllCurves,
   onToggleDeviation,
   onSelectFormation,
+  selectedObject,
+  onSelectLasGroup,
+  onSelectCurve,
+  onSelectTopsGroup,
 }: WellDataPanelProps) {
   const [expandedNodes, setExpandedNodes] = useState<Record<string, boolean>>({})
 
@@ -153,6 +154,16 @@ export function WellDataPanel({
     }
     return 'partial'
   }, [formations.length, visibleFormationIds.length])
+
+  const curvesCheckboxState = useMemo<ToggleState>(() => {
+    if (curves.length === 0 || visibleCurveMnemonics.length === 0) {
+      return 'none'
+    }
+    if (visibleCurveMnemonics.length >= curves.length) {
+      return 'all'
+    }
+    return 'partial'
+  }, [curves.length, visibleCurveMnemonics.length])
 
   function isOpen(nodeId: string): boolean {
     return expandedNodes[nodeId] ?? false
@@ -187,7 +198,7 @@ export function WellDataPanel({
 
           return (
             <div key={item.well_id} className="tree-node tree-node--root">
-              <div className={`tree-node__row tree-node__row--root ${isActive ? 'tree-node__row--active' : ''}`}>
+              <div className={`tree-node__row tree-node__row--root ${isActive ? 'tree-node__row--active' : ''} ${selectedObject?.type === 'well' && selectedObject.wellId === item.well_id ? 'tree-node__row--selected' : ''}`}>
                 <TreeToggleButton isOpen={showDetails} onToggle={() => toggleNode(rootId)} />
                 <input
                   type="radio"
@@ -211,12 +222,12 @@ export function WellDataPanel({
                   ) : (
                     <>
                       <div className="tree-node">
-                        <div className="tree-node__row">
+                        <div className={`tree-node__row ${selectedObject?.type === 'well' && selectedObject.wellId === item.well_id ? 'tree-node__row--selected' : ''}`}>
                           <TreeToggleButton
                             isOpen={isOpen(`${rootId}:metadata`)}
                             onToggle={() => toggleNode(`${rootId}:metadata`)}
                           />
-                          <button type="button" className="tree-node__section-label">
+                          <button type="button" className="tree-node__section-label" onClick={() => onSelectWell(item.well_id)}>
                             Well metadata
                           </button>
                         </div>
@@ -232,42 +243,33 @@ export function WellDataPanel({
                       </div>
 
                       <div className="tree-node">
-                        <div className="tree-node__row">
+                        <div className={`tree-node__row ${selectedObject?.type === 'las-group' && selectedObject.wellId === item.well_id ? 'tree-node__row--selected' : ''}`}>
                           <TreeToggleButton
                             isOpen={isOpen(`${rootId}:las`)}
                             onToggle={() => toggleNode(`${rootId}:las`)}
                           />
-                          <button type="button" className="tree-node__section-label">
+                          <TriStateCheckbox state={curvesCheckboxState} onToggle={onToggleAllCurves} />
+                          <button type="button" className="tree-node__section-label" onClick={onSelectLasGroup}>
                             LAS
                           </button>
                         </div>
                         {isOpen(`${rootId}:las`) ? (
                           <div className="tree-node__children">
                             {hasLas ? (
-                              <div className="tree-node">
-                                <div className="tree-node__row">
-                                  <TreeToggleButton
-                                    isOpen={isOpen(`${rootId}:las:source`)}
-                                    onToggle={() => toggleNode(`${rootId}:las:source`)}
+                              curves.map((curve) => (
+                                <div
+                                  key={curve.mnemonic}
+                                  className={selectedObject?.type === 'curve' && selectedObject.mnemonic === curve.mnemonic ? 'tree-node__item-selected' : ''}
+                                  onClick={() => onSelectCurve(curve.mnemonic)}
+                                >
+                                  <CheckboxLeaf
+                                    checked={visibleCurveMnemonics.includes(curve.mnemonic)}
+                                    label={curve.mnemonic}
+                                    secondary={curve.unit || '—'}
+                                    onChange={(nextValue) => onToggleCurve(curve.mnemonic, nextValue)}
                                   />
-                                  <button type="button" className="tree-node__section-label">
-                                    {fileLabel(well.source_las_path)}
-                                  </button>
                                 </div>
-                                {isOpen(`${rootId}:las:source`) ? (
-                                  <div className="tree-node__children">
-                                    {curves.map((curve) => (
-                                      <CheckboxLeaf
-                                        key={curve.mnemonic}
-                                        checked={visibleCurveMnemonics.includes(curve.mnemonic)}
-                                        label={curve.mnemonic}
-                                        secondary={curve.unit || '—'}
-                                        onChange={(nextValue) => onToggleCurve(curve.mnemonic, nextValue)}
-                                      />
-                                    ))}
-                                  </div>
-                                ) : null}
-                              </div>
+                              ))
                             ) : (
                               <p className="sidebar-panel__empty">No LAS loaded.</p>
                             )}
@@ -276,13 +278,13 @@ export function WellDataPanel({
                       </div>
 
                       <div className="tree-node">
-                        <div className="tree-node__row">
+                        <div className={`tree-node__row ${selectedObject?.type === 'tops-group' && selectedObject.wellId === item.well_id ? 'tree-node__row--selected' : ''}`}>
                           <TreeToggleButton
                             isOpen={isOpen(`${rootId}:tops`)}
                             onToggle={() => toggleNode(`${rootId}:tops`)}
                           />
                           <TriStateCheckbox state={topsCheckboxState} onToggle={onToggleAllFormations} />
-                          <button type="button" className="tree-node__section-label">
+                          <button type="button" className="tree-node__section-label" onClick={onSelectTopsGroup}>
                             TOPS
                           </button>
                         </div>

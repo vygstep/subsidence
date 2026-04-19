@@ -294,7 +294,7 @@ body.is-resizing {
 .tree-node__row {
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: 2px;
   min-height: 30px;
   padding: 3px 0;
 }
@@ -308,14 +308,21 @@ body.is-resizing {
   color: #2563eb;
 }
 
+.tree-node__row--selected {
+  background: #e8f0fe;
+  border-radius: 8px;
+  padding-left: 2px;
+  padding-right: 4px;
+}
+
 .tree-toggle {
   border: 0;
   background: transparent;
   color: #64748b;
   font-size: 0.74rem;
   line-height: 1;
-  width: 18px;
-  height: 18px;
+  width: 14px;
+  height: 14px;
   padding: 0;
   cursor: pointer;
   transform: rotate(0deg);
@@ -336,6 +343,11 @@ body.is-resizing {
   padding: 0;
   cursor: pointer;
   text-align: left;
+}
+
+.tree-node__item-selected {
+  background: #e8f0fe;
+  border-radius: 8px;
 }
 
 .tree-tristate-checkbox {
@@ -1039,6 +1051,11 @@ body.is-resizing {
 .strat-chart-item--active {
   border-color: #2563eb;
   background: rgba(37, 99, 235, 0.08);
+}
+
+.strat-chart-item--selected {
+  outline: 2px solid #2563eb;
+  outline-offset: -1px;
 }
 
 .strat-chart-item__radio-label {

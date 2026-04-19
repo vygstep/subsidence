@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 
 import {
   CreateWellDialog,
@@ -25,6 +25,13 @@ interface WellListItem {
 type DialogKind = 'project-open' | 'project-new' | 'create-well' | 'load-las' | 'load-tops' | 'load-deviation' | 'link-top' | 'load-strat-chart' | null
 type SidebarTab = 'wells' | 'models' | 'strat-charts'
 type ToolbarMode = 'project' | 'strat-chart' | 'wells' | 'tops'
+type SelectedObject =
+  | { type: 'well'; wellId: string }
+  | { type: 'las-group'; wellId: string }
+  | { type: 'curve'; wellId: string; mnemonic: string }
+  | { type: 'tops-group'; wellId: string }
+  | { type: 'top-pick'; wellId: string; formationId: string }
+  | { type: 'strat-chart'; chartId: number }
 
 interface WellViewState {
   tracks: TrackConfig[]
@@ -129,8 +136,18 @@ function App() {
   const [wellViewStates, setWellViewStates] = useState<Record<string, WellViewState>>({})
   const [formationLinkTarget, setFormationLinkTarget] = useState<FormationTop | null>(null)
   const [selectedFormationId, setSelectedFormationId] = useState<string | null>(null)
+  const [selectedObject, setSelectedObject] = useState<SelectedObject | null>(null)
   const [sidebarWidth, setSidebarWidth] = useState(DEFAULT_SIDEBAR_WIDTH)
   const [sidebarTopRatio, setSidebarTopRatio] = useState(DEFAULT_SIDEBAR_TOP_RATIO)
+  const [wellInspectorDraft, setWellInspectorDraft] = useState({
+    well_name: '',
+    x: '',
+    y: '',
+    kb_elev: '',
+    gl_elev: '',
+    td_md: '',
+    crs: '',
+  })
 
   const loadWell = useWellDataStore((state) => state.loadWell)
   const resetWell = useWellDataStore((state) => state.reset)
@@ -461,9 +478,27 @@ function App() {
   }, [formations, selectedFormationId])
 
   useEffect(() => {
+    if (!well) {
+      setSelectedObject(null)
+      return
+    }
+
+    setWellInspectorDraft({
+      well_name: well.well_name,
+      x: String(well.x ?? 0),
+      y: String(well.y ?? 0),
+      kb_elev: String(well.kb_elev ?? 0),
+      gl_elev: String(well.gl_elev ?? 0),
+      td_md: String(well.td_md ?? 0),
+      crs: well.crs ?? '',
+    })
+  }, [well])
+
+  useEffect(() => {
     if (!well?.well_id) {
       selectTrack(null)
       setSelectedFormationId(null)
+      setSelectedObject(null)
       return
     }
 
@@ -474,6 +509,7 @@ function App() {
     ))
     selectTrack(null)
     setSelectedFormationId(null)
+    setSelectedObject({ type: 'well', wellId: well.well_id })
   }, [well?.well_id, selectTrack])
 
   const topbarTitle = !isProjectOpen
@@ -527,7 +563,29 @@ function App() {
 
   function handleSelectWell(wellId: string): void {
     selectTrack(null)
+    setSelectedObject({ type: 'well', wellId })
     void loadWell(wellId)
+  }
+
+  function handleSelectLasGroup(): void {
+    if (!well?.well_id) {
+      return
+    }
+    setSelectedObject({ type: 'las-group', wellId: well.well_id })
+  }
+
+  function handleSelectCurve(mnemonic: string): void {
+    if (!well?.well_id) {
+      return
+    }
+    setSelectedObject({ type: 'curve', wellId: well.well_id, mnemonic })
+  }
+
+  function handleSelectTopsGroup(): void {
+    if (!well?.well_id) {
+      return
+    }
+    setSelectedObject({ type: 'tops-group', wellId: well.well_id })
   }
 
   function handleSetDeviationVisible(nextValue: boolean): void {
@@ -555,7 +613,29 @@ function App() {
 
   function handleSelectFormation(formationId: string): void {
     setSelectedFormationId(formationId)
+    if (well?.well_id) {
+      setSelectedObject({ type: 'top-pick', wellId: well.well_id, formationId })
+    }
     setActiveToolbarMode('tops')
+  }
+
+  function handleToggleAllCurves(nextValue: boolean): void {
+    if (!well?.well_id) {
+      return
+    }
+
+    if (!nextValue) {
+      updateWellViewState(well.well_id, (state) => ({
+        ...state,
+        tracks: [createEmptyTrack()],
+      }))
+      selectTrack(null)
+      return
+    }
+
+    curves.forEach((curve) => {
+      handleToggleCurve(curve.mnemonic, true)
+    })
   }
 
   function handleToggleAllFormations(nextValue: boolean): void {
@@ -783,87 +863,62 @@ function App() {
     })
   }
 
-  const activeTemplateSummary = useMemo(() => {
-    if (!well?.well_id) {
+  const selectedCurveConfig = useMemo(() => {
+    if (selectedObject?.type !== 'curve') {
       return null
     }
+    return activeWellView.tracks.flatMap((track) => track.curves).find((curve) => curve.mnemonic === selectedObject.mnemonic) ?? null
+  }, [activeWellView.tracks, selectedObject])
 
-    return {
-      trackCount: activeWellView.tracks.length,
-      tracks: activeWellView.tracks,
-      hiddenTrackIds: activeWellView.hiddenTrackIds,
-      visibleCurveCount: visibleCurveMnemonics.length,
-      visibleTopCount: visibleFormationIds.length,
-      deviationVisible: activeWellView.deviationVisible,
+  const selectedChart = useMemo(() => {
+    if (selectedObject?.type !== 'strat-chart') {
+      return null
     }
-  }, [activeWellView, visibleCurveMnemonics.length, visibleFormationIds.length, well?.well_id])
+    return stratCharts.find((chart) => chart.id === selectedObject.chartId) ?? null
+  }, [selectedObject, stratCharts])
 
-  function handleToggleTrackHidden(trackId: string): void {
+  async function handleSaveWellInspector(): Promise<void> {
     if (!well?.well_id) {
       return
     }
 
-    updateWellViewState(well.well_id, (state) => {
-      const nextHiddenTrackIds = state.hiddenTrackIds.includes(trackId)
-        ? state.hiddenTrackIds.filter((id) => id !== trackId)
-        : [...state.hiddenTrackIds, trackId]
-      return {
-        ...state,
-        hiddenTrackIds: nextHiddenTrackIds,
-      }
-    })
-
-    if (selectedTrackId === trackId) {
-      selectTrack(null)
+    const payload = {
+      well_name: wellInspectorDraft.well_name.trim(),
+      x: Number(wellInspectorDraft.x),
+      y: Number(wellInspectorDraft.y),
+      kb_elev: Number(wellInspectorDraft.kb_elev),
+      gl_elev: Number(wellInspectorDraft.gl_elev),
+      td_md: Number(wellInspectorDraft.td_md),
+      crs: wellInspectorDraft.crs.trim(),
     }
+
+    const response = await fetch(`/api/wells/${well.well_id}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload),
+    })
+    if (!response.ok) {
+      window.alert(await readError(response, `Failed to update well '${well.well_name}' (${response.status})`))
+      return
+    }
+
+    await refreshWellList(well.well_id)
   }
 
-  function handleMoveTrack(trackId: string, direction: -1 | 1): void {
+  function handleCurveSettingUpdate(mnemonic: string, patch: Partial<TrackConfig['curves'][number]>): void {
     if (!well?.well_id) {
       return
     }
 
-    updateWellViewState(well.well_id, (state) => {
-      const currentIndex = state.tracks.findIndex((track) => track.id === trackId)
-      if (currentIndex < 0) {
-        return state
-      }
-      const nextIndex = currentIndex + direction
-      if (nextIndex < 0 || nextIndex >= state.tracks.length) {
-        return state
-      }
-
-      const nextTracks = [...state.tracks]
-      const [track] = nextTracks.splice(currentIndex, 1)
-      nextTracks.splice(nextIndex, 0, track)
-      return {
-        ...state,
-        tracks: nextTracks,
-      }
-    })
-  }
-
-  function handleRemoveTrack(trackId: string): void {
-    if (!well?.well_id) {
-      return
-    }
-
-    updateWellViewState(well.well_id, (state) => {
-      if (state.tracks.length <= 1) {
-        return state
-      }
-
-      const nextTracks = state.tracks.filter((track) => track.id !== trackId)
-      return {
-        ...state,
-        tracks: nextTracks.length > 0 ? nextTracks : [createEmptyTrack()],
-        hiddenTrackIds: state.hiddenTrackIds.filter((id) => id !== trackId),
-      }
-    })
-
-    if (selectedTrackId === trackId) {
-      selectTrack(null)
-    }
+    updateWellViewState(well.well_id, (state) => ({
+      ...state,
+      tracks: state.tracks.map((track) => ({
+        ...track,
+        curves: track.curves.map((curve) => (
+          curve.mnemonic === mnemonic ? { ...curve, ...patch } : curve
+        )),
+      })),
+    }))
   }
 
   function renderDialog() {
@@ -965,6 +1020,151 @@ function App() {
     </>
   )
 
+  let settingsContent: ReactNode
+  if (!selectedObject) {
+    settingsContent = <p className="sidebar-panel__empty">Select an object in Data Manager to inspect its settings.</p>
+  } else if (selectedObject.type === 'well' && well) {
+    settingsContent = (
+      <div className="template-panel">
+        <div className="template-panel__group">
+          <div className="template-panel__label">Object</div>
+          <div className="template-panel__value">Well settings</div>
+        </div>
+        <label className="project-dialog__field">
+          <span>Well name</span>
+          <input value={wellInspectorDraft.well_name} onChange={(event) => setWellInspectorDraft((current) => ({ ...current, well_name: event.target.value }))} />
+        </label>
+        <div className="project-dialog__grid">
+          <label className="project-dialog__field">
+            <span>X</span>
+            <input value={wellInspectorDraft.x} onChange={(event) => setWellInspectorDraft((current) => ({ ...current, x: event.target.value }))} />
+          </label>
+          <label className="project-dialog__field">
+            <span>Y</span>
+            <input value={wellInspectorDraft.y} onChange={(event) => setWellInspectorDraft((current) => ({ ...current, y: event.target.value }))} />
+          </label>
+          <label className="project-dialog__field">
+            <span>KB</span>
+            <input value={wellInspectorDraft.kb_elev} onChange={(event) => setWellInspectorDraft((current) => ({ ...current, kb_elev: event.target.value }))} />
+          </label>
+          <label className="project-dialog__field">
+            <span>GL</span>
+            <input value={wellInspectorDraft.gl_elev} onChange={(event) => setWellInspectorDraft((current) => ({ ...current, gl_elev: event.target.value }))} />
+          </label>
+          <label className="project-dialog__field">
+            <span>TD</span>
+            <input value={wellInspectorDraft.td_md} onChange={(event) => setWellInspectorDraft((current) => ({ ...current, td_md: event.target.value }))} />
+          </label>
+          <label className="project-dialog__field">
+            <span>CRS</span>
+            <input value={wellInspectorDraft.crs} onChange={(event) => setWellInspectorDraft((current) => ({ ...current, crs: event.target.value }))} />
+          </label>
+        </div>
+        <div className="project-dialog__actions">
+          <button type="button" className="project-dialog__button project-dialog__button--primary" onClick={() => void handleSaveWellInspector()}>
+            Save well
+          </button>
+        </div>
+      </div>
+    )
+  } else if (selectedObject.type === 'las-group' && well) {
+    settingsContent = (
+      <div className="template-panel">
+        <div className="template-panel__group"><div className="template-panel__label">Object</div><div className="template-panel__value">LAS</div></div>
+        <div className="tree-leaf"><span>Source</span><span>{well.source_las_path ?? 'unset'}</span></div>
+        <div className="tree-leaf"><span>Curves</span><span>{curves.length}</span></div>
+        <div className="tree-leaf"><span>Visible</span><span>{visibleCurveMnemonics.length}</span></div>
+        <div className="tree-leaf"><span>Depth range</span><span>{minDepth.toFixed(1)} – {maxDepth.toFixed(1)}</span></div>
+      </div>
+    )
+  } else if (selectedObject.type === 'curve' && selectedCurveConfig) {
+    settingsContent = (
+      <div className="template-panel">
+        <div className="template-panel__group"><div className="template-panel__label">Curve</div><div className="template-panel__value">{selectedCurveConfig.mnemonic}</div></div>
+        <div className="tree-leaf"><span>Unit</span><span>{selectedCurveConfig.unit || '—'}</span></div>
+        <label className="project-dialog__field">
+          <span>Color</span>
+          <input type="color" value={selectedCurveConfig.color} onChange={(event) => handleCurveSettingUpdate(selectedCurveConfig.mnemonic, { color: event.target.value })} />
+        </label>
+        <div className="project-dialog__grid">
+          <label className="project-dialog__field">
+            <span>Min</span>
+            <input value={selectedCurveConfig.scaleMin} onChange={(event) => handleCurveSettingUpdate(selectedCurveConfig.mnemonic, { scaleMin: Number(event.target.value) })} />
+          </label>
+          <label className="project-dialog__field">
+            <span>Max</span>
+            <input value={selectedCurveConfig.scaleMax} onChange={(event) => handleCurveSettingUpdate(selectedCurveConfig.mnemonic, { scaleMax: Number(event.target.value) })} />
+          </label>
+          <label className="project-dialog__field">
+            <span>Line width</span>
+            <input value={selectedCurveConfig.lineWidth} onChange={(event) => handleCurveSettingUpdate(selectedCurveConfig.mnemonic, { lineWidth: Number(event.target.value) })} />
+          </label>
+          <label className="project-dialog__field">
+            <span>Line style</span>
+            <select value={selectedCurveConfig.lineStyle} onChange={(event) => handleCurveSettingUpdate(selectedCurveConfig.mnemonic, { lineStyle: event.target.value as TrackConfig['curves'][number]['lineStyle'] })}>
+              <option value="solid">Solid</option>
+              <option value="dashed">Dashed</option>
+              <option value="dotted">Dotted</option>
+            </select>
+          </label>
+        </div>
+      </div>
+    )
+  } else if (selectedObject.type === 'tops-group') {
+    settingsContent = (
+      <div className="template-panel">
+        <div className="template-panel__group"><div className="template-panel__label">Object</div><div className="template-panel__value">TOPS</div></div>
+        <div className="tree-leaf"><span>Total picks</span><span>{formations.length}</span></div>
+        <div className="tree-leaf"><span>Visible picks</span><span>{visibleFormationIds.length}</span></div>
+        <div className="tree-leaf"><span>Linked picks</span><span>{formations.filter((formation) => Boolean(formation.active_strat_unit_name)).length}</span></div>
+      </div>
+    )
+  } else if (selectedObject.type === 'top-pick' && selectedFormation) {
+    settingsContent = (
+      <div className="template-panel">
+        <div className="template-panel__group"><div className="template-panel__label">Top</div><div className="template-panel__value">{selectedFormation.name}</div></div>
+        <label className="project-dialog__field">
+          <span>Name</span>
+          <input value={selectedFormation.name} onChange={(event) => void updateFormation(selectedFormation.id, { name: event.target.value })} />
+        </label>
+        <div className="project-dialog__grid">
+          <label className="project-dialog__field">
+            <span>Depth</span>
+            <input value={selectedFormation.depth_md} onChange={(event) => handleMoveFormation(selectedFormation.id, Number(event.target.value))} />
+          </label>
+          <label className="project-dialog__field">
+            <span>Age</span>
+            <input value={selectedFormation.age_ma ?? ''} onChange={(event) => void updateFormation(selectedFormation.id, { age_ma: event.target.value ? Number(event.target.value) : undefined })} />
+          </label>
+          <label className="project-dialog__field">
+            <span>Type</span>
+            <select value={selectedFormation.kind} onChange={(event) => void updateFormation(selectedFormation.id, { kind: event.target.value })}>
+              <option value="strat">strat</option>
+              <option value="unconformity">unconformity</option>
+            </select>
+          </label>
+          <label className="project-dialog__field">
+            <span>Color</span>
+            <input type="color" value={selectedFormation.color} onChange={(event) => void updateFormation(selectedFormation.id, { color: event.target.value })} />
+          </label>
+        </div>
+        <div className="tree-leaf"><span>Linked unit</span><span>{selectedFormation.active_strat_unit_name ?? 'Unlinked'}</span></div>
+      </div>
+    )
+  } else if (selectedObject.type === 'strat-chart' && selectedChart) {
+    settingsContent = (
+      <div className="template-panel">
+        <div className="template-panel__group"><div className="template-panel__label">Chart</div><div className="template-panel__value">{selectedChart.name}</div></div>
+        <div className="tree-leaf"><span>Units</span><span>{selectedChart.unit_count}</span></div>
+        <div className="tree-leaf"><span>Imported at</span><span>{new Date(selectedChart.imported_at).toLocaleString()}</span></div>
+        <div className="tree-leaf"><span>Source</span><span>{selectedChart.source_path ?? 'unset'}</span></div>
+        <div className="tree-leaf"><span>State</span><span>{selectedChart.is_active ? 'Active' : 'Inactive'}</span></div>
+      </div>
+    )
+  } else {
+    settingsContent = <p className="sidebar-panel__empty">Select an object in Data Manager to inspect its settings.</p>
+  }
+
   return (
     <div className="app-layout">
       <header className="app-topbar">
@@ -1047,6 +1247,8 @@ function App() {
                     charts={stratCharts}
                     onActivate={(chartId) => void activateChart(chartId)}
                     onDelete={(chartId) => void deleteChart(chartId)}
+                    selectedChartId={selectedObject?.type === 'strat-chart' ? selectedObject.chartId : null}
+                    onSelect={(chartId) => setSelectedObject({ type: 'strat-chart', chartId })}
                   />
                 ) : activeSidebarTab === 'wells' ? (
                   <WellDataPanel
@@ -1063,8 +1265,13 @@ function App() {
                     onToggleCurve={handleToggleCurve}
                     onToggleFormation={handleToggleFormation}
                     onToggleAllFormations={handleToggleAllFormations}
+                    onToggleAllCurves={handleToggleAllCurves}
                     onToggleDeviation={handleSetDeviationVisible}
                     onSelectFormation={handleSelectFormation}
+                    selectedObject={selectedObject}
+                    onSelectLasGroup={handleSelectLasGroup}
+                    onSelectCurve={handleSelectCurve}
+                    onSelectTopsGroup={handleSelectTopsGroup}
                   />
                 ) : (
                   <div className="sidebar-panel__body">
@@ -1088,88 +1295,7 @@ function App() {
                 <header className="sidebar-panel__header">
                   <h2 className="sidebar-panel__title">Settings</h2>
                 </header>
-                <div className="sidebar-panel__body">
-                  {well && activeTemplateSummary ? (
-                    <div className="template-panel">
-                      <div className="template-panel__group">
-                        <div className="template-panel__label">Well</div>
-                        <div className="template-panel__value">{well.well_name}</div>
-                      </div>
-                      <div className="template-panel__group">
-                        <div className="template-panel__label">Tracks</div>
-                        <div className="template-panel__value">{activeTemplateSummary.trackCount}</div>
-                      </div>
-                      <div className="template-panel__group">
-                        <div className="template-panel__label">Visible curves</div>
-                        <div className="template-panel__value">{activeTemplateSummary.visibleCurveCount}</div>
-                      </div>
-                      <div className="template-panel__group">
-                        <div className="template-panel__label">Visible tops</div>
-                        <div className="template-panel__value">{activeTemplateSummary.visibleTopCount}</div>
-                      </div>
-                      <div className="template-panel__group">
-                        <div className="template-panel__label">Deviation</div>
-                        <div className="template-panel__value">{activeTemplateSummary.deviationVisible ? 'Visible' : 'Hidden'}</div>
-                      </div>
-                      <div className="template-panel__tracks">
-                        {activeTemplateSummary.tracks.map((track, index) => (
-                          <div key={track.id} className="template-track-card">
-                            <div className="template-track-card__header">
-                              <div className="template-track-card__title">{track.title}</div>
-                              <div className="template-track-card__actions">
-                                <button
-                                  type="button"
-                                  className="template-track-card__button"
-                                  onClick={() => handleMoveTrack(track.id, -1)}
-                                  disabled={index === 0}
-                                >
-                                  ↑
-                                </button>
-                                <button
-                                  type="button"
-                                  className="template-track-card__button"
-                                  onClick={() => handleMoveTrack(track.id, 1)}
-                                  disabled={index === activeTemplateSummary.tracks.length - 1}
-                                >
-                                  ↓
-                                </button>
-                                <button
-                                  type="button"
-                                  className="template-track-card__button"
-                                  onClick={() => handleToggleTrackHidden(track.id)}
-                                >
-                                  {activeTemplateSummary.hiddenTrackIds.includes(track.id) ? 'Show' : 'Hide'}
-                                </button>
-                                <button
-                                  type="button"
-                                  className="template-track-card__button"
-                                  onClick={() => handleRemoveTrack(track.id)}
-                                  disabled={activeTemplateSummary.tracks.length <= 1}
-                                >
-                                  Remove
-                                </button>
-                              </div>
-                            </div>
-                            {track.curves.length > 0 ? (
-                              <div className="template-track-card__curves">
-                                {track.curves.map((curve) => (
-                                  <span key={curve.mnemonic} className="template-track-card__curve">{curve.mnemonic}</span>
-                                ))}
-                              </div>
-                            ) : (
-                              <div className="template-track-card__empty">Empty track</div>
-                            )}
-                            {activeTemplateSummary.hiddenTrackIds.includes(track.id) && (
-                              <div className="template-track-card__status">Hidden in viewer</div>
-                            )}
-                          </div>
-                        ))}
-                      </div>
-                    </div>
-                  ) : (
-                    <p className="sidebar-panel__empty">Load a well to inspect per-well track settings.</p>
-                  )}
-                </div>
+                <div className="sidebar-panel__body">{settingsContent}</div>
               </section>
             </aside>
 

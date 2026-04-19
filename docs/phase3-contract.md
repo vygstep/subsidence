@@ -608,6 +608,39 @@ iteration is:
     - disclosure toggles are separate from selection controls
     - well activation does not auto-expand a well
 
+15. `Data Manager` is also an object browser:
+    - object rows are selectable independently from radio / checkbox controls
+    - selected rows are highlighted like selected folders/items in a file explorer
+    - the `Settings` zone acts as an inspector for the currently selected object
+
+16. The `LAS` tree is flattened:
+    - the intermediate source filename node is removed
+    - the `LAS` node itself owns the group checkbox
+    - curve leaves render directly under `LAS`
+
+17. `LAS` group checkbox uses tri-state behavior:
+    - empty = no curves from this LAS are visible
+    - gray/indeterminate = only part of the LAS curve set is visible
+    - checked = all LAS curves are visible
+
+18. Spacing between disclosure triangle and selection controls in `Data Manager` must be compact and significantly smaller than the current default tree spacing.
+
+19. `Settings` must render typed inspectors, not only generic summary cards. First-class object types are:
+    - `well`
+    - `las_group`
+    - `curve`
+    - `tops_group`
+    - `top_pick`
+    - `strat_chart`
+
+20. Expected `Settings` content by object type:
+    - `well`: editable metadata (`Well name`, `X`, `Y`, `KB`, `GL`, `TD`, `CRS`)
+    - `las_group`: source path and LAS-level statistics
+    - `curve`: curve-level visual settings and scale settings
+    - `tops_group`: group-level statistics and visibility summary
+    - `top_pick`: editable pick metadata (`name`, `depth`, `age`, `type`, `color`, linked unit)
+    - `strat_chart`: chart statistics only for now
+
 These rules supersede the current temporary assumption that the viewer always opens with the same
 default GR / resistivity / porosity track template.
 

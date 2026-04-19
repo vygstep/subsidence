@@ -60,6 +60,16 @@ class WellResponse(BaseModel):
     formations: list[FormationResponse]
 
 
+class WellPatchRequest(BaseModel):
+    well_name: str | None = None
+    kb_elev: float | None = None
+    gl_elev: float | None = None
+    td_md: float | None = None
+    x: float | None = None
+    y: float | None = None
+    crs: str | None = None
+
+
 
 def _manager(request: Request):
     return request.app.state.project_manager
@@ -181,3 +191,35 @@ def get_well(well_id: str, request: Request) -> WellResponse:
             curves=curves,
             formations=formations,
         )
+
+
+@router.patch('/wells/{well_id}', response_model=WellResponse)
+def patch_well(well_id: str, payload: WellPatchRequest, request: Request) -> WellResponse:
+    manager = _require_open_project(request)
+    with manager.get_session() as session:
+        well = session.get(WellModel, well_id)
+        if well is None:
+            raise HTTPException(status_code=404, detail=f'Well not found: {well_id}')
+
+        if payload.well_name is not None:
+            next_name = payload.well_name.strip()
+            if not next_name:
+                raise HTTPException(status_code=400, detail='Well name cannot be empty')
+            well.name = next_name
+        if payload.kb_elev is not None:
+            well.kb_elev = payload.kb_elev
+        if payload.gl_elev is not None:
+            well.gl_elev = payload.gl_elev
+        if payload.td_md is not None:
+            well.td_md = payload.td_md
+        if payload.x is not None:
+            well.lon = payload.x
+        if payload.y is not None:
+            well.lat = payload.y
+        if payload.crs is not None:
+            well.crs = payload.crs
+
+        session.commit()
+
+    manager.mark_dirty()
+    return get_well(well_id, request)
