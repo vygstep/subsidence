@@ -432,6 +432,68 @@ This panel must live specifically in the left-side `Well Data` window. A second 
 `Subsidence Models` should be reserved below it for future work; placeholder content is acceptable
 for now.
 
+**Data Manager and track interaction contract**
+
+The current implementation still contains a temporary top-level well selector and hardcoded default
+tracks in the frontend. That is a transitional scaffold only. The product contract for the next UI
+iteration is:
+
+1. Remove the top-level `Well selector` from the header once the left-side data tree is able to
+   switch wells directly.
+
+2. The `Wells` tab in the left sidebar must show **all wells in the open project**, not only the
+   currently active well. The tree becomes project-wide:
+
+   ```text
+   Wells
+   ├── Well A
+   │   ├── Well metadata
+   │   ├── LAS
+   │   ├── TOPS
+   │   └── DEV
+   └── Well B
+       ├── Well metadata
+       ├── LAS
+       ├── TOPS
+       └── DEV
+   ```
+
+3. Objects in `Data Manager` must be clickable:
+   - clicking a well root makes that well active
+   - clicking a data object selects that object as the source for the next placement action
+   - active well and active object must have visible UI highlighting
+
+4. Tracks must stop being driven by hardcoded template content. In particular, no curves such as
+   `ILD` may appear unless they are actually loaded in the active project/well. All placeholder
+   or scaffold-only data renderers must be removed as the real data-manager flow comes online.
+
+5. Track rendering becomes **loaded-data-only**:
+   - only data that exist in the active well may be rendered
+   - if the active well has no loaded data, the viewer still renders:
+     - the `Depth` track
+     - one empty data track named `Track 1`
+
+6. Data placement flow:
+   - the user may select a target track first
+   - if a track is selected, importing or assigning LAS/deviation data attaches them to that track
+   - if no track is selected, importing or assigning data creates a new track
+   - formation tops are well-local picks by default
+   - the UI must provide an optional `Link to strat chart` action so a pick can be linked to the
+     main stratigraphic chart later
+
+7. Track lifecycle operations must be supported by the UI contract:
+   - select track
+   - reorder tracks
+   - hide / remove track
+
+8. Formation-top operations must be supported by the UI contract:
+   - create top
+   - delete top
+   - move top
+
+These rules supersede the current temporary assumption that the viewer always opens with the same
+default GR / resistivity / porosity track template.
+
 **Acceptance criteria:** Starting from a freshly created project, the user can use only the
 frontend to:
 
