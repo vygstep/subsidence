@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 
 import {
   CreateWellDialog,
@@ -10,6 +10,7 @@ import {
   LoadStratChartDialog,
   LogViewPanel,
   NewProjectDialog,
+  SettingsInspector,
   StratChartTab,
   WellDataPanel,
   ZoomControl,
@@ -891,6 +892,16 @@ function App() {
     await refreshWellInventories(well.well_id)
   }
 
+  function handleWellInspectorDraftChange(
+    field: keyof typeof wellInspectorDraft,
+    value: string,
+  ): void {
+    setWellInspectorDraft((current) => ({
+      ...current,
+      [field]: value,
+    }))
+  }
+
   function handleCurveSettingUpdate(mnemonic: string, patch: Partial<TrackConfig['curves'][number]>): void {
     if (!well?.well_id) {
       return
@@ -1006,150 +1017,28 @@ function App() {
     </>
   )
 
-  let settingsContent: ReactNode
-  if (!selectedObject) {
-    settingsContent = <p className="sidebar-panel__empty">Select an object in Data Manager to inspect its settings.</p>
-  } else if (selectedObject.type === 'well' && well) {
-    settingsContent = (
-      <div className="template-panel">
-        <div className="template-panel__group">
-          <div className="template-panel__label">Object</div>
-          <div className="template-panel__value">Well settings</div>
-        </div>
-        <label className="project-dialog__field">
-          <span>Well name</span>
-          <input value={wellInspectorDraft.well_name} onChange={(event) => setWellInspectorDraft((current) => ({ ...current, well_name: event.target.value }))} />
-        </label>
-        <div className="project-dialog__grid">
-          <label className="project-dialog__field">
-            <span>X</span>
-            <input value={wellInspectorDraft.x} onChange={(event) => setWellInspectorDraft((current) => ({ ...current, x: event.target.value }))} />
-          </label>
-          <label className="project-dialog__field">
-            <span>Y</span>
-            <input value={wellInspectorDraft.y} onChange={(event) => setWellInspectorDraft((current) => ({ ...current, y: event.target.value }))} />
-          </label>
-          <label className="project-dialog__field">
-            <span>KB</span>
-            <input value={wellInspectorDraft.kb_elev} onChange={(event) => setWellInspectorDraft((current) => ({ ...current, kb_elev: event.target.value }))} />
-          </label>
-          <label className="project-dialog__field">
-            <span>GL</span>
-            <input value={wellInspectorDraft.gl_elev} onChange={(event) => setWellInspectorDraft((current) => ({ ...current, gl_elev: event.target.value }))} />
-          </label>
-          <label className="project-dialog__field">
-            <span>TD</span>
-            <input value={wellInspectorDraft.td_md} onChange={(event) => setWellInspectorDraft((current) => ({ ...current, td_md: event.target.value }))} />
-          </label>
-          <label className="project-dialog__field">
-            <span>CRS</span>
-            <input value={wellInspectorDraft.crs} onChange={(event) => setWellInspectorDraft((current) => ({ ...current, crs: event.target.value }))} />
-          </label>
-        </div>
-        <div className="project-dialog__actions">
-          <button type="button" className="project-dialog__button project-dialog__button--primary" onClick={() => void handleSaveWellInspector()}>
-            Save well
-          </button>
-        </div>
-      </div>
-    )
-  } else if (selectedObject.type === 'las-group' && well) {
-    settingsContent = (
-      <div className="template-panel">
-        <div className="template-panel__group"><div className="template-panel__label">Object</div><div className="template-panel__value">LAS</div></div>
-        <div className="tree-leaf"><span>Source</span><span>{well.source_las_path ?? 'unset'}</span></div>
-        <div className="tree-leaf"><span>Curves</span><span>{curves.length}</span></div>
-        <div className="tree-leaf"><span>Visible</span><span>{visibleCurveMnemonics.length}</span></div>
-        <div className="tree-leaf"><span>Depth range</span><span>{minDepth.toFixed(1)} – {maxDepth.toFixed(1)}</span></div>
-      </div>
-    )
-  } else if (selectedObject.type === 'curve' && selectedCurveConfig) {
-    settingsContent = (
-      <div className="template-panel">
-        <div className="template-panel__group"><div className="template-panel__label">Curve</div><div className="template-panel__value">{selectedCurveConfig.mnemonic}</div></div>
-        <div className="tree-leaf"><span>Unit</span><span>{selectedCurveConfig.unit || '—'}</span></div>
-        <label className="project-dialog__field">
-          <span>Color</span>
-          <input type="color" value={selectedCurveConfig.color} onChange={(event) => handleCurveSettingUpdate(selectedCurveConfig.mnemonic, { color: event.target.value })} />
-        </label>
-        <div className="project-dialog__grid">
-          <label className="project-dialog__field">
-            <span>Min</span>
-            <input value={selectedCurveConfig.scaleMin} onChange={(event) => handleCurveSettingUpdate(selectedCurveConfig.mnemonic, { scaleMin: Number(event.target.value) })} />
-          </label>
-          <label className="project-dialog__field">
-            <span>Max</span>
-            <input value={selectedCurveConfig.scaleMax} onChange={(event) => handleCurveSettingUpdate(selectedCurveConfig.mnemonic, { scaleMax: Number(event.target.value) })} />
-          </label>
-          <label className="project-dialog__field">
-            <span>Line width</span>
-            <input value={selectedCurveConfig.lineWidth} onChange={(event) => handleCurveSettingUpdate(selectedCurveConfig.mnemonic, { lineWidth: Number(event.target.value) })} />
-          </label>
-          <label className="project-dialog__field">
-            <span>Line style</span>
-            <select value={selectedCurveConfig.lineStyle} onChange={(event) => handleCurveSettingUpdate(selectedCurveConfig.mnemonic, { lineStyle: event.target.value as TrackConfig['curves'][number]['lineStyle'] })}>
-              <option value="solid">Solid</option>
-              <option value="dashed">Dashed</option>
-              <option value="dotted">Dotted</option>
-            </select>
-          </label>
-        </div>
-      </div>
-    )
-  } else if (selectedObject.type === 'tops-group') {
-    settingsContent = (
-      <div className="template-panel">
-        <div className="template-panel__group"><div className="template-panel__label">Object</div><div className="template-panel__value">TOPS</div></div>
-        <div className="tree-leaf"><span>Total picks</span><span>{formations.length}</span></div>
-        <div className="tree-leaf"><span>Visible picks</span><span>{visibleFormationIds.length}</span></div>
-        <div className="tree-leaf"><span>Linked picks</span><span>{formations.filter((formation) => Boolean(formation.active_strat_unit_name)).length}</span></div>
-      </div>
-    )
-  } else if (selectedObject.type === 'top-pick' && selectedFormation) {
-    settingsContent = (
-      <div className="template-panel">
-        <div className="template-panel__group"><div className="template-panel__label">Top</div><div className="template-panel__value">{selectedFormation.name}</div></div>
-        <label className="project-dialog__field">
-          <span>Name</span>
-          <input value={selectedFormation.name} onChange={(event) => void updateFormation(selectedFormation.id, { name: event.target.value })} />
-        </label>
-        <div className="project-dialog__grid">
-          <label className="project-dialog__field">
-            <span>Depth</span>
-            <input value={selectedFormation.depth_md} onChange={(event) => handleMoveFormation(selectedFormation.id, Number(event.target.value))} />
-          </label>
-          <label className="project-dialog__field">
-            <span>Age</span>
-            <input value={selectedFormation.age_ma ?? ''} onChange={(event) => void updateFormation(selectedFormation.id, { age_ma: event.target.value ? Number(event.target.value) : undefined })} />
-          </label>
-          <label className="project-dialog__field">
-            <span>Type</span>
-            <select value={selectedFormation.kind} onChange={(event) => void updateFormation(selectedFormation.id, { kind: event.target.value })}>
-              <option value="strat">strat</option>
-              <option value="unconformity">unconformity</option>
-            </select>
-          </label>
-          <label className="project-dialog__field">
-            <span>Color</span>
-            <input type="color" value={selectedFormation.color} onChange={(event) => void updateFormation(selectedFormation.id, { color: event.target.value })} />
-          </label>
-        </div>
-        <div className="tree-leaf"><span>Linked unit</span><span>{selectedFormation.active_strat_unit_name ?? 'Unlinked'}</span></div>
-      </div>
-    )
-  } else if (selectedObject.type === 'strat-chart' && selectedChart) {
-    settingsContent = (
-      <div className="template-panel">
-        <div className="template-panel__group"><div className="template-panel__label">Chart</div><div className="template-panel__value">{selectedChart.name}</div></div>
-        <div className="tree-leaf"><span>Units</span><span>{selectedChart.unit_count}</span></div>
-        <div className="tree-leaf"><span>Imported at</span><span>{new Date(selectedChart.imported_at).toLocaleString()}</span></div>
-        <div className="tree-leaf"><span>Source</span><span>{selectedChart.source_path ?? 'unset'}</span></div>
-        <div className="tree-leaf"><span>State</span><span>{selectedChart.is_active ? 'Active' : 'Inactive'}</span></div>
-      </div>
-    )
-  } else {
-    settingsContent = <p className="sidebar-panel__empty">Select an object in Data Manager to inspect its settings.</p>
-  }
+  const settingsContent = (
+    <SettingsInspector
+      selectedObject={selectedObject}
+      well={well}
+      wellInspectorDraft={wellInspectorDraft}
+      onWellInspectorDraftChange={handleWellInspectorDraftChange}
+      onSaveWellInspector={handleSaveWellInspector}
+      selectedCurveConfig={selectedCurveConfig}
+      onCurveSettingUpdate={handleCurveSettingUpdate}
+      formations={formations}
+      visibleFormationIds={visibleFormationIds}
+      selectedFormation={selectedFormation}
+      onFormationUpdate={(formationId, patch) => void updateFormation(formationId, patch)}
+      onFormationMove={handleMoveFormation}
+      selectedChart={selectedChart}
+      curveCount={curves.length}
+      visibleCurveCount={visibleCurveMnemonics.length}
+      minDepth={minDepth}
+      maxDepth={maxDepth}
+    />
+  )
+
 
   return (
     <div className="app-layout">
