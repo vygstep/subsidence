@@ -468,10 +468,15 @@ iteration is:
    or scaffold-only data renderers must be removed as the real data-manager flow comes online.
 
 5. Track rendering becomes **loaded-data-only**:
-   - only data that exist in the active well may be rendered
-   - if the active well has no loaded data, the viewer still renders:
+   - loaded project data appear in `Data Manager`, not automatically in the viewer
+   - by default, the viewer renders only:
      - the `Depth` track
      - one empty data track named `Track 1`
+   - if the active well has no loaded data, the same default layout remains:
+     - the `Depth` track
+     - one empty data track named `Track 1`
+   - curves, deviation data, and other loadable objects must be added to tracks explicitly by the
+     user; they are not auto-mounted into the viewer on load
 
 6. Data placement flow:
    - the user may select a target track first
