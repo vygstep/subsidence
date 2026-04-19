@@ -17,11 +17,6 @@ import {
 import { useProjectStore, useViewStore, useWellDataStore } from '@/stores'
 import type { CurveData, FormationTop, TrackConfig } from '@/types'
 
-interface WellListItem {
-  well_id: string
-  well_name: string
-}
-
 type DialogKind = 'project-open' | 'project-new' | 'create-well' | 'load-las' | 'load-tops' | 'load-deviation' | 'link-top' | 'load-strat-chart' | null
 type SidebarTab = 'wells' | 'models' | 'strat-charts'
 type ToolbarMode = 'project' | 'strat-chart' | 'wells' | 'tops'
@@ -120,19 +115,10 @@ function createCurveConfig(curve: CurveData, index: number): TrackConfig['curves
   }
 }
 
-async function fetchWellList(): Promise<WellListItem[]> {
-  const response = await fetch('/api/wells')
-  if (!response.ok) {
-    throw new Error(`Failed to list wells (${response.status})`)
-  }
-  return (await response.json()) as WellListItem[]
-}
-
 function App() {
   const [activeDialog, setActiveDialog] = useState<DialogKind>('project-open')
   const [activeSidebarTab, setActiveSidebarTab] = useState<SidebarTab>('wells')
   const [activeToolbarMode, setActiveToolbarMode] = useState<ToolbarMode>('project')
-  const [wellOptions, setWellOptions] = useState<WellListItem[]>([])
   const [wellViewStates, setWellViewStates] = useState<Record<string, WellViewState>>({})
   const [formationLinkTarget, setFormationLinkTarget] = useState<FormationTop | null>(null)
   const [selectedFormationId, setSelectedFormationId] = useState<string | null>(null)
@@ -150,6 +136,7 @@ function App() {
   })
 
   const loadWell = useWellDataStore((state) => state.loadWell)
+  const loadWellInventories = useWellDataStore((state) => state.loadWellInventories)
   const resetWell = useWellDataStore((state) => state.reset)
   const addFormation = useWellDataStore((state) => state.addFormation)
   const updateFormation = useWellDataStore((state) => state.updateFormation)
@@ -160,6 +147,7 @@ function App() {
   const activateChart = useWellDataStore((state) => state.activateChart)
   const deleteChart = useWellDataStore((state) => state.deleteChart)
   const stratCharts = useWellDataStore((state) => state.stratCharts)
+  const wellInventories = useWellDataStore((state) => state.wellInventories)
   const well = useWellDataStore((state) => state.well)
   const curves = useWellDataStore((state) => state.curves)
   const formations = useWellDataStore((state) => state.formations)
@@ -201,9 +189,14 @@ function App() {
     }))
   }
 
-  async function refreshWellList(preferredWellId?: string): Promise<void> {
-    const wells = await fetchWellList()
-    setWellOptions(wells)
+  const wellOptions = useMemo(
+    () => wellInventories.map((item) => ({ well_id: item.well_id, well_name: item.well_name })),
+    [wellInventories],
+  )
+
+  async function refreshWellInventories(preferredWellId?: string): Promise<void> {
+    await loadWellInventories()
+    const wells = useWellDataStore.getState().wellInventories
 
     if (wells.length === 0) {
       resetWell()
@@ -233,7 +226,6 @@ function App() {
 
   useEffect(() => {
     if (!isProjectOpen) {
-      setWellOptions([])
       setActiveToolbarMode('project')
       if (activeDialog === null) {
         setActiveDialog('project-open')
@@ -356,12 +348,12 @@ function App() {
     const loadCurrentProject = async () => {
       try {
         const projectChanged = lastProjectPathRef.current !== projectPath
-        const wells = await fetchWellList()
+        await loadWellInventories()
+        const wells = useWellDataStore.getState().wellInventories
         if (cancelled) {
           return
         }
         lastProjectPathRef.current = projectPath
-        setWellOptions(wells)
         if (wells.length === 0) {
           resetWell()
           return
@@ -379,7 +371,6 @@ function App() {
         }
       } catch {
         if (!cancelled) {
-          setWellOptions([])
           resetWell()
         }
       }
@@ -389,7 +380,7 @@ function App() {
     return () => {
       cancelled = true
     }
-  }, [isProjectOpen, projectPath, loadWell, resetWell, selectTrack, well])
+  }, [isProjectOpen, projectPath, loadWell, loadWellInventories, resetWell, selectTrack, well])
 
   useEffect(() => {
     const onKeyDown = (event: KeyboardEvent) => {
@@ -465,7 +456,31 @@ function App() {
     Array.from(new Set(activeWellView.tracks.flatMap((track) => track.curves.map((curve) => curve.mnemonic))))
   ), [activeWellView.tracks])
 
+  const visibleCurveMnemonicsByWellId = useMemo(
+    () => Object.fromEntries(
+      Object.entries(wellViewStates).map(([wellId, state]) => [
+        wellId,
+        Array.from(new Set(state.tracks.flatMap((track) => track.curves.map((curve) => curve.mnemonic)))),
+      ]),
+    ),
+    [wellViewStates],
+  )
+
   const visibleFormationIds = activeWellView.visibleFormationIds
+
+  const visibleFormationIdsByWellId = useMemo(
+    () => Object.fromEntries(
+      Object.entries(wellViewStates).map(([wellId, state]) => [wellId, state.visibleFormationIds]),
+    ),
+    [wellViewStates],
+  )
+
+  const deviationVisibilityByWellId = useMemo(
+    () => Object.fromEntries(
+      Object.entries(wellViewStates).map(([wellId, state]) => [wellId, state.deviationVisible]),
+    ),
+    [wellViewStates],
+  )
 
   const visibleFormations = useMemo(() => (
     formations.filter((formation) => visibleFormationIds.includes(formation.id))
@@ -512,6 +527,23 @@ function App() {
     setSelectedObject({ type: 'well', wellId: well.well_id })
   }, [well?.well_id, selectTrack])
 
+  useEffect(() => {
+    if (wellInventories.length === 0) {
+      return
+    }
+    setWellViewStates((current) => {
+      let changed = false
+      const next = { ...current }
+      for (const inventory of wellInventories) {
+        if (!next[inventory.well_id]) {
+          next[inventory.well_id] = createDefaultWellView()
+          changed = true
+        }
+      }
+      return changed ? next : current
+    })
+  }, [wellInventories])
+
   const topbarTitle = !isProjectOpen
     ? 'No project open'
     : isLoading
@@ -522,12 +554,11 @@ function App() {
 
   async function handleProjectClose(): Promise<void> {
     await closeProject()
-    setWellOptions([])
     setActiveDialog('project-open')
   }
 
   async function handleWellMutation(wellId: string): Promise<void> {
-    await refreshWellList(wellId)
+    await refreshWellInventories(wellId)
   }
 
   async function handleDeleteWell(): Promise<void> {
@@ -555,7 +586,7 @@ function App() {
       })
       setSelectedFormationId(null)
       selectTrack(null)
-      await refreshWellList()
+      await refreshWellInventories()
     } catch (error) {
       window.alert(error instanceof Error ? error.message : 'Failed to delete well.')
     }
@@ -567,43 +598,42 @@ function App() {
     void loadWell(wellId)
   }
 
-  function handleSelectLasGroup(): void {
-    if (!well?.well_id) {
-      return
+  async function handleSelectLasGroup(wellId: string): Promise<void> {
+    if (wellId !== well?.well_id) {
+      await loadWell(wellId)
     }
-    setSelectedObject({ type: 'las-group', wellId: well.well_id })
+    setSelectedObject({ type: 'las-group', wellId })
   }
 
-  function handleSelectCurve(mnemonic: string): void {
-    if (!well?.well_id) {
-      return
+  async function handleSelectCurve(wellId: string, mnemonic: string): Promise<void> {
+    if (wellId !== well?.well_id) {
+      await loadWell(wellId)
     }
-    setSelectedObject({ type: 'curve', wellId: well.well_id, mnemonic })
+    setSelectedObject({ type: 'curve', wellId, mnemonic })
   }
 
-  function handleSelectTopsGroup(): void {
-    if (!well?.well_id) {
-      return
+  async function handleSelectTopsGroup(wellId: string): Promise<void> {
+    if (wellId !== well?.well_id) {
+      await loadWell(wellId)
     }
-    setSelectedObject({ type: 'tops-group', wellId: well.well_id })
+    setSelectedObject({ type: 'tops-group', wellId })
   }
 
-  function handleSetDeviationVisible(nextValue: boolean): void {
-    if (!well?.well_id) {
-      return
+  async function handleSetDeviationVisible(wellId: string, nextValue: boolean): Promise<void> {
+    if (wellId !== well?.well_id) {
+      await loadWell(wellId)
     }
-    updateWellViewState(well.well_id, (state) => ({
+    updateWellViewState(wellId, (state) => ({
       ...state,
       deviationVisible: nextValue,
     }))
   }
 
-  function handleToggleFormation(formationId: string, nextValue: boolean): void {
-    if (!well?.well_id) {
-      return
+  async function handleToggleFormation(wellId: string, formationId: string, nextValue: boolean): Promise<void> {
+    if (wellId !== well?.well_id) {
+      await loadWell(wellId)
     }
-
-    updateWellViewState(well.well_id, (state) => ({
+    updateWellViewState(wellId, (state) => ({
       ...state,
       visibleFormationIds: nextValue
         ? Array.from(new Set([...state.visibleFormationIds, formationId]))
@@ -611,21 +641,21 @@ function App() {
     }))
   }
 
-  function handleSelectFormation(formationId: string): void {
-    setSelectedFormationId(formationId)
-    if (well?.well_id) {
-      setSelectedObject({ type: 'top-pick', wellId: well.well_id, formationId })
+  async function handleSelectFormation(wellId: string, formationId: string): Promise<void> {
+    if (wellId !== well?.well_id) {
+      await loadWell(wellId)
     }
+    setSelectedFormationId(formationId)
+    setSelectedObject({ type: 'top-pick', wellId, formationId })
     setActiveToolbarMode('tops')
   }
 
-  function handleToggleAllCurves(nextValue: boolean): void {
-    if (!well?.well_id) {
-      return
+  async function handleToggleAllCurves(wellId: string, nextValue: boolean): Promise<void> {
+    if (wellId !== well?.well_id) {
+      await loadWell(wellId)
     }
-
     if (!nextValue) {
-      updateWellViewState(well.well_id, (state) => ({
+      updateWellViewState(wellId, (state) => ({
         ...state,
         tracks: [createEmptyTrack()],
       }))
@@ -633,19 +663,19 @@ function App() {
       return
     }
 
-    curves.forEach((curve) => {
-      handleToggleCurve(curve.mnemonic, true)
+    useWellDataStore.getState().curves.forEach((curve) => {
+      void handleToggleCurve(wellId, curve.mnemonic, true)
     })
   }
 
-  function handleToggleAllFormations(nextValue: boolean): void {
-    if (!well?.well_id) {
-      return
+  async function handleToggleAllFormations(wellId: string, nextValue: boolean): Promise<void> {
+    if (wellId !== well?.well_id) {
+      await loadWell(wellId)
     }
-
-    updateWellViewState(well.well_id, (state) => ({
+    const currentFormations = useWellDataStore.getState().formations
+    updateWellViewState(wellId, (state) => ({
       ...state,
-      visibleFormationIds: nextValue ? formations.map((formation) => formation.id) : [],
+      visibleFormationIds: nextValue ? currentFormations.map((formation) => formation.id) : [],
     }))
   }
 
@@ -798,17 +828,22 @@ function App() {
     }
   }
 
-  function handleToggleCurve(mnemonic: string, nextValue: boolean): void {
-    if (!well?.well_id) {
-      return
+  async function handleToggleCurve(wellId: string, mnemonic: string, nextValue: boolean): Promise<void> {
+    if (wellId !== well?.well_id) {
+      await loadWell(wellId)
     }
 
-    const curve = curves.find((item) => item.mnemonic === mnemonic)
+    const activeWellId = useWellDataStore.getState().well?.well_id
+    if (!activeWellId) {
+      return
+    }
+    const currentCurves = useWellDataStore.getState().curves
+    const curve = currentCurves.find((item) => item.mnemonic === mnemonic)
     if (!curve) {
       return
     }
 
-    updateWellViewState(well.well_id, (state) => {
+    updateWellViewState(activeWellId, (state) => {
       if (!nextValue) {
         const nextTracks = state.tracks.map((track) => ({
           ...track,
@@ -902,7 +937,7 @@ function App() {
       return
     }
 
-    await refreshWellList(well.well_id)
+    await refreshWellInventories(well.well_id)
   }
 
   function handleCurveSettingUpdate(mnemonic: string, patch: Partial<TrackConfig['curves'][number]>): void {
@@ -1252,14 +1287,11 @@ function App() {
                   />
                 ) : activeSidebarTab === 'wells' ? (
                   <WellDataPanel
-                    wells={wellOptions}
+                    wells={wellInventories}
                     activeWellId={well?.well_id ?? null}
-                    well={well}
-                    curves={curves}
-                    formations={formations}
-                    visibleCurveMnemonics={visibleCurveMnemonics}
-                    visibleFormationIds={visibleFormationIds}
-                    isDeviationVisible={activeWellView.deviationVisible}
+                    visibleCurveMnemonicsByWellId={visibleCurveMnemonicsByWellId}
+                    visibleFormationIdsByWellId={visibleFormationIdsByWellId}
+                    deviationVisibilityByWellId={deviationVisibilityByWellId}
                     selectedFormationId={selectedFormationId}
                     onSelectWell={handleSelectWell}
                     onToggleCurve={handleToggleCurve}

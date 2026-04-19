@@ -1,6 +1,6 @@
 import { create } from 'zustand'
 
-import type { CurveData, FormationTop, StratChartInfo, Well } from '@/types'
+import type { CurveData, FormationTop, StratChartInfo, Well, WellInventory } from '@/types'
 
 interface CurveResponse {
   mnemonic: string
@@ -51,6 +51,7 @@ interface FormationPatchPayload {
 
 export interface WellDataStore {
   well: Well | null
+  wellInventories: WellInventory[]
   curves: CurveData[]
   formations: FormationTop[]
   colorOverrides: Record<string, string>
@@ -59,6 +60,7 @@ export interface WellDataStore {
   error: string | null
   reset: () => void
   setColorOverrides: (overrides: Record<string, string>) => void
+  loadWellInventories: () => Promise<void>
   loadWell: (wellId: string) => Promise<void>
   addFormation: (formation: FormationCreatePayload) => Promise<void>
   updateFormation: (formationId: string, patch: FormationPatchPayload) => Promise<void>
@@ -118,6 +120,7 @@ const pendingDepthPatches = new Map<string, number>()
 
 const emptyState = {
   well: null,
+  wellInventories: [],
   curves: [],
   formations: [],
   colorOverrides: {},
@@ -133,6 +136,14 @@ export const useWellDataStore = create<WellDataStore>((set, get) => ({
   },
   setColorOverrides(overrides) {
     set({ colorOverrides: overrides })
+  },
+  async loadWellInventories() {
+    const response = await fetch('/api/wells/inventory')
+    if (!response.ok) {
+      throw new Error(await readError(response, `Failed to load well inventories (${response.status})`))
+    }
+    const payload = (await response.json()) as WellInventory[]
+    set({ wellInventories: payload })
   },
   async loadWell(wellId: string) {
     set({ isLoading: true, error: null })
@@ -162,9 +173,12 @@ export const useWellDataStore = create<WellDataStore>((set, get) => ({
         isLoading: false,
         error: null,
       })
+      await get().loadWellInventories()
     } catch (error) {
+      const inventories = get().wellInventories
       set({
         ...emptyState,
+        wellInventories: inventories,
         error: error instanceof Error ? error.message : 'Unknown error',
       })
     }
@@ -189,6 +203,7 @@ export const useWellDataStore = create<WellDataStore>((set, get) => ({
       formations: sortFormations([...state.formations, created]),
       error: null,
     }))
+    await get().loadWellInventories()
   },
   async updateFormation(formationId, patch) {
     const wellId = get().well?.well_id
@@ -214,6 +229,7 @@ export const useWellDataStore = create<WellDataStore>((set, get) => ({
       ),
       error: null,
     }))
+    await get().loadWellInventories()
   },
   async updateFormationDepth(formationId, depth) {
     const wellId = get().well?.well_id
@@ -256,6 +272,7 @@ export const useWellDataStore = create<WellDataStore>((set, get) => ({
             ),
             error: null,
           }))
+          await get().loadWellInventories()
         })
         .catch((error) => {
           set({ error: error instanceof Error ? error.message : 'Unknown error' })
@@ -284,6 +301,7 @@ export const useWellDataStore = create<WellDataStore>((set, get) => ({
       formations: state.formations.filter((formation) => formation.id !== formationId),
       error: null,
     }))
+    await get().loadWellInventories()
   },
   async loadStratCharts() {
     const response = await fetch('/api/strat-charts')
