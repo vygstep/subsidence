@@ -62,6 +62,7 @@ export interface WellDataStore {
   setColorOverrides: (overrides: Record<string, string>) => void
   loadWellInventories: () => Promise<void>
   loadWell: (wellId: string) => Promise<void>
+  refreshWell: (preferredWellId?: string) => Promise<void>
   addFormation: (formation: FormationCreatePayload) => Promise<void>
   updateFormation: (formationId: string, patch: FormationPatchPayload) => Promise<void>
   updateFormationDepth: (formationId: string, depth: number) => Promise<void>
@@ -335,6 +336,24 @@ export const useWellDataStore = create<WellDataStore>((set, get) => ({
     if (wellId) {
       const formations = await fetchFormations(wellId)
       set({ formations: sortFormations(formations.map(mapFormation)) })
+    }
+  },
+  async refreshWell(preferredWellId) {
+    await get().loadWellInventories()
+    const wells = get().wellInventories
+    if (wells.length === 0) {
+      get().reset()
+      return
+    }
+    const currentWellId = get().well?.well_id
+    const hasCurrent = currentWellId ? wells.some((w) => w.well_id === currentWellId) : false
+    const nextWellId = preferredWellId ?? (hasCurrent ? currentWellId : wells[0].well_id)
+    if (!nextWellId) {
+      get().reset()
+      return
+    }
+    if (preferredWellId || nextWellId !== currentWellId) {
+      await get().loadWell(nextWellId)
     }
   },
   async linkFormationToChart(formationId, chartId, stratUnitId) {

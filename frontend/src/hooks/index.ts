@@ -1,4 +1,5 @@
-﻿export * from './useCanvasRenderer'
+export * from './useCanvasRenderer'
 export * from './useDepthScale'
+export * from './useSidebarResize'
 export * from './useSynchronizedScroll'
 export * from './useValueScale'
