@@ -6,7 +6,7 @@ from pathlib import Path
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-from .schema import CurveDictEntry, LithologyDictEntry
+from .schema import CurveDictEntry, LithologyDictEntry, StratUnit
 
 
 def _seed_curve_entries(session: Session, csv_path: Path) -> None:
@@ -40,14 +40,74 @@ def _seed_lithology_entries(session: Session, csv_path: Path) -> None:
             )
 
 
+def _repo_sample_data_dir() -> Path:
+    return Path(__file__).resolve().parents[4] / 'sample_data'
+
+
+def _seed_strat_units(session: Session, units_path: Path, ranks_path: Path) -> None:
+    rank_map: dict[int, str] = {}
+    with ranks_path.open('r', encoding='utf-8', newline='') as handle:
+        for row in csv.DictReader(handle):
+            rank_id_raw = (row.get('rank_id') or '').strip()
+            if not rank_id_raw:
+                continue
+            rank_map[int(rank_id_raw)] = (row.get('rank') or '').strip()
+
+    pending: dict[int, dict[str, str]] = {}
+    with units_path.open('r', encoding='utf-8', newline='') as handle:
+        for row in csv.DictReader(handle):
+            unit_id_raw = (row.get('unit_id') or '').strip()
+            name = (row.get('unit_name') or '').strip()
+            if not unit_id_raw or not name:
+                continue
+            pending[int(unit_id_raw)] = row
+
+    inserted_ids: set[int] = set()
+    while pending:
+        inserted_in_pass = False
+        for unit_id in list(pending):
+            row = pending[unit_id]
+            parent_id_raw = (row.get('parent_unit_id') or '').strip()
+            parent_id = int(parent_id_raw) if parent_id_raw else None
+            if parent_id is not None and parent_id not in inserted_ids:
+                continue
+
+            rank_id_raw = (row.get('rank_id') or '').strip()
+            session.add(
+                StratUnit(
+                    id=unit_id,
+                    name=(row.get('unit_name') or '').strip(),
+                    rank=rank_map.get(int(rank_id_raw)) if rank_id_raw else None,
+                    parent_id=parent_id,
+                    age_top_ma=float(row['start_age_ma']) if (row.get('start_age_ma') or '').strip() else None,
+                    age_base_ma=float(row['end_age_ma']) if (row.get('end_age_ma') or '').strip() else None,
+                    lithology=None,
+                    color_hex=(row.get('html_rgb_hash') or '').strip() or None,
+                )
+            )
+            inserted_ids.add(unit_id)
+            pending.pop(unit_id)
+            inserted_in_pass = True
+
+        if not inserted_in_pass:
+            raise ValueError('Unable to seed strat_units due to unresolved parent references')
+
+
 def seed_dictionaries(session: Session, db_path: Path) -> None:
     del db_path
     seed_dir = Path(__file__).parent / 'dictionaries'
+    sample_dir = _repo_sample_data_dir()
 
     has_curve_rows = session.execute(select(CurveDictEntry.id).limit(1)).scalar_one_or_none() is not None
     has_lithology_rows = session.execute(select(LithologyDictEntry.id).limit(1)).scalar_one_or_none() is not None
+    has_strat_rows = session.execute(select(StratUnit.id).limit(1)).scalar_one_or_none() is not None
 
     if not has_curve_rows:
         _seed_curve_entries(session, seed_dir / 'curve_families.csv')
     if not has_lithology_rows:
         _seed_lithology_entries(session, seed_dir / 'lithology_defaults.csv')
+    if not has_strat_rows:
+        units_path = sample_dir / 'ics_chart2023_units.csv'
+        ranks_path = sample_dir / 'ics_chart2023_ranks.csv'
+        if units_path.exists() and ranks_path.exists():
+            _seed_strat_units(session, units_path, ranks_path)

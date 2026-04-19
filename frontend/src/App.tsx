@@ -7,6 +7,7 @@ import {
   ImportLasDialog,
   ImportTopsDialog,
   LinkStratChartDialog,
+  LoadStratChartDialog,
   LogViewPanel,
   NewProjectDialog,
   WellDataPanel,
@@ -20,9 +21,9 @@ interface WellListItem {
   well_name: string
 }
 
-type DialogKind = 'project-open' | 'project-new' | 'create-well' | 'load-las' | 'load-tops' | 'load-deviation' | 'link-top' | null
+type DialogKind = 'project-open' | 'project-new' | 'create-well' | 'load-las' | 'load-tops' | 'load-deviation' | 'link-top' | 'load-strat-chart' | null
 type SidebarTab = 'wells' | 'models' | 'templates'
-type ToolbarMode = 'project' | 'wells' | 'tops'
+type ToolbarMode = 'project' | 'strat-chart' | 'wells' | 'tops'
 
 interface WellViewState {
   tracks: TrackConfig[]
@@ -624,6 +625,14 @@ function App() {
     setSelectedFormationId(null)
   }
 
+  async function handleDeleteStratChart(): Promise<void> {
+    if (!window.confirm('Delete the stratigraphic chart? Formation links will be cleared.')) return
+    const response = await fetch('/api/strat-chart', { method: 'DELETE' })
+    if (!response.ok) {
+      alert('Failed to delete stratigraphic chart')
+    }
+  }
+
   function handleToggleCurve(mnemonic: string, nextValue: boolean): void {
     if (!well?.well_id) {
       return
@@ -786,6 +795,13 @@ function App() {
         return <ImportTopsDialog wells={wellOptions} onClose={() => setActiveDialog(null)} onSuccess={handleWellMutation} />
       case 'load-deviation':
         return <ImportDeviationDialog wells={wellOptions} onClose={() => setActiveDialog(null)} onSuccess={handleWellMutation} />
+      case 'load-strat-chart':
+        return (
+          <LoadStratChartDialog
+            onClose={() => setActiveDialog(null)}
+            onSuccess={(_count) => { setActiveDialog(null) }}
+          />
+        )
       case 'link-top':
         return formationLinkTarget ? (
           <LinkStratChartDialog
@@ -812,6 +828,13 @@ function App() {
       <button type="button" className="app-action-button" onClick={() => void handleProjectClose()}>Close project</button>
       <button type="button" className="app-action-button app-action-button--primary" onClick={() => void saveProject()} disabled={!isDirty}>Save project</button>
       <button type="button" className="app-action-button" onClick={() => void createCheckpoint()}>Create checkpoint</button>
+    </>
+  )
+
+  const stratChartModeActions = (
+    <>
+      <button type="button" className="app-action-button" onClick={() => setActiveDialog('load-strat-chart')}>Load StratChart</button>
+      <button type="button" className="app-action-button" onClick={() => void handleDeleteStratChart()}>Delete StratChart</button>
     </>
   )
 
@@ -849,6 +872,7 @@ function App() {
           {isProjectOpen && (
             <div className="app-topbar__actions">
               <button type="button" className={`app-action-button ${activeToolbarMode === 'project' ? 'app-action-button--mode-active' : ''}`} onClick={() => setActiveToolbarMode('project')}>Project</button>
+              <button type="button" className={`app-action-button ${activeToolbarMode === 'strat-chart' ? 'app-action-button--mode-active' : ''}`} onClick={() => setActiveToolbarMode('strat-chart')}>StratChart</button>
               <button type="button" className={`app-action-button ${activeToolbarMode === 'wells' ? 'app-action-button--mode-active' : ''}`} onClick={() => setActiveToolbarMode('wells')}>Wells</button>
               <button type="button" className={`app-action-button ${activeToolbarMode === 'tops' ? 'app-action-button--mode-active' : ''}`} onClick={() => setActiveToolbarMode('tops')}>Tops</button>
 
@@ -870,6 +894,7 @@ function App() {
           <div className="app-topbar__row app-topbar__row--secondary">
             <div className="app-topbar__actions">
               {activeToolbarMode === 'project' ? projectModeActions : null}
+              {activeToolbarMode === 'strat-chart' ? stratChartModeActions : null}
               {activeToolbarMode === 'wells' ? wellsModeActions : null}
               {activeToolbarMode === 'tops' ? topsModeActions : null}
             </div>

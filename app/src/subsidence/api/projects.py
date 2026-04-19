@@ -360,7 +360,7 @@ def import_las(payload: ImportLasRequest, request: Request) -> ImportLasResponse
             curve_count = len(list(session.scalars(select(CurveMetadata).where(CurveMetadata.well_id == well_id))))
             session.commit()
         manager.execute_command(command)  # apply() is no-op: well already in DB
-        manager.mark_dirty()
+        manager.save_project()
     except (ValueError, FileNotFoundError) as error:
         raise HTTPException(status_code=400, detail=str(error)) from error
     return ImportLasResponse(well_id=well_id, well_name=well_name, curve_count=curve_count)
@@ -378,7 +378,7 @@ def import_tops(payload: ImportTopsRequest, request: Request) -> ImportTopsRespo
             linked = link_tops_to_unconformities(session, target_well_id)
             formation_count = len(list(session.scalars(select(FormationTopModel).where(FormationTopModel.well_id == target_well_id))))
             session.commit()
-        manager.mark_dirty()
+        manager.save_project()
     except (ValueError, FileNotFoundError, NotImplementedError) as error:
         raise HTTPException(status_code=400, detail=str(error)) from error
     return ImportTopsResponse(well_id=target_well_id, formation_count=formation_count, linked_count=len(linked))
@@ -393,7 +393,7 @@ def import_unconformities(payload: ImportUnconformitiesRequest, request: Request
             linked = link_tops_to_unconformities(session, payload.well_id)
             formation_count = len(list(session.scalars(select(FormationTopModel).where(FormationTopModel.well_id == payload.well_id))))
             session.commit()
-        manager.mark_dirty()
+        manager.save_project()
     except (ValueError, FileNotFoundError) as error:
         raise HTTPException(status_code=400, detail=str(error)) from error
     return ImportUnconformitiesResponse(well_id=payload.well_id, formation_count=formation_count, linked_count=len(linked))
@@ -410,7 +410,7 @@ def import_deviation(payload: ImportDeviationRequest, request: Request) -> Impor
             mode = survey.mode
             data_uri = survey.data_uri
             session.commit()
-        manager.mark_dirty()
+        manager.save_project()
     except (ValueError, FileNotFoundError) as error:
         raise HTTPException(status_code=400, detail=str(error)) from error
     return ImportDeviationResponse(well_id=target_well_id, reference=reference, mode=mode, data_uri=data_uri)

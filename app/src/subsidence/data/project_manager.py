@@ -160,6 +160,9 @@ class ProjectManager:
         working_db_path = session_dir / 'working.db'
         shutil.copy2(canonical_db, working_db_path)
         engine = create_engine_for_project(working_db_path)
+        with Session(engine) as session:
+            self._seed_dictionaries(session, bundle_path)
+            session.commit()
 
         autosave_task = self._start_autosave_task(session_id)
         self._state = ProjectOpenState(

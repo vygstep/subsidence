@@ -8,6 +8,7 @@ from sqlalchemy.orm import selectinload
 from subsidence.data import CreateFormation, ProjectManager, RemoveFormation, UpdateFormation, UpdateFormationDepth
 from subsidence.data.undo import _model_to_dict
 from subsidence.data.schema import FormationTopModel, StratUnit, WellModel
+from subsidence.data.strat_link import auto_link_formation_to_strat_unit, find_strat_unit_by_name
 
 router = APIRouter(tags=['formations'])
 
@@ -128,6 +129,18 @@ def list_formations(well_id: str, request: Request) -> list[FormationTopResponse
             .order_by(FormationTopModel.depth_md.asc(), FormationTopModel.id.asc())
             .options(selectinload(FormationTopModel.strat_unit))
         ).all()
+        changed = False
+        for row in rows:
+            changed = auto_link_formation_to_strat_unit(session, row) or changed
+        if changed:
+            session.flush()
+            session.commit()
+            rows = session.scalars(
+                select(FormationTopModel)
+                .where(FormationTopModel.well_id == well_id)
+                .order_by(FormationTopModel.depth_md.asc(), FormationTopModel.id.asc())
+                .options(selectinload(FormationTopModel.strat_unit))
+            ).all()
         return [_to_response(row) for row in rows]
 
 
@@ -146,6 +159,7 @@ def create_formation(well_id: str, body: FormationTopCreate, request: Request) -
             is_locked=body.is_locked,
         )
         session.add(row)
+        auto_link_formation_to_strat_unit(session, row)
         session.flush()
         session.refresh(row)
         manager.undo_stack.push(CreateFormation(_model_to_dict(row)), session)
@@ -193,6 +207,14 @@ def update_formation(well_id: str, formation_id: int, body: FormationTopPatch, r
             if row.strat_unit_id != strat_unit_id:
                 old_values['strat_unit_id'] = row.strat_unit_id
                 new_values['strat_unit_id'] = strat_unit_id
+        elif body.name is not None and row.strat_unit_id is None:
+            matched_unit = find_strat_unit_by_name(session, body.name)
+            if matched_unit is not None:
+                old_values['strat_unit_id'] = None
+                new_values['strat_unit_id'] = matched_unit.id
+                if 'color' not in body.model_fields_set and matched_unit.color_hex and (row.color or '').strip().lower() in {'', '#4b5563', '#808080', '#9ca3af', '#90a4ae'}:
+                    old_values['color'] = row.color
+                    new_values['color'] = matched_unit.color_hex
 
     if not new_values:
         with manager.get_session() as session:
