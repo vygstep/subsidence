@@ -6,21 +6,23 @@ import {
   ImportDeviationDialog,
   ImportLasDialog,
   ImportTopsDialog,
+  LinkStratChartDialog,
   LogViewPanel,
   NewProjectDialog,
   WellDataPanel,
   ZoomControl,
 } from '@/components'
 import { useProjectStore, useViewStore, useWellDataStore } from '@/stores'
-import type { CurveData, TrackConfig } from '@/types'
+import type { CurveData, FormationTop, TrackConfig } from '@/types'
 
 interface WellListItem {
   well_id: string
   well_name: string
 }
 
-type DialogKind = 'project-open' | 'project-new' | 'create-well' | 'load-las' | 'load-tops' | 'load-deviation' | null
+type DialogKind = 'project-open' | 'project-new' | 'create-well' | 'load-las' | 'load-tops' | 'load-deviation' | 'link-top' | null
 type SidebarTab = 'wells' | 'models' | 'templates'
+type ToolbarMode = 'project' | 'wells' | 'tops'
 
 interface WellViewState {
   tracks: TrackConfig[]
@@ -106,11 +108,18 @@ async function fetchWellList(): Promise<WellListItem[]> {
 function App() {
   const [activeDialog, setActiveDialog] = useState<DialogKind>('project-open')
   const [activeSidebarTab, setActiveSidebarTab] = useState<SidebarTab>('wells')
+  const [activeToolbarMode, setActiveToolbarMode] = useState<ToolbarMode>('project')
   const [wellOptions, setWellOptions] = useState<WellListItem[]>([])
   const [wellViewStates, setWellViewStates] = useState<Record<string, WellViewState>>({})
+  const [formationLinkTarget, setFormationLinkTarget] = useState<FormationTop | null>(null)
+  const [selectedFormationId, setSelectedFormationId] = useState<string | null>(null)
 
   const loadWell = useWellDataStore((state) => state.loadWell)
   const resetWell = useWellDataStore((state) => state.reset)
+  const addFormation = useWellDataStore((state) => state.addFormation)
+  const updateFormation = useWellDataStore((state) => state.updateFormation)
+  const updateFormationDepth = useWellDataStore((state) => state.updateFormationDepth)
+  const removeFormation = useWellDataStore((state) => state.removeFormation)
   const well = useWellDataStore((state) => state.well)
   const curves = useWellDataStore((state) => state.curves)
   const formations = useWellDataStore((state) => state.formations)
@@ -127,6 +136,7 @@ function App() {
   const loadVisualConfig = useProjectStore((state) => state.loadVisualConfig)
   const saveVisualConfig = useProjectStore((state) => state.saveVisualConfig)
   const saveProject = useProjectStore((state) => state.saveProject)
+  const createCheckpoint = useProjectStore((state) => state.createCheckpoint)
   const closeProject = useProjectStore((state) => state.closeProject)
   const undoProject = useProjectStore((state) => state.undo)
   const redoProject = useProjectStore((state) => state.redo)
@@ -179,6 +189,7 @@ function App() {
   useEffect(() => {
     if (!isProjectOpen) {
       setWellOptions([])
+      setActiveToolbarMode('project')
       if (activeDialog === null) {
         setActiveDialog('project-open')
       }
@@ -196,6 +207,7 @@ function App() {
       resetWell()
       resetVisualConfig()
       selectTrack(null)
+      setSelectedFormationId(null)
       setWellViewStates({})
       return
     }
@@ -357,8 +369,15 @@ function App() {
   ), [formations, visibleFormationIds])
 
   useEffect(() => {
+    if (selectedFormationId && !formations.some((formation) => formation.id === selectedFormationId)) {
+      setSelectedFormationId(null)
+    }
+  }, [formations, selectedFormationId])
+
+  useEffect(() => {
     if (!well?.well_id) {
       selectTrack(null)
+      setSelectedFormationId(null)
       return
     }
 
@@ -368,6 +387,7 @@ function App() {
         : { ...current, [well.well_id]: createDefaultWellView() }
     ))
     selectTrack(null)
+    setSelectedFormationId(null)
   }, [well?.well_id, selectTrack])
 
   const topbarTitle = !isProjectOpen
@@ -414,6 +434,151 @@ function App() {
         ? Array.from(new Set([...state.visibleFormationIds, formationId]))
         : state.visibleFormationIds.filter((id) => id !== formationId),
     }))
+  }
+
+  function handleSelectFormation(formationId: string): void {
+    setSelectedFormationId(formationId)
+    setActiveToolbarMode('tops')
+  }
+
+  function handleToggleAllFormations(nextValue: boolean): void {
+    if (!well?.well_id) {
+      return
+    }
+
+    updateWellViewState(well.well_id, (state) => ({
+      ...state,
+      visibleFormationIds: nextValue ? formations.map((formation) => formation.id) : [],
+    }))
+  }
+
+  async function handleAddFormation(): Promise<void> {
+    if (!well?.well_id) {
+      return
+    }
+
+    const referenceDepth = useViewStore.getState().cursorDepth ?? useViewStore.getState().visibleDepthRange.min
+    await addFormation({
+      name: `Top ${formations.length + 1}`,
+      depth_md: Number(referenceDepth.toFixed(1)),
+      color: '#9ca3af',
+    })
+
+    const latest = useWellDataStore.getState().formations.at(-1)
+    if (latest) {
+      setSelectedFormationId(latest.id)
+      updateWellViewState(well.well_id, (state) => ({
+        ...state,
+        visibleFormationIds: Array.from(new Set([...state.visibleFormationIds, latest.id])),
+      }))
+    }
+  }
+
+  function handleMoveFormation(formationId: string, depth: number): void {
+    if (!Number.isFinite(depth)) {
+      return
+    }
+    void updateFormationDepth(formationId, depth)
+  }
+
+  function handleRemoveFormation(formationId: string): void {
+    if (!well?.well_id) {
+      return
+    }
+
+    updateWellViewState(well.well_id, (state) => ({
+      ...state,
+      visibleFormationIds: state.visibleFormationIds.filter((id) => id !== formationId),
+    }))
+    if (selectedFormationId === formationId) {
+      setSelectedFormationId(null)
+    }
+    void removeFormation(formationId)
+  }
+
+  function handleOpenFormationLink(formationId: string): void {
+    const formation = formations.find((item) => item.id === formationId) ?? null
+    setFormationLinkTarget(formation)
+    setActiveDialog('link-top')
+  }
+
+  async function handleLinkFormation(stratUnitId: number | null): Promise<void> {
+    if (!formationLinkTarget) {
+      return
+    }
+
+    await updateFormation(formationLinkTarget.id, { strat_unit_id: stratUnitId })
+    setFormationLinkTarget(null)
+    setActiveDialog(null)
+  }
+
+  const selectedFormation = useMemo(
+    () => formations.find((item) => item.id === selectedFormationId) ?? null,
+    [formations, selectedFormationId],
+  )
+
+  async function handleSetFormationAge(): Promise<void> {
+    if (!selectedFormation) {
+      return
+    }
+    const value = window.prompt('Set top age (Ma)', selectedFormation.age_ma?.toString() ?? '')
+    if (value === null) {
+      return
+    }
+    const trimmed = value.trim()
+    const age = trimmed ? Number(trimmed) : undefined
+    if (trimmed && !Number.isFinite(age)) {
+      return
+    }
+    await updateFormation(selectedFormation.id, { age_ma: age })
+  }
+
+  async function handleSetFormationType(): Promise<void> {
+    if (!selectedFormation) {
+      return
+    }
+    const value = window.prompt('Set top type (`strat` or `unconformity`)', selectedFormation.kind)
+    if (value === null) {
+      return
+    }
+    const nextKind = value.trim().toLowerCase()
+    if (!nextKind || (nextKind !== 'strat' && nextKind !== 'unconformity')) {
+      return
+    }
+    await updateFormation(selectedFormation.id, { kind: nextKind })
+  }
+
+  async function handleMoveSelectedFormation(): Promise<void> {
+    if (!selectedFormation) {
+      return
+    }
+    const value = window.prompt('Move top to depth (MD)', selectedFormation.depth_md.toString())
+    if (value === null) {
+      return
+    }
+    const nextDepth = Number(value.trim())
+    if (!Number.isFinite(nextDepth)) {
+      return
+    }
+    handleMoveFormation(selectedFormation.id, nextDepth)
+  }
+
+  async function handleDeleteAllFormations(): Promise<void> {
+    if (!well?.well_id || formations.length === 0) {
+      return
+    }
+
+    for (const formation of formations) {
+      // Sequential deletes keep current backend/store flow simple and deterministic.
+      // eslint-disable-next-line no-await-in-loop
+      await removeFormation(formation.id)
+    }
+
+    updateWellViewState(well.well_id, (state) => ({
+      ...state,
+      visibleFormationIds: [],
+    }))
+    setSelectedFormationId(null)
   }
 
   function handleToggleCurve(mnemonic: string, nextValue: boolean): void {
@@ -578,6 +743,18 @@ function App() {
         return <ImportTopsDialog wells={wellOptions} onClose={() => setActiveDialog(null)} onSuccess={handleWellMutation} />
       case 'load-deviation':
         return <ImportDeviationDialog wells={wellOptions} onClose={() => setActiveDialog(null)} onSuccess={handleWellMutation} />
+      case 'link-top':
+        return formationLinkTarget ? (
+          <LinkStratChartDialog
+            formationName={formationLinkTarget.name}
+            currentUnitId={formationLinkTarget.strat_unit_id ?? undefined}
+            onClose={() => {
+              setFormationLinkTarget(null)
+              setActiveDialog(null)
+            }}
+            onSelect={handleLinkFormation}
+          />
+        ) : null
       default:
         return null
     }
@@ -585,42 +762,75 @@ function App() {
 
   const dialogContent = renderDialog()
 
+  const projectModeActions = (
+    <>
+      <button type="button" className="app-action-button" onClick={() => setActiveDialog('project-new')}>New project</button>
+      <button type="button" className="app-action-button" onClick={() => setActiveDialog('project-open')}>Open project</button>
+      <button type="button" className="app-action-button" onClick={() => void handleProjectClose()}>Close project</button>
+      <button type="button" className="app-action-button app-action-button--primary" onClick={() => void saveProject()} disabled={!isDirty}>Save project</button>
+      <button type="button" className="app-action-button" onClick={() => void createCheckpoint()}>Create checkpoint</button>
+    </>
+  )
+
+  const wellsModeActions = (
+    <>
+      <button type="button" className="app-action-button" onClick={() => setActiveDialog('create-well')}>Create well</button>
+      <button type="button" className="app-action-button" onClick={() => setActiveDialog('load-las')}>Load logs</button>
+      <button type="button" className="app-action-button" onClick={() => setActiveDialog('load-tops')}>Load tops</button>
+      <button type="button" className="app-action-button" onClick={() => setActiveDialog('load-deviation')}>Load deviation</button>
+    </>
+  )
+
+  const topsModeActions = (
+    <>
+      <button type="button" className="app-action-button" onClick={() => setActiveDialog('load-tops')}>Load tops</button>
+      <button type="button" className="app-action-button" onClick={() => void handleAddFormation()} disabled={!well}>Add top</button>
+      <button type="button" className="app-action-button" onClick={() => selectedFormation && handleOpenFormationLink(selectedFormation.id)} disabled={!selectedFormation}>Link top</button>
+      <button type="button" className="app-action-button" onClick={() => void handleSetFormationAge()} disabled={!selectedFormation}>Set age</button>
+      <button type="button" className="app-action-button" onClick={() => void handleSetFormationType()} disabled={!selectedFormation}>Set type</button>
+      <button type="button" className="app-action-button" onClick={() => selectedFormation && handleRemoveFormation(selectedFormation.id)} disabled={!selectedFormation}>Delete top</button>
+      <button type="button" className="app-action-button" onClick={() => void handleDeleteAllFormations()} disabled={formations.length === 0}>Delete all tops</button>
+      <button type="button" className="app-action-button" onClick={() => void handleMoveSelectedFormation()} disabled={!selectedFormation}>Move top</button>
+    </>
+  )
+
   return (
     <div className="app-layout">
       <header className="app-topbar">
-        <span className="app-topbar__brand">SUBSIDENCE</span>
-        <span className="app-topbar__project">{isDirty ? '* ' : ''}{projectName ?? '-'}</span>
-        <span className="app-topbar__well">{topbarTitle}</span>
+        <div className="app-topbar__row">
+          <span className="app-topbar__brand">SUBSIDENCE</span>
+          <span className="app-topbar__project">{isDirty ? '* ' : ''}{projectName ?? '-'}</span>
+          <span className="app-topbar__well">{topbarTitle}</span>
+
+          {isProjectOpen && (
+            <div className="app-topbar__actions">
+              <button type="button" className={`app-action-button ${activeToolbarMode === 'project' ? 'app-action-button--mode-active' : ''}`} onClick={() => setActiveToolbarMode('project')}>Project</button>
+              <button type="button" className={`app-action-button ${activeToolbarMode === 'wells' ? 'app-action-button--mode-active' : ''}`} onClick={() => setActiveToolbarMode('wells')}>Wells</button>
+              <button type="button" className={`app-action-button ${activeToolbarMode === 'tops' ? 'app-action-button--mode-active' : ''}`} onClick={() => setActiveToolbarMode('tops')}>Tops</button>
+
+              <span className="app-topbar__divider" />
+
+              <button type="button" className="app-action-button" onClick={() => void undoProject()} disabled={!canUndo}>Undo</button>
+              <button type="button" className="app-action-button" onClick={() => void redoProject()} disabled={!canRedo}>Redo</button>
+            </div>
+          )}
+
+          {curves.length > 0 && (
+            <span className="app-topbar__meta">
+              {curves.length} curves | {curves[0].depths.length.toLocaleString()} samples
+            </span>
+          )}
+        </div>
 
         {isProjectOpen && (
-          <div className="app-topbar__actions">
-            <button type="button" className="app-action-button" onClick={() => setActiveDialog('project-new')}>New project</button>
-            <button type="button" className="app-action-button" onClick={() => setActiveDialog('project-open')}>Open project</button>
-            <button type="button" className="app-action-button" onClick={() => void handleProjectClose()}>Close project</button>
-            <button type="button" className="app-action-button app-action-button--primary" onClick={() => void saveProject()} disabled={!isDirty}>Save project</button>
-
-            <span className="app-topbar__divider" />
-
-            <button type="button" className="app-action-button" onClick={() => setActiveDialog('create-well')}>Create well</button>
-            <button type="button" className="app-action-button" onClick={() => setActiveDialog('load-las')}>Load LAS</button>
-            <button type="button" className="app-action-button" onClick={() => setActiveDialog('load-tops')}>Load tops</button>
-            <button type="button" className="app-action-button" onClick={() => setActiveDialog('load-deviation')}>Load deviation</button>
-
-            <span className="app-topbar__divider" />
-
-            <button type="button" className="app-action-button" onClick={() => void undoProject()} disabled={!canUndo}>Undo</button>
-            <button type="button" className="app-action-button" onClick={() => void redoProject()} disabled={!canRedo}>Redo</button>
-
-            <span className="app-topbar__divider" />
-
+          <div className="app-topbar__row app-topbar__row--secondary">
+            <div className="app-topbar__actions">
+              {activeToolbarMode === 'project' ? projectModeActions : null}
+              {activeToolbarMode === 'wells' ? wellsModeActions : null}
+              {activeToolbarMode === 'tops' ? topsModeActions : null}
+            </div>
             <ZoomControl />
           </div>
-        )}
-
-        {curves.length > 0 && (
-          <span className="app-topbar__meta">
-            {curves.length} curves | {curves[0].depths.length.toLocaleString()} samples
-          </span>
         )}
       </header>
       <main className={isProjectOpen ? 'app-main' : 'app-main app-main--gated'}>
@@ -662,10 +872,13 @@ function App() {
                     visibleCurveMnemonics={visibleCurveMnemonics}
                     visibleFormationIds={visibleFormationIds}
                     isDeviationVisible={activeWellView.deviationVisible}
+                    selectedFormationId={selectedFormationId}
                     onSelectWell={handleSelectWell}
                     onToggleCurve={handleToggleCurve}
                     onToggleFormation={handleToggleFormation}
+                    onToggleAllFormations={handleToggleAllFormations}
                     onToggleDeviation={handleSetDeviationVisible}
+                    onSelectFormation={handleSelectFormation}
                   />
                 ) : activeSidebarTab === 'templates' ? (
                   <div className="sidebar-panel__body">

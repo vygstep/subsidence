@@ -30,8 +30,19 @@ export interface FormationTop {
   depth_md: number
   age_ma?: number
   color: string
+  kind: string
+  strat_color?: string | null
   is_locked: boolean
   lithology?: LithologyType
+  strat_unit_id?: number | null
+  strat_unit_name?: string | null
+}
+
+export interface StratUnitOption {
+  id: number
+  name: string
+  rank?: string | null
+  color_hex?: string | null
 }
 
 export type LithologyType =

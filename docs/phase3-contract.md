@@ -55,40 +55,44 @@ React panels communicating through Zustand stores and the Phase 2.5 REST API.
 - [x] 2.5 Verify: enter a valid `.subsidence` path in the dialog ? project opens; title bar shows `project_name`; invalid path shows inline error
 
 ### Step 2.5 — Well import actions UI
-- [ ] 2.5.1 Add a compact app toolbar visible when `projectStore.isOpen === true`
-- [ ] 2.5.2 Add project actions: `New project`, `Open project`, `Close project`, `Save project`
-- [ ] 2.5.3 Add history actions: `Undo`, `Redo`
-- [ ] 2.5.4 Add import actions: `Create well`, `Load LAS`, `Load tops`, `Load deviation`
+- [ ] 2.5.1 Add a two-row app toolbar visible when `projectStore.isOpen === true`
+- [ ] 2.5.2 Top toolbar row is mode-based: `Project`, `Wells`, `Tops`, `Undo`, `Redo`
+- [ ] 2.5.3 Only one mode is active at a time among `Project`, `Wells`, and `Tops`; `Undo` / `Redo` remain global actions
+- [ ] 2.5.4 Bottom toolbar row is contextual and changes with the active mode
 - [ ] 2.5.5 Remove the top-level `Well selector` from the header; active well switching must happen through the left-side `Wells` tab
-- [ ] 2.5.6 Keep `Zoom presets` in the same header/toolbar composition so primary app actions live in one place
-- [ ] 2.5.7 `Create well` opens a metadata dialog and creates a valid empty well record even when no LAS, tops, or deviation data exist yet
-- [ ] 2.5.8 `Create well` dialog includes at minimum: `Well name`, `X`, `Y`, `KB`, `TD`, and `CRS`; defaults are explicit and user-editable
-- [ ] 2.5.9 `GET /api/wells/{id}` must return a well with `curves=[]` and `formations=[]` instead of `404` when the well exists but no data have been imported yet
-- [ ] 2.5.10 `Load LAS` opens a dialog with LAS file path input and imports through `POST /api/projects/import-las`; if the target well does not exist, the backend auto-creates it from LAS header metadata or defaults
-- [ ] 2.5.11 `Load tops` opens a dialog with well selector, CSV path, and depth reference, then calls `POST /api/projects/import-tops`; it must be valid to import tops before LAS
-- [ ] 2.5.12 `Load deviation` opens a dialog with well selector and CSV path, then calls `POST /api/projects/import-deviation`; it must be valid to import deviation before LAS
-- [ ] 2.5.13 All first-load flows are independent: `Create well`, `Load LAS`, `Load tops`, and `Load deviation` may be the first data action in a project
-- [ ] 2.5.14 Imports may update well metadata: for example, if imported LAS reaches deeper than current `TD`, the well `TD` is promoted to the LAS final depth
-- [ ] 2.5.15 Auto-created wells use deterministic defaults when file metadata are missing: `well-1`, `x=0`, `y=0`, `kb=10`, `td=final depth of LAS` (or source-derived depth when available)
-- [ ] 2.5.16 After each successful action, refresh project status / well list and hydrate the affected well into `wellDataStore`
-- [ ] 2.5.17 Verify: a user can create an empty well, import tops before LAS, import deviation before LAS, or import LAS first and have the well auto-created entirely from the frontend without manual API calls
-- [ ] 2.5.18 Add a left-side sidebar with tabs `Wells`, `Models`, and `Templates`
-- [ ] 2.5.19 `Wells` shows a project-wide collapsible tree for **all wells in the open project**
-- [ ] 2.5.20 Well roots use radio behavior: only one well can be active and visualized in the main view at a time
-- [ ] 2.5.21 Each well tree includes `Well metadata`, `LAS`, `TOPS`, and `DEV` nodes; every branch can collapse to the well root
-- [ ] 2.5.22 Curves, `TOPS`, and `DEV` use checkbox behavior so multiple data objects may be enabled independently
-- [ ] 2.5.23 `Well metadata` shows at minimum `Name`, `Location (X, Y)`, `KB / GL`, `TD`, and `CRS`
-- [ ] 2.5.24 `LAS` shows imported log source groups and their curves as child nodes; initial implementation may expose one source group if the backend currently stores one LAS source per well
-- [ ] 2.5.25 `TOPS` shows imported formation picks as child rows under one collapsible node; each row supports optional `Link to strat chart`
-- [ ] 2.5.26 A top row background uses the linked stratigraphic color when available; otherwise it defaults to medium gray
-- [ ] 2.5.27 `DEV` shows whether deviation exists and, when present, the stored deviation mode/reference summary as child rows
-- [ ] 2.5.28 All objects in `Wells` are clickable; clicking a well root activates it, clicking a data object selects it as the source for visualization actions
-- [ ] 2.5.29 Track rendering is `loaded-data-only`: loaded data appear in `Wells`, but nothing is auto-mounted into the viewer
-- [ ] 2.5.30 Default viewer state for any well is always `Depth` plus one empty data track named `Track 1`
-- [ ] 2.5.31 If a track is selected, adding a data object places it into that track; if no track is selected, the viewer creates a new track for the object
-- [ ] 2.5.32 Track visibility/composition settings are unique per well and are managed through the `Templates` tab
-- [ ] 2.5.33 `Templates` holds per-well visualization settings such as which tracks exist, which are hidden, which are removed, and which objects are assigned to each track
-- [ ] 2.5.34 `Models` remains reserved for subsidence workflows; placeholder content is acceptable in Step 2.5
+- [ ] 2.5.6 `Project` mode exposes: `New project`, `Open project`, `Close project`, `Save project`, `Create checkpoint`
+- [ ] 2.5.7 `Wells` mode exposes: `Create well`, `Load logs`, `Load tops`, `Load deviation`
+- [ ] 2.5.8 `Load logs` covers both LAS and CSV inputs through one unified action
+- [ ] 2.5.9 `Tops` mode exposes: `Load tops`, `Add top`, `Link top`, `Set age`, `Set type`, `Delete top`, `Delete all tops`, `Move top`
+- [ ] 2.5.10 `Tops` mode actions that require a selected top stay disabled until a top is selected
+- [ ] 2.5.11 `Create well` opens a metadata dialog and creates a valid empty well record even when no LAS, tops, or deviation data exist yet
+- [ ] 2.5.12 `Create well` dialog includes at minimum: `Well name`, `X`, `Y`, `KB`, `TD`, and `CRS`; defaults are explicit and user-editable
+- [ ] 2.5.13 `GET /api/wells/{id}` must return a well with `curves=[]` and `formations=[]` instead of `404` when the well exists but no data have been imported yet
+- [ ] 2.5.14 `Load LAS` opens a dialog with LAS file path input and imports through `POST /api/projects/import-las`; if the target well does not exist, the backend auto-creates it from LAS header metadata or defaults
+- [ ] 2.5.15 `Load tops` opens a dialog with well selector, CSV path, and depth reference, then calls `POST /api/projects/import-tops`; it must be valid to import tops before LAS
+- [ ] 2.5.16 `Load deviation` opens a dialog with well selector and CSV path, then calls `POST /api/projects/import-deviation`; it must be valid to import deviation before LAS
+- [ ] 2.5.17 All first-load flows are independent: `Create well`, `Load LAS`, `Load tops`, and `Load deviation` may be the first data action in a project
+- [ ] 2.5.18 Imports may update well metadata: for example, if imported LAS reaches deeper than current `TD`, the well `TD` is promoted to the LAS final depth
+- [ ] 2.5.19 Auto-created wells use deterministic defaults when file metadata are missing: `well-1`, `x=0`, `y=0`, `kb=10`, `td=final depth of LAS` (or source-derived depth when available)
+- [ ] 2.5.20 After each successful action, refresh project status / well list and hydrate the affected well into `wellDataStore`
+- [ ] 2.5.21 Verify: a user can create an empty well, import tops before LAS, import deviation before LAS, or import LAS first and have the well auto-created entirely from the frontend without manual API calls
+- [ ] 2.5.22 Add a left-side sidebar with tabs `Wells`, `Models`, and `Templates`
+- [ ] 2.5.23 `Wells` shows a project-wide collapsible tree for **all wells in the open project**
+- [ ] 2.5.24 Well roots use radio behavior: only one well can be active and visualized in the main view at a time
+- [ ] 2.5.25 Each well tree includes `Well metadata`, `LAS`, `TOPS`, and `DEV` nodes; every branch can collapse to the well root
+- [ ] 2.5.26 Curves, `TOPS`, and `DEV` use checkbox behavior so multiple data objects may be enabled independently
+- [ ] 2.5.27 `Well metadata` shows at minimum `Name`, `Location (X, Y)`, `KB / GL`, `TD`, and `CRS`
+- [ ] 2.5.28 `LAS` shows imported log source groups and their curves as child nodes; initial implementation may expose one source group if the backend currently stores one LAS source per well
+- [ ] 2.5.29 `TOPS` shows imported formation picks as child rows under one collapsible node; each row supports optional `Link to strat chart`
+- [ ] 2.5.30 A top row background uses the linked stratigraphic color when available; otherwise it defaults to medium gray
+- [ ] 2.5.31 `DEV` shows whether deviation exists and, when present, the stored deviation mode/reference summary as child rows
+- [ ] 2.5.32 All objects in `Wells` are clickable; clicking a well root activates it, clicking a data object selects it as the source for visualization actions
+- [ ] 2.5.33 Track rendering is `loaded-data-only`: loaded data appear in `Wells`, but nothing is auto-mounted into the viewer
+- [ ] 2.5.34 Default viewer state for any well is always `Depth` plus one empty data track named `Track 1`
+- [ ] 2.5.35 If a track is selected, adding a data object places it into that track; if no track is selected, the viewer creates a new track for the object
+- [ ] 2.5.36 Track visibility/composition settings are unique per well and are managed through the `Templates` tab
+- [ ] 2.5.37 `Templates` holds per-well visualization settings such as which tracks exist, which are hidden, which are removed, and which objects are assigned to each track
+- [ ] 2.5.38 `Models` remains reserved for subsidence workflows; placeholder content is acceptable in Step 2.5
 
 ### Step 3 — Formation tops API + store CRUD
 - [ ] 3.1 Write `app/src/subsidence/api/formations.py` with five endpoints (see spec)
@@ -230,43 +234,64 @@ Shows `Recent projects` list (from `GET /api/projects/recent`) plus a manual pat
 ### Step 2.5 — Well import actions UI
 
 Status: pending
-Verification: toolbar exposes project/import/history actions; `Wells`, `Models`, and `Templates` tabs drive active-well selection and viewer composition; one usable well can be created/imported entirely from the frontend
+Verification: top row exposes `Project`, `Wells`, `Tops`, `Undo`, `Redo`; second row switches contextual actions by mode; `Wells`, `Models`, and `Templates` tabs drive active-well selection and viewer composition
 Commit: —
 
 **Goal:** Close the current product gap between project selection and interactive work. A user who has opened a project must be able to manage the project, save/undo/redo, and create or populate a well from the UI before entering formation editing and overlay interaction steps.
 
-**Primary toolbar actions to add:**
+**Toolbar structure:**
 
-- `New project`
-- `Open project`
-- `Close project`
-- `Save project`
+Top row:
+
+- `Project`
+- `Wells`
+- `Tops`
 - `Undo`
 - `Redo`
-- `Create well`
-- `Load LAS`
-- `Load tops`
-- `Load deviation`
 
-**Header controls to keep in the same action band:**
+Second row depends on the active mode:
 
-- `Zoom presets`
+- `Project` mode:
+  - `New project`
+  - `Open project`
+  - `Close project`
+  - `Save project`
+  - `Create checkpoint`
+- `Wells` mode:
+  - `Create well`
+  - `Load logs`
+  - `Load tops`
+  - `Load deviation`
+- `Tops` mode:
+  - `Load tops`
+  - `Add top`
+  - `Link top`
+  - `Set age`
+  - `Set type`
+  - `Delete top`
+  - `Delete all tops`
+  - `Move top`
 
 **Behavior contract:**
 
+- `Project`, `Wells`, and `Tops` are mutually exclusive modes; one is always active while a project is open
+- `Undo` / `Redo` remain global actions in the top row and are not mode toggles
 - `New project` reopens `NewProjectDialog`
 - `Open project` reopens `FileOpenDialog`
 - `Close project` calls `POST /api/projects/close`, clears app state, and returns to the gated project-selector view
 - `Save project` calls `POST /api/projects/save`
-- `Undo` / `Redo` call the existing project history endpoints and refresh status after completion
+- `Create checkpoint` calls `POST /api/projects/checkpoints`
+- `Load logs` is a single action that accepts LAS and CSV log inputs
 - active well switching is handled through the left-side `Wells` tab; no separate header well selector remains
 
 **UI contract:**
 
-- Actions live in the main app toolbar and are visible only when a project is open.
-- Each action opens a lightweight dialog rather than navigating away from the current viewer.
+- The toolbar is rendered in two rows and is visible only when a project is open.
+- The top row controls mode and global history actions.
+- The second row shows contextual buttons for the currently active mode only.
+- Each action opens a lightweight dialog or performs a scoped action without navigating away from the current viewer.
 - Dialog errors are shown inline; success closes the dialog and refreshes project state.
-- Buttons that are not currently available (`Save`, `Undo`, `Redo`, `Close project`) are disabled when their action is not valid.
+- Buttons that are not currently available (`Save`, `Undo`, `Redo`, `Close project`, and any top action that needs a selected top) are disabled when their action is not valid.
 
 **Independent well-ingestion contract**
 
@@ -475,6 +500,14 @@ iteration is:
 4. Data objects use checkbox behavior:
    - curves, `TOPS`, and `DEV` may be independently enabled or disabled for visualization
    - multiple data objects may be enabled at the same time
+   - the `TOPS` parent node exposes a tri-state checkbox:
+     - empty when no tops are visualized
+     - gray/indeterminate when only part of the tops set is visualized
+     - black/checked when all tops are visualized
+   - clicking the `TOPS` parent checkbox behaves as:
+     - empty -> enable all tops
+     - checked -> disable all tops
+     - gray/indeterminate -> disable all tops
 
 5. Objects in `Data Manager` must be clickable:
    - clicking a well root makes that well active

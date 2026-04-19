@@ -21,14 +21,19 @@ interface FormationResponse {
   depth_md: number
   age_ma?: number
   color: string
+  kind: string
+  strat_color?: string | null
   is_locked: boolean
   lithology?: FormationTop['lithology']
+  strat_unit_id?: number | null
+  strat_unit_name?: string | null
 }
 
 interface FormationCreatePayload {
   name: string
   depth_md: number
   color?: string
+  kind?: string
   lithology?: FormationTop['lithology']
   age_ma?: number
   is_locked?: boolean
@@ -38,9 +43,11 @@ interface FormationPatchPayload {
   name?: string
   depth_md?: number
   color?: string
+  kind?: string
   lithology?: FormationTop['lithology']
   age_ma?: number
   is_locked?: boolean
+  strat_unit_id?: number | null
 }
 
 export interface WellDataStore {
@@ -86,8 +93,12 @@ function mapFormation(row: FormationResponse): FormationTop {
     depth_md: row.depth_md,
     age_ma: row.age_ma,
     color: row.color,
+    kind: row.kind,
+    strat_color: row.strat_color,
     is_locked: row.is_locked,
     lithology: row.lithology,
+    strat_unit_id: row.strat_unit_id,
+    strat_unit_name: row.strat_unit_name,
   }
 }
 

@@ -7,7 +7,7 @@ from sqlalchemy.orm import selectinload
 
 from subsidence.data import CreateFormation, ProjectManager, RemoveFormation, UpdateFormation, UpdateFormationDepth
 from subsidence.data.undo import _model_to_dict
-from subsidence.data.schema import FormationTopModel, WellModel
+from subsidence.data.schema import FormationTopModel, StratUnit, WellModel
 
 router = APIRouter(tags=['formations'])
 
@@ -16,6 +16,7 @@ class FormationTopCreate(BaseModel):
     name: str
     depth_md: float
     color: str = '#808080'
+    kind: str = 'strat'
     lithology: str | None = None
     age_ma: float | None = None
     is_locked: bool = False
@@ -25,9 +26,11 @@ class FormationTopPatch(BaseModel):
     name: str | None = None
     depth_md: float | None = None
     color: str | None = None
+    kind: str | None = None
     lithology: str | None = None
     age_ma: float | None = None
     is_locked: bool | None = None
+    strat_unit_id: int | None = None
 
 
 class FormationTopResponse(BaseModel):
@@ -35,9 +38,20 @@ class FormationTopResponse(BaseModel):
     name: str
     depth_md: float
     color: str
+    kind: str
+    strat_color: str | None
     lithology: str | None
     age_ma: float | None
     is_locked: bool
+    strat_unit_id: int | None
+    strat_unit_name: str | None
+
+
+class StratUnitLookupResponse(BaseModel):
+    id: int
+    name: str
+    rank: str | None
+    color_hex: str | None
 
 
 def _manager(request: Request) -> ProjectManager:
@@ -72,10 +86,35 @@ def _to_response(row: FormationTopModel) -> FormationTopResponse:
         name=row.name,
         depth_md=row.depth_md,
         color=row.color,
+        kind=row.kind,
+        strat_color=row.strat_unit.color_hex if row.strat_unit is not None else None,
         lithology=row.strat_unit.lithology if row.strat_unit is not None else None,
         age_ma=row.age_top_ma,
         is_locked=row.is_locked,
+        strat_unit_id=row.strat_unit_id,
+        strat_unit_name=row.strat_unit.name if row.strat_unit is not None else None,
     )
+
+
+@router.get('/strat-units', response_model=list[StratUnitLookupResponse])
+def list_strat_units(request: Request, q: str = '', limit: int = 20) -> list[StratUnitLookupResponse]:
+    manager = _require_open_project(request)
+    with manager.get_session() as session:
+        stmt = select(StratUnit).order_by(StratUnit.name.asc()).limit(max(1, min(limit, 100)))
+        query = q.strip()
+        if query:
+            stmt = stmt.where(StratUnit.name.ilike(f'%{query}%'))
+
+        rows = session.scalars(stmt).all()
+        return [
+            StratUnitLookupResponse(
+                id=row.id,
+                name=row.name,
+                rank=row.rank,
+                color_hex=row.color_hex,
+            )
+            for row in rows
+        ]
 
 
 @router.get('/wells/{well_id}/formations', response_model=list[FormationTopResponse])
@@ -103,6 +142,7 @@ def create_formation(well_id: str, body: FormationTopCreate, request: Request) -
             depth_md=body.depth_md,
             age_top_ma=body.age_ma,
             color=body.color,
+            kind=body.kind,
             is_locked=body.is_locked,
         )
         session.add(row)
@@ -132,6 +172,7 @@ def update_formation(well_id: str, formation_id: int, body: FormationTopPatch, r
             'name': ('name', body.name),
             'depth_md': ('depth_md', body.depth_md),
             'color': ('color', body.color),
+            'kind': ('kind', body.kind),
             'age_top_ma': ('age_top_ma', body.age_ma),
             'is_locked': ('is_locked', body.is_locked),
         }
@@ -144,6 +185,14 @@ def update_formation(well_id: str, formation_id: int, body: FormationTopPatch, r
                 continue
             old_values[model_field] = current_value
             new_values[model_field] = value
+
+        if 'strat_unit_id' in body.model_fields_set:
+            strat_unit_id = body.strat_unit_id
+            if strat_unit_id is not None and session.get(StratUnit, strat_unit_id) is None:
+                raise HTTPException(status_code=404, detail=f'Strat unit not found: {strat_unit_id}')
+            if row.strat_unit_id != strat_unit_id:
+                old_values['strat_unit_id'] = row.strat_unit_id
+                new_values['strat_unit_id'] = strat_unit_id
 
     if not new_values:
         with manager.get_session() as session:

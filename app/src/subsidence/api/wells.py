@@ -30,8 +30,12 @@ class FormationResponse(BaseModel):
     depth_md: float
     age_ma: float | None = None
     color: str
+    kind: str
+    strat_color: str | None = None
     is_locked: bool
     lithology: str | None = None
+    strat_unit_id: int | None = None
+    strat_unit_name: str | None = None
 
 
 class DeviationSummaryResponse(BaseModel):
@@ -131,8 +135,12 @@ def get_well(well_id: str, request: Request) -> WellResponse:
                 depth_md=row.depth_md,
                 age_ma=row.age_top_ma,
                 color=row.color,
+                kind=row.kind,
+                strat_color=row.strat_unit.color_hex if row.strat_unit is not None else None,
                 is_locked=row.is_locked,
                 lithology=row.strat_unit.lithology if row.strat_unit is not None else None,
+                strat_unit_id=row.strat_unit_id,
+                strat_unit_name=row.strat_unit.name if row.strat_unit is not None else None,
             )
             for row in formation_rows
         ]

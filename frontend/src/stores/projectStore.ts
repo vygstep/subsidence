@@ -26,6 +26,7 @@ export interface ProjectStore {
   loadVisualConfig: () => Promise<void>
   saveVisualConfig: (patch: Record<string, unknown>) => Promise<void>
   saveProject: () => Promise<void>
+  createCheckpoint: (name?: string, description?: string) => Promise<void>
   undo: () => Promise<void>
   redo: () => Promise<void>
 }
@@ -120,6 +121,17 @@ async function openProjectRequest(path: string): Promise<OpenProjectResponse> {
 
 async function postAction(path: string): Promise<void> {
   const response = await fetch(path, { method: 'POST' })
+  if (!response.ok) {
+    throw new Error(await readError(response, `Request failed for ${path} (${response.status})`))
+  }
+}
+
+async function postJsonAction(path: string, payload: Record<string, unknown>): Promise<void> {
+  const response = await fetch(path, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(payload),
+  })
   if (!response.ok) {
     throw new Error(await readError(response, `Request failed for ${path} (${response.status})`))
   }
@@ -262,6 +274,22 @@ export const useProjectStore = create<ProjectStore>((set, get) => ({
   },
   async saveProject() {
     await postAction('/api/projects/save')
+    const payload = await fetchStatus()
+    set({
+      isOpen: payload.is_open,
+      projectName: payload.project_name,
+      projectPath: payload.project_path,
+      isDirty: payload.is_dirty,
+      canUndo: payload.can_undo,
+      canRedo: payload.can_redo,
+    })
+  },
+  async createCheckpoint(name, description = '') {
+    const stamp = new Date().toISOString().replace(/[:.]/g, '-')
+    await postJsonAction('/api/projects/checkpoints', {
+      name: name?.trim() || `checkpoint-${stamp}`,
+      description,
+    })
     const payload = await fetchStatus()
     set({
       isOpen: payload.is_open,

@@ -1,4 +1,4 @@
-import { Fragment } from 'react'
+import { Fragment, useEffect, useMemo, useRef } from 'react'
 
 import type { CurveData, FormationTop, Well } from '@/types'
 
@@ -11,10 +11,13 @@ interface WellDataPanelProps {
   visibleCurveMnemonics: string[]
   visibleFormationIds: string[]
   isDeviationVisible: boolean
+  selectedFormationId: string | null
   onSelectWell: (wellId: string) => void
   onToggleCurve: (mnemonic: string, nextValue: boolean) => void
   onToggleFormation: (formationId: string, nextValue: boolean) => void
+  onToggleAllFormations: (nextValue: boolean) => void
   onToggleDeviation: (nextValue: boolean) => void
+  onSelectFormation: (formationId: string) => void
 }
 
 function formatNumber(value: number | null | undefined): string {
@@ -50,7 +53,37 @@ function checkboxLeaf(
 }
 
 function topBackgroundColor(formation: FormationTop): string {
-  return formation.color || '#9ca3af'
+  return formation.strat_color || '#9ca3af'
+}
+
+interface TriStateCheckboxProps {
+  state: 'none' | 'partial' | 'all'
+  onToggle: (nextValue: boolean) => void
+}
+
+function TriStateCheckbox({ state, onToggle }: TriStateCheckboxProps) {
+  const inputRef = useRef<HTMLInputElement | null>(null)
+
+  useEffect(() => {
+    if (inputRef.current) {
+      inputRef.current.indeterminate = state === 'partial'
+    }
+  }, [state])
+
+  return (
+    <input
+      ref={inputRef}
+      type="checkbox"
+      className={`tree-tristate-checkbox tree-tristate-checkbox--${state}`}
+      checked={state === 'all'}
+      readOnly
+      onClick={(event) => {
+        event.preventDefault()
+        event.stopPropagation()
+        onToggle(state === 'none')
+      }}
+    />
+  )
 }
 
 export function WellDataPanel({
@@ -62,10 +95,13 @@ export function WellDataPanel({
   visibleCurveMnemonics,
   visibleFormationIds,
   isDeviationVisible,
+  selectedFormationId,
   onSelectWell,
   onToggleCurve,
   onToggleFormation,
+  onToggleAllFormations,
   onToggleDeviation,
+  onSelectFormation,
 }: WellDataPanelProps) {
   if (wells.length === 0) {
     return (
@@ -78,6 +114,15 @@ export function WellDataPanel({
   const hasLas = Boolean(well) && curves.length > 0
   const hasTops = Boolean(well) && formations.length > 0
   const hasDeviation = Boolean(well?.deviation)
+  const topsCheckboxState = useMemo<'none' | 'partial' | 'all'>(() => {
+    if (formations.length === 0 || visibleFormationIds.length === 0) {
+      return 'none'
+    }
+    if (visibleFormationIds.length >= formations.length) {
+      return 'all'
+    }
+    return 'partial'
+  }, [formations.length, visibleFormationIds.length])
 
   return (
     <div className="sidebar-panel__body">
@@ -143,19 +188,34 @@ export function WellDataPanel({
                 </details>
 
                 <details className="tree-node" open>
-                  <summary className="tree-node__summary">TOPS</summary>
+                  <summary className="tree-node__summary tree-node__summary--with-action">
+                    <span className="tree-node__summary-main">
+                      <TriStateCheckbox state={topsCheckboxState} onToggle={onToggleAllFormations} />
+                      <span>TOPS</span>
+                    </span>
+                  </summary>
                   <div className="tree-node__children">
                     {hasTops ? (
                       formations.map((formation) => (
-                        <Fragment key={formation.id}>
+                        <div
+                          key={formation.id}
+                          className={`top-leaf ${selectedFormationId === formation.id ? 'top-leaf--selected' : ''}`}
+                          style={{ backgroundColor: topBackgroundColor(formation) }}
+                          onClick={() => onSelectFormation(formation.id)}
+                        >
                           {checkboxLeaf(
                             visibleFormationIds.includes(formation.id),
                             formation.name,
                             formatNumber(formation.depth_md),
                             (nextValue) => onToggleFormation(formation.id, nextValue),
-                            topBackgroundColor(formation),
                           )}
-                        </Fragment>
+                          {formation.strat_unit_name ? (
+                            <div className="top-leaf__link-state">Linked: {formation.strat_unit_name}</div>
+                          ) : (
+                            <div className="top-leaf__link-state">Unlinked</div>
+                          )}
+                          <div className="top-leaf__kind">Type: {formation.kind}</div>
+                        </div>
                       ))
                     ) : (
                       <p className="sidebar-panel__empty">No tops loaded.</p>
