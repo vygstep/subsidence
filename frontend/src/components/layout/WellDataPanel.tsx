@@ -304,12 +304,6 @@ export function WellDataPanel({
                                     secondary={formatNumber(formation.depth_md)}
                                     onChange={(nextValue) => onToggleFormation(formation.id, nextValue)}
                                   />
-                                  {formation.active_strat_unit_name ? (
-                                    <div className="top-leaf__link-state">Linked: {formation.active_strat_unit_name}</div>
-                                  ) : (
-                                    <div className="top-leaf__link-state">Unlinked</div>
-                                  )}
-                                  <div className="top-leaf__kind">Type: {formation.kind}</div>
                                 </div>
                               ))
                             ) : (
