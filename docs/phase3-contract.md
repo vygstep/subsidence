@@ -111,22 +111,22 @@ React panels communicating through Zustand stores and the Phase 2.5 REST API.
 - [x] 2.5.A6 Import persistence fix: `import-las`, `import-tops`, `import-deviation`, `import-unconformities` call `manager.save_project()` instead of `manager.mark_dirty()` so canonical `project.db` is always updated after a successful import; previously a server restart after import would silently discard all imported data
 
 ### Step 2.5-B — StratChart multi-chart system
-- [ ] 2.5.B1 Add `strat_charts` table to schema: `id`, `name`, `source_path`, `is_active` (bool), `imported_at`; enforce single active with a DB check or application-level guard
-- [ ] 2.5.B2 Add `chart_id INTEGER FK → strat_charts.id` to `strat_units`; migrate existing rows to an auto-created chart named `"Default"` if any exist
-- [ ] 2.5.B3 Add `formation_strat_links` table: `id`, `formation_id FK → formation_tops.id ON DELETE CASCADE`, `strat_unit_id FK → strat_units.id ON DELETE CASCADE`, `chart_id FK → strat_charts.id` (denormalised); `UNIQUE (formation_id, chart_id)`
-- [ ] 2.5.B4 Remove `strat_unit_id` from `FormationTopModel`; update `_capture_well_snapshot` / `_restore_well_snapshot` to serialise and restore `formation_strat_links` rows for the well
-- [ ] 2.5.B5 Extend `POST /api/strat-chart/import` with optional `name` body field (defaults to filename stem); creates a `strat_chart` row and associates all imported units to it; if no chart exists yet, set `is_active = true` automatically
-- [ ] 2.5.B6 `GET /api/strat-charts` → `list[StratChartInfo]` (`id`, `name`, `is_active`, `unit_count`, `imported_at`, `source_path`)
-- [ ] 2.5.B7 `PATCH /api/strat-charts/{chart_id}/activate` → sets target `is_active = true`, all others `false`; returns updated list
-- [ ] 2.5.B8 `DELETE /api/strat-charts/{chart_id}` → deletes chart + its strat_units + cascades to `formation_strat_links`; does not auto-activate another chart
-- [ ] 2.5.B9 `PUT /api/wells/{well_id}/formations/{formation_id}/strat-link` body `{ chart_id, strat_unit_id | null }` → upsert or delete row in `formation_strat_links`; returns updated `FormationTopResponse`
-- [ ] 2.5.B10 `GET /api/wells/{id}/formations` response gains `strat_links: [{chart_id, chart_name, strat_unit_id, strat_unit_name, color_hex}]` and computed `active_strat_color: string | null`, `active_strat_unit_name: string | null`
-- [ ] 2.5.B11 Auto-link priority on `import_tops_csv` and `import_unconformities_csv`: (1) name match case-insensitive against active chart; (2) age fallback — if top has `age_top_ma`, find narrowest-rank unit in active chart where `unit.age_top_ma ≤ top.age_top_ma ≤ unit.age_base_ma`; runs only against the **active** chart
-- [ ] 2.5.B12 On `POST /api/strat-chart/import` success: run auto-link (name + age) for **all** existing formation tops in all wells against the newly imported chart; if the chart is active, update formation colors accordingly
-- [ ] 2.5.B13 Formation top display color = `active_strat_color ?? formation.color`; apply in `FormationTopLine`, `FormationTopsList`, and `FormationColumn`
-- [ ] 2.5.B14 `LinkStratChartDialog` filters unit search to the **active** chart only; disabled and shows tooltip `"No active chart"` when `is_active` chart does not exist; `Link top` toolbar button disabled when no active chart
-- [ ] 2.5.B15 Add `StratChart` tab to left sidebar (between `Wells` and `Models`): scrollable list of loaded charts; each row shows chart name, unit count, import date, radio button for active, trash button; empty state shows `"No charts loaded — use Load StratChart"`
-- [ ] 2.5.B16 Clicking a radio in the `StratChart` tab calls `PATCH .../activate`, refreshes chart list and all formation tops (colors update without page reload)
+- [x] 2.5.B1 Add `strat_charts` table to schema: `id`, `name`, `source_path`, `is_active` (bool), `imported_at`; enforce single active with a DB check or application-level guard
+- [x] 2.5.B2 Add `chart_id INTEGER FK → strat_charts.id` to `strat_units`; migrate existing rows to an auto-created chart named `"Default"` if any exist — implemented as migration to `"ICS 2023"` chart, not `"Default"`
+- [x] 2.5.B3 Add `formation_strat_links` table: `id`, `formation_id FK → formation_tops.id ON DELETE CASCADE`, `strat_unit_id FK → strat_units.id ON DELETE CASCADE`, `chart_id FK → strat_charts.id` (denormalised); `UNIQUE (formation_id, chart_id)`
+- [x] 2.5.B4 Remove `strat_unit_id` from `FormationTopModel`; update `_capture_well_snapshot` / `_restore_well_snapshot` to serialise and restore `formation_strat_links` rows for the well
+- [x] 2.5.B5 Extend `POST /api/strat-chart/import` with optional `name` body field (defaults to filename stem); creates a `strat_chart` row and associates all imported units to it; if no chart exists yet, set `is_active = true` automatically
+- [x] 2.5.B6 `GET /api/strat-charts` → `list[StratChartInfo]` (`id`, `name`, `is_active`, `unit_count`, `imported_at`, `source_path`)
+- [x] 2.5.B7 `PATCH /api/strat-charts/{chart_id}/activate` → sets target `is_active = true`, all others `false`; returns updated list
+- [x] 2.5.B8 `DELETE /api/strat-charts/{chart_id}` → deletes chart + its strat_units + cascades to `formation_strat_links`; does not auto-activate another chart
+- [x] 2.5.B9 `PUT /api/wells/{well_id}/formations/{formation_id}/strat-link` body `{ chart_id, strat_unit_id | null }` → upsert or delete row in `formation_strat_links`; returns updated `FormationTopResponse`
+- [x] 2.5.B10 `GET /api/wells/{id}/formations` response gains `strat_links: [{chart_id, chart_name, strat_unit_id, strat_unit_name, color_hex}]` and computed `active_strat_color: string | null`, `active_strat_unit_name: string | null`
+- [x] 2.5.B11 Auto-link priority on `import_tops_csv` and `import_unconformities_csv`: (1) name match case-insensitive against active chart; (2) age fallback — if top has `age_top_ma`, find narrowest-rank unit in active chart where `unit.age_top_ma ≤ top.age_top_ma ≤ unit.age_base_ma`; runs only against the **active** chart
+- [x] 2.5.B12 On `POST /api/strat-charts/import` success: run auto-link (name + age) for **all** existing formation tops in all wells against the newly imported chart; if the chart is active, update formation colors accordingly
+- [x] 2.5.B13 Formation top display color = `active_strat_color ?? formation.color`; applied in `WellDataPanel` and `FormationColumn`; `FormationTopLine` is part of Step 4
+- [x] 2.5.B14 `LinkStratChartDialog` filters unit search to the **active** chart only; disabled and shows tooltip `"No active chart"` when `is_active` chart does not exist; `Link top` toolbar button disabled when no active chart
+- [x] 2.5.B15 Add `StratChart` tab to left sidebar (between `Wells` and `Models`): scrollable list of loaded charts; each row shows chart name, unit count, import date, radio button for active, trash button; empty state shows `"No charts loaded — use Load StratChart"`
+- [x] 2.5.B16 Clicking a radio in the `StratChart` tab calls `PATCH .../activate`, refreshes chart list and all formation tops (colors update without page reload)
 - [ ] 2.5.B17 Verify: load chart A → tops auto-linked by name; load chart B → tops also auto-linked to B; activate chart B → colors switch to B palette; `Link top` dialog shows only B units; delete chart B → formation links to B removed, colors fall back to chart A or own color
 
 ### Step 3 — Formation tops API + store CRUD
