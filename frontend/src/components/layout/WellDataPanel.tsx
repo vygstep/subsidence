@@ -1,9 +1,20 @@
+import { Fragment } from 'react'
+
 import type { CurveData, FormationTop, Well } from '@/types'
 
 interface WellDataPanelProps {
+  wells: Array<{ well_id: string; well_name: string }>
+  activeWellId: string | null
   well: Well | null
   curves: CurveData[]
   formations: FormationTop[]
+  visibleCurveMnemonics: string[]
+  visibleFormationIds: string[]
+  isDeviationVisible: boolean
+  onSelectWell: (wellId: string) => void
+  onToggleCurve: (mnemonic: string, nextValue: boolean) => void
+  onToggleFormation: (formationId: string, nextValue: boolean) => void
+  onToggleDeviation: (nextValue: boolean) => void
 }
 
 function formatNumber(value: number | null | undefined): string {
@@ -22,8 +33,41 @@ function fileLabel(path: string | null | undefined): string {
   return parts[parts.length - 1] || normalized
 }
 
-export function WellDataPanel({ well, curves, formations }: WellDataPanelProps) {
-  if (!well) {
+function checkboxLeaf(
+  checked: boolean,
+  label: string,
+  secondary: string,
+  onChange: (nextValue: boolean) => void,
+  backgroundColor?: string,
+) {
+  return (
+    <label className="tree-checkbox-leaf" style={backgroundColor ? { backgroundColor } : undefined}>
+      <input type="checkbox" checked={checked} onChange={(event) => onChange(event.target.checked)} />
+      <span className="tree-checkbox-leaf__label">{label}</span>
+      <span className="tree-checkbox-leaf__meta">{secondary}</span>
+    </label>
+  )
+}
+
+function topBackgroundColor(formation: FormationTop): string {
+  return formation.color || '#9ca3af'
+}
+
+export function WellDataPanel({
+  wells,
+  activeWellId,
+  well,
+  curves,
+  formations,
+  visibleCurveMnemonics,
+  visibleFormationIds,
+  isDeviationVisible,
+  onSelectWell,
+  onToggleCurve,
+  onToggleFormation,
+  onToggleDeviation,
+}: WellDataPanelProps) {
+  if (wells.length === 0) {
     return (
       <div className="sidebar-panel__body">
         <p className="sidebar-panel__empty">No well loaded.</p>
@@ -31,85 +75,124 @@ export function WellDataPanel({ well, curves, formations }: WellDataPanelProps) 
     )
   }
 
-  const hasLas = curves.length > 0
-  const hasTops = formations.length > 0
-  const hasDeviation = Boolean(well.deviation)
+  const hasLas = Boolean(well) && curves.length > 0
+  const hasTops = Boolean(well) && formations.length > 0
+  const hasDeviation = Boolean(well?.deviation)
 
   return (
     <div className="sidebar-panel__body">
-      <details className="tree-node tree-node--root" open>
-        <summary className="tree-node__summary">{well.well_name}</summary>
+      {wells.map((item) => {
+        const isActive = item.well_id === activeWellId
+        return (
+          <details key={item.well_id} className="tree-node tree-node--root" open={isActive}>
+            <summary
+              className={`tree-node__summary tree-node__summary--well ${isActive ? 'tree-node__summary--active' : ''}`}
+              onClick={(event) => {
+                event.preventDefault()
+                onSelectWell(item.well_id)
+              }}
+            >
+              <span className="tree-node__summary-main">
+                <input
+                  type="radio"
+                  name="active-well"
+                  checked={isActive}
+                  onChange={() => onSelectWell(item.well_id)}
+                  onClick={(event) => event.stopPropagation()}
+                />
+                <span>{item.well_name}</span>
+              </span>
+            </summary>
 
-        <div className="tree-node__children">
-          <details className="tree-node" open>
-            <summary className="tree-node__summary">Well metadata</summary>
-            <div className="tree-node__children">
-              <div className="tree-leaf"><span>Name</span><span>{well.well_name}</span></div>
-              <div className="tree-leaf"><span>Location (X, Y)</span><span>{formatNumber(well.x)}, {formatNumber(well.y)}</span></div>
-              <div className="tree-leaf"><span>KB / GL</span><span>{formatNumber(well.kb_elev)} / {formatNumber(well.gl_elev)}</span></div>
-              <div className="tree-leaf"><span>TD</span><span>{formatNumber(well.td_md)}</span></div>
-              <div className="tree-leaf"><span>CRS</span><span>{well.crs || 'unset'}</span></div>
-            </div>
-          </details>
-
-          <details className="tree-node" open>
-            <summary className="tree-node__summary">LAS</summary>
-            <div className="tree-node__children">
-              {hasLas ? (
+            {isActive && well ? (
+              <div className="tree-node__children">
                 <details className="tree-node" open>
-                  <summary className="tree-node__summary">{fileLabel(well.source_las_path)}</summary>
+                  <summary className="tree-node__summary">Well metadata</summary>
                   <div className="tree-node__children">
-                    {curves.map((curve) => (
-                      <div key={curve.mnemonic} className="tree-leaf">
-                        <span>{curve.mnemonic}</span>
-                        <span>{curve.unit || '—'}</span>
-                      </div>
-                    ))}
+                    <div className="tree-leaf"><span>Name</span><span>{well.well_name}</span></div>
+                    <div className="tree-leaf"><span>Location (X, Y)</span><span>{formatNumber(well.x)}, {formatNumber(well.y)}</span></div>
+                    <div className="tree-leaf"><span>KB / GL</span><span>{formatNumber(well.kb_elev)} / {formatNumber(well.gl_elev)}</span></div>
+                    <div className="tree-leaf"><span>TD</span><span>{formatNumber(well.td_md)}</span></div>
+                    <div className="tree-leaf"><span>CRS</span><span>{well.crs || 'unset'}</span></div>
                   </div>
                 </details>
-              ) : (
-                <p className="sidebar-panel__empty">No LAS loaded.</p>
-              )}
-            </div>
-          </details>
 
-          <details className="tree-node" open>
-            <summary className="tree-node__summary">TOPS</summary>
-            <div className="tree-node__children">
-              {hasTops ? (
-                formations.map((formation) => (
-                  <div key={formation.id} className="tree-leaf">
-                    <span>{formation.name}</span>
-                    <span>{formatNumber(formation.depth_md)}</span>
+                <details className="tree-node" open>
+                  <summary className="tree-node__summary">LAS</summary>
+                  <div className="tree-node__children">
+                    {hasLas ? (
+                      <details className="tree-node" open>
+                        <summary className="tree-node__summary">{fileLabel(well.source_las_path)}</summary>
+                        <div className="tree-node__children">
+                          {curves.map((curve) => (
+                            <Fragment key={curve.mnemonic}>
+                              {checkboxLeaf(
+                                visibleCurveMnemonics.includes(curve.mnemonic),
+                                curve.mnemonic,
+                                curve.unit || '—',
+                                (nextValue) => onToggleCurve(curve.mnemonic, nextValue),
+                              )}
+                            </Fragment>
+                          ))}
+                        </div>
+                      </details>
+                    ) : (
+                      <p className="sidebar-panel__empty">No LAS loaded.</p>
+                    )}
                   </div>
-                ))
-              ) : (
-                <p className="sidebar-panel__empty">No tops loaded.</p>
-              )}
-            </div>
-          </details>
+                </details>
 
-          <details className="tree-node" open>
-            <summary className="tree-node__summary">DEV</summary>
-            <div className="tree-node__children">
-              {hasDeviation ? (
-                <>
-                  <div className="tree-leaf"><span>Reference</span><span>{well.deviation?.reference}</span></div>
-                  <div className="tree-leaf"><span>Mode</span><span>{well.deviation?.mode}</span></div>
-                  {(well.deviation?.fields ?? []).map((field) => (
-                    <div key={field} className="tree-leaf">
-                      <span>{field}</span>
-                      <span>Loaded</span>
-                    </div>
-                  ))}
-                </>
-              ) : (
-                <p className="sidebar-panel__empty">No deviation loaded.</p>
-              )}
-            </div>
+                <details className="tree-node" open>
+                  <summary className="tree-node__summary">TOPS</summary>
+                  <div className="tree-node__children">
+                    {hasTops ? (
+                      formations.map((formation) => (
+                        <Fragment key={formation.id}>
+                          {checkboxLeaf(
+                            visibleFormationIds.includes(formation.id),
+                            formation.name,
+                            formatNumber(formation.depth_md),
+                            (nextValue) => onToggleFormation(formation.id, nextValue),
+                            topBackgroundColor(formation),
+                          )}
+                        </Fragment>
+                      ))
+                    ) : (
+                      <p className="sidebar-panel__empty">No tops loaded.</p>
+                    )}
+                  </div>
+                </details>
+
+                <details className="tree-node" open>
+                  <summary className="tree-node__summary">DEV</summary>
+                  <div className="tree-node__children">
+                    {hasDeviation ? (
+                      <>
+                        {checkboxLeaf(
+                          isDeviationVisible,
+                          'Deviation survey',
+                          well.deviation?.reference ?? 'Loaded',
+                          onToggleDeviation,
+                        )}
+                        <div className="tree-leaf"><span>Reference</span><span>{well.deviation?.reference}</span></div>
+                        <div className="tree-leaf"><span>Mode</span><span>{well.deviation?.mode}</span></div>
+                        {(well.deviation?.fields ?? []).map((field) => (
+                          <div key={field} className="tree-leaf">
+                            <span>{field}</span>
+                            <span>Loaded</span>
+                          </div>
+                        ))}
+                      </>
+                    ) : (
+                      <p className="sidebar-panel__empty">No deviation loaded.</p>
+                    )}
+                  </div>
+                </details>
+              </div>
+            ) : null}
           </details>
-        </div>
-      </details>
+        )
+      })}
     </div>
   )
 }

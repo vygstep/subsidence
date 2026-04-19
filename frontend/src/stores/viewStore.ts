@@ -15,11 +15,13 @@ export interface ViewStore {
   depthPerPixel: number
   visibleDepthRange: VisibleDepthRange
   cursorDepth: number | null
+  selectedTrackId: string | null
   trackWidths: Record<string, number>
   viewportHeight: number
   setScroll: (depth: number) => void
   setScale: (dpp: number) => void
   setCursorDepth: (depth: number | null) => void
+  selectTrack: (trackId: string | null) => void
   setViewportHeight: (height: number) => void
   setTrackWidth: (id: string, width: number) => void
   applyVisualConfig: (config: VisualConfigPayload) => void
@@ -53,6 +55,7 @@ export const useViewStore = create<ViewStore>((set) => ({
   depthPerPixel: initialDepthPerPixel,
   visibleDepthRange: deriveVisibleDepthRange(initialScrollDepth, initialDepthPerPixel, initialViewportHeight),
   cursorDepth: null,
+  selectedTrackId: null,
   trackWidths: {},
   viewportHeight: initialViewportHeight,
   setScroll(depth) {
@@ -69,6 +72,9 @@ export const useViewStore = create<ViewStore>((set) => ({
   },
   setCursorDepth(cursorDepth) {
     set({ cursorDepth })
+  },
+  selectTrack(selectedTrackId) {
+    set({ selectedTrackId })
   },
   setViewportHeight(viewportHeight) {
     set((state) => ({

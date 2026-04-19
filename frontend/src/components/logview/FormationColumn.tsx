@@ -1,11 +1,12 @@
 import { useMemo } from 'react'
 
 import { useCanvasRenderer, useDepthScale } from '@/hooks'
-import { useViewStore, useWellDataStore } from '@/stores'
+import { useViewStore } from '@/stores'
 import { drawLithologyBlock } from '@/renderers'
-import type { LithologyType } from '@/types'
+import type { FormationTop, LithologyType } from '@/types'
 
 interface FormationColumnProps {
+  formations: FormationTop[]
   height: number
   maxDepth: number
   width?: number
@@ -18,9 +19,8 @@ function toRenderableLithology(lithology: LithologyType | undefined) {
   return lithology
 }
 
-export function FormationColumn({ height, maxDepth, width = 80 }: FormationColumnProps) {
+export function FormationColumn({ formations, height, maxDepth, width = 80 }: FormationColumnProps) {
   const visibleDepthRange = useViewStore((state) => state.visibleDepthRange)
-  const formations = useWellDataStore((state) => state.formations)
 
   const orderedFormations = useMemo(
     () => [...formations].sort((left, right) => left.depth_md - right.depth_md),

@@ -12,77 +12,7 @@ import {
   ZoomControl,
 } from '@/components'
 import { useProjectStore, useViewStore, useWellDataStore } from '@/stores'
-import type { TrackConfig } from '@/types'
-
-const DEFAULT_TRACKS: TrackConfig[] = [
-  {
-    id: 'gr',
-    title: 'Gamma Ray',
-    width: 200,
-    scaleType: 'linear',
-    gridDivisions: 3,
-    showGrid: true,
-    curves: [
-      {
-        mnemonic: 'GR',
-        unit: 'API',
-        color: '#22c55e',
-        lineWidth: 1.5,
-        lineStyle: 'solid',
-        scaleMin: 0,
-        scaleMax: 150,
-        scaleReversed: false,
-        fill: {
-          type: 'to-baseline',
-          baseline: 75,
-          colorPositive: '#fef3c7',
-          colorNegative: '#d1fae5',
-          opacity: 0.5,
-        },
-      },
-      { mnemonic: 'CALI', unit: 'in', color: '#111827', lineWidth: 2, lineStyle: 'dashed', scaleMin: 6, scaleMax: 16, scaleReversed: false },
-    ],
-  },
-  {
-    id: 'res',
-    title: 'Resistivity',
-    width: 200,
-    scaleType: 'logarithmic',
-    gridDivisions: 4,
-    showGrid: true,
-    curves: [
-      { mnemonic: 'ILD', unit: 'ohm.m', color: '#ef4444', lineWidth: 1.5, lineStyle: 'solid', scaleMin: 0.2, scaleMax: 2000, scaleReversed: false },
-    ],
-  },
-  {
-    id: 'por',
-    title: 'Porosity',
-    width: 200,
-    scaleType: 'linear',
-    gridDivisions: 3,
-    showGrid: true,
-    curves: [
-      {
-        mnemonic: 'RHOB',
-        unit: 'g/cc',
-        color: '#ef4444',
-        lineWidth: 1.5,
-        lineStyle: 'solid',
-        scaleMin: 1.95,
-        scaleMax: 2.95,
-        scaleReversed: false,
-        fill: {
-          type: 'crossover',
-          pairedCurve: 'NPHI',
-          colorPositive: '#fef9c3',
-          colorNegative: '#e5e7eb',
-          opacity: 0.45,
-        },
-      },
-      { mnemonic: 'NPHI', unit: 'v/v', color: '#2563eb', lineWidth: 1.2, lineStyle: 'dashed', scaleMin: 0.45, scaleMax: -0.15, scaleReversed: true },
-    ],
-  },
-]
+import type { CurveData, TrackConfig } from '@/types'
 
 interface WellListItem {
   well_id: string
@@ -90,7 +20,80 @@ interface WellListItem {
 }
 
 type DialogKind = 'project-open' | 'project-new' | 'create-well' | 'load-las' | 'load-tops' | 'load-deviation' | null
-type SidebarTab = 'wells' | 'models'
+type SidebarTab = 'wells' | 'models' | 'templates'
+
+interface WellViewState {
+  tracks: TrackConfig[]
+  visibleFormationIds: string[]
+  deviationVisible: boolean
+  hiddenTrackIds: string[]
+}
+
+const TRACK_COLORS = ['#22c55e', '#ef4444', '#2563eb', '#f59e0b', '#8b5cf6', '#0f766e', '#dc2626', '#475569']
+
+function computeCurveBounds(curve: CurveData): { min: number; max: number } {
+  let min = Number.POSITIVE_INFINITY
+  let max = Number.NEGATIVE_INFINITY
+
+  for (let index = 0; index < curve.values.length; index += 1) {
+    const value = curve.values[index]
+    if (!Number.isFinite(value) || value === curve.null_value) {
+      continue
+    }
+    min = Math.min(min, value)
+    max = Math.max(max, value)
+  }
+
+  if (!Number.isFinite(min) || !Number.isFinite(max) || min === max) {
+    const fallback = Number.isFinite(min) ? min : 0
+    return { min: fallback, max: fallback + 1 }
+  }
+
+  return { min, max }
+}
+
+function createEmptyTrack(trackId = 'track-1', title = 'Track 1'): TrackConfig {
+  return {
+    id: trackId,
+    title,
+    width: 200,
+    scaleType: 'linear',
+    gridDivisions: 3,
+    showGrid: true,
+    curves: [],
+  }
+}
+
+function createDefaultWellView(): WellViewState {
+  return {
+    tracks: [createEmptyTrack()],
+    visibleFormationIds: [],
+    deviationVisible: false,
+    hiddenTrackIds: [],
+  }
+}
+
+function nextTrackNumber(tracks: TrackConfig[]): number {
+  const numbers = tracks.map((track) => {
+    const match = /^track-(\d+)$/.exec(track.id)
+    return match ? Number(match[1]) : 0
+  })
+  return Math.max(0, ...numbers) + 1
+}
+
+function createCurveConfig(curve: CurveData, index: number): TrackConfig['curves'][number] {
+  const bounds = computeCurveBounds(curve)
+  return {
+    mnemonic: curve.mnemonic,
+    unit: curve.unit,
+    color: TRACK_COLORS[index % TRACK_COLORS.length],
+    lineWidth: 1.5,
+    lineStyle: 'solid',
+    scaleMin: bounds.min,
+    scaleMax: bounds.max,
+    scaleReversed: false,
+  }
+}
 
 async function fetchWellList(): Promise<WellListItem[]> {
   const response = await fetch('/api/wells')
@@ -104,6 +107,7 @@ function App() {
   const [activeDialog, setActiveDialog] = useState<DialogKind>('project-open')
   const [activeSidebarTab, setActiveSidebarTab] = useState<SidebarTab>('wells')
   const [wellOptions, setWellOptions] = useState<WellListItem[]>([])
+  const [wellViewStates, setWellViewStates] = useState<Record<string, WellViewState>>({})
 
   const loadWell = useWellDataStore((state) => state.loadWell)
   const resetWell = useWellDataStore((state) => state.reset)
@@ -128,10 +132,19 @@ function App() {
   const redoProject = useProjectStore((state) => state.redo)
 
   const depthPerPixel = useViewStore((state) => state.depthPerPixel)
+  const selectedTrackId = useViewStore((state) => state.selectedTrackId)
+  const selectTrack = useViewStore((state) => state.selectTrack)
   const trackWidths = useViewStore((state) => state.trackWidths)
   const resetVisualConfig = useViewStore((state) => state.resetVisualConfig)
 
   const configHydratedRef = useRef(false)
+
+  function updateWellViewState(wellId: string, updater: (state: WellViewState) => WellViewState): void {
+    setWellViewStates((current) => ({
+      ...current,
+      [wellId]: updater(current[wellId] ?? createDefaultWellView()),
+    }))
+  }
 
   async function refreshWellList(preferredWellId?: string): Promise<void> {
     const wells = await fetchWellList()
@@ -182,6 +195,8 @@ function App() {
       configHydratedRef.current = false
       resetWell()
       resetVisualConfig()
+      selectTrack(null)
+      setWellViewStates({})
       return
     }
 
@@ -312,15 +327,48 @@ function App() {
     return { minDepth: min, maxDepth: max }
   }, [curves])
 
+  const activeWellView = useMemo(() => {
+    if (!well?.well_id) {
+      return createDefaultWellView()
+    }
+    return wellViewStates[well.well_id] ?? createDefaultWellView()
+  }, [well?.well_id, wellViewStates])
+
   const tracks = useMemo(() => (
-    DEFAULT_TRACKS.map((track) => ({
+    activeWellView.tracks
+      .filter((track) => !activeWellView.hiddenTrackIds.includes(track.id))
+      .map((track) => ({
       ...track,
       curves: track.curves.map((curve) => ({
         ...curve,
         color: colorOverrides[curve.mnemonic] ?? curve.color,
       })),
     }))
-  ), [colorOverrides])
+  ), [activeWellView.hiddenTrackIds, activeWellView.tracks, colorOverrides])
+
+  const visibleCurveMnemonics = useMemo(() => (
+    Array.from(new Set(activeWellView.tracks.flatMap((track) => track.curves.map((curve) => curve.mnemonic))))
+  ), [activeWellView.tracks])
+
+  const visibleFormationIds = activeWellView.visibleFormationIds
+
+  const visibleFormations = useMemo(() => (
+    formations.filter((formation) => visibleFormationIds.includes(formation.id))
+  ), [formations, visibleFormationIds])
+
+  useEffect(() => {
+    if (!well?.well_id) {
+      selectTrack(null)
+      return
+    }
+
+    setWellViewStates((current) => (
+      current[well.well_id]
+        ? current
+        : { ...current, [well.well_id]: createDefaultWellView() }
+    ))
+    selectTrack(null)
+  }, [well?.well_id, selectTrack])
 
   const topbarTitle = !isProjectOpen
     ? 'No project open'
@@ -338,6 +386,182 @@ function App() {
 
   async function handleWellMutation(wellId: string): Promise<void> {
     await refreshWellList(wellId)
+  }
+
+  function handleSelectWell(wellId: string): void {
+    selectTrack(null)
+    void loadWell(wellId)
+  }
+
+  function handleSetDeviationVisible(nextValue: boolean): void {
+    if (!well?.well_id) {
+      return
+    }
+    updateWellViewState(well.well_id, (state) => ({
+      ...state,
+      deviationVisible: nextValue,
+    }))
+  }
+
+  function handleToggleFormation(formationId: string, nextValue: boolean): void {
+    if (!well?.well_id) {
+      return
+    }
+
+    updateWellViewState(well.well_id, (state) => ({
+      ...state,
+      visibleFormationIds: nextValue
+        ? Array.from(new Set([...state.visibleFormationIds, formationId]))
+        : state.visibleFormationIds.filter((id) => id !== formationId),
+    }))
+  }
+
+  function handleToggleCurve(mnemonic: string, nextValue: boolean): void {
+    if (!well?.well_id) {
+      return
+    }
+
+    const curve = curves.find((item) => item.mnemonic === mnemonic)
+    if (!curve) {
+      return
+    }
+
+    updateWellViewState(well.well_id, (state) => {
+      if (!nextValue) {
+        const nextTracks = state.tracks.map((track) => ({
+          ...track,
+          curves: track.curves.filter((item) => item.mnemonic !== mnemonic),
+        }))
+
+        const hasAnyCurve = nextTracks.some((track) => track.curves.length > 0)
+        return {
+          ...state,
+          tracks: hasAnyCurve ? nextTracks : [createEmptyTrack()],
+        }
+      }
+
+      if (state.tracks.some((track) => track.curves.some((item) => item.mnemonic === mnemonic))) {
+        return state
+      }
+
+      const existingCurveCount = state.tracks.reduce((count, track) => count + track.curves.length, 0)
+      const curveConfig = createCurveConfig(curve, existingCurveCount)
+
+      if (selectedTrackId && state.tracks.some((track) => track.id === selectedTrackId)) {
+        return {
+          ...state,
+          tracks: state.tracks.map((track) => {
+            if (track.id !== selectedTrackId) {
+              return track
+            }
+            return {
+              ...track,
+              curves: [...track.curves, curveConfig],
+            }
+          }),
+        }
+      }
+
+      const trackNumber = nextTrackNumber(state.tracks)
+      return {
+        ...state,
+        tracks: [
+          ...state.tracks,
+          {
+            id: `track-${trackNumber}`,
+            title: `Track ${trackNumber}`,
+            width: 200,
+            scaleType: 'linear',
+            gridDivisions: 3,
+            showGrid: true,
+            curves: [curveConfig],
+          },
+        ],
+      }
+    })
+  }
+
+  const activeTemplateSummary = useMemo(() => {
+    if (!well?.well_id) {
+      return null
+    }
+
+    return {
+      trackCount: activeWellView.tracks.length,
+      tracks: activeWellView.tracks,
+      hiddenTrackIds: activeWellView.hiddenTrackIds,
+      visibleCurveCount: visibleCurveMnemonics.length,
+      visibleTopCount: visibleFormationIds.length,
+      deviationVisible: activeWellView.deviationVisible,
+    }
+  }, [activeWellView, visibleCurveMnemonics.length, visibleFormationIds.length, well?.well_id])
+
+  function handleToggleTrackHidden(trackId: string): void {
+    if (!well?.well_id) {
+      return
+    }
+
+    updateWellViewState(well.well_id, (state) => {
+      const nextHiddenTrackIds = state.hiddenTrackIds.includes(trackId)
+        ? state.hiddenTrackIds.filter((id) => id !== trackId)
+        : [...state.hiddenTrackIds, trackId]
+      return {
+        ...state,
+        hiddenTrackIds: nextHiddenTrackIds,
+      }
+    })
+
+    if (selectedTrackId === trackId) {
+      selectTrack(null)
+    }
+  }
+
+  function handleMoveTrack(trackId: string, direction: -1 | 1): void {
+    if (!well?.well_id) {
+      return
+    }
+
+    updateWellViewState(well.well_id, (state) => {
+      const currentIndex = state.tracks.findIndex((track) => track.id === trackId)
+      if (currentIndex < 0) {
+        return state
+      }
+      const nextIndex = currentIndex + direction
+      if (nextIndex < 0 || nextIndex >= state.tracks.length) {
+        return state
+      }
+
+      const nextTracks = [...state.tracks]
+      const [track] = nextTracks.splice(currentIndex, 1)
+      nextTracks.splice(nextIndex, 0, track)
+      return {
+        ...state,
+        tracks: nextTracks,
+      }
+    })
+  }
+
+  function handleRemoveTrack(trackId: string): void {
+    if (!well?.well_id) {
+      return
+    }
+
+    updateWellViewState(well.well_id, (state) => {
+      if (state.tracks.length <= 1) {
+        return state
+      }
+
+      const nextTracks = state.tracks.filter((track) => track.id !== trackId)
+      return {
+        ...state,
+        tracks: nextTracks.length > 0 ? nextTracks : [createEmptyTrack()],
+        hiddenTrackIds: state.hiddenTrackIds.filter((id) => id !== trackId),
+      }
+    })
+
+    if (selectedTrackId === trackId) {
+      selectTrack(null)
+    }
   }
 
   function renderDialog() {
@@ -389,21 +613,6 @@ function App() {
 
             <span className="app-topbar__divider" />
 
-            <select
-              className="app-well-selector"
-              value={well?.well_id ?? ''}
-              onChange={(event) => void loadWell(event.target.value)}
-              disabled={wellOptions.length === 0}
-            >
-              {wellOptions.length === 0 ? (
-                <option value="">No wells</option>
-              ) : (
-                wellOptions.map((item) => (
-                  <option key={item.well_id} value={item.well_id}>{item.well_name}</option>
-                ))
-              )}
-            </select>
-
             <ZoomControl />
           </div>
         )}
@@ -434,10 +643,113 @@ function App() {
                   >
                     Models
                   </button>
+                  <button
+                    type="button"
+                    className={`sidebar-tab ${activeSidebarTab === 'templates' ? 'sidebar-tab--active' : ''}`}
+                    onClick={() => setActiveSidebarTab('templates')}
+                  >
+                    Templates
+                  </button>
                 </header>
 
                 {activeSidebarTab === 'wells' ? (
-                  <WellDataPanel well={well} curves={curves} formations={formations} />
+                  <WellDataPanel
+                    wells={wellOptions}
+                    activeWellId={well?.well_id ?? null}
+                    well={well}
+                    curves={curves}
+                    formations={formations}
+                    visibleCurveMnemonics={visibleCurveMnemonics}
+                    visibleFormationIds={visibleFormationIds}
+                    isDeviationVisible={activeWellView.deviationVisible}
+                    onSelectWell={handleSelectWell}
+                    onToggleCurve={handleToggleCurve}
+                    onToggleFormation={handleToggleFormation}
+                    onToggleDeviation={handleSetDeviationVisible}
+                  />
+                ) : activeSidebarTab === 'templates' ? (
+                  <div className="sidebar-panel__body">
+                    {well && activeTemplateSummary ? (
+                      <div className="template-panel">
+                        <div className="template-panel__group">
+                          <div className="template-panel__label">Well</div>
+                          <div className="template-panel__value">{well.well_name}</div>
+                        </div>
+                        <div className="template-panel__group">
+                          <div className="template-panel__label">Tracks</div>
+                          <div className="template-panel__value">{activeTemplateSummary.trackCount}</div>
+                        </div>
+                        <div className="template-panel__group">
+                          <div className="template-panel__label">Visible curves</div>
+                          <div className="template-panel__value">{activeTemplateSummary.visibleCurveCount}</div>
+                        </div>
+                        <div className="template-panel__group">
+                          <div className="template-panel__label">Visible tops</div>
+                          <div className="template-panel__value">{activeTemplateSummary.visibleTopCount}</div>
+                        </div>
+                        <div className="template-panel__group">
+                          <div className="template-panel__label">Deviation</div>
+                          <div className="template-panel__value">{activeTemplateSummary.deviationVisible ? 'Visible' : 'Hidden'}</div>
+                        </div>
+                        <div className="template-panel__tracks">
+                          {activeTemplateSummary.tracks.map((track, index) => (
+                            <div key={track.id} className="template-track-card">
+                              <div className="template-track-card__header">
+                                <div className="template-track-card__title">{track.title}</div>
+                                <div className="template-track-card__actions">
+                                  <button
+                                    type="button"
+                                    className="template-track-card__button"
+                                    onClick={() => handleMoveTrack(track.id, -1)}
+                                    disabled={index === 0}
+                                  >
+                                    ↑
+                                  </button>
+                                  <button
+                                    type="button"
+                                    className="template-track-card__button"
+                                    onClick={() => handleMoveTrack(track.id, 1)}
+                                    disabled={index === activeTemplateSummary.tracks.length - 1}
+                                  >
+                                    ↓
+                                  </button>
+                                  <button
+                                    type="button"
+                                    className="template-track-card__button"
+                                    onClick={() => handleToggleTrackHidden(track.id)}
+                                  >
+                                    {activeTemplateSummary.hiddenTrackIds.includes(track.id) ? 'Show' : 'Hide'}
+                                  </button>
+                                  <button
+                                    type="button"
+                                    className="template-track-card__button"
+                                    onClick={() => handleRemoveTrack(track.id)}
+                                    disabled={activeTemplateSummary.tracks.length <= 1}
+                                  >
+                                    Remove
+                                  </button>
+                                </div>
+                              </div>
+                              {track.curves.length > 0 ? (
+                                <div className="template-track-card__curves">
+                                  {track.curves.map((curve) => (
+                                    <span key={curve.mnemonic} className="template-track-card__curve">{curve.mnemonic}</span>
+                                  ))}
+                                </div>
+                              ) : (
+                                <div className="template-track-card__empty">Empty track</div>
+                              )}
+                              {activeTemplateSummary.hiddenTrackIds.includes(track.id) && (
+                                <div className="template-track-card__status">Hidden in viewer</div>
+                              )}
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    ) : (
+                      <p className="sidebar-panel__empty">Load a well to inspect per-well track settings.</p>
+                    )}
+                  </div>
                 ) : (
                   <div className="sidebar-panel__body">
                     <p className="sidebar-panel__empty">Reserved for upcoming modelling workflows.</p>
@@ -449,17 +761,21 @@ function App() {
             <section className="app-main-pane">
               {error ? (
                 <p className="app-error-banner">{error}</p>
-              ) : well && curves.length === 0 ? (
-                <p className="app-error-banner">Well loaded. No curves imported yet.</p>
-              ) : curves.length === 0 ? (
+              ) : !well ? (
                 <p className="app-error-banner">No wells are available in the open project.</p>
               ) : (
-                <LogViewPanel
-                  tracks={tracks}
-                  curves={curves}
-                  minDepth={minDepth}
-                  maxDepth={maxDepth}
-                />
+                <>
+                  {curves.length === 0 && (
+                    <p className="app-error-banner">Well loaded. No curves imported yet.</p>
+                  )}
+                  <LogViewPanel
+                    tracks={tracks}
+                    curves={curves}
+                    formations={visibleFormations}
+                    minDepth={minDepth}
+                    maxDepth={maxDepth}
+                  />
+                </>
               )}
             </section>
           </div>

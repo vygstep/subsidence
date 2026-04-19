@@ -2,7 +2,7 @@ import { Fragment, useEffect, useRef, useState } from 'react'
 
 import { useSynchronizedScroll } from '@/hooks'
 import { useViewStore } from '@/stores'
-import type { CurveData, TrackConfig } from '@/types'
+import type { CurveData, FormationTop, TrackConfig } from '@/types'
 
 import { DataTrack } from './DataTrack'
 import { DepthTrack } from './DepthTrack'
@@ -13,6 +13,7 @@ import { DEPTH_TRACK_ID, FORMATION_TRACK_ID, TrackResizeHandle } from './TrackRe
 interface LogViewPanelProps {
   tracks: TrackConfig[]
   curves: CurveData[]
+  formations: FormationTop[]
   minDepth: number
   maxDepth: number
 }
@@ -20,7 +21,7 @@ interface LogViewPanelProps {
 const DEFAULT_DEPTH_WIDTH = 60
 const DEFAULT_FORMATION_WIDTH = 80
 
-export function LogViewPanel({ tracks, curves, minDepth, maxDepth }: LogViewPanelProps) {
+export function LogViewPanel({ tracks, curves, formations, minDepth, maxDepth }: LogViewPanelProps) {
   const containerRef = useRef<HTMLDivElement | null>(null)
   const [trackHeight, setTrackHeight] = useState(600)
   const setViewportHeight = useViewStore((state) => state.setViewportHeight)
@@ -72,7 +73,7 @@ export function LogViewPanel({ tracks, curves, minDepth, maxDepth }: LogViewPane
             </Fragment>
           )
         })}
-        <FormationColumn height={trackHeight} maxDepth={maxDepth} width={formationWidth} />
+        <FormationColumn formations={formations} height={trackHeight} maxDepth={maxDepth} width={formationWidth} />
         <TrackResizeHandle
           trackId={FORMATION_TRACK_ID}
           initialWidth={formationWidth}
