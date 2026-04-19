@@ -1,4 +1,4 @@
-﻿[build-system]
+[build-system]
 requires = ["setuptools>=68", "wheel"]
 build-backend = "setuptools.build_meta"
 
@@ -6,7 +6,7 @@ build-backend = "setuptools.build_meta"
 name = "subsidence"
 version = "0.1.0"
 description = "Compass-aligned backend for well log visualization"
-readme = "../README.md"
+readme = "README.md"
 requires-python = ">=3.11"
 authors = [{ name = "SUBSIDENCE team" }]
 dependencies = [
