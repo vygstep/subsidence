@@ -16,7 +16,7 @@ React panels communicating through Zustand stores and the Phase 2.5 REST API.
 |---|---|---|---|
 | Step 1  | done | `PATCH /api/projects/visual-config` persists `trackWidths`, `depthPerPixel`, and `curveColors`; close + reopen preserves visual config; export LAS/CSV endpoints return valid files | `c442f5e` |
 | Step 2  | done | New Project dialog creates bundle; Open dialog restores last-saved state | `6b5cfa1` |
-| Step 2.5 | pending | Toolbar exposes project actions, import actions, undo/redo, and well selector; one well can be created/imported entirely from the frontend | — |
+| Step 2.5 | pending | Toolbar exposes project/import/history actions; `Wells`, `Models`, and `Templates` tabs drive well switching and viewer composition; one well can be created/imported entirely from the frontend | — |
 | Step 3  | pending | `POST /api/projects/wells/{id}/formations` → line appears in FormationColumn | — |
 | Step 4  | pending | formation lines render at correct depths and move with scroll; crosshair tracks mouse | — |
 | Step 5  | pending | drag top 50 m → depth commits; Ctrl+Z reverts in one undo step | — |
@@ -59,7 +59,7 @@ React panels communicating through Zustand stores and the Phase 2.5 REST API.
 - [ ] 2.5.2 Add project actions: `New project`, `Open project`, `Close project`, `Save project`
 - [ ] 2.5.3 Add history actions: `Undo`, `Redo`
 - [ ] 2.5.4 Add import actions: `Create well`, `Load LAS`, `Load tops`, `Load deviation`
-- [ ] 2.5.5 Add well navigation control: a `Well selector` bound to the currently loaded well
+- [ ] 2.5.5 Remove the top-level `Well selector` from the header; active well switching must happen through the left-side `Wells` tab
 - [ ] 2.5.6 Keep `Zoom presets` in the same header/toolbar composition so primary app actions live in one place
 - [ ] 2.5.7 `Create well` opens a metadata dialog and creates a valid empty well record even when no LAS, tops, or deviation data exist yet
 - [ ] 2.5.8 `Create well` dialog includes at minimum: `Well name`, `X`, `Y`, `KB`, `TD`, and `CRS`; defaults are explicit and user-editable
@@ -72,13 +72,23 @@ React panels communicating through Zustand stores and the Phase 2.5 REST API.
 - [ ] 2.5.15 Auto-created wells use deterministic defaults when file metadata are missing: `well-1`, `x=0`, `y=0`, `kb=10`, `td=final depth of LAS` (or source-derived depth when available)
 - [ ] 2.5.16 After each successful action, refresh project status / well list and hydrate the affected well into `wellDataStore`
 - [ ] 2.5.17 Verify: a user can create an empty well, import tops before LAS, import deviation before LAS, or import LAS first and have the well auto-created entirely from the frontend without manual API calls
-- [ ] 2.5.18 Add a left-side `Well Data` panel that shows a collapsible tree for the currently loaded well
-- [ ] 2.5.19 `Well Data` tree includes `Well metadata`, `LAS`, `TOPS`, and `DEV` nodes; every branch can collapse to the well root
-- [ ] 2.5.20 `Well metadata` shows at minimum `Name`, `Location (X, Y)`, `KB / GL`, `TD`, and `CRS`
-- [ ] 2.5.21 `LAS` shows imported log source groups and their curves as child nodes; initial implementation may expose one source group if the backend currently stores one LAS source per well
-- [ ] 2.5.22 `TOPS` shows imported formation picks as child rows under one collapsible node
-- [ ] 2.5.23 `DEV` shows whether deviation exists and, when present, the stored deviation mode/reference summary as child rows
-- [ ] 2.5.24 Reserve a second left-side panel section named `Subsidence Models` below `Well Data`; placeholder content is acceptable in Step 2.5
+- [ ] 2.5.18 Add a left-side sidebar with tabs `Wells`, `Models`, and `Templates`
+- [ ] 2.5.19 `Wells` shows a project-wide collapsible tree for **all wells in the open project**
+- [ ] 2.5.20 Well roots use radio behavior: only one well can be active and visualized in the main view at a time
+- [ ] 2.5.21 Each well tree includes `Well metadata`, `LAS`, `TOPS`, and `DEV` nodes; every branch can collapse to the well root
+- [ ] 2.5.22 Curves, `TOPS`, and `DEV` use checkbox behavior so multiple data objects may be enabled independently
+- [ ] 2.5.23 `Well metadata` shows at minimum `Name`, `Location (X, Y)`, `KB / GL`, `TD`, and `CRS`
+- [ ] 2.5.24 `LAS` shows imported log source groups and their curves as child nodes; initial implementation may expose one source group if the backend currently stores one LAS source per well
+- [ ] 2.5.25 `TOPS` shows imported formation picks as child rows under one collapsible node; each row supports optional `Link to strat chart`
+- [ ] 2.5.26 A top row background uses the linked stratigraphic color when available; otherwise it defaults to medium gray
+- [ ] 2.5.27 `DEV` shows whether deviation exists and, when present, the stored deviation mode/reference summary as child rows
+- [ ] 2.5.28 All objects in `Wells` are clickable; clicking a well root activates it, clicking a data object selects it as the source for visualization actions
+- [ ] 2.5.29 Track rendering is `loaded-data-only`: loaded data appear in `Wells`, but nothing is auto-mounted into the viewer
+- [ ] 2.5.30 Default viewer state for any well is always `Depth` plus one empty data track named `Track 1`
+- [ ] 2.5.31 If a track is selected, adding a data object places it into that track; if no track is selected, the viewer creates a new track for the object
+- [ ] 2.5.32 Track visibility/composition settings are unique per well and are managed through the `Templates` tab
+- [ ] 2.5.33 `Templates` holds per-well visualization settings such as which tracks exist, which are hidden, which are removed, and which objects are assigned to each track
+- [ ] 2.5.34 `Models` remains reserved for subsidence workflows; placeholder content is acceptable in Step 2.5
 
 ### Step 3 — Formation tops API + store CRUD
 - [ ] 3.1 Write `app/src/subsidence/api/formations.py` with five endpoints (see spec)
@@ -139,13 +149,13 @@ React panels communicating through Zustand stores and the Phase 2.5 REST API.
 - [ ] 9.7 Add left sidebar to `MainLayout.tsx` (200 px, collapsible): top half `FormationTopsList`, bottom half `CurveBrowser`
 - [ ] 9.8 Verify: add top via sidebar → overlay line appears; delete → disappears; click row → view centers on formation depth
 
-### Step 10 — WellOverviewMinimap + well selector
+### Step 10 — WellOverviewMinimap + well switching
 - [ ] 10.1 Write `src/components/logview/WellOverviewMinimap.tsx`: small Canvas (80 × full-height sidebar), renders all visible curves as 1 px lines at full-well depth range; draws a blue translucent viewport rect indicating current scroll position (see spec)
 - [ ] 10.2 Click or drag on minimap → `viewStore.setScroll(mappedDepth)`
 - [ ] 10.3 Extend existing `GET /api/wells` to include `td_md` in the response (field already on `WellModel`; add it to `WellListItem`)
-- [ ] 10.4 Add well-selector `<select>` in `AppHeader.tsx` populated from `GET /api/projects/wells`; on change call `wellDataStore.loadWell(newId)`
+- [ ] 10.4 Drive well switching from the `Wells` tab tree rather than from a header `<select>`; the minimap and viewer must react when the active well changes
 - [ ] 10.5 Add `WellOverviewMinimap` to `LogViewPanel.tsx` anchored to the right edge of the track area
-- [ ] 10.6 Verify: drag minimap viewport rect → main view scrolls to matching depth; import a second well → well selector lists both; switch → all tracks show new well's curves
+- [ ] 10.6 Verify: drag minimap viewport rect → main view scrolls to matching depth; import a second well → `Wells` tab lists both; switch → all tracks show the new well's viewer state
 
 ---
 
@@ -220,7 +230,7 @@ Shows `Recent projects` list (from `GET /api/projects/recent`) plus a manual pat
 ### Step 2.5 — Well import actions UI
 
 Status: pending
-Verification: toolbar exposes project actions, import actions, undo/redo, and a well selector; one usable well can be created/imported entirely from the frontend
+Verification: toolbar exposes project/import/history actions; `Wells`, `Models`, and `Templates` tabs drive active-well selection and viewer composition; one usable well can be created/imported entirely from the frontend
 Commit: —
 
 **Goal:** Close the current product gap between project selection and interactive work. A user who has opened a project must be able to manage the project, save/undo/redo, and create or populate a well from the UI before entering formation editing and overlay interaction steps.
@@ -240,7 +250,6 @@ Commit: —
 
 **Header controls to keep in the same action band:**
 
-- `Well selector`
 - `Zoom presets`
 
 **Behavior contract:**
@@ -250,7 +259,7 @@ Commit: —
 - `Close project` calls `POST /api/projects/close`, clears app state, and returns to the gated project-selector view
 - `Save project` calls `POST /api/projects/save`
 - `Undo` / `Redo` call the existing project history endpoints and refresh status after completion
-- `Well selector` changes the loaded well in `wellDataStore` without leaving the current view
+- active well switching is handled through the left-side `Wells` tab; no separate header well selector remains
 
 **UI contract:**
 
@@ -428,9 +437,10 @@ Expected node semantics:
 - `DEV`
   - deviation presence summary plus mode/reference child rows when survey data exist
 
-This panel must live specifically in the left-side `Well Data` window. A second window named
-`Subsidence Models` should be reserved below it for future work; placeholder content is acceptable
-for now.
+This panel must live specifically in the `Wells` sidebar tab. The left sidebar also contains:
+
+- `Models` — reserved for subsidence workflows; placeholder content is acceptable for now
+- `Templates` — per-well visualization settings and viewer composition
 
 **Data Manager and track interaction contract**
 
@@ -438,8 +448,8 @@ The current implementation still contains a temporary top-level well selector an
 tracks in the frontend. That is a transitional scaffold only. The product contract for the next UI
 iteration is:
 
-1. Remove the top-level `Well selector` from the header once the left-side data tree is able to
-   switch wells directly.
+1. Remove the top-level `Well selector` from the header. Active well switching belongs to the
+   `Wells` tree only.
 
 2. The `Wells` tab in the left sidebar must show **all wells in the open project**, not only the
    currently active well. The tree becomes project-wide:
@@ -458,16 +468,24 @@ iteration is:
        └── DEV
    ```
 
-3. Objects in `Data Manager` must be clickable:
+3. Wells use radio behavior:
+   - only one well can be active and visualized in the main view at a time
+   - clicking a well root activates it
+
+4. Data objects use checkbox behavior:
+   - curves, `TOPS`, and `DEV` may be independently enabled or disabled for visualization
+   - multiple data objects may be enabled at the same time
+
+5. Objects in `Data Manager` must be clickable:
    - clicking a well root makes that well active
    - clicking a data object selects that object as the source for the next placement action
    - active well and active object must have visible UI highlighting
 
-4. Tracks must stop being driven by hardcoded template content. In particular, no curves such as
+6. Tracks must stop being driven by hardcoded template content. In particular, no curves such as
    `ILD` may appear unless they are actually loaded in the active project/well. All placeholder
    or scaffold-only data renderers must be removed as the real data-manager flow comes online.
 
-5. Track rendering becomes **loaded-data-only**:
+7. Track rendering becomes **loaded-data-only**:
    - loaded project data appear in `Data Manager`, not automatically in the viewer
    - by default, the viewer renders only:
      - the `Depth` track
@@ -478,7 +496,7 @@ iteration is:
    - curves, deviation data, and other loadable objects must be added to tracks explicitly by the
      user; they are not auto-mounted into the viewer on load
 
-6. Data placement flow:
+8. Data placement flow:
    - the user may select a target track first
    - if a track is selected, importing or assigning LAS/deviation data attaches them to that track
    - if no track is selected, importing or assigning data creates a new track
@@ -486,15 +504,30 @@ iteration is:
    - the UI must provide an optional `Link to strat chart` action so a pick can be linked to the
      main stratigraphic chart later
 
-7. Track lifecycle operations must be supported by the UI contract:
+9. `TOPS` rows in `Data Manager` must use stratigraphic color semantics:
+   - if a top is linked to the main stratigraphic chart and a canonical color is available, the
+     row background uses that color
+   - if a top is not linked or no canonical color can be resolved, the row background defaults to
+     medium gray
+
+10. Track lifecycle operations must be supported by the UI contract:
    - select track
    - reorder tracks
    - hide / remove track
 
-8. Formation-top operations must be supported by the UI contract:
+11. Formation-top operations must be supported by the UI contract:
    - create top
    - delete top
    - move top
+
+12. Visualization settings are unique per well and are not shared globally across the project.
+
+13. The `Templates` tab is responsible for per-well visualization settings, including:
+    - which tracks exist
+    - which tracks are hidden
+    - which tracks are removed
+    - which objects are assigned to each track
+    - later, reusable layout presets if needed
 
 These rules supersede the current temporary assumption that the viewer always opens with the same
 default GR / resistivity / porosity track template.
@@ -509,9 +542,9 @@ frontend to:
 - import deviation before LAS
 - import LAS into an existing well and have `TD` update if the LAS goes deeper
 - import LAS first and have the well auto-created from file metadata or defaults
-- switch between available wells from the header without manual API calls
-- inspect the loaded well through a compact collapsible `Well Data` tree that lists metadata,
-  imported logs, tops, and deviation presence
+- switch between available wells from the `Wells` tab without manual API calls
+- inspect the loaded well through a compact project-wide `Wells` tree that lists metadata,
+  imported logs, tops, deviation presence, and per-object visualization state
 
 ---
 
@@ -935,10 +968,10 @@ Lists all `wellDataStore.well?.curves` sorted by mnemonic. Each row shows mnemon
 
 ---
 
-### Step 10 — WellOverviewMinimap + well selector
+### Step 10 — WellOverviewMinimap + well switching
 
 Status: pending
-Verification: drag minimap rect → view scrolls; switch wells → all tracks update
+Verification: drag minimap rect → view scrolls; switch wells from `Wells` tab → all tracks update
 Commit: —
 
 **`src/components/logview/WellOverviewMinimap.tsx`:**
@@ -984,15 +1017,11 @@ def list_wells(request: Request) -> list[WellListItem]:
         return [WellListItem(well_id=row.id, well_name=row.name, td_md=row.td_md or 0.0) for row in rows]
 ```
 
-**`AppHeader.tsx` well selector:**
+**Well switching source:**
 
-```tsx
-<select value={wellDataStore.well?.well_id ?? ''} onChange={e => wellDataStore.loadWell(e.target.value)}>
-  {wells.map(w => <option key={w.well_id} value={w.well_id}>{w.well_name}</option>)}
-</select>
-```
-
-The `loadWell` action already fetches curves + formations and replaces the store state; all Canvas tracks re-render via Zustand subscriptions.
+The active well comes from the left-side `Wells` tree. Clicking a different well root calls
+`wellDataStore.loadWell(newId)`. The action already fetches curves + formations and replaces the
+store state; all Canvas tracks re-render via Zustand subscriptions.
 
 `WellOverviewMinimap` is placed in `LogViewPanel.tsx` as an absolute-positioned overlay anchored to the right edge of the track area (z-index 5, below InteractionOverlay at z-index 10).
 
@@ -1071,7 +1100,7 @@ Step 8 (PropertyPanel)
         ↓
 Step 9 (FormationTopsList + CurveBrowser + MainLayout)
         ↓
-Step 10 (WellOverviewMinimap + well selector)
+Step 10 (WellOverviewMinimap + well switching)
 ```
 
 ---
