@@ -699,15 +699,22 @@ function App() {
   }
 
   async function handleDeleteStratChart(): Promise<void> {
-    if (!window.confirm('Delete all stratigraphic charts? Formation links will be cleared.')) return
-    const response = await fetch('/api/strat-chart', { method: 'DELETE' })
-    if (!response.ok) {
-      alert('Failed to delete stratigraphic charts')
+    const activeChart = stratCharts.find((chart) => chart.is_active) ?? null
+    if (!activeChart) {
       return
     }
-    await loadStratCharts()
-    if (well?.well_id) {
-      await loadWell(well.well_id)
+
+    if (!window.confirm(`Delete stratigraphic chart "${activeChart.name}"? Formation links to this chart will be cleared.`)) {
+      return
+    }
+
+    try {
+      await deleteChart(activeChart.id)
+      if (well?.well_id) {
+        await loadWell(well.well_id)
+      }
+    } catch {
+      alert('Failed to delete the active stratigraphic chart')
     }
   }
 
@@ -924,7 +931,14 @@ function App() {
   const stratChartModeActions = (
     <>
       <button type="button" className="app-action-button" onClick={() => setActiveDialog('load-strat-chart')}>Load StratChart</button>
-      <button type="button" className="app-action-button" onClick={() => void handleDeleteStratChart()}>Delete StratChart</button>
+      <button
+        type="button"
+        className="app-action-button"
+        onClick={() => void handleDeleteStratChart()}
+        disabled={!stratCharts.some((chart) => chart.is_active)}
+      >
+        Delete StratChart
+      </button>
     </>
   )
 

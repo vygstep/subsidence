@@ -8,7 +8,7 @@ from pydantic import BaseModel
 from sqlalchemy import delete, func, select
 
 from subsidence.data import ProjectManager
-from subsidence.data.schema import StratChart, StratUnit
+from subsidence.data.schema import FormationStratLink, StratChart, StratUnit
 from subsidence.data.strat_link import auto_link_all_formations_to_chart
 
 router = APIRouter(tags=['strat-chart'])
@@ -150,8 +150,9 @@ def delete_strat_chart_by_id(chart_id: int, request: Request) -> None:
         chart = session.get(StratChart, chart_id)
         if chart is None:
             raise HTTPException(status_code=404, detail=f'Strat chart not found: {chart_id}')
-        session.delete(chart)
-        session.flush()
+        session.execute(delete(FormationStratLink).where(FormationStratLink.chart_id == chart_id))
+        session.execute(delete(StratUnit).where(StratUnit.chart_id == chart_id))
+        session.execute(delete(StratChart).where(StratChart.id == chart_id))
         session.commit()
     manager.save_project()
 
@@ -182,6 +183,8 @@ def import_strat_chart(body: ImportStratChartRequest, request: Request) -> Impor
 def delete_all_strat_charts(request: Request) -> None:
     manager = _require_open_project(request)
     with manager.get_session() as session:
+        session.execute(delete(FormationStratLink))
+        session.execute(delete(StratUnit))
         session.execute(delete(StratChart))
         session.commit()
     manager.save_project()

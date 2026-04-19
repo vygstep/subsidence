@@ -104,7 +104,7 @@ React panels communicating through Zustand stores and the Phase 2.5 REST API.
 
 ### Step 2.5-A — StratChart toolbar + import persistence (done `3ef7aec`)
 - [x] 2.5.A1 Add `StratChart` mode button to toolbar top row, between `Project` and `Wells`
-- [x] 2.5.A2 `StratChart` mode second row: `Load StratChart` opens `LoadStratChartDialog`; `Delete StratChart` deletes all strat units with confirm
+- [x] 2.5.A2 `StratChart` mode second row: `Load StratChart` opens `LoadStratChartDialog`; `Delete StratChart` deletes the currently active chart with confirm
 - [x] 2.5.A3 `LoadStratChartDialog`: single CSV path input; calls `POST /api/strat-chart/import`; shows inline error on failure
 - [x] 2.5.A4 `POST /api/strat-chart/import`: parses combined ICS CSV format (`unit_id`, `parent_unit_id`, `unit_name`, `rank_name`, `start_age_ma`, `end_age_ma`, `html_rgb_hash`); resolves parent references in topological order; replaces all existing strat units and clears formation links
 - [x] 2.5.A5 `DELETE /api/strat-chart`: removes all strat units, sets `formation_tops.strat_unit_id = NULL` on all rows
