@@ -137,6 +137,7 @@ def activate_strat_chart(chart_id: int, request: Request) -> StratChartInfo:
         session.execute(StratChart.__table__.update().values(is_active=False))
         chart.is_active = True
         session.flush()
+        auto_link_all_formations_to_chart(session, chart)
         session.commit()
         manager.save_project()
         return _chart_info(session, chart)

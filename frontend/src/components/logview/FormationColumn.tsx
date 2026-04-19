@@ -54,7 +54,7 @@ export function FormationColumn({ formations, height, maxDepth, width = 80 }: Fo
         drawLithologyBlock(
           ctx,
           toRenderableLithology(formation.lithology),
-          formation.color,
+          formation.active_strat_color ?? formation.color,
           0,
           yTop,
           canvasWidth,

@@ -854,7 +854,7 @@ function App() {
       <button type="button" className="app-action-button" onClick={() => setActiveDialog('project-new')}>New project</button>
       <button type="button" className="app-action-button" onClick={() => setActiveDialog('project-open')}>Open project</button>
       <button type="button" className="app-action-button" onClick={() => void handleProjectClose()}>Close project</button>
-      <button type="button" className="app-action-button app-action-button--primary" onClick={() => void saveProject()} disabled={!isDirty}>Save project</button>
+      <button type="button" className="app-action-button app-action-button--primary" onClick={() => void saveProject()}>Save project</button>
       <button type="button" className="app-action-button" onClick={() => void createCheckpoint()}>Create checkpoint</button>
     </>
   )
