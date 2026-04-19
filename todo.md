@@ -49,4 +49,4 @@ Primary references:
 
 ## Immediate Next Step
 
-Execute Phase 3 Step 2: project selector UI.
+Execute Phase 3 cleanup stabilization from `docs/phase3-cleanup-contract.md`.
