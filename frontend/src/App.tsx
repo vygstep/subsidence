@@ -14,30 +14,18 @@ import {
   WellDataPanel,
   ZoomControl,
 } from '@/components'
-import { useProjectStore, useViewStore, useWellDataStore } from '@/stores'
+import {
+  createDefaultWellView,
+  createEmptyTrack,
+  useProjectStore,
+  useViewStore,
+  useWellDataStore,
+  useWorkspaceStore,
+} from '@/stores'
 import type { CurveData, FormationTop, TrackConfig } from '@/types'
 
-type DialogKind = 'project-open' | 'project-new' | 'create-well' | 'load-las' | 'load-tops' | 'load-deviation' | 'link-top' | 'load-strat-chart' | null
-type SidebarTab = 'wells' | 'models' | 'strat-charts'
-type ToolbarMode = 'project' | 'strat-chart' | 'wells' | 'tops'
-type SelectedObject =
-  | { type: 'well'; wellId: string }
-  | { type: 'las-group'; wellId: string }
-  | { type: 'curve'; wellId: string; mnemonic: string }
-  | { type: 'tops-group'; wellId: string }
-  | { type: 'top-pick'; wellId: string; formationId: string }
-  | { type: 'strat-chart'; chartId: number }
-
-interface WellViewState {
-  tracks: TrackConfig[]
-  visibleFormationIds: string[]
-  deviationVisible: boolean
-  hiddenTrackIds: string[]
-}
-
 const TRACK_COLORS = ['#22c55e', '#ef4444', '#2563eb', '#f59e0b', '#8b5cf6', '#0f766e', '#dc2626', '#475569']
-const DEFAULT_SIDEBAR_WIDTH = 320
-const DEFAULT_SIDEBAR_TOP_RATIO = 0.66
+type DialogKind = 'project-open' | 'project-new' | 'create-well' | 'load-las' | 'load-tops' | 'load-deviation' | 'link-top' | 'load-strat-chart' | null
 
 async function readError(response: Response, fallback: string): Promise<string> {
   try {
@@ -72,27 +60,6 @@ function computeCurveBounds(curve: CurveData): { min: number; max: number } {
   return { min, max }
 }
 
-function createEmptyTrack(trackId = 'track-1', title = 'Track 1'): TrackConfig {
-  return {
-    id: trackId,
-    title,
-    width: 200,
-    scaleType: 'linear',
-    gridDivisions: 3,
-    showGrid: true,
-    curves: [],
-  }
-}
-
-function createDefaultWellView(): WellViewState {
-  return {
-    tracks: [createEmptyTrack()],
-    visibleFormationIds: [],
-    deviationVisible: false,
-    hiddenTrackIds: [],
-  }
-}
-
 function nextTrackNumber(tracks: TrackConfig[]): number {
   const numbers = tracks.map((track) => {
     const match = /^track-(\d+)$/.exec(track.id)
@@ -117,14 +84,7 @@ function createCurveConfig(curve: CurveData, index: number): TrackConfig['curves
 
 function App() {
   const [activeDialog, setActiveDialog] = useState<DialogKind>('project-open')
-  const [activeSidebarTab, setActiveSidebarTab] = useState<SidebarTab>('wells')
-  const [activeToolbarMode, setActiveToolbarMode] = useState<ToolbarMode>('project')
-  const [wellViewStates, setWellViewStates] = useState<Record<string, WellViewState>>({})
   const [formationLinkTarget, setFormationLinkTarget] = useState<FormationTop | null>(null)
-  const [selectedFormationId, setSelectedFormationId] = useState<string | null>(null)
-  const [selectedObject, setSelectedObject] = useState<SelectedObject | null>(null)
-  const [sidebarWidth, setSidebarWidth] = useState(DEFAULT_SIDEBAR_WIDTH)
-  const [sidebarTopRatio, setSidebarTopRatio] = useState(DEFAULT_SIDEBAR_TOP_RATIO)
   const [wellInspectorDraft, setWellInspectorDraft] = useState({
     well_name: '',
     x: '',
@@ -175,19 +135,29 @@ function App() {
   const selectTrack = useViewStore((state) => state.selectTrack)
   const trackWidths = useViewStore((state) => state.trackWidths)
   const resetVisualConfig = useViewStore((state) => state.resetVisualConfig)
+  const activeSidebarTab = useWorkspaceStore((state) => state.activeSidebarTab)
+  const activeToolbarMode = useWorkspaceStore((state) => state.activeToolbarMode)
+  const selectedFormationId = useWorkspaceStore((state) => state.selectedFormationId)
+  const selectedObject = useWorkspaceStore((state) => state.selectedObject)
+  const sidebarWidth = useWorkspaceStore((state) => state.sidebarWidth)
+  const sidebarTopRatio = useWorkspaceStore((state) => state.sidebarTopRatio)
+  const wellViewStates = useWorkspaceStore((state) => state.wellViewStates)
+  const setActiveSidebarTab = useWorkspaceStore((state) => state.setActiveSidebarTab)
+  const setActiveToolbarMode = useWorkspaceStore((state) => state.setActiveToolbarMode)
+  const setSelectedFormationId = useWorkspaceStore((state) => state.setSelectedFormationId)
+  const setSelectedObject = useWorkspaceStore((state) => state.setSelectedObject)
+  const setSidebarWidth = useWorkspaceStore((state) => state.setSidebarWidth)
+  const setSidebarTopRatio = useWorkspaceStore((state) => state.setSidebarTopRatio)
+  const resetWorkspace = useWorkspaceStore((state) => state.resetWorkspace)
+  const updateWellViewState = useWorkspaceStore((state) => state.updateWellViewState)
+  const ensureWellViewState = useWorkspaceStore((state) => state.ensureWellViewState)
+  const dropWellViewState = useWorkspaceStore((state) => state.dropWellViewState)
 
   const configHydratedRef = useRef(false)
   const workspaceRef = useRef<HTMLDivElement | null>(null)
   const sidebarRef = useRef<HTMLElement | null>(null)
   const dragModeRef = useRef<'sidebar-width' | 'sidebar-split' | null>(null)
   const lastProjectPathRef = useRef<string | null>(null)
-
-  function updateWellViewState(wellId: string, updater: (state: WellViewState) => WellViewState): void {
-    setWellViewStates((current) => ({
-      ...current,
-      [wellId]: updater(current[wellId] ?? createDefaultWellView()),
-    }))
-  }
 
   const wellOptions = useMemo(
     () => wellInventories.map((item) => ({ well_id: item.well_id, well_name: item.well_name })),
@@ -290,8 +260,7 @@ function App() {
       resetWell()
       resetVisualConfig()
       selectTrack(null)
-      setSelectedFormationId(null)
-      setWellViewStates({})
+      resetWorkspace()
       return
     }
 
@@ -517,32 +486,18 @@ function App() {
       return
     }
 
-    setWellViewStates((current) => (
-      current[well.well_id]
-        ? current
-        : { ...current, [well.well_id]: createDefaultWellView() }
-    ))
+    ensureWellViewState(well.well_id)
     selectTrack(null)
     setSelectedFormationId(null)
     setSelectedObject({ type: 'well', wellId: well.well_id })
-  }, [well?.well_id, selectTrack])
+  }, [ensureWellViewState, selectTrack, well?.well_id, setSelectedFormationId, setSelectedObject])
 
   useEffect(() => {
     if (wellInventories.length === 0) {
       return
     }
-    setWellViewStates((current) => {
-      let changed = false
-      const next = { ...current }
-      for (const inventory of wellInventories) {
-        if (!next[inventory.well_id]) {
-          next[inventory.well_id] = createDefaultWellView()
-          changed = true
-        }
-      }
-      return changed ? next : current
-    })
-  }, [wellInventories])
+    wellInventories.forEach((inventory) => ensureWellViewState(inventory.well_id))
+  }, [ensureWellViewState, wellInventories])
 
   const topbarTitle = !isProjectOpen
     ? 'No project open'
@@ -579,11 +534,7 @@ function App() {
         throw new Error(await readError(response, `Failed to delete well '${well.well_name}' (${response.status})`))
       }
 
-      setWellViewStates((current) => {
-        const next = { ...current }
-        delete next[well.well_id]
-        return next
-      })
+      dropWellViewState(well.well_id)
       setSelectedFormationId(null)
       selectTrack(null)
       await refreshWellInventories()
