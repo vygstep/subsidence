@@ -6,7 +6,7 @@ from sqlalchemy import select
 from sqlalchemy.orm import selectinload
 
 from subsidence.data import load_curves_from_parquet
-from subsidence.data.schema import CurveMetadata, DeviationSurveyModel, FormationTopModel, WellModel
+from subsidence.data.schema import CurveMetadata, DeviationSurveyModel, FormationStratLink, FormationTopModel, WellModel
 
 router = APIRouter(tags=['wells'])
 
@@ -83,6 +83,15 @@ def _deviation_fields(mode: str) -> list[str]:
     return []
 
 
+def _formation_load_options():
+    return [
+        selectinload(FormationTopModel.strat_links).options(
+            selectinload(FormationStratLink.strat_unit),
+            selectinload(FormationStratLink.chart),
+        )
+    ]
+
+
 @router.get('/wells', response_model=list[WellListItem])
 def list_wells(request: Request) -> list[WellListItem]:
     manager = _require_open_project(request)
@@ -125,7 +134,7 @@ def get_well(well_id: str, request: Request) -> WellResponse:
             select(FormationTopModel)
             .where(FormationTopModel.well_id == well.id)
             .order_by(FormationTopModel.depth_md.asc())
-            .options(selectinload(FormationTopModel.strat_unit))
+            .options(*_formation_load_options())
         ))
         deviation = session.scalar(select(DeviationSurveyModel).where(DeviationSurveyModel.well_id == well.id))
         formations = [
@@ -136,11 +145,19 @@ def get_well(well_id: str, request: Request) -> WellResponse:
                 age_ma=row.age_top_ma,
                 color=row.color,
                 kind=row.kind,
-                strat_color=row.strat_unit.color_hex if row.strat_unit is not None else None,
+                strat_color=(
+                    next((link.strat_unit.color_hex for link in row.strat_links if link.chart.is_active), None)
+                ),
                 is_locked=row.is_locked,
-                lithology=row.strat_unit.lithology if row.strat_unit is not None else None,
-                strat_unit_id=row.strat_unit_id,
-                strat_unit_name=row.strat_unit.name if row.strat_unit is not None else None,
+                lithology=(
+                    next((link.strat_unit.lithology for link in row.strat_links if link.chart.is_active), None)
+                ),
+                strat_unit_id=(
+                    next((link.strat_unit_id for link in row.strat_links if link.chart.is_active), None)
+                ),
+                strat_unit_name=(
+                    next((link.strat_unit.name for link in row.strat_links if link.chart.is_active), None)
+                ),
             )
             for row in formation_rows
         ]
