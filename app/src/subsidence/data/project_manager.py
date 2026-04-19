@@ -91,10 +91,14 @@ class ProjectManager:
     def working_db_path(self) -> Path | None:
         return self._state.working_db_path if self._state else None
 
-    def create_project(self, name: str, path: Path | str) -> Path:
+    def create_project(self, name: str, path: Path | str, overwrite: bool = False) -> Path:
         bundle_path = self._resolve_bundle_path(name, path)
         if bundle_path.exists():
-            raise FileExistsError(f'Project already exists: {bundle_path}')
+            if not overwrite:
+                raise FileExistsError(f'Project already exists: {bundle_path}')
+            if not bundle_path.is_dir():
+                raise FileExistsError(f'Project path exists and is not a directory: {bundle_path}')
+            shutil.rmtree(bundle_path)
 
         bundle_path.mkdir(parents=True)
         for directory in BUNDLE_DIRS:

@@ -16,7 +16,7 @@ React panels communicating through Zustand stores and the Phase 2.5 REST API.
 |---|---|---|---|
 | Step 1  | done | `PATCH /api/projects/visual-config` persists `trackWidths`, `depthPerPixel`, and `curveColors`; close + reopen preserves visual config; export LAS/CSV endpoints return valid files | `c442f5e` |
 | Step 2  | done | New Project dialog creates bundle; Open dialog restores last-saved state | `6b5cfa1` |
-| Step 2.5 | partial | Toolbar exposes project/import/history actions; `Wells`, `Models`, and `Templates` tabs drive well switching and viewer composition; one well can be created/imported entirely from the frontend | — |
+| Step 2.5 | partial | Toolbar exposes project/import/history actions; `StratCharts`, `Wells`, `Models`, and `Settings` drive well switching, chart management, and per-well viewer composition; one well can be created/imported entirely from the frontend | — |
 | Step 2.5-A | done | StratChart toolbar mode (Load/Delete); import-las/tops/deviation auto-save to canonical db | `3ef7aec` |
 | Step 2.5-B | pending | `strat_charts` table + `formation_strat_links`; active-chart switching; StratChart sidebar tab; Link top → active chart | — |
 | Step 3  | pending | `POST /api/projects/wells/{id}/formations` → line appears in FormationColumn | — |
@@ -78,23 +78,29 @@ React panels communicating through Zustand stores and the Phase 2.5 REST API.
 - [ ] 2.5.19 Auto-created wells use deterministic defaults when file metadata are missing: `well-1`, `x=0`, `y=0`, `kb=10`, `td=final depth of LAS` (or source-derived depth when available)
 - [ ] 2.5.20 After each successful action, refresh project status / well list and hydrate the affected well into `wellDataStore`
 - [ ] 2.5.21 Verify: a user can create an empty well, import tops before LAS, import deviation before LAS, or import LAS first and have the well auto-created entirely from the frontend without manual API calls
-- [ ] 2.5.22 Add a left-side sidebar with tabs `Wells`, `Models`, and `Templates`
-- [ ] 2.5.23 `Wells` shows a project-wide collapsible tree for **all wells in the open project**
-- [ ] 2.5.24 Well roots use radio behavior: only one well can be active and visualized in the main view at a time
-- [ ] 2.5.25 Each well tree includes `Well metadata`, `LAS`, `TOPS`, and `DEV` nodes; every branch can collapse to the well root
-- [ ] 2.5.26 Curves, `TOPS`, and `DEV` use checkbox behavior so multiple data objects may be enabled independently
-- [ ] 2.5.27 `Well metadata` shows at minimum `Name`, `Location (X, Y)`, `KB / GL`, `TD`, and `CRS`
-- [ ] 2.5.28 `LAS` shows imported log source groups and their curves as child nodes; initial implementation may expose one source group if the backend currently stores one LAS source per well
-- [ ] 2.5.29 `TOPS` shows imported formation picks as child rows under one collapsible node; each row supports optional `Link to strat chart`
-- [ ] 2.5.30 A top row background uses the linked stratigraphic color when available; otherwise it defaults to medium gray
-- [ ] 2.5.31 `DEV` shows whether deviation exists and, when present, the stored deviation mode/reference summary as child rows
-- [ ] 2.5.32 All objects in `Wells` are clickable; clicking a well root activates it, clicking a data object selects it as the source for visualization actions
-- [ ] 2.5.33 Track rendering is `loaded-data-only`: loaded data appear in `Wells`, but nothing is auto-mounted into the viewer
-- [ ] 2.5.34 Default viewer state for any well is always `Depth` plus one empty data track named `Track 1`
-- [ ] 2.5.35 If a track is selected, adding a data object places it into that track; if no track is selected, the viewer creates a new track for the object
-- [ ] 2.5.36 Track visibility/composition settings are unique per well and are managed through the `Templates` tab
-- [ ] 2.5.37 `Templates` holds per-well visualization settings such as which tracks exist, which are hidden, which are removed, and which objects are assigned to each track
-- [ ] 2.5.38 `Models` remains reserved for subsidence workflows; placeholder content is acceptable in Step 2.5
+- [ ] 2.5.22 Add a left-side `Data Manager` split into two vertical zones
+- [ ] 2.5.23 The top `Data Manager` zone occupies `2/3` of the sidebar height by default and contains tabs `StratCharts`, `Wells`, and `Models`
+- [ ] 2.5.24 The bottom `Data Manager` zone occupies `1/3` of the sidebar height by default and is named `Settings`
+- [ ] 2.5.25 The `Data Manager` outer vertical border is draggable so the user can resize the sidebar width
+- [ ] 2.5.26 The divider between the top and bottom `Data Manager` zones is draggable so the user can resize the top/bottom split
+- [ ] 2.5.27 `Wells` shows a project-wide collapsible tree for **all wells in the open project**
+- [ ] 2.5.28 Well roots use radio behavior: only one well can be active and visualized in the main view at a time
+- [ ] 2.5.29 Each well tree includes `Well metadata`, `LAS`, `TOPS`, and `DEV` nodes; every branch can collapse independently
+- [ ] 2.5.30 Curves, `TOPS`, and `DEV` use checkbox behavior so multiple data objects may be enabled independently
+- [ ] 2.5.31 Default `Data Manager` state on project open is fully collapsed: all well roots and all child branches start collapsed
+- [ ] 2.5.32 Collapse/expand behavior must remain available after adding radios and checkboxes; disclosure toggles are separate from selection controls
+- [ ] 2.5.33 `Well metadata` shows at minimum `Name`, `Location (X, Y)`, `KB / GL`, `TD`, and `CRS`
+- [ ] 2.5.34 `LAS` shows imported log source groups and their curves as child nodes; initial implementation may expose one source group if the backend currently stores one LAS source per well
+- [ ] 2.5.35 `TOPS` shows imported formation picks as child rows under one collapsible node; each row supports optional `Link to strat chart`
+- [ ] 2.5.36 A top row background uses the linked stratigraphic color when available; otherwise it defaults to medium gray
+- [ ] 2.5.37 `DEV` shows whether deviation exists and, when present, the stored deviation mode/reference summary as child rows
+- [ ] 2.5.38 All objects in `Wells` are clickable; clicking a well root activates it, clicking a data object selects it as the source for visualization actions
+- [ ] 2.5.39 Track rendering is `loaded-data-only`: loaded data appear in `Wells`, but nothing is auto-mounted into the viewer
+- [ ] 2.5.40 Default viewer state for any well is always `Depth` plus one empty data track named `Track 1`
+- [ ] 2.5.41 If a track is selected, adding a data object places it into that track; if no track is selected, the viewer creates a new track for the object
+- [ ] 2.5.42 Track visibility/composition settings are unique per well and are managed through the `Settings` zone
+- [ ] 2.5.43 `Settings` holds per-well visualization settings such as which tracks exist, which are hidden, which are removed, and which objects are assigned to each track
+- [ ] 2.5.44 `Models` remains reserved for subsidence workflows; placeholder content is acceptable in Step 2.5
 
 ### Step 2.5-A — StratChart toolbar + import persistence (done `3ef7aec`)
 - [x] 2.5.A1 Add `StratChart` mode button to toolbar top row, between `Project` and `Wells`
@@ -263,7 +269,7 @@ Shows `Recent projects` list (from `GET /api/projects/recent`) plus a manual pat
 ### Step 2.5 — Well import actions UI
 
 Status: pending
-Verification: top row exposes `Project`, `Wells`, `Tops`, `Undo`, `Redo`; second row switches contextual actions by mode; `Wells`, `Models`, and `Templates` tabs drive active-well selection and viewer composition
+Verification: top row exposes `Project`, `Wells`, `Tops`, `Undo`, `Redo`; second row switches contextual actions by mode; `StratCharts`, `Wells`, `Models`, and `Settings` drive active-well selection, chart management, and per-well viewer composition
 Commit: —
 
 **Goal:** Close the current product gap between project selection and interactive work. A user who has opened a project must be able to manage the project, save/undo/redo, and create or populate a well from the UI before entering formation editing and overlay interaction steps.
@@ -491,10 +497,15 @@ Expected node semantics:
 - `DEV`
   - deviation presence summary plus mode/reference child rows when survey data exist
 
-This panel must live specifically in the `Wells` sidebar tab. The left sidebar also contains:
+This panel must live specifically in the `Wells` sidebar tab. The left sidebar now uses a split
+layout:
 
-- `Models` — reserved for subsidence workflows; placeholder content is acceptable for now
-- `Templates` — per-well visualization settings and viewer composition
+- top zone (`2/3` by default): `StratCharts`, `Wells`, `Models`
+- bottom zone (`1/3` by default): `Settings`
+- the outer sidebar border is horizontally draggable
+- the divider between top and bottom zones is vertically draggable
+
+`Models` remains reserved for subsidence workflows; placeholder content is acceptable for now.
 
 **Data Manager and track interaction contract**
 
@@ -584,12 +595,18 @@ iteration is:
 
 12. Visualization settings are unique per well and are not shared globally across the project.
 
-13. The `Templates` tab is responsible for per-well visualization settings, including:
+13. The `Settings` zone is responsible for per-well visualization settings, including:
     - which tracks exist
     - which tracks are hidden
     - which tracks are removed
     - which objects are assigned to each track
     - later, reusable layout presets if needed
+
+14. `Data Manager` collapse behavior is part of the contract:
+    - all well roots and child sections start collapsed on project open
+    - collapse/expand must still work after adding radios and checkboxes
+    - disclosure toggles are separate from selection controls
+    - well activation does not auto-expand a well
 
 These rules supersede the current temporary assumption that the viewer always opens with the same
 default GR / resistivity / porosity track template.

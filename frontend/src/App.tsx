@@ -23,7 +23,7 @@ interface WellListItem {
 }
 
 type DialogKind = 'project-open' | 'project-new' | 'create-well' | 'load-las' | 'load-tops' | 'load-deviation' | 'link-top' | 'load-strat-chart' | null
-type SidebarTab = 'wells' | 'models' | 'templates' | 'strat-charts'
+type SidebarTab = 'wells' | 'models' | 'strat-charts'
 type ToolbarMode = 'project' | 'strat-chart' | 'wells' | 'tops'
 
 interface WellViewState {
@@ -34,6 +34,8 @@ interface WellViewState {
 }
 
 const TRACK_COLORS = ['#22c55e', '#ef4444', '#2563eb', '#f59e0b', '#8b5cf6', '#0f766e', '#dc2626', '#475569']
+const DEFAULT_SIDEBAR_WIDTH = 320
+const DEFAULT_SIDEBAR_TOP_RATIO = 0.66
 
 async function readError(response: Response, fallback: string): Promise<string> {
   try {
@@ -127,6 +129,8 @@ function App() {
   const [wellViewStates, setWellViewStates] = useState<Record<string, WellViewState>>({})
   const [formationLinkTarget, setFormationLinkTarget] = useState<FormationTop | null>(null)
   const [selectedFormationId, setSelectedFormationId] = useState<string | null>(null)
+  const [sidebarWidth, setSidebarWidth] = useState(DEFAULT_SIDEBAR_WIDTH)
+  const [sidebarTopRatio, setSidebarTopRatio] = useState(DEFAULT_SIDEBAR_TOP_RATIO)
 
   const loadWell = useWellDataStore((state) => state.loadWell)
   const resetWell = useWellDataStore((state) => state.reset)
@@ -148,6 +152,7 @@ function App() {
 
   const isProjectOpen = useProjectStore((state) => state.isOpen)
   const projectName = useProjectStore((state) => state.projectName)
+  const projectPath = useProjectStore((state) => state.projectPath)
   const isDirty = useProjectStore((state) => state.isDirty)
   const canUndo = useProjectStore((state) => state.canUndo)
   const canRedo = useProjectStore((state) => state.canRedo)
@@ -167,6 +172,10 @@ function App() {
   const resetVisualConfig = useViewStore((state) => state.resetVisualConfig)
 
   const configHydratedRef = useRef(false)
+  const workspaceRef = useRef<HTMLDivElement | null>(null)
+  const sidebarRef = useRef<HTMLElement | null>(null)
+  const dragModeRef = useRef<'sidebar-width' | 'sidebar-split' | null>(null)
+  const lastProjectPathRef = useRef<string | null>(null)
 
   function updateWellViewState(wellId: string, updater: (state: WellViewState) => WellViewState): void {
     setWellViewStates((current) => ({
@@ -219,6 +228,52 @@ function App() {
       setActiveDialog(null)
     }
   }, [activeDialog, isProjectOpen])
+
+  useEffect(() => {
+    const handlePointerMove = (event: MouseEvent) => {
+      if (!dragModeRef.current) {
+        return
+      }
+
+      if (dragModeRef.current === 'sidebar-width') {
+        const workspaceRect = workspaceRef.current?.getBoundingClientRect()
+        if (!workspaceRect) {
+          return
+        }
+
+        const nextWidth = Math.min(
+          520,
+          Math.max(240, event.clientX - workspaceRect.left),
+        )
+        setSidebarWidth(nextWidth)
+        return
+      }
+
+      const sidebarRect = sidebarRef.current?.getBoundingClientRect()
+      if (!sidebarRect) {
+        return
+      }
+
+      const relativeY = event.clientY - sidebarRect.top
+      const nextRatio = Math.min(
+        0.85,
+        Math.max(0.2, relativeY / sidebarRect.height),
+      )
+      setSidebarTopRatio(nextRatio)
+    }
+
+    const handlePointerUp = () => {
+      dragModeRef.current = null
+      document.body.classList.remove('is-resizing')
+    }
+
+    window.addEventListener('mousemove', handlePointerMove)
+    window.addEventListener('mouseup', handlePointerUp)
+    return () => {
+      window.removeEventListener('mousemove', handlePointerMove)
+      window.removeEventListener('mouseup', handlePointerUp)
+    }
+  }, [])
 
   useEffect(() => {
     if (!isProjectOpen) {
@@ -275,6 +330,7 @@ function App() {
 
   useEffect(() => {
     if (!isProjectOpen) {
+      lastProjectPathRef.current = null
       resetWell()
       return
     }
@@ -282,10 +338,12 @@ function App() {
     let cancelled = false
     const loadCurrentProject = async () => {
       try {
+        const projectChanged = lastProjectPathRef.current !== projectPath
         const wells = await fetchWellList()
         if (cancelled) {
           return
         }
+        lastProjectPathRef.current = projectPath
         setWellOptions(wells)
         if (wells.length === 0) {
           resetWell()
@@ -293,9 +351,13 @@ function App() {
         }
 
         const currentWellId = well?.well_id
-        const hasCurrent = currentWellId ? wells.some((item) => item.well_id == currentWellId) : false
+        const hasCurrent = !projectChanged && currentWellId ? wells.some((item) => item.well_id == currentWellId) : false
         const nextWellId = hasCurrent && currentWellId ? currentWellId : wells[0].well_id
-        if (nextWellId && nextWellId !== currentWellId) {
+        if (projectChanged) {
+          selectTrack(null)
+          setSelectedFormationId(null)
+        }
+        if (nextWellId && (projectChanged || nextWellId !== currentWellId || !well)) {
           await loadWell(nextWellId)
         }
       } catch {
@@ -310,7 +372,7 @@ function App() {
     return () => {
       cancelled = true
     }
-  }, [isProjectOpen, loadWell, resetWell])
+  }, [isProjectOpen, projectPath, loadWell, resetWell, selectTrack, well])
 
   useEffect(() => {
     const onKeyDown = (event: KeyboardEvent) => {
@@ -932,17 +994,17 @@ function App() {
       </header>
       <main className={isProjectOpen ? 'app-main' : 'app-main app-main--gated'}>
         {isProjectOpen ? (
-          <div className="app-workspace">
-            <aside className="app-sidebar">
-              <section className="sidebar-panel">
+          <div ref={workspaceRef} className="app-workspace">
+            <aside
+              ref={sidebarRef}
+              className="app-sidebar"
+              style={{ width: `${sidebarWidth}px` }}
+            >
+              <section
+                className="sidebar-panel app-sidebar__zone"
+                style={{ flex: `${sidebarTopRatio} 1 0%` }}
+              >
                 <header className="sidebar-tabs">
-                  <button
-                    type="button"
-                    className={`sidebar-tab ${activeSidebarTab === 'wells' ? 'sidebar-tab--active' : ''}`}
-                    onClick={() => setActiveSidebarTab('wells')}
-                  >
-                    Wells
-                  </button>
                   <button
                     type="button"
                     className={`sidebar-tab ${activeSidebarTab === 'strat-charts' ? 'sidebar-tab--active' : ''}`}
@@ -952,17 +1014,17 @@ function App() {
                   </button>
                   <button
                     type="button"
+                    className={`sidebar-tab ${activeSidebarTab === 'wells' ? 'sidebar-tab--active' : ''}`}
+                    onClick={() => setActiveSidebarTab('wells')}
+                  >
+                    Wells
+                  </button>
+                  <button
+                    type="button"
                     className={`sidebar-tab ${activeSidebarTab === 'models' ? 'sidebar-tab--active' : ''}`}
                     onClick={() => setActiveSidebarTab('models')}
                   >
                     Models
-                  </button>
-                  <button
-                    type="button"
-                    className={`sidebar-tab ${activeSidebarTab === 'templates' ? 'sidebar-tab--active' : ''}`}
-                    onClick={() => setActiveSidebarTab('templates')}
-                  >
-                    Templates
                   </button>
                 </header>
 
@@ -990,96 +1052,120 @@ function App() {
                     onToggleDeviation={handleSetDeviationVisible}
                     onSelectFormation={handleSelectFormation}
                   />
-                ) : activeSidebarTab === 'templates' ? (
-                  <div className="sidebar-panel__body">
-                    {well && activeTemplateSummary ? (
-                      <div className="template-panel">
-                        <div className="template-panel__group">
-                          <div className="template-panel__label">Well</div>
-                          <div className="template-panel__value">{well.well_name}</div>
-                        </div>
-                        <div className="template-panel__group">
-                          <div className="template-panel__label">Tracks</div>
-                          <div className="template-panel__value">{activeTemplateSummary.trackCount}</div>
-                        </div>
-                        <div className="template-panel__group">
-                          <div className="template-panel__label">Visible curves</div>
-                          <div className="template-panel__value">{activeTemplateSummary.visibleCurveCount}</div>
-                        </div>
-                        <div className="template-panel__group">
-                          <div className="template-panel__label">Visible tops</div>
-                          <div className="template-panel__value">{activeTemplateSummary.visibleTopCount}</div>
-                        </div>
-                        <div className="template-panel__group">
-                          <div className="template-panel__label">Deviation</div>
-                          <div className="template-panel__value">{activeTemplateSummary.deviationVisible ? 'Visible' : 'Hidden'}</div>
-                        </div>
-                        <div className="template-panel__tracks">
-                          {activeTemplateSummary.tracks.map((track, index) => (
-                            <div key={track.id} className="template-track-card">
-                              <div className="template-track-card__header">
-                                <div className="template-track-card__title">{track.title}</div>
-                                <div className="template-track-card__actions">
-                                  <button
-                                    type="button"
-                                    className="template-track-card__button"
-                                    onClick={() => handleMoveTrack(track.id, -1)}
-                                    disabled={index === 0}
-                                  >
-                                    ↑
-                                  </button>
-                                  <button
-                                    type="button"
-                                    className="template-track-card__button"
-                                    onClick={() => handleMoveTrack(track.id, 1)}
-                                    disabled={index === activeTemplateSummary.tracks.length - 1}
-                                  >
-                                    ↓
-                                  </button>
-                                  <button
-                                    type="button"
-                                    className="template-track-card__button"
-                                    onClick={() => handleToggleTrackHidden(track.id)}
-                                  >
-                                    {activeTemplateSummary.hiddenTrackIds.includes(track.id) ? 'Show' : 'Hide'}
-                                  </button>
-                                  <button
-                                    type="button"
-                                    className="template-track-card__button"
-                                    onClick={() => handleRemoveTrack(track.id)}
-                                    disabled={activeTemplateSummary.tracks.length <= 1}
-                                  >
-                                    Remove
-                                  </button>
-                                </div>
-                              </div>
-                              {track.curves.length > 0 ? (
-                                <div className="template-track-card__curves">
-                                  {track.curves.map((curve) => (
-                                    <span key={curve.mnemonic} className="template-track-card__curve">{curve.mnemonic}</span>
-                                  ))}
-                                </div>
-                              ) : (
-                                <div className="template-track-card__empty">Empty track</div>
-                              )}
-                              {activeTemplateSummary.hiddenTrackIds.includes(track.id) && (
-                                <div className="template-track-card__status">Hidden in viewer</div>
-                              )}
-                            </div>
-                          ))}
-                        </div>
-                      </div>
-                    ) : (
-                      <p className="sidebar-panel__empty">Load a well to inspect per-well track settings.</p>
-                    )}
-                  </div>
                 ) : (
                   <div className="sidebar-panel__body">
                     <p className="sidebar-panel__empty">Reserved for upcoming modelling workflows.</p>
                   </div>
                 )}
               </section>
+
+              <div
+                className="app-sidebar__splitter"
+                onMouseDown={() => {
+                  dragModeRef.current = 'sidebar-split'
+                  document.body.classList.add('is-resizing')
+                }}
+              />
+
+              <section
+                className="sidebar-panel app-sidebar__zone"
+                style={{ flex: `${1 - sidebarTopRatio} 1 0%` }}
+              >
+                <header className="sidebar-panel__header">
+                  <h2 className="sidebar-panel__title">Settings</h2>
+                </header>
+                <div className="sidebar-panel__body">
+                  {well && activeTemplateSummary ? (
+                    <div className="template-panel">
+                      <div className="template-panel__group">
+                        <div className="template-panel__label">Well</div>
+                        <div className="template-panel__value">{well.well_name}</div>
+                      </div>
+                      <div className="template-panel__group">
+                        <div className="template-panel__label">Tracks</div>
+                        <div className="template-panel__value">{activeTemplateSummary.trackCount}</div>
+                      </div>
+                      <div className="template-panel__group">
+                        <div className="template-panel__label">Visible curves</div>
+                        <div className="template-panel__value">{activeTemplateSummary.visibleCurveCount}</div>
+                      </div>
+                      <div className="template-panel__group">
+                        <div className="template-panel__label">Visible tops</div>
+                        <div className="template-panel__value">{activeTemplateSummary.visibleTopCount}</div>
+                      </div>
+                      <div className="template-panel__group">
+                        <div className="template-panel__label">Deviation</div>
+                        <div className="template-panel__value">{activeTemplateSummary.deviationVisible ? 'Visible' : 'Hidden'}</div>
+                      </div>
+                      <div className="template-panel__tracks">
+                        {activeTemplateSummary.tracks.map((track, index) => (
+                          <div key={track.id} className="template-track-card">
+                            <div className="template-track-card__header">
+                              <div className="template-track-card__title">{track.title}</div>
+                              <div className="template-track-card__actions">
+                                <button
+                                  type="button"
+                                  className="template-track-card__button"
+                                  onClick={() => handleMoveTrack(track.id, -1)}
+                                  disabled={index === 0}
+                                >
+                                  ↑
+                                </button>
+                                <button
+                                  type="button"
+                                  className="template-track-card__button"
+                                  onClick={() => handleMoveTrack(track.id, 1)}
+                                  disabled={index === activeTemplateSummary.tracks.length - 1}
+                                >
+                                  ↓
+                                </button>
+                                <button
+                                  type="button"
+                                  className="template-track-card__button"
+                                  onClick={() => handleToggleTrackHidden(track.id)}
+                                >
+                                  {activeTemplateSummary.hiddenTrackIds.includes(track.id) ? 'Show' : 'Hide'}
+                                </button>
+                                <button
+                                  type="button"
+                                  className="template-track-card__button"
+                                  onClick={() => handleRemoveTrack(track.id)}
+                                  disabled={activeTemplateSummary.tracks.length <= 1}
+                                >
+                                  Remove
+                                </button>
+                              </div>
+                            </div>
+                            {track.curves.length > 0 ? (
+                              <div className="template-track-card__curves">
+                                {track.curves.map((curve) => (
+                                  <span key={curve.mnemonic} className="template-track-card__curve">{curve.mnemonic}</span>
+                                ))}
+                              </div>
+                            ) : (
+                              <div className="template-track-card__empty">Empty track</div>
+                            )}
+                            {activeTemplateSummary.hiddenTrackIds.includes(track.id) && (
+                              <div className="template-track-card__status">Hidden in viewer</div>
+                            )}
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  ) : (
+                    <p className="sidebar-panel__empty">Load a well to inspect per-well track settings.</p>
+                  )}
+                </div>
+              </section>
             </aside>
+
+            <div
+              className="app-workspace__splitter"
+              onMouseDown={() => {
+                dragModeRef.current = 'sidebar-width'
+                document.body.classList.add('is-resizing')
+              }}
+            />
 
             <section className="app-main-pane">
               {error ? (

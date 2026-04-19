@@ -163,8 +163,8 @@ textarea {
 }
 
 .app-workspace {
-  display: grid;
-  grid-template-columns: 280px minmax(0, 1fr);
+  display: flex;
+  align-items: stretch;
   gap: 12px;
   height: 100%;
   min-height: 0;
@@ -173,8 +173,35 @@ textarea {
 .app-sidebar {
   display: flex;
   flex-direction: column;
-  gap: 12px;
   min-height: 0;
+  flex-shrink: 0;
+}
+
+.app-sidebar__zone {
+  min-height: 0;
+}
+
+.app-sidebar__splitter,
+.app-workspace__splitter {
+  flex-shrink: 0;
+  border-radius: 999px;
+  background: #d6e0eb;
+}
+
+.app-sidebar__splitter {
+  height: 8px;
+  margin: 6px 0;
+  cursor: row-resize;
+}
+
+.app-workspace__splitter {
+  width: 8px;
+  cursor: col-resize;
+}
+
+body.is-resizing {
+  user-select: none;
+  cursor: col-resize;
 }
 
 .app-main-pane {
@@ -252,60 +279,63 @@ textarea {
   color: #64748b;
 }
 
-.tree-node {
+.tree-list {
   display: flex;
   flex-direction: column;
   gap: 6px;
 }
 
-.tree-node + .tree-node,
-.tree-node__children > .tree-node,
-.tree-node__children > .tree-leaf,
-.tree-node__children > .sidebar-panel__empty {
-  margin-top: 4px;
+.tree-node {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
 }
 
-.tree-node__summary {
+.tree-node__row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 30px;
+  padding: 3px 0;
+}
+
+.tree-node__row--root {
+  font-size: 0.86rem;
+  font-weight: 700;
+}
+
+.tree-node__row--active .tree-node__label-button {
+  color: #2563eb;
+}
+
+.tree-toggle {
+  border: 0;
+  background: transparent;
+  color: #64748b;
+  font-size: 0.74rem;
+  line-height: 1;
+  width: 18px;
+  height: 18px;
+  padding: 0;
   cursor: pointer;
-  list-style: revert;
+  transform: rotate(0deg);
+  transition: transform 120ms ease;
+}
+
+.tree-toggle--open {
+  transform: rotate(90deg);
+}
+
+.tree-node__label-button,
+.tree-node__section-label {
+  border: 0;
+  background: transparent;
+  color: #17212b;
   font-size: 0.82rem;
   font-weight: 700;
-  color: #17212b;
-}
-
-.tree-node__summary--well {
-  display: flex;
-  align-items: center;
-}
-
-.tree-node__summary--with-action {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 8px;
-}
-
-.tree-node__summary-main {
-  display: inline-flex;
-  align-items: center;
-  gap: 8px;
-}
-
-.tree-node__summary-actions {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-}
-
-.tree-node__action {
-  border: 1px solid #cbd5e1;
-  background: #ffffff;
-  color: #334155;
-  border-radius: 999px;
-  padding: 2px 8px;
-  font-size: 0.68rem;
-  font-weight: 700;
+  padding: 0;
   cursor: pointer;
+  text-align: left;
 }
 
 .tree-tristate-checkbox {
@@ -320,16 +350,11 @@ textarea {
   accent-color: #94a3b8;
 }
 
-.tree-node__summary--active {
-  color: #2563eb;
-}
-
-.tree-node--root > .tree-node__summary {
-  font-size: 0.86rem;
-}
-
 .tree-node__children {
   margin-left: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
 }
 
 .tree-leaf {
@@ -867,6 +892,18 @@ textarea {
   margin: -4px 0 0;
   font-size: 0.78rem;
   color: #64748b;
+}
+
+.project-dialog__checkbox {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 0.82rem;
+  color: #314155;
+}
+
+.project-dialog__checkbox input {
+  margin: 0;
 }
 
 .project-dialog__section {

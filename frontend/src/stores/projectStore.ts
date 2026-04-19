@@ -21,7 +21,7 @@ export interface ProjectStore {
   pollStatus: () => Promise<void>
   loadRecentProjects: () => Promise<void>
   openProject: (path: string) => Promise<void>
-  createProject: (name: string, path: string) => Promise<void>
+  createProject: (name: string, path: string, overwrite?: boolean) => Promise<void>
   closeProject: () => Promise<void>
   loadVisualConfig: () => Promise<void>
   saveVisualConfig: (patch: Record<string, unknown>) => Promise<void>
@@ -95,11 +95,11 @@ async function fetchRecentProjects(): Promise<RecentProjectResponse[]> {
   return (await response.json()) as RecentProjectResponse[]
 }
 
-async function createProjectRequest(name: string, path: string): Promise<CreateProjectResponse> {
+async function createProjectRequest(name: string, path: string, overwrite = false): Promise<CreateProjectResponse> {
   const response = await fetch('/api/projects', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ name, path }),
+    body: JSON.stringify({ name, path, overwrite }),
   })
   if (!response.ok) {
     throw new Error(await readError(response, `Failed to create project (${response.status})`))
@@ -241,8 +241,8 @@ export const useProjectStore = create<ProjectStore>((set, get) => ({
       // Do not fail project open because recent-project history could not refresh.
     }
   },
-  async createProject(name, path) {
-    const payload = await createProjectRequest(name, path)
+  async createProject(name, path, overwrite = false) {
+    const payload = await createProjectRequest(name, path, overwrite)
     await get().openProject(payload.project_path)
   },
   async closeProject() {

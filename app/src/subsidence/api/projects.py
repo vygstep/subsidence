@@ -40,6 +40,7 @@ router = APIRouter(tags=['projects'])
 class CreateProjectRequest(BaseModel):
     name: str
     path: str
+    overwrite: bool = False
 
 
 class OpenProjectRequest(BaseModel):
@@ -205,6 +206,12 @@ class SaveProjectResponse(BaseModel):
     project_path: str
 
 
+class RecentProjectItemResponse(BaseModel):
+    name: str
+    path: str
+    last_opened: str
+
+
 class CloseProjectResponse(BaseModel):
     status: str
 
@@ -277,10 +284,16 @@ def _select_export_well(session, well_id: str | None) -> WellModel:
 def create_project(payload: CreateProjectRequest, request: Request) -> CreateProjectResponse:
     manager = _manager(request)
     try:
-        project_path = manager.create_project(payload.name, payload.path)
+        project_path = manager.create_project(payload.name, payload.path, overwrite=payload.overwrite)
     except FileExistsError as error:
         raise HTTPException(status_code=409, detail=str(error)) from error
     return CreateProjectResponse(project_path=str(project_path))
+
+
+@router.get('/recent', response_model=list[RecentProjectItemResponse])
+def list_recent_projects(request: Request) -> list[RecentProjectItemResponse]:
+    manager = _manager(request)
+    return [RecentProjectItemResponse(**entry) for entry in manager.list_recent_projects()]
 
 
 @router.post('/wells', response_model=CreateWellResponse)

@@ -12,6 +12,7 @@ export function NewProjectDialog({ onSwitchToOpen, onClose }: NewProjectDialogPr
 
   const [name, setName] = useState('')
   const [path, setPath] = useState('')
+  const [overwrite, setOverwrite] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [isSubmitting, setIsSubmitting] = useState(false)
 
@@ -33,7 +34,7 @@ export function NewProjectDialog({ onSwitchToOpen, onClose }: NewProjectDialogPr
     setIsSubmitting(true)
     setError(null)
     try {
-      await createProject(nextName, nextPath)
+      await createProject(nextName, nextPath, overwrite)
       onClose?.()
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : 'Failed to create project')
@@ -77,6 +78,15 @@ export function NewProjectDialog({ onSwitchToOpen, onClose }: NewProjectDialogPr
         </label>
 
         <p className="project-dialog__hint">The app will create a <code>.subsidence</code> bundle inside the selected directory.</p>
+
+        <label className="project-dialog__checkbox">
+          <input
+            type="checkbox"
+            checked={overwrite}
+            onChange={(event) => setOverwrite(event.target.checked)}
+          />
+          <span>Overwrite existing project bundle if it already exists</span>
+        </label>
 
         {error && <p className="project-dialog__error">{error}</p>}
 
