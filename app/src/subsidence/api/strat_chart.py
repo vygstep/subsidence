@@ -166,7 +166,6 @@ def delete_strat_chart_by_id(chart_id: int, request: Request) -> None:
     manager.save_project()
 
 
-@router.post('/strat-chart/import', response_model=ImportStratChartResponse)
 @router.post('/strat-charts/import', response_model=ImportStratChartResponse)
 def import_strat_chart(body: ImportStratChartRequest, request: Request) -> ImportStratChartResponse:
     manager = _require_open_project(request)
@@ -187,26 +186,3 @@ def import_strat_chart(body: ImportStratChartRequest, request: Request) -> Impor
 
     manager.save_project()
     return ImportStratChartResponse(units_imported=count)
-
-
-@router.delete('/strat-chart', status_code=204)
-def delete_all_strat_charts(request: Request) -> None:
-    manager = _require_open_project(request)
-    with manager.get_session() as session:
-        protected_ids = [
-            chart.id
-            for chart in session.scalars(select(StratChart).order_by(StratChart.id.asc())).all()
-            if _is_builtin_chart(chart)
-        ]
-        deletable_ids = [
-            chart.id
-            for chart in session.scalars(select(StratChart).order_by(StratChart.id.asc())).all()
-            if chart.id not in protected_ids
-        ]
-        if not deletable_ids:
-            return
-        session.execute(delete(FormationStratLink).where(FormationStratLink.chart_id.in_(deletable_ids)))
-        session.execute(delete(StratUnit).where(StratUnit.chart_id.in_(deletable_ids)))
-        session.execute(delete(StratChart).where(StratChart.id.in_(deletable_ids)))
-        session.commit()
-    manager.save_project()

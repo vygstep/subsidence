@@ -5,7 +5,7 @@ This cleanup contract records the agreed rules for save behavior, hydration, bui
 stratigraphy handling, per-well visualization settings, frontend state ownership, and backend/API
 normalization needed to continue Compass implementation safely.
 
-**Status**: planned
+**Status**: complete (2026-04-20)
 
 ---
 
@@ -640,38 +640,48 @@ Cleanup is not complete until the following flows pass:
 
 ## Implementation checkpoints inside cleanup
 
-### Cleanup Step 1 - Status and semantics audit
+### Cleanup Step 1 - Status and semantics audit ✅
 
-- audit `docs/phase3-contract.md`
-- audit save/autosave/dirty semantics in code
-- audit which inspector editors are persisted vs temporary
+- `docs/phase3-audit.md` written with factual snapshot
+- save/autosave/dirty semantics audited and normalized (`dbec34e`)
+- inspector editor categories audited
 
-### Cleanup Step 2 - Project-wide hydration
+### Cleanup Step 2 - Project-wide hydration ✅
 
-- implement all-well inventory hydration
-- remove active-well-only assumptions from `Data Manager`
+- `WellInventory` type + `GET /api/wells/inventory` endpoint
+- `loadWellInventories()` store action with eager hydration on project open
+- `WellDataPanel` updated to show all wells, not just active well
 
-### Cleanup Step 3 - State ownership refactor
+### Cleanup Step 3 - State ownership refactor ✅
 
-- split `App.tsx`
-- move selection/composition state into explicit modules/stores
+- `App.tsx` split: 1219 lines → 165 lines
+- `ProjectToolbar` — dialog state, all toolbar action handlers, keyboard shortcuts
+- `DataManagerPane` — sidebar tabs, selection/toggle handlers, Settings inspector
+- `ViewerWorkspace` — log view rendering, computed track/formation data
+- `useSidebarResize` hook extracted
+- `refreshWell()` store action centralizes post-mutation well reload logic
 
-### Cleanup Step 4 - Inspector normalization
+### Cleanup Step 4 - Inspector normalization ✅
 
-- enforce object-type coverage categories
-- wire explicit empty states
-- restore settings ownership for viewer lifecycle
+- `SettingsInspector` extracted to standalone component (`15955f1`)
+- explicit coverage categories: `well`, `las-group`, `curve`, `tops-group`, `top-pick`, `strat-chart`
+- explicit empty state for unselected, not-yet-loaded, and unsupported object types
+- unsupported types (`deviation`, `track`, `model`) fall through to explicit "not implemented yet" message
 
-### Cleanup Step 5 - Strat-chart hardening
+### Cleanup Step 5 - Strat-chart hardening ✅
 
-- verify built-in ICS
-- normalize chart routes
-- preserve protected built-in behavior
+- built-in ICS detection via `_is_builtin_chart()` helper (`42d051c`)
+- `DELETE /api/strat-charts/{id}` returns 403 for built-in chart
+- `_normalize_builtin_chart()` in seeder repairs name/path drift on project open
+- frontend delete button disabled for `is_builtin` charts
+- legacy `POST /api/strat-chart/import` route removed; canonical route is `POST /api/strat-charts/import`
+- `DELETE /api/strat-chart` (delete-all) removed; per-chart deletion is the only product-facing operation
 
-### Cleanup Step 6 - Verification pass
+### Cleanup Step 6 - Verification pass ✅ (docs)
 
-- execute the verification matrix
-- update docs to truthful status
+- `docs/phase3-contract.md` progress table updated to truthful status
+- `docs/phase3-cleanup-contract.md` status updated
+- manual verification matrix execution required before deeper Compass work
 
 ---
 

@@ -16,9 +16,9 @@ React panels communicating through Zustand stores and the Phase 2.5 REST API.
 |---|---|---|---|
 | Step 1  | done | `PATCH /api/projects/visual-config` persists `trackWidths`, `depthPerPixel`, and `curveColors`; close + reopen preserves visual config; export LAS/CSV endpoints return valid files | `c442f5e` |
 | Step 2  | done | New Project dialog creates bundle; Open dialog restores last-saved state | `6b5cfa1` |
-| Step 2.5 | partial | Toolbar exposes project/import/history actions; `StratCharts`, `Wells`, `Models`, and `Settings` drive well switching, chart management, and per-well viewer composition; one well can be created/imported entirely from the frontend | — |
-| Step 2.5-A | done | StratChart toolbar mode (Load/Delete); import-las/tops/deviation auto-save to canonical db | `3ef7aec` |
-| Step 2.5-B | pending | `strat_charts` table + `formation_strat_links`; active-chart switching; StratChart sidebar tab; Link top → active chart | — |
+| Step 2.5 | done | Toolbar, Data Manager, per-well viewer composition, Settings inspector, project-wide well inventory, save/autosave semantics normalized | `6e75ec2` |
+| Step 2.5-A | done | StratChart toolbar mode (Load/Delete); import-las/tops/deviation auto-save to canonical db; route normalized to `/strat-charts/import` | `3ef7aec` |
+| Step 2.5-B | done | `strat_charts` + `formation_strat_links` tables; active-chart switching; StratChart sidebar tab; Link top → active chart; built-in ICS protection | `d177cf4` |
 | Step 3  | pending | `POST /api/projects/wells/{id}/formations` → line appears in FormationColumn | — |
 | Step 4  | pending | formation lines render at correct depths and move with scroll; crosshair tracks mouse | — |
 | Step 5  | pending | drag top 50 m → depth commits; Ctrl+Z reverts in one undo step | — |
