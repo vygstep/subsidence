@@ -5,7 +5,14 @@ from pydantic import BaseModel
 from sqlalchemy import select
 from sqlalchemy.orm import selectinload
 
-from subsidence.data import CreateFormation, ProjectManager, RemoveFormation, UpdateFormation, UpdateFormationDepth
+from subsidence.data import (
+    CreateFormation,
+    ProjectManager,
+    RemoveFormation,
+    UpdateFormation,
+    UpdateFormationDepth,
+    UpdateFormationStratLink,
+)
 from subsidence.data.undo import _model_to_dict
 from subsidence.data.schema import FormationStratLink, FormationTopModel, StratChart, StratUnit, WellModel
 from subsidence.data.strat_link import auto_link_to_active_chart, find_strat_unit_by_name
@@ -64,7 +71,7 @@ class StratUnitLookupResponse(BaseModel):
 
 class StratLinkRequest(BaseModel):
     chart_id: int
-    strat_unit_id: int
+    strat_unit_id: int | None
 
 
 def _manager(request: Request) -> ProjectManager:
@@ -253,9 +260,12 @@ def upsert_formation_strat_link(well_id: str, formation_id: int, body: StratLink
         chart = session.get(StratChart, body.chart_id)
         if chart is None:
             raise HTTPException(status_code=404, detail=f'Strat chart not found: {body.chart_id}')
-        strat_unit = session.get(StratUnit, body.strat_unit_id)
-        if strat_unit is None:
-            raise HTTPException(status_code=404, detail=f'Strat unit not found: {body.strat_unit_id}')
+        if body.strat_unit_id is not None:
+            strat_unit = session.get(StratUnit, body.strat_unit_id)
+            if strat_unit is None:
+                raise HTTPException(status_code=404, detail=f'Strat unit not found: {body.strat_unit_id}')
+            if strat_unit.chart_id != body.chart_id:
+                raise HTTPException(status_code=400, detail='Strat unit does not belong to the selected chart')
 
         existing_link = session.scalar(
             select(FormationStratLink).where(
@@ -263,19 +273,22 @@ def upsert_formation_strat_link(well_id: str, formation_id: int, body: StratLink
                 FormationStratLink.chart_id == body.chart_id,
             )
         )
-        if existing_link is None:
-            session.add(FormationStratLink(
+        old_strat_unit_id = existing_link.strat_unit_id if existing_link is not None else None
+
+    if old_strat_unit_id != body.strat_unit_id:
+        manager.execute_command(
+            UpdateFormationStratLink(
                 formation_id=formation_id,
-                strat_unit_id=body.strat_unit_id,
                 chart_id=body.chart_id,
-            ))
-        else:
-            existing_link.strat_unit_id = body.strat_unit_id
+                old_strat_unit_id=old_strat_unit_id,
+                new_strat_unit_id=body.strat_unit_id,
+            )
+        )
 
-        session.flush()
-        session.commit()
-
+    with manager.get_session() as session:
         updated = _load_formation(session, formation_id)
+        if updated is None:
+            raise HTTPException(status_code=404, detail=f'Formation not found: {formation_id}')
         return _to_response(updated)
 
 
@@ -290,3 +303,4 @@ def delete_formation(well_id: str, formation_id: int, request: Request) -> None:
         snapshot = _model_to_dict(row)
 
     manager.execute_command(RemoveFormation(snapshot))
+    manager.save_project()

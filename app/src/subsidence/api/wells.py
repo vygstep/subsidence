@@ -5,7 +5,7 @@ from pydantic import BaseModel
 from sqlalchemy import select
 from sqlalchemy.orm import selectinload
 
-from subsidence.data import load_curves_from_parquet
+from subsidence.data import UpdateWell, load_curves_from_parquet
 from subsidence.data.schema import CurveMetadata, DeviationSurveyModel, FormationStratLink, FormationTopModel, WellModel
 
 router = APIRouter(tags=['wells'])
@@ -291,25 +291,42 @@ def patch_well(well_id: str, payload: WellPatchRequest, request: Request) -> Wel
         if well is None:
             raise HTTPException(status_code=404, detail=f'Well not found: {well_id}')
 
+        old_values: dict[str, object] = {}
+        new_values: dict[str, object] = {}
+
         if payload.well_name is not None:
             next_name = payload.well_name.strip()
             if not next_name:
                 raise HTTPException(status_code=400, detail='Well name cannot be empty')
-            well.name = next_name
+            if well.name != next_name:
+                old_values['name'] = well.name
+                new_values['name'] = next_name
         if payload.kb_elev is not None:
-            well.kb_elev = payload.kb_elev
+            if well.kb_elev != payload.kb_elev:
+                old_values['kb_elev'] = well.kb_elev
+                new_values['kb_elev'] = payload.kb_elev
         if payload.gl_elev is not None:
-            well.gl_elev = payload.gl_elev
+            if well.gl_elev != payload.gl_elev:
+                old_values['gl_elev'] = well.gl_elev
+                new_values['gl_elev'] = payload.gl_elev
         if payload.td_md is not None:
-            well.td_md = payload.td_md
+            if well.td_md != payload.td_md:
+                old_values['td_md'] = well.td_md
+                new_values['td_md'] = payload.td_md
         if payload.x is not None:
-            well.lon = payload.x
+            if well.lon != payload.x:
+                old_values['lon'] = well.lon
+                new_values['lon'] = payload.x
         if payload.y is not None:
-            well.lat = payload.y
+            if well.lat != payload.y:
+                old_values['lat'] = well.lat
+                new_values['lat'] = payload.y
         if payload.crs is not None:
-            well.crs = payload.crs
+            if well.crs != payload.crs:
+                old_values['crs'] = well.crs
+                new_values['crs'] = payload.crs
 
-        session.commit()
+    if new_values:
+        manager.execute_command(UpdateWell(well_id, old_values, new_values))
 
-    manager.mark_dirty()
     return get_well(well_id, request)

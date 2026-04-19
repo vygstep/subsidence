@@ -139,7 +139,7 @@ def activate_strat_chart(chart_id: int, request: Request) -> StratChartInfo:
         session.flush()
         auto_link_all_formations_to_chart(session, chart)
         session.commit()
-        manager.save_project()
+        manager.mark_dirty()
         return _chart_info(session, chart)
 
 

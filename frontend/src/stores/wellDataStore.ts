@@ -69,7 +69,7 @@ export interface WellDataStore {
   loadStratCharts: () => Promise<void>
   activateChart: (chartId: number) => Promise<void>
   deleteChart: (chartId: number) => Promise<void>
-  linkFormationToChart: (formationId: string, chartId: number, stratUnitId: number) => Promise<void>
+  linkFormationToChart: (formationId: string, chartId: number, stratUnitId: number | null) => Promise<void>
 }
 
 function toFloat32Array(values: number[]): Float32Array {
@@ -354,5 +354,6 @@ export const useWellDataStore = create<WellDataStore>((set, get) => ({
         state.formations.map((f) => (f.id === formationId ? updated : f)),
       ),
     }))
+    await get().loadWellInventories()
   },
 }))

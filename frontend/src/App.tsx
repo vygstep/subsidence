@@ -684,7 +684,7 @@ function App() {
   async function handleLinkFormation(stratUnitId: number | null): Promise<void> {
     if (!formationLinkTarget) return
     const activeChart = stratCharts.find((c) => c.is_active) ?? null
-    if (stratUnitId !== null && activeChart) {
+    if (activeChart) {
       await linkFormationToChart(formationLinkTarget.id, activeChart.id, stratUnitId)
     }
     setFormationLinkTarget(null)

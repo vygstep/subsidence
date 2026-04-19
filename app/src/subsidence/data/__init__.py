@@ -26,7 +26,9 @@ from .undo import (
     UndoStack,
     UpdateFormation,
     UpdateFormationDepth,
+    UpdateFormationStratLink,
     UpdateVisualConfig,
+    UpdateWell,
 )
 
 __all__ = [
@@ -49,7 +51,9 @@ __all__ = [
     "UndoStack",
     "UpdateFormation",
     "UpdateFormationDepth",
+    "UpdateFormationStratLink",
     "UpdateVisualConfig",
+    "UpdateWell",
     "load_curve_alias_rules",
     "load_lithology_entries",
     "resolve_curve_alias",

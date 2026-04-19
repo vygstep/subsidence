@@ -313,10 +313,12 @@ def create_well(payload: CreateWellRequest, request: Request) -> CreateWellRespo
             td=payload.td,
             crs=payload.crs,
         )
+        session.flush()
+        command = ImportWell.capture(session, manager.project_path, row.id)
         session.commit()
         session.refresh(row)
 
-    manager.mark_dirty()
+    manager.execute_command(command)
     return CreateWellResponse(well_id=row.id, well_name=row.name)
 
 
@@ -327,7 +329,7 @@ def delete_well(well_id: str, request: Request) -> DictionaryUpdateResponse:
         with manager.get_session() as session:
             command = RemoveWell.capture(session, manager.project_path, well_id)
         manager.execute_command(command)
-        manager.mark_dirty()
+        manager.save_project()
     except ValueError as error:
         raise HTTPException(status_code=404, detail=str(error)) from error
     return DictionaryUpdateResponse(status='ok')

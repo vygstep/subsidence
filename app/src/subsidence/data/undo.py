@@ -246,6 +246,46 @@ class UpdateFormation(Command):
             setattr(formation, key, value)
 
 
+class UpdateFormationStratLink(Command):
+    def __init__(self, formation_id: int, chart_id: int, old_strat_unit_id: int | None, new_strat_unit_id: int | None) -> None:
+        self.formation_id = formation_id
+        self.chart_id = chart_id
+        self.old_strat_unit_id = old_strat_unit_id
+        self.new_strat_unit_id = new_strat_unit_id
+
+    @property
+    def description(self) -> str:
+        return f'Update strat link for formation {self.formation_id}'
+
+    def apply(self, session: Session) -> None:
+        self._set_link(session, self.new_strat_unit_id)
+
+    def revert(self, session: Session) -> None:
+        self._set_link(session, self.old_strat_unit_id)
+
+    def _set_link(self, session: Session, strat_unit_id: int | None) -> None:
+        link = session.scalar(
+            select(FormationStratLink).where(
+                FormationStratLink.formation_id == self.formation_id,
+                FormationStratLink.chart_id == self.chart_id,
+            )
+        )
+        if strat_unit_id is None:
+            if link is not None:
+                session.delete(link)
+            return
+        if link is None:
+            session.add(
+                FormationStratLink(
+                    formation_id=self.formation_id,
+                    chart_id=self.chart_id,
+                    strat_unit_id=strat_unit_id,
+                )
+            )
+            return
+        link.strat_unit_id = strat_unit_id
+
+
 class RemoveFormation(Command):
     def __init__(self, snapshot: dict[str, Any]) -> None:
         self._snapshot = snapshot
@@ -264,6 +304,30 @@ class RemoveFormation(Command):
         if session.get(FormationTopModel, self._snapshot['id']) is not None:
             return
         session.add(FormationTopModel(**self._snapshot))
+
+
+class UpdateWell(Command):
+    def __init__(self, well_id: str, old_values: dict[str, Any], new_values: dict[str, Any]) -> None:
+        self.well_id = well_id
+        self.old_values = old_values
+        self.new_values = new_values
+
+    @property
+    def description(self) -> str:
+        return f'Update well {self.well_id}'
+
+    def apply(self, session: Session) -> None:
+        self._apply_values(session, self.new_values)
+
+    def revert(self, session: Session) -> None:
+        self._apply_values(session, self.old_values)
+
+    def _apply_values(self, session: Session, values: dict[str, Any]) -> None:
+        well = session.get(WellModel, self.well_id)
+        if well is None:
+            raise ValueError(f'Well not found: {self.well_id}')
+        for key, value in values.items():
+            setattr(well, key, value)
 
 
 class UpdateVisualConfig(Command):
