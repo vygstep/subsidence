@@ -44,17 +44,9 @@ def _repo_sample_data_dir() -> Path:
     return Path(__file__).resolve().parents[4] / 'sample_data'
 
 
-def _seed_strat_units(session: Session, units_path: Path, ranks_path: Path, chart: StratChart) -> None:
-    rank_map: dict[int, str] = {}
-    with ranks_path.open('r', encoding='utf-8', newline='') as handle:
-        for row in csv.DictReader(handle):
-            rank_id_raw = (row.get('rank_id') or '').strip()
-            if not rank_id_raw:
-                continue
-            rank_map[int(rank_id_raw)] = (row.get('rank') or '').strip()
-
+def _seed_strat_units(session: Session, csv_path: Path, chart: StratChart) -> None:
     pending: dict[int, dict[str, str]] = {}
-    with units_path.open('r', encoding='utf-8', newline='') as handle:
+    with csv_path.open('r', encoding='utf-8-sig', newline='') as handle:
         for row in csv.DictReader(handle):
             unit_id_raw = (row.get('unit_id') or '').strip()
             name = (row.get('unit_name') or '').strip()
@@ -72,12 +64,11 @@ def _seed_strat_units(session: Session, units_path: Path, ranks_path: Path, char
             if parent_id is not None and parent_id not in inserted_ids:
                 continue
 
-            rank_id_raw = (row.get('rank_id') or '').strip()
             session.add(
                 StratUnit(
                     id=unit_id,
                     name=(row.get('unit_name') or '').strip(),
-                    rank=rank_map.get(int(rank_id_raw)) if rank_id_raw else None,
+                    rank=(row.get('rank_name') or '').strip() or None,
                     parent_id=parent_id,
                     age_top_ma=float(row['start_age_ma']) if (row.get('start_age_ma') or '').strip() else None,
                     age_base_ma=float(row['end_age_ma']) if (row.get('end_age_ma') or '').strip() else None,
@@ -94,7 +85,7 @@ def _seed_strat_units(session: Session, units_path: Path, ranks_path: Path, char
             raise ValueError('Unable to seed strat_units due to unresolved parent references')
 
 
-def _migrate_orphan_strat_units(session: Session) -> None:
+def _migrate_orphan_strat_units(session: Session, csv_path: Path) -> None:
     orphan_count = session.scalar(
         select(func.count()).select_from(StratUnit).where(StratUnit.chart_id.is_(None))
     ) or 0
@@ -104,15 +95,26 @@ def _migrate_orphan_strat_units(session: Session) -> None:
     default_chart = session.scalar(select(StratChart).where(StratChart.name == 'ICS 2023'))
     if default_chart is None:
         no_charts = session.scalar(select(func.count()).select_from(StratChart)) == 0
-        default_chart = StratChart(name='ICS 2023', source_path=None, is_active=no_charts)
+        default_chart = StratChart(name='ICS 2023', source_path=str(csv_path), is_active=no_charts)
         session.add(default_chart)
         session.flush()
+    elif default_chart.source_path != str(csv_path):
+        default_chart.source_path = str(csv_path)
 
     session.execute(
         StratUnit.__table__.update()
         .where(StratUnit.chart_id.is_(None))
         .values(chart_id=default_chart.id)
     )
+
+
+def _normalize_builtin_chart(session: Session, csv_path: Path) -> None:
+    charts = session.scalars(select(StratChart).order_by(StratChart.id.asc())).all()
+    for chart in charts:
+        source_name = Path(chart.source_path).name.lower() if chart.source_path else ''
+        if chart.name == 'ICS 2023' or source_name in {'ics_chart2023.csv', 'ics_chart2023_units.csv'}:
+            chart.name = 'ICS 2023'
+            chart.source_path = str(csv_path)
 
 
 def seed_dictionaries(session: Session, db_path: Path) -> None:
@@ -123,18 +125,20 @@ def seed_dictionaries(session: Session, db_path: Path) -> None:
     has_curve_rows = session.execute(select(CurveDictEntry.id).limit(1)).scalar_one_or_none() is not None
     has_lithology_rows = session.execute(select(LithologyDictEntry.id).limit(1)).scalar_one_or_none() is not None
     has_strat_rows = session.execute(select(StratUnit.id).limit(1)).scalar_one_or_none() is not None
+    builtin_chart_path = sample_dir / 'ics_chart2023.csv'
 
     if not has_curve_rows:
         _seed_curve_entries(session, seed_dir / 'curve_families.csv')
     if not has_lithology_rows:
         _seed_lithology_entries(session, seed_dir / 'lithology_defaults.csv')
     if not has_strat_rows:
-        units_path = sample_dir / 'ics_chart2023_units.csv'
-        ranks_path = sample_dir / 'ics_chart2023_ranks.csv'
-        if units_path.exists() and ranks_path.exists():
-            default_chart = StratChart(name='ICS 2023', source_path=str(units_path), is_active=True)
+        if builtin_chart_path.exists():
+            default_chart = StratChart(name='ICS 2023', source_path=str(builtin_chart_path), is_active=True)
             session.add(default_chart)
             session.flush()
-            _seed_strat_units(session, units_path, ranks_path, default_chart)
+            _seed_strat_units(session, builtin_chart_path, default_chart)
     else:
-        _migrate_orphan_strat_units(session)
+        _migrate_orphan_strat_units(session, builtin_chart_path)
+
+    if builtin_chart_path.exists():
+        _normalize_builtin_chart(session, builtin_chart_path)

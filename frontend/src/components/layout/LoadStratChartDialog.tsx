@@ -30,7 +30,7 @@ export function LoadStratChartDialog({ onClose, onSuccess }: LoadStratChartDialo
     setIsSubmitting(true)
     setError(null)
     try {
-      const response = await fetch('/api/strat-chart/import', {
+      const response = await fetch('/api/strat-charts/import', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ csv_path: path }),

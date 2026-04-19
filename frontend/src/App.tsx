@@ -765,6 +765,10 @@ function App() {
     if (!activeChart) {
       return
     }
+    if (activeChart.is_builtin) {
+      window.alert('Built-in ICS chart cannot be deleted.')
+      return
+    }
 
     if (!window.confirm(`Delete stratigraphic chart "${activeChart.name}"? Formation links to this chart will be cleared.`)) {
       return
@@ -987,7 +991,7 @@ function App() {
         type="button"
         className="app-action-button"
         onClick={() => void handleDeleteStratChart()}
-        disabled={!stratCharts.some((chart) => chart.is_active)}
+        disabled={!stratCharts.some((chart) => chart.is_active && !chart.is_builtin)}
       >
         Delete StratChart
       </button>

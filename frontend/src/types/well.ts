@@ -62,6 +62,7 @@ export interface StratChartInfo {
   id: number
   name: string
   is_active: boolean
+  is_builtin: boolean
   unit_count: number
   imported_at: string
   source_path: string | null

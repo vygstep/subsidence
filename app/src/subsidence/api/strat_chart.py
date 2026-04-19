@@ -37,9 +37,15 @@ class StratChartInfo(BaseModel):
     id: int
     name: str
     is_active: bool
+    is_builtin: bool
     unit_count: int
     imported_at: str
     source_path: str | None
+
+
+def _is_builtin_chart(chart: StratChart) -> bool:
+    source_name = Path(chart.source_path).name.lower() if chart.source_path else ''
+    return chart.name == 'ICS 2023' and source_name in {'', 'ics_chart2023.csv', 'ics_chart2023_units.csv'}
 
 
 def _import_ics_csv(session, csv_path: Path) -> tuple[StratChart, int]:
@@ -113,6 +119,7 @@ def _chart_info(session, chart: StratChart) -> StratChartInfo:
         id=chart.id,
         name=chart.name,
         is_active=chart.is_active,
+        is_builtin=_is_builtin_chart(chart),
         unit_count=unit_count,
         imported_at=chart.imported_at.isoformat(),
         source_path=chart.source_path,
@@ -150,6 +157,8 @@ def delete_strat_chart_by_id(chart_id: int, request: Request) -> None:
         chart = session.get(StratChart, chart_id)
         if chart is None:
             raise HTTPException(status_code=404, detail=f'Strat chart not found: {chart_id}')
+        if _is_builtin_chart(chart):
+            raise HTTPException(status_code=403, detail='Built-in ICS chart cannot be deleted')
         session.execute(delete(FormationStratLink).where(FormationStratLink.chart_id == chart_id))
         session.execute(delete(StratUnit).where(StratUnit.chart_id == chart_id))
         session.execute(delete(StratChart).where(StratChart.id == chart_id))
@@ -158,6 +167,7 @@ def delete_strat_chart_by_id(chart_id: int, request: Request) -> None:
 
 
 @router.post('/strat-chart/import', response_model=ImportStratChartResponse)
+@router.post('/strat-charts/import', response_model=ImportStratChartResponse)
 def import_strat_chart(body: ImportStratChartRequest, request: Request) -> ImportStratChartResponse:
     manager = _require_open_project(request)
     csv_path = Path(body.csv_path)
@@ -183,8 +193,20 @@ def import_strat_chart(body: ImportStratChartRequest, request: Request) -> Impor
 def delete_all_strat_charts(request: Request) -> None:
     manager = _require_open_project(request)
     with manager.get_session() as session:
-        session.execute(delete(FormationStratLink))
-        session.execute(delete(StratUnit))
-        session.execute(delete(StratChart))
+        protected_ids = [
+            chart.id
+            for chart in session.scalars(select(StratChart).order_by(StratChart.id.asc())).all()
+            if _is_builtin_chart(chart)
+        ]
+        deletable_ids = [
+            chart.id
+            for chart in session.scalars(select(StratChart).order_by(StratChart.id.asc())).all()
+            if chart.id not in protected_ids
+        ]
+        if not deletable_ids:
+            return
+        session.execute(delete(FormationStratLink).where(FormationStratLink.chart_id.in_(deletable_ids)))
+        session.execute(delete(StratUnit).where(StratUnit.chart_id.in_(deletable_ids)))
+        session.execute(delete(StratChart).where(StratChart.id.in_(deletable_ids)))
         session.commit()
     manager.save_project()

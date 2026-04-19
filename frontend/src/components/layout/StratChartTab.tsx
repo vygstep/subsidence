@@ -40,7 +40,8 @@ export function StratChartTab({ charts, onActivate, onDelete, selectedChartId, o
             <button
               type="button"
               className="strat-chart-item__delete"
-              title="Delete this chart"
+              title={chart.is_builtin ? 'Built-in ICS chart cannot be deleted' : 'Delete this chart'}
+              disabled={chart.is_builtin}
               onClick={(event) => {
                 event.stopPropagation()
                 if (window.confirm(`Delete strat chart "${chart.name}"?`)) {
