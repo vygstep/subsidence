@@ -36,8 +36,28 @@ def _seed_lithology_entries(session: Session, csv_path: Path) -> None:
                     color_hex=row['color_hex'],
                     pattern_id=row['pattern_id'] or None,
                     sort_order=int(row['sort_order']),
+                    density=float(row.get('density') or 2650.0),
+                    porosity_surface=float(row.get('porosity_surface') or 0.50),
+                    compaction_coeff=float(row.get('compaction_coeff') or 0.30),
                 )
             )
+
+
+def _migrate_lithology_compaction_params(session: Session, csv_path: Path) -> None:
+    """Back-fill compaction columns for rows seeded before Phase 4."""
+    with csv_path.open('r', encoding='utf-8', newline='') as handle:
+        defaults = {row['lithology_code']: row for row in csv.DictReader(handle)}
+
+    rows = session.scalars(select(LithologyDictEntry)).all()
+    for entry in rows:
+        d = defaults.get(entry.lithology_code)
+        if d is None:
+            continue
+        if entry.density == 2650.0 and entry.porosity_surface == 0.50 and entry.compaction_coeff == 0.30:
+            # still at schema defaults — replace with literature values
+            entry.density = float(d.get('density') or 2650.0)
+            entry.porosity_surface = float(d.get('porosity_surface') or 0.50)
+            entry.compaction_coeff = float(d.get('compaction_coeff') or 0.30)
 
 
 def _repo_sample_data_dir() -> Path:
@@ -131,6 +151,8 @@ def seed_dictionaries(session: Session, db_path: Path) -> None:
         _seed_curve_entries(session, seed_dir / 'curve_families.csv')
     if not has_lithology_rows:
         _seed_lithology_entries(session, seed_dir / 'lithology_defaults.csv')
+    else:
+        _migrate_lithology_compaction_params(session, seed_dir / 'lithology_defaults.csv')
     if not has_strat_rows:
         if builtin_chart_path.exists():
             default_chart = StratChart(name='ICS 2023', source_path=str(builtin_chart_path), is_active=True)

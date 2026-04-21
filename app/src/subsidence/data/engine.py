@@ -73,6 +73,16 @@ def migrate_schema(engine: Engine) -> None:
         if 'strat_unit_id' in formation_cols:
             # SQLite < 3.35 cannot DROP COLUMN; leave it as an orphan column (ORM ignores it)
             pass
+        litho_cols = {row[1] for row in conn.execute(text("PRAGMA table_info(lithology_dict_entries)"))}
+        if 'density' not in litho_cols:
+            conn.execute(text("ALTER TABLE lithology_dict_entries ADD COLUMN density REAL NOT NULL DEFAULT 2650.0"))
+            conn.commit()
+        if 'porosity_surface' not in litho_cols:
+            conn.execute(text("ALTER TABLE lithology_dict_entries ADD COLUMN porosity_surface REAL NOT NULL DEFAULT 0.50"))
+            conn.commit()
+        if 'compaction_coeff' not in litho_cols:
+            conn.execute(text("ALTER TABLE lithology_dict_entries ADD COLUMN compaction_coeff REAL NOT NULL DEFAULT 0.30"))
+            conn.commit()
 
 
 def validate_project_db(db_path: Path | str) -> tuple[int, int]:

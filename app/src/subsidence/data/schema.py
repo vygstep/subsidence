@@ -249,6 +249,13 @@ class LithologyDictEntry(Base):
     # null → solid fill; matches lithology_code for entries that have a canvas pattern
     description: Mapped[str | None] = mapped_column(Text, nullable=True)
     sort_order: Mapped[int] = mapped_column(Integer, default=0)
+    # Compaction parameters (Athy model: φ(z) = φ₀·exp(−c·z))
+    density: Mapped[float] = mapped_column(Float, default=2650.0)
+    # grain (matrix) density in kg/m³
+    porosity_surface: Mapped[float] = mapped_column(Float, default=0.50)
+    # φ₀, surface porosity (unitless fraction 0–1)
+    compaction_coeff: Mapped[float] = mapped_column(Float, default=0.30)
+    # c in km⁻¹; engine converts to m⁻¹ via c_m = c_km / 1000.0
 
 
 # ---------------------------------------------------------------------------
