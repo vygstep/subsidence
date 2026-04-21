@@ -1,4 +1,4 @@
-import { useViewStore, useWellDataStore, useWorkspaceStore, createEmptyTrack } from '@/stores'
+import { buildTrackOrder, useViewStore, useWellDataStore, useWorkspaceStore, createEmptyTrack } from '@/stores'
 import type { TrackConfig } from '@/types'
 
 const TRACK_COLORS = ['#22c55e', '#ef4444', '#2563eb', '#f59e0b', '#8b5cf6', '#0f766e', '#dc2626', '#475569']
@@ -75,6 +75,15 @@ export function CurveBrowser() {
             curves: [curveConfig],
           },
         ],
+        trackOrder: buildTrackOrder(
+          [
+            ...state.tracks
+              .filter((t) => t.curves.length > 0 || t.id === (state.tracks[0]?.id))
+              .map((track) => track.id),
+            `track-${nextNum}`,
+          ],
+          state.trackOrder,
+        ),
       }
     })
   }

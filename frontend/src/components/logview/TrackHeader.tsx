@@ -6,12 +6,37 @@ interface TrackHeaderProps {
   config: TrackConfig
   width: number
   isSelected?: boolean
+  isDragOver?: boolean
   onSelect?: () => void
+  onDragStart?: (event: React.DragEvent<HTMLButtonElement>) => void
+  onDragEnd?: () => void
+  onDragOver?: (event: React.DragEvent<HTMLButtonElement>) => void
+  onDrop?: (event: React.DragEvent<HTMLButtonElement>) => void
 }
 
-export function TrackHeader({ config, width, isSelected = false, onSelect }: TrackHeaderProps) {
+export function TrackHeader({
+  config,
+  width,
+  isSelected = false,
+  isDragOver = false,
+  onSelect,
+  onDragStart,
+  onDragEnd,
+  onDragOver,
+  onDrop,
+}: TrackHeaderProps) {
   return (
-    <button type="button" className={`track-header ${isSelected ? 'track-header--selected' : ''}`} style={{ width }} onClick={onSelect}>
+    <button
+      type="button"
+      draggable
+      className={`track-header ${isSelected ? 'track-header--selected' : ''} ${isDragOver ? 'track-header--drag-over' : ''}`}
+      style={{ width }}
+      onClick={onSelect}
+      onDragStart={onDragStart}
+      onDragEnd={onDragEnd}
+      onDragOver={onDragOver}
+      onDrop={onDrop}
+    >
       <div className="track-header__title">{config.title}</div>
       {config.curves.map((curve) => (
         <CurveScaleBar key={curve.mnemonic} curve={curve} />

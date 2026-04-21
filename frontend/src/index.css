@@ -800,6 +800,8 @@ body.is-resizing {
 
 .track-header-row__depth-header,
 .track-header-row__formation-header {
+  border: 0;
+  background: transparent;
   flex-shrink: 0;
   display: flex;
   align-items: center;
@@ -827,6 +829,12 @@ body.is-resizing {
   border-right: 1px solid #c4d0dc;
 }
 
+.track-header-row__special-header--drag-over {
+  background: rgba(37, 99, 235, 0.1);
+  outline: 2px dashed rgba(37, 99, 235, 0.55);
+  outline-offset: -2px;
+}
+
 .track-header {
   border: 0;
   background: transparent;
@@ -844,6 +852,12 @@ body.is-resizing {
   outline: 2px solid #2563eb;
   outline-offset: -2px;
   background: rgba(124, 184, 232, 0.12);
+}
+
+.track-header--drag-over {
+  background: rgba(37, 99, 235, 0.1);
+  outline: 2px dashed rgba(37, 99, 235, 0.55);
+  outline-offset: -2px;
 }
 
 .track-header__title {
@@ -925,6 +939,7 @@ body.is-resizing {
 }
 
 .log-view-panel__tracks {
+  position: relative;
   display: flex;
   flex-direction: row;
   flex: 1;

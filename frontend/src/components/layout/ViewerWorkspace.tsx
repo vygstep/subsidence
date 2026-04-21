@@ -3,7 +3,7 @@ import { useMemo } from 'react'
 import { LogViewPanel } from '../logview'
 import { SubsidencePanel } from '../subsidence'
 import { SplitView } from './SplitView'
-import { createDefaultWellView, useViewStore, useWellDataStore, useWorkspaceStore } from '@/stores'
+import { buildTrackOrder, createDefaultWellView, useViewStore, useWellDataStore, useWorkspaceStore } from '@/stores'
 
 export function ViewerWorkspace() {
   const well = useWellDataStore((state) => state.well)
@@ -49,6 +49,11 @@ export function ViewerWorkspace() {
     formations.filter((f) => activeWellView.visibleFormationIds.includes(f.id))
   ), [formations, activeWellView.visibleFormationIds])
 
+  const trackOrder = useMemo(
+    () => buildTrackOrder(tracks.map((track) => track.id), activeWellView.trackOrder),
+    [tracks, activeWellView.trackOrder],
+  )
+
   return (
     <section className="app-main-pane">
       {error ? (
@@ -66,6 +71,7 @@ export function ViewerWorkspace() {
             left={
               <LogViewPanel
                 tracks={tracks}
+                trackOrder={trackOrder}
                 curves={curves}
                 formations={visibleFormations}
                 minDepth={minDepth}

@@ -2,6 +2,9 @@ import { create } from 'zustand'
 
 import type { TrackConfig } from '@/types'
 
+export const DEPTH_TRACK_ID = 'depth'
+export const FORMATION_TRACK_ID = 'formations'
+
 export type SidebarTab = 'wells' | 'models' | 'strat-charts'
 export type ToolbarMode = 'project' | 'strat-chart' | 'wells' | 'tops'
 export type SelectedObject =
@@ -15,6 +18,7 @@ export type SelectedObject =
 
 export interface WellViewState {
   tracks: TrackConfig[]
+  trackOrder: string[]
   visibleFormationIds: string[]
   deviationVisible: boolean
   hiddenTrackIds: string[]
@@ -22,6 +26,14 @@ export interface WellViewState {
 
 const DEFAULT_SIDEBAR_WIDTH = 320
 const DEFAULT_SIDEBAR_TOP_RATIO = 0.66
+
+export function buildTrackOrder(trackIds: string[], rawOrder?: string[]): string[] {
+  const allIds = [DEPTH_TRACK_ID, ...trackIds, FORMATION_TRACK_ID]
+  const source = Array.isArray(rawOrder) ? rawOrder : []
+  const normalized = source.filter((id, index) => allIds.includes(id) && source.indexOf(id) === index)
+  const missing = allIds.filter((id) => !normalized.includes(id))
+  return [...normalized, ...missing]
+}
 
 export function createEmptyTrack(trackId = 'track-1', title = 'Track 1'): TrackConfig {
   return {
@@ -36,8 +48,10 @@ export function createEmptyTrack(trackId = 'track-1', title = 'Track 1'): TrackC
 }
 
 export function createDefaultWellView(): WellViewState {
+  const track = createEmptyTrack()
   return {
-    tracks: [createEmptyTrack()],
+    tracks: [track],
+    trackOrder: buildTrackOrder([track.id]),
     visibleFormationIds: [],
     deviationVisible: false,
     hiddenTrackIds: [],
@@ -76,7 +90,14 @@ export function coerceWellViewState(raw: unknown): WellViewState {
   }
 
   const value = raw as Record<string, unknown>
-  const tracks = Array.isArray(value.tracks) ? value.tracks.filter(isTrackConfig) : fallback.tracks
+  const rawTracks = Array.isArray(value.tracks) ? value.tracks.filter(isTrackConfig) : fallback.tracks
+  const tracks = rawTracks.length > 0 ? rawTracks : fallback.tracks
+  const trackOrder = buildTrackOrder(
+    tracks.map((track) => track.id),
+    Array.isArray(value.trackOrder)
+      ? value.trackOrder.filter((id): id is string => typeof id === 'string')
+      : undefined,
+  )
   const visibleFormationIds = Array.isArray(value.visibleFormationIds)
     ? value.visibleFormationIds.filter((id): id is string => typeof id === 'string')
     : fallback.visibleFormationIds
@@ -88,7 +109,8 @@ export function coerceWellViewState(raw: unknown): WellViewState {
     : fallback.deviationVisible
 
   return {
-    tracks: tracks.length > 0 ? tracks : fallback.tracks,
+    tracks,
+    trackOrder,
     visibleFormationIds,
     deviationVisible,
     hiddenTrackIds,

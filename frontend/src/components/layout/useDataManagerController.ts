@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react'
 
-import { createDefaultWellView, createEmptyTrack, useViewStore, useWellDataStore, useWorkspaceStore } from '@/stores'
+import { buildTrackOrder, createDefaultWellView, createEmptyTrack, useViewStore, useWellDataStore, useWorkspaceStore } from '@/stores'
 import type { TrackConfig } from '@/types'
 
 const TRACK_COLORS = ['#22c55e', '#ef4444', '#2563eb', '#f59e0b', '#8b5cf6', '#0f766e', '#dc2626', '#475569']
@@ -263,7 +263,12 @@ export function useDataManagerController() {
           curves: track.curves.filter((c) => c.mnemonic !== mnemonic),
         }))
         const hasAnyCurve = nextTracks.some((track) => track.curves.length > 0)
-        return { ...state, tracks: hasAnyCurve ? nextTracks : [createEmptyTrack()] }
+        const finalTracks = hasAnyCurve ? nextTracks : [createEmptyTrack()]
+        return {
+          ...state,
+          tracks: finalTracks,
+          trackOrder: buildTrackOrder(finalTracks.map((track) => track.id), state.trackOrder),
+        }
       }
 
       if (state.tracks.some((track) => track.curves.some((c) => c.mnemonic === mnemonic))) {
@@ -307,6 +312,10 @@ export function useDataManagerController() {
             curves: [curveConfig],
           },
         ],
+        trackOrder: buildTrackOrder(
+          [...state.tracks.map((track) => track.id), `track-${trackNumber}`],
+          state.trackOrder,
+        ),
       }
     })
   }
@@ -314,7 +323,14 @@ export function useDataManagerController() {
   async function handleToggleAllCurves(wellId: string, nextValue: boolean): Promise<void> {
     if (wellId !== well?.well_id) await loadWell(wellId)
     if (!nextValue) {
-      updateWellViewState(wellId, (state) => ({ ...state, tracks: [createEmptyTrack()] }))
+      updateWellViewState(wellId, (state) => {
+        const track = createEmptyTrack()
+        return {
+          ...state,
+          tracks: [track],
+          trackOrder: buildTrackOrder([track.id], state.trackOrder),
+        }
+      })
       return
     }
     useWellDataStore.getState().curves.forEach((curve) => {
