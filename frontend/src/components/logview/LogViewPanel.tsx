@@ -1,9 +1,10 @@
-import { Fragment, useEffect, useRef, useState } from 'react'
+import { Fragment, useCallback, useEffect, useRef, useState } from 'react'
 
 import { useSynchronizedScroll } from '@/hooks'
 import { useViewStore } from '@/stores'
 import type { CurveData, FormationTop, TrackConfig } from '@/types'
 
+import { InteractionOverlay } from '../interaction'
 import { DataTrack } from './DataTrack'
 import { DepthTrack } from './DepthTrack'
 import { FormationColumn } from './FormationColumn'
@@ -24,18 +25,40 @@ const DEFAULT_FORMATION_WIDTH = 80
 export function LogViewPanel({ tracks, curves, formations, minDepth, maxDepth }: LogViewPanelProps) {
   const containerRef = useRef<HTMLDivElement | null>(null)
   const [trackHeight, setTrackHeight] = useState(600)
+
   const setViewportHeight = useViewStore((state) => state.setViewportHeight)
   const trackWidths = useViewStore((state) => state.trackWidths)
+  const scrollDepth = useViewStore((state) => state.scrollDepth)
+  const depthPerPixel = useViewStore((state) => state.depthPerPixel)
+  const cursorDepth = useViewStore((state) => state.cursorDepth)
+  const setCursorDepth = useViewStore((state) => state.setCursorDepth)
+
   const depthWidth = trackWidths[DEPTH_TRACK_ID] ?? DEFAULT_DEPTH_WIDTH
   const formationWidth = trackWidths[FORMATION_TRACK_ID] ?? DEFAULT_FORMATION_WIDTH
+
+  const depthToPixel = useCallback(
+    (depth: number) => (depth - scrollDepth) / depthPerPixel,
+    [scrollDepth, depthPerPixel],
+  )
+
+  const handleMouseMove = useCallback(
+    (e: React.MouseEvent<HTMLDivElement>) => {
+      const rect = e.currentTarget.getBoundingClientRect()
+      const y = e.clientY - rect.top
+      setCursorDepth(scrollDepth + y * depthPerPixel)
+    },
+    [scrollDepth, depthPerPixel, setCursorDepth],
+  )
+
+  const handleMouseLeave = useCallback(() => {
+    setCursorDepth(null)
+  }, [setCursorDepth])
 
   useSynchronizedScroll(containerRef, minDepth, maxDepth)
 
   useEffect(() => {
     const element = containerRef.current
-    if (!element) {
-      return
-    }
+    if (!element) return
 
     const observer = new ResizeObserver((entries) => {
       const height = entries[0]?.contentRect.height ?? 600
@@ -55,31 +78,30 @@ export function LogViewPanel({ tracks, curves, formations, minDepth, maxDepth }:
       <div className="log-view-panel__tracks">
         <DepthTrack height={trackHeight} width={depthWidth} />
         <TrackResizeHandle trackId={DEPTH_TRACK_ID} initialWidth={depthWidth} />
-        {tracks.map((track) => {
-          const width = trackWidths[track.id] ?? track.width
-
-          return (
-            <Fragment key={track.id}>
-              <DataTrack
-                config={track}
-                curves={curves}
-                width={width}
-                height={trackHeight}
-              />
-              <TrackResizeHandle
-                trackId={track.id}
-                initialWidth={width}
-              />
-            </Fragment>
-          )
-        })}
+        <div
+          style={{ position: 'relative', display: 'flex', flexDirection: 'row', flex: 1, minWidth: 0, overflow: 'hidden' }}
+          onMouseMove={handleMouseMove}
+          onMouseLeave={handleMouseLeave}
+        >
+          {tracks.map((track) => {
+            const width = trackWidths[track.id] ?? track.width
+            return (
+              <Fragment key={track.id}>
+                <DataTrack config={track} curves={curves} width={width} height={trackHeight} />
+                <TrackResizeHandle trackId={track.id} initialWidth={width} />
+              </Fragment>
+            )
+          })}
+          <InteractionOverlay
+            height={trackHeight}
+            formations={formations}
+            depthToPixel={depthToPixel}
+            cursorDepth={cursorDepth}
+          />
+        </div>
         <FormationColumn formations={formations} height={trackHeight} maxDepth={maxDepth} width={formationWidth} />
-        <TrackResizeHandle
-          trackId={FORMATION_TRACK_ID}
-          initialWidth={formationWidth}
-        />
+        <TrackResizeHandle trackId={FORMATION_TRACK_ID} initialWidth={formationWidth} />
       </div>
     </div>
   )
 }
-
