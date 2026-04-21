@@ -207,31 +207,6 @@ export function WellDataPanel({
                   <div className="tree-node">
                     <div
                       className={`tree-node__row ${
-                        selectedObject?.type === 'well' && selectedObject.wellId === item.well_id ? 'tree-node__row--selected' : ''
-                      }`}
-                    >
-                      <TreeToggleButton
-                        isOpen={isOpen(`${rootId}:metadata`)}
-                        onToggle={() => toggleNode(`${rootId}:metadata`)}
-                      />
-                      <button type="button" className="tree-node__section-label" onClick={() => onSelectWell(item.well_id)}>
-                        Well metadata
-                      </button>
-                    </div>
-                    {isOpen(`${rootId}:metadata`) ? (
-                      <div className="tree-node__children">
-                        <div className="tree-leaf"><span>Name</span><span>{item.well_name}</span></div>
-                        <div className="tree-leaf"><span>Project X / Y</span><span>{formatNumber(item.x)}, {formatNumber(item.y)}</span></div>
-                        <div className="tree-leaf"><span>KB / GL</span><span>{formatNumber(item.kb_elev)} / {formatNumber(item.gl_elev)}</span></div>
-                        <div className="tree-leaf"><span>TD</span><span>{formatNumber(item.td_md)}</span></div>
-                        <div className="tree-leaf"><span>CRS</span><span>{item.crs || 'unset'}</span></div>
-                      </div>
-                    ) : null}
-                  </div>
-
-                  <div className="tree-node">
-                    <div
-                      className={`tree-node__row ${
                         selectedObject?.type === 'las-group' && selectedObject.wellId === item.well_id ? 'tree-node__row--selected' : ''
                       }`}
                     >
