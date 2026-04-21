@@ -12,7 +12,10 @@ import { ZoomControl } from './ZoomControl'
 import { useProjectStore, useViewStore, useWellDataStore, useWorkspaceStore } from '@/stores'
 import type { FormationTop } from '@/types'
 
-type DialogKind = 'project-open' | 'project-new' | 'create-well' | 'load-las' | 'load-tops' | 'load-deviation' | 'link-top' | 'load-strat-chart' | null
+type DialogKind = 'project-open' | 'project-new' | 'create-well' | 'load-las' | 'load-tops' | 'load-deviation' | 'link-top' | 'load-strat-chart' | 'set-top-type' | null
+type FormationTypeOption = 'strat' | 'unconformity'
+
+const FORMATION_TYPE_OPTIONS: FormationTypeOption[] = ['strat', 'unconformity']
 
 async function readError(response: Response, fallback: string): Promise<string> {
   try {
@@ -22,6 +25,56 @@ async function readError(response: Response, fallback: string): Promise<string> 
     // ignore non-JSON payloads
   }
   return fallback
+}
+
+interface SetFormationTypeDialogProps {
+  formationName: string
+  initialType: FormationTypeOption
+  onClose: () => void
+  onConfirm: (nextType: FormationTypeOption) => void | Promise<void>
+}
+
+function SetFormationTypeDialog({
+  formationName,
+  initialType,
+  onClose,
+  onConfirm,
+}: SetFormationTypeDialogProps) {
+  const [nextType, setNextType] = useState<FormationTypeOption>(initialType)
+
+  return (
+    <div className="project-dialog">
+      <header className="project-dialog__header">
+        <div>
+          <p className="project-dialog__eyebrow">Top type</p>
+          <h2 className="project-dialog__title">{formationName}</h2>
+        </div>
+        <button type="button" className="project-dialog__link" onClick={onClose}>Close</button>
+      </header>
+
+      <div className="project-dialog__body">
+        <label className="project-dialog__field">
+          <span>Type</span>
+          <select value={nextType} onChange={(event) => setNextType(event.target.value as FormationTypeOption)}>
+            {FORMATION_TYPE_OPTIONS.map((option) => (
+              <option key={option} value={option}>{option}</option>
+            ))}
+          </select>
+        </label>
+
+        <div className="project-dialog__actions" style={{ gap: 8 }}>
+          <button type="button" className="project-dialog__button" onClick={onClose}>Cancel</button>
+          <button
+            type="button"
+            className="project-dialog__button project-dialog__button--primary"
+            onClick={() => void onConfirm(nextType)}
+          >
+            Set type
+          </button>
+        </div>
+      </div>
+    </div>
+  )
 }
 
 export function ProjectToolbar() {
@@ -209,11 +262,7 @@ export function ProjectToolbar() {
 
   async function handleSetFormationType(): Promise<void> {
     if (!selectedFormation) return
-    const value = window.prompt('Set top type (`strat` or `unconformity`)', selectedFormation.kind)
-    if (value === null) return
-    const nextKind = value.trim().toLowerCase()
-    if (!nextKind || (nextKind !== 'strat' && nextKind !== 'unconformity')) return
-    await useWellDataStore.getState().updateFormation(selectedFormation.id, { kind: nextKind })
+    setActiveDialog('set-top-type')
   }
 
   async function handleMoveSelectedFormation(): Promise<void> {
@@ -285,6 +334,22 @@ export function ProjectToolbar() {
           />
         ) : null
       }
+      case 'set-top-type':
+        return selectedFormation ? (
+          <SetFormationTypeDialog
+            formationName={selectedFormation.name}
+            initialType={
+              FORMATION_TYPE_OPTIONS.includes(selectedFormation.kind as FormationTypeOption)
+                ? selectedFormation.kind as FormationTypeOption
+                : 'strat'
+            }
+            onClose={() => setActiveDialog(null)}
+            onConfirm={async (nextType) => {
+              await useWellDataStore.getState().updateFormation(selectedFormation.id, { kind: nextType })
+              setActiveDialog(null)
+            }}
+          />
+        ) : null
       default:
         return null
     }

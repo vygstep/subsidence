@@ -10,41 +10,6 @@ It is not a contract. It is a grouped execution list that can be handled pass by
 
 These items should be handled first because they affect correctness and trust in the UI.
 
-### B1. Data Manager group checkbox refresh
-
-Problem:
-
-- high-level object checkboxes do not refresh visually immediately after click
-- they update only after interacting with the disclosure triangle
-- the underlying action already works, but the view state does not reflect it immediately
-
-Expected result:
-
-- group checkboxes update immediately after click
-- no extra expand/collapse interaction is required to refresh the row state
-
-### B2. Saved project does not restore visual state
-
-Problem:
-
-- after reopening a saved project, visible curves and visible tops are not restored correctly
-
-Expected result:
-
-- saved visual composition is restored after reopen
-- curves and tops that were saved as visible remain visible
-
-### B3. Dragging a formation should select it in Data Manager
-
-Problem:
-
-- when a formation is dragged inside the track, the same formation is not selected in `Data Manager`
-
-Expected result:
-
-- active dragged formation becomes selected in `Data Manager`
-- `Settings` switches to that top automatically
-
 ### B4. `Set type` must use predefined formation types
 
 Problem:
