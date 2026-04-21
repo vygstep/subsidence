@@ -1515,8 +1515,8 @@ body.is-resizing {
 }
 
 .geological-timescale {
-  background: #1e293b;
-  border-bottom: 1px solid #334155;
+  background: #f0f5fa;
+  border-bottom: 1px solid #c4d0dc;
 }
 
 /* Compaction model params table */

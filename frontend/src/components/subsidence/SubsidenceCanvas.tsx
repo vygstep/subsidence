@@ -148,6 +148,8 @@ export function SubsidenceCanvas() {
         timeRange={{ min_ma: minAge, max_ma: maxAge }}
         width={containerWidth}
         height={TIMESCALE_HEIGHT}
+        paddingLeft={PADDING.left}
+        paddingRight={PADDING.right}
       />
       <div className="subsidence-canvas-wrapper">
         <canvas ref={canvasRef} className="subsidence-canvas" />
