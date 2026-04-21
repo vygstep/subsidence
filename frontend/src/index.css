@@ -1239,4 +1239,34 @@ body.is-resizing {
 .subsidence-panel__content {
   flex: 1;
   min-height: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+/* ── SubsidenceCanvas ───────────────────────────────────────────────────────── */
+
+.subsidence-canvas-container {
+  display: flex;
+  flex-direction: column;
+  width: 100%;
+  height: 100%;
+  min-height: 0;
+}
+
+.subsidence-canvas-wrapper {
+  flex: 1;
+  min-height: 0;
+  position: relative;
+}
+
+.subsidence-canvas {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+}
+
+.geological-timescale {
+  background: #1e293b;
+  border-bottom: 1px solid #334155;
 }
