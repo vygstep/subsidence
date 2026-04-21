@@ -41,17 +41,21 @@ export function LogViewPanel({ tracks, curves, formations, minDepth, maxDepth }:
     [scrollDepth, depthPerPixel],
   )
 
+  const [mouseClient, setMouseClient] = useState<{ x: number; y: number } | null>(null)
+
   const handleMouseMove = useCallback(
     (e: React.MouseEvent<HTMLDivElement>) => {
       const rect = e.currentTarget.getBoundingClientRect()
       const y = e.clientY - rect.top
       setCursorDepth(scrollDepth + y * depthPerPixel)
+      setMouseClient({ x: e.clientX, y: e.clientY })
     },
     [scrollDepth, depthPerPixel, setCursorDepth],
   )
 
   const handleMouseLeave = useCallback(() => {
     setCursorDepth(null)
+    setMouseClient(null)
   }, [setCursorDepth])
 
   useSynchronizedScroll(containerRef, minDepth, maxDepth)
@@ -95,8 +99,10 @@ export function LogViewPanel({ tracks, curves, formations, minDepth, maxDepth }:
           <InteractionOverlay
             height={trackHeight}
             formations={formations}
+            curves={curves}
             depthToPixel={depthToPixel}
             cursorDepth={cursorDepth}
+            mouseClient={mouseClient}
           />
         </div>
         <FormationColumn formations={formations} height={trackHeight} maxDepth={maxDepth} width={formationWidth} />

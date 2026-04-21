@@ -1,3 +1,4 @@
+export * from './StatusBar'
 export * from './ZoomControl'
 export * from './FileOpenDialog'
 export * from './NewProjectDialog'

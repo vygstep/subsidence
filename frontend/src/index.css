@@ -33,6 +33,39 @@ textarea {
   background: #eef3f8;
 }
 
+.status-bar {
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  height: 22px;
+  padding: 0 8px;
+  background: #1e293b;
+  color: #94a3b8;
+  font-size: 11px;
+  font-family: ui-monospace, monospace;
+  gap: 8px;
+}
+
+.status-bar__depth {
+  min-width: 120px;
+  color: #e2e8f0;
+}
+
+.status-bar__center {
+  flex: 1;
+}
+
+.status-bar__right {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.status-bar__dirty {
+  color: #f59e0b;
+  font-size: 9px;
+}
+
 .app-topbar {
   flex-shrink: 0;
   display: flex;

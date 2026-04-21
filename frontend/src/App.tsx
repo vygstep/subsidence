@@ -1,6 +1,6 @@
 import { useEffect, useRef } from 'react'
 
-import { DataManagerPane, ProjectToolbar, ViewerWorkspace } from '@/components'
+import { DataManagerPane, ProjectToolbar, StatusBar, ViewerWorkspace } from '@/components'
 import { useSidebarResize } from '@/hooks'
 import {
   useProjectStore,
@@ -143,6 +143,7 @@ function App() {
   return (
     <div className="app-layout">
       <ProjectToolbar />
+      <StatusBar />
       <main className={isProjectOpen ? 'app-main' : 'app-main app-main--gated'}>
         {isProjectOpen ? (
           <div ref={workspaceRef} className="app-workspace">
