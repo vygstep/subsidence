@@ -1,3 +1,7 @@
+import { useCallback, useState } from 'react'
+
+import { useFormationDrag } from '@/hooks'
+import { useWellDataStore } from '@/stores'
 import type { FormationTop } from '@/types'
 
 interface FormationTopLineProps {
@@ -9,22 +13,47 @@ const LABEL_HEIGHT = 18
 const LABEL_PADDING = 5
 
 export function FormationTopLine({ formation, yPosition }: FormationTopLineProps) {
+  const updateFormationDepth = useWellDataStore((state) => state.updateFormationDepth)
+  const [localY, setLocalY] = useState<number | null>(null)
+
+  const handleDepthChange = useCallback((depth: number) => {
+    setLocalY(depth)
+  }, [])
+
+  const handleDragEnd = useCallback(
+    (finalDepth: number) => {
+      setLocalY(null)
+      void updateFormationDepth(formation.id, finalDepth)
+    },
+    [formation.id, updateFormationDepth],
+  )
+
+  const { isDragging, dragHandlers } = useFormationDrag({
+    formation,
+    onDepthChange: handleDepthChange,
+    onDragEnd: handleDragEnd,
+  })
+
   const color = formation.active_strat_color ?? formation.color
+  const displayY = localY !== null ? localY : yPosition
+  const cursor = formation.is_locked ? 'not-allowed' : 'ns-resize'
+  const strokeOpacity = isDragging ? 1.0 : 0.75
 
   return (
-    <g style={{ pointerEvents: 'auto' }}>
+    <g style={{ pointerEvents: 'auto', cursor }} {...dragHandlers}>
       <line
         x1={0}
-        y1={yPosition}
+        y1={displayY}
         x2="100%"
-        y2={yPosition}
+        y2={displayY}
         stroke={color}
         strokeWidth={1.5}
         strokeDasharray="6 3"
+        strokeOpacity={strokeOpacity}
       />
       <rect
         x={2}
-        y={yPosition - LABEL_HEIGHT}
+        y={displayY - LABEL_HEIGHT}
         width={120}
         height={LABEL_HEIGHT}
         fill={color}
@@ -33,7 +62,7 @@ export function FormationTopLine({ formation, yPosition }: FormationTopLineProps
       />
       <text
         x={LABEL_PADDING}
-        y={yPosition - LABEL_HEIGHT / 2}
+        y={displayY - LABEL_HEIGHT / 2}
         dominantBaseline="middle"
         fill="#ffffff"
         fontSize={11}
@@ -45,7 +74,7 @@ export function FormationTopLine({ formation, yPosition }: FormationTopLineProps
       {formation.is_locked && (
         <text
           x={126}
-          y={yPosition - LABEL_HEIGHT / 2}
+          y={displayY - LABEL_HEIGHT / 2}
           dominantBaseline="middle"
           fill={color}
           fontSize={11}
