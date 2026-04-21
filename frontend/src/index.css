@@ -238,6 +238,11 @@ textarea {
   min-height: 0;
 }
 
+.app-sidebar__zone > .sidebar-panel {
+  height: 100%;
+  min-height: 0;
+}
+
 .app-sidebar__splitter,
 .app-workspace__splitter {
   flex-shrink: 0;
@@ -326,6 +331,8 @@ body.is-resizing {
 }
 
 .sidebar-panel__body {
+  flex: 1 1 auto;
+  min-height: 0;
   padding: 10px 12px;
   overflow: auto;
 }
