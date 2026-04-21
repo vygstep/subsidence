@@ -1,5 +1,7 @@
 import { useState } from 'react'
 
+import { getLastImportRoot, pickFile, rememberImportPath } from './pathMemory'
+
 interface WellOption {
   well_id: string
   well_name: string
@@ -31,10 +33,11 @@ async function readError(response: Response, fallback: string): Promise<string> 
 export function ImportTopsDialog({ wells, activeWellId, onClose, onSuccess }: ImportTopsDialogProps) {
   const [wellId, setWellId] = useState(activeWellId ?? '')
   const [createNewWell, setCreateNewWell] = useState(false)
-  const [csvPath, setCsvPath] = useState('')
+  const [csvPath, setCsvPath] = useState(() => getLastImportRoot())
   const [depthRef, setDepthRef] = useState<'MD' | 'TVD' | 'TVDSS'>('MD')
   const [error, setError] = useState<string | null>(null)
   const [isSubmitting, setIsSubmitting] = useState(false)
+  const lastImportRoot = getLastImportRoot()
 
   const handleSubmit = async (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault()
@@ -62,12 +65,30 @@ export function ImportTopsDialog({ wells, activeWellId, onClose, onSuccess }: Im
       }
 
       const payload = (await response.json()) as ImportTopsResponse
+      rememberImportPath(nextPath)
       await onSuccess(payload.well_id)
       onClose()
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : 'Failed to import tops')
     } finally {
       setIsSubmitting(false)
+    }
+  }
+
+  const handleBrowse = async () => {
+    setError(null)
+    try {
+      const picked = await pickFile(csvPath || lastImportRoot, [
+        ['Delimited text', '*.csv *.tsv *.txt'],
+        ['CSV files', '*.csv'],
+        ['TSV files', '*.tsv'],
+        ['All files', '*.*'],
+      ])
+      if (picked) {
+        setCsvPath(picked)
+      }
+    } catch (cause) {
+      setError(cause instanceof Error ? cause.message : 'Failed to open file picker')
     }
   }
 
@@ -106,13 +127,23 @@ export function ImportTopsDialog({ wells, activeWellId, onClose, onSuccess }: Im
 
         <label className="project-dialog__field">
           <span>Tops CSV path</span>
-          <input
-            type="text"
-            value={csvPath}
-            onChange={(event) => setCsvPath(event.target.value)}
-            placeholder="D:\\data\\tops.csv"
-            autoFocus
-          />
+          <div className="project-dialog__field-row">
+            <input
+              type="text"
+              value={csvPath}
+              onChange={(event) => setCsvPath(event.target.value)}
+              placeholder="D:\\data\\tops.csv"
+              autoFocus
+            />
+            <div className="project-dialog__path-actions">
+              <button type="button" className="project-dialog__path-action" disabled={!lastImportRoot} onClick={() => setCsvPath(lastImportRoot)}>
+                Use last folder
+              </button>
+              <button type="button" className="project-dialog__path-action" onClick={() => void handleBrowse()}>
+                Browse...
+              </button>
+            </div>
+          </div>
         </label>
 
         <label className="project-dialog__field">

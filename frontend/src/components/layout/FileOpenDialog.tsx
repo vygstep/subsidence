@@ -2,6 +2,8 @@ import { useEffect, useState } from 'react'
 
 import { useProjectStore } from '@/stores'
 
+import { getLastProjectPath, getLastProjectRoot, pickFolder } from './pathMemory'
+
 interface FileOpenDialogProps {
   onSwitchToNew: () => void
   onClose?: () => void
@@ -20,9 +22,12 @@ export function FileOpenDialog({ onSwitchToNew, onClose }: FileOpenDialogProps) 
   const loadRecentProjects = useProjectStore((state) => state.loadRecentProjects)
   const openProject = useProjectStore((state) => state.openProject)
 
-  const [path, setPath] = useState('')
+  const [path, setPath] = useState(() => getLastProjectPath())
   const [error, setError] = useState<string | null>(null)
   const [isSubmitting, setIsSubmitting] = useState(false)
+
+  const lastProjectPath = getLastProjectPath()
+  const lastProjectRoot = getLastProjectRoot()
 
   useEffect(() => {
     let cancelled = false
@@ -63,6 +68,18 @@ export function FileOpenDialog({ onSwitchToNew, onClose }: FileOpenDialogProps) 
     }
   }
 
+  const handleBrowse = async () => {
+    setError(null)
+    try {
+      const picked = await pickFolder(path || lastProjectRoot)
+      if (picked) {
+        setPath(picked)
+      }
+    } catch (cause) {
+      setError(cause instanceof Error ? cause.message : 'Failed to open folder picker')
+    }
+  }
+
   return (
     <section className="project-dialog" aria-labelledby="project-open-title">
       <header className="project-dialog__header">
@@ -78,13 +95,26 @@ export function FileOpenDialog({ onSwitchToNew, onClose }: FileOpenDialogProps) 
       <form className="project-dialog__body" onSubmit={handleSubmit}>
         <label className="project-dialog__field">
           <span>Project bundle path</span>
-          <input
-            type="text"
-            value={path}
-            onChange={(event) => setPath(event.target.value)}
-            placeholder="D:\\projects\\example.subsidence"
-            autoFocus
-          />
+          <div className="project-dialog__field-row">
+            <input
+              type="text"
+              value={path}
+              onChange={(event) => setPath(event.target.value)}
+              placeholder="D:\\projects\\example.subsidence"
+              autoFocus
+            />
+            <div className="project-dialog__path-actions">
+              <button type="button" className="project-dialog__path-action" disabled={!lastProjectPath} onClick={() => setPath(lastProjectPath)}>
+                Use last project
+              </button>
+              <button type="button" className="project-dialog__path-action" disabled={!lastProjectRoot} onClick={() => setPath(lastProjectRoot)}>
+                Use last folder
+              </button>
+              <button type="button" className="project-dialog__path-action" onClick={() => void handleBrowse()}>
+                Browse...
+              </button>
+            </div>
+          </div>
         </label>
 
         <div className="project-dialog__section">
@@ -126,7 +156,7 @@ export function FileOpenDialog({ onSwitchToNew, onClose }: FileOpenDialogProps) 
             </button>
           )}
           <button type="submit" className="project-dialog__button project-dialog__button--primary" disabled={isSubmitting}>
-            {isSubmitting ? 'Opening…' : 'Open project'}
+            {isSubmitting ? 'Opening...' : 'Open project'}
           </button>
         </div>
       </form>

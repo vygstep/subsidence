@@ -1,5 +1,7 @@
 import { useState } from 'react'
 
+import { getLastImportRoot, pickFile, rememberImportPath } from './pathMemory'
+
 interface WellOption {
   well_id: string
   well_name: string
@@ -34,10 +36,11 @@ export function ImportLasDialog({ wells, activeWellId, onClose, onSuccess }: Imp
   const [wellId, setWellId] = useState(activeWellId ?? '')
   const [createNewWell, setCreateNewWell] = useState(false)
   const [sourceType, setSourceType] = useState<LogSourceType>('las')
-  const [sourcePath, setSourcePath] = useState('')
+  const [sourcePath, setSourcePath] = useState(() => getLastImportRoot())
   const [depthColumn, setDepthColumn] = useState('')
   const [error, setError] = useState<string | null>(null)
   const [isSubmitting, setIsSubmitting] = useState(false)
+  const lastImportRoot = getLastImportRoot()
 
   const handleSubmit = async (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault()
@@ -78,12 +81,35 @@ export function ImportLasDialog({ wells, activeWellId, onClose, onSuccess }: Imp
       }
 
       const payload = (await response.json()) as ImportLasResponse
+      rememberImportPath(nextPath)
       await onSuccess(payload.well_id)
       onClose()
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : 'Failed to import logs')
     } finally {
       setIsSubmitting(false)
+    }
+  }
+
+  const handleBrowse = async () => {
+    setError(null)
+    try {
+      const picked = await pickFile(sourcePath || lastImportRoot, sourceType === 'las'
+        ? [
+            ['LAS files', '*.las'],
+            ['All files', '*.*'],
+          ]
+        : [
+            ['Delimited text', '*.csv *.tsv *.txt'],
+            ['CSV files', '*.csv'],
+            ['TSV files', '*.tsv'],
+            ['All files', '*.*'],
+          ])
+      if (picked) {
+        setSourcePath(picked)
+      }
+    } catch (cause) {
+      setError(cause instanceof Error ? cause.message : 'Failed to open file picker')
     }
   }
 
@@ -132,13 +158,23 @@ export function ImportLasDialog({ wells, activeWellId, onClose, onSuccess }: Imp
 
         <label className="project-dialog__field">
           <span>{sourceType === 'las' ? 'LAS file path' : 'CSV file path'}</span>
-          <input
-            type="text"
-            value={sourcePath}
-            onChange={(event) => setSourcePath(event.target.value)}
-            placeholder={sourceType === 'las' ? 'D:\\data\\well.las' : 'D:\\data\\well_logs.csv'}
-            autoFocus
-          />
+          <div className="project-dialog__field-row">
+            <input
+              type="text"
+              value={sourcePath}
+              onChange={(event) => setSourcePath(event.target.value)}
+              placeholder={sourceType === 'las' ? 'D:\\data\\well.las' : 'D:\\data\\well_logs.csv'}
+              autoFocus
+            />
+            <div className="project-dialog__path-actions">
+              <button type="button" className="project-dialog__path-action" disabled={!lastImportRoot} onClick={() => setSourcePath(lastImportRoot)}>
+                Use last folder
+              </button>
+              <button type="button" className="project-dialog__path-action" onClick={() => void handleBrowse()}>
+                Browse...
+              </button>
+            </div>
+          </div>
         </label>
 
         {sourceType === 'csv' ? (

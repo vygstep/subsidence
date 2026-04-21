@@ -4,6 +4,9 @@ import csv
 import io
 import json
 import math
+import subprocess
+import tkinter as tk
+from tkinter import filedialog
 from pathlib import Path
 from uuid import uuid4
 
@@ -47,6 +50,19 @@ class CreateProjectRequest(BaseModel):
 
 class OpenProjectRequest(BaseModel):
     path: str
+
+
+class RevealPathRequest(BaseModel):
+    path: str
+
+
+class PickFolderRequest(BaseModel):
+    initial_path: str | None = None
+
+
+class PickFileRequest(BaseModel):
+    initial_path: str | None = None
+    file_types: list[tuple[str, str]] | None = None
 
 
 class ImportLasRequest(BaseModel):
@@ -238,6 +254,10 @@ class VisualConfigResponse(BaseModel):
     config: dict
 
 
+class PickPathResponse(BaseModel):
+    path: str | None = None
+
+
 def _manager(request: Request) -> ProjectManager:
     return request.app.state.project_manager
 
@@ -294,6 +314,28 @@ def _require_non_negative_number(value: float | None, field_name: str) -> float 
     if _require_finite_number(value, field_name) < 0:
         raise HTTPException(status_code=400, detail=f'{field_name} must be >= 0')
     return value
+
+
+def _normalize_initial_dir(path: str | None) -> str | None:
+    if not path:
+        return None
+    candidate = Path(path.strip()).expanduser()
+    if candidate.is_file():
+        candidate = candidate.parent
+    if candidate.exists() and candidate.is_dir():
+        return str(candidate.resolve())
+    return None
+
+
+def _pick_path(callback):
+    root = tk.Tk()
+    root.withdraw()
+    root.attributes('-topmost', True)
+    root.update()
+    try:
+        return callback()
+    finally:
+        root.destroy()
 
 
 def _select_export_well(session, well_id: str | None) -> WellModel:
@@ -375,6 +417,60 @@ def open_project(payload: OpenProjectRequest, request: Request) -> OpenProjectRe
         return OpenProjectResponse(**manager.open_project(payload.path))
     except (RuntimeError, FileNotFoundError, ValueError) as error:
         raise HTTPException(status_code=400, detail=str(error)) from error
+
+
+@router.post('/reveal-path', response_model=DictionaryUpdateResponse)
+def reveal_path(payload: RevealPathRequest, request: Request) -> DictionaryUpdateResponse:
+    _manager(request)
+    raw_path = payload.path.strip()
+    if not raw_path:
+        raise HTTPException(status_code=400, detail='Path is required')
+
+    target = Path(raw_path).expanduser()
+    if not target.exists():
+        raise HTTPException(status_code=404, detail=f'Path does not exist: {raw_path}')
+
+    try:
+        if target.is_file():
+            subprocess.Popen(['explorer', f'/select,{target.resolve()}'])
+        else:
+            subprocess.Popen(['explorer', str(target.resolve())])
+    except OSError as error:
+        raise HTTPException(status_code=500, detail=f'Failed to open Explorer: {error}') from error
+
+    return DictionaryUpdateResponse(status='ok')
+
+
+@router.post('/pick-folder', response_model=PickPathResponse)
+def pick_folder(payload: PickFolderRequest, request: Request) -> PickPathResponse:
+    _manager(request)
+    initial_dir = _normalize_initial_dir(payload.initial_path)
+
+    try:
+        selected = _pick_path(lambda: filedialog.askdirectory(initialdir=initial_dir or None, mustexist=True))
+    except tk.TclError as error:
+        raise HTTPException(status_code=500, detail=f'Failed to open folder picker: {error}') from error
+
+    return PickPathResponse(path=selected or None)
+
+
+@router.post('/pick-file', response_model=PickPathResponse)
+def pick_file(payload: PickFileRequest, request: Request) -> PickPathResponse:
+    _manager(request)
+    initial_dir = _normalize_initial_dir(payload.initial_path)
+    file_types = payload.file_types or [('All files', '*.*')]
+
+    try:
+        selected = _pick_path(
+            lambda: filedialog.askopenfilename(
+                initialdir=initial_dir or None,
+                filetypes=file_types,
+            )
+        )
+    except tk.TclError as error:
+        raise HTTPException(status_code=500, detail=f'Failed to open file picker: {error}') from error
+
+    return PickPathResponse(path=selected or None)
 
 
 @router.post('/close', response_model=CloseProjectResponse)

@@ -2,6 +2,8 @@ import { useState } from 'react'
 
 import { useProjectStore } from '@/stores'
 
+import { getLastProjectRoot, pickFolder } from './pathMemory'
+
 interface NewProjectDialogProps {
   onSwitchToOpen: () => void
   onClose?: () => void
@@ -11,10 +13,12 @@ export function NewProjectDialog({ onSwitchToOpen, onClose }: NewProjectDialogPr
   const createProject = useProjectStore((state) => state.createProject)
 
   const [name, setName] = useState('')
-  const [path, setPath] = useState('')
+  const [path, setPath] = useState(() => getLastProjectRoot())
   const [overwrite, setOverwrite] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [isSubmitting, setIsSubmitting] = useState(false)
+
+  const lastProjectRoot = getLastProjectRoot()
 
   const handleSubmit = async (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault()
@@ -40,6 +44,18 @@ export function NewProjectDialog({ onSwitchToOpen, onClose }: NewProjectDialogPr
       setError(cause instanceof Error ? cause.message : 'Failed to create project')
     } finally {
       setIsSubmitting(false)
+    }
+  }
+
+  const handleBrowse = async () => {
+    setError(null)
+    try {
+      const picked = await pickFolder(path || lastProjectRoot)
+      if (picked) {
+        setPath(picked)
+      }
+    } catch (cause) {
+      setError(cause instanceof Error ? cause.message : 'Failed to open folder picker')
     }
   }
 
@@ -69,12 +85,22 @@ export function NewProjectDialog({ onSwitchToOpen, onClose }: NewProjectDialogPr
 
         <label className="project-dialog__field">
           <span>Location</span>
-          <input
-            type="text"
-            value={path}
-            onChange={(event) => setPath(event.target.value)}
-            placeholder="D:\\projects"
-          />
+          <div className="project-dialog__field-row">
+            <input
+              type="text"
+              value={path}
+              onChange={(event) => setPath(event.target.value)}
+              placeholder="D:\\projects"
+            />
+            <div className="project-dialog__path-actions">
+              <button type="button" className="project-dialog__path-action" disabled={!lastProjectRoot} onClick={() => setPath(lastProjectRoot)}>
+                Use last folder
+              </button>
+              <button type="button" className="project-dialog__path-action" onClick={() => void handleBrowse()}>
+                Browse...
+              </button>
+            </div>
+          </div>
         </label>
 
         <p className="project-dialog__hint">The app will create a <code>.subsidence</code> bundle inside the selected directory.</p>
@@ -97,7 +123,7 @@ export function NewProjectDialog({ onSwitchToOpen, onClose }: NewProjectDialogPr
             </button>
           )}
           <button type="submit" className="project-dialog__button project-dialog__button--primary" disabled={isSubmitting}>
-            {isSubmitting ? 'Creating…' : 'Create project'}
+            {isSubmitting ? 'Creating...' : 'Create project'}
           </button>
         </div>
       </form>

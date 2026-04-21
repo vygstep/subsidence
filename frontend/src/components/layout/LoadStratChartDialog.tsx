@@ -1,5 +1,7 @@
 import { useState } from 'react'
 
+import { getLastImportRoot, pickFile, rememberImportPath } from './pathMemory'
+
 interface LoadStratChartDialogProps {
   onClose: () => void
   onSuccess: (unitsImported: number) => void
@@ -16,9 +18,10 @@ async function readError(response: Response, fallback: string): Promise<string> 
 }
 
 export function LoadStratChartDialog({ onClose, onSuccess }: LoadStratChartDialogProps) {
-  const [csvPath, setCsvPath] = useState('')
+  const [csvPath, setCsvPath] = useState(() => getLastImportRoot())
   const [error, setError] = useState<string | null>(null)
   const [isSubmitting, setIsSubmitting] = useState(false)
+  const lastImportRoot = getLastImportRoot()
 
   const handleSubmit = async (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault()
@@ -39,12 +42,30 @@ export function LoadStratChartDialog({ onClose, onSuccess }: LoadStratChartDialo
         throw new Error(await readError(response, `Import failed (${response.status})`))
       }
       const payload = (await response.json()) as { units_imported: number }
+      rememberImportPath(path)
       onSuccess(payload.units_imported)
       onClose()
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : 'Import failed')
     } finally {
       setIsSubmitting(false)
+    }
+  }
+
+  const handleBrowse = async () => {
+    setError(null)
+    try {
+      const picked = await pickFile(csvPath || lastImportRoot, [
+        ['Delimited text', '*.csv *.tsv *.txt'],
+        ['CSV files', '*.csv'],
+        ['TSV files', '*.tsv'],
+        ['All files', '*.*'],
+      ])
+      if (picked) {
+        setCsvPath(picked)
+      }
+    } catch (cause) {
+      setError(cause instanceof Error ? cause.message : 'Failed to open file picker')
     }
   }
 
@@ -63,13 +84,23 @@ export function LoadStratChartDialog({ onClose, onSuccess }: LoadStratChartDialo
       <form className="project-dialog__body" onSubmit={handleSubmit}>
         <label className="project-dialog__field">
           <span>ICS chart CSV path</span>
-          <input
-            type="text"
-            value={csvPath}
-            onChange={(event) => setCsvPath(event.target.value)}
-            placeholder="D:\\data\\ics_chart2023.csv"
-            autoFocus
-          />
+          <div className="project-dialog__field-row">
+            <input
+              type="text"
+              value={csvPath}
+              onChange={(event) => setCsvPath(event.target.value)}
+              placeholder="D:\\data\\ics_chart2023.csv"
+              autoFocus
+            />
+            <div className="project-dialog__path-actions">
+              <button type="button" className="project-dialog__path-action" disabled={!lastImportRoot} onClick={() => setCsvPath(lastImportRoot)}>
+                Use last folder
+              </button>
+              <button type="button" className="project-dialog__path-action" onClick={() => void handleBrowse()}>
+                Browse...
+              </button>
+            </div>
+          </div>
         </label>
 
         <p className="project-dialog__hint">

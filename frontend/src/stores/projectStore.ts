@@ -1,5 +1,7 @@
 import { create } from 'zustand'
 
+import { rememberProjectBundlePath } from '@/components/layout/pathMemory'
+
 import { useViewStore } from './viewStore'
 import { useWellDataStore } from './wellDataStore'
 import { useWorkspaceStore } from './workspaceStore'
@@ -285,6 +287,7 @@ export const useProjectStore = create<ProjectStore>((set, get) => ({
       visualConfig: {},
       visualConfigSaveToken: 0,
     })
+    rememberProjectBundlePath(payload.project_path)
     try {
       await get().loadRecentProjects()
     } catch {
