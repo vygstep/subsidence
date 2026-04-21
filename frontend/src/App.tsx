@@ -152,11 +152,15 @@ function App() {
         )
         wellViewsHydratedRef.current = true
 
-        const currentWellId = well?.well_id
+        const currentWell = useWellDataStore.getState().well
+        const currentWellId = currentWell?.well_id
         const hasCurrent = !projectChanged && currentWellId ? wells.some((w) => w.well_id === currentWellId) : false
         const nextWellId = hasCurrent && currentWellId ? currentWellId : wells[0].well_id
         if (projectChanged) { selectTrack(null); setSelectedFormationId(null) }
-        if (nextWellId && (projectChanged || nextWellId !== currentWellId || !well)) {
+        // Hydrate per-project visual state only on project-open cycles. Re-running
+        // this effect on every current-well refresh would overwrite unsaved local
+        // track/tops visibility drafts with the last saved backend snapshot.
+        if (nextWellId && (projectChanged || nextWellId !== currentWellId || !currentWell)) {
           await loadWell(nextWellId)
         }
       } catch {
@@ -165,7 +169,7 @@ function App() {
     }
     void loadCurrentProject()
     return () => { cancelled = true }
-  }, [isProjectOpen, projectPath, loadScopedVisualConfig, loadWell, loadWellInventories, replaceWellViewStates, resetWell, selectTrack, well, setSelectedFormationId])
+  }, [isProjectOpen, projectPath, loadScopedVisualConfig, loadWell, loadWellInventories, replaceWellViewStates, resetWell, selectTrack, setSelectedFormationId])
 
   useEffect(() => {
     if (selectedFormationId && !formations.some((f) => f.id === selectedFormationId)) {

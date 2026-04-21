@@ -49,4 +49,4 @@ Primary references:
 
 ## Immediate Next Step
 
-Execute Phase 3 cleanup 2 stabilization from `docs/phase3-cleanup2-contract.md`.
+Execute `Pass 1 - Bugfixes` from `docs/bugs_and_improvements.md`, one item at a time with confirmation after each item.

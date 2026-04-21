@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useLayoutEffect, useRef, useState } from 'react'
 
 import type { FormationInventoryItem, WellInventory } from '@/types'
 
@@ -65,7 +65,7 @@ interface TriStateCheckboxProps {
 function TriStateCheckbox({ state, onToggle }: TriStateCheckboxProps) {
   const inputRef = useRef<HTMLInputElement | null>(null)
 
-  useEffect(() => {
+  useLayoutEffect(() => {
     if (inputRef.current) {
       inputRef.current.indeterminate = state === 'partial'
     }
@@ -77,11 +77,9 @@ function TriStateCheckbox({ state, onToggle }: TriStateCheckboxProps) {
       type="checkbox"
       className={`tree-tristate-checkbox tree-tristate-checkbox--${state}`}
       checked={state === 'all'}
-      readOnly
+      onChange={() => onToggle(state === 'none')}
       onClick={(event) => {
-        event.preventDefault()
         event.stopPropagation()
-        onToggle(state === 'none')
       }}
     />
   )

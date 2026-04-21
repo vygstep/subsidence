@@ -1,7 +1,7 @@
 import { useCallback, useState } from 'react'
 
 import { useFormationDrag } from '@/hooks'
-import { useViewStore, useWellDataStore } from '@/stores'
+import { useViewStore, useWellDataStore, useWorkspaceStore } from '@/stores'
 import type { FormationTop } from '@/types'
 
 interface FormationTopLineProps {
@@ -14,7 +14,16 @@ const LABEL_PADDING = 5
 
 export function FormationTopLine({ formation, yPosition }: FormationTopLineProps) {
   const updateFormationDepth = useWellDataStore((state) => state.updateFormationDepth)
+  const wellId = useWellDataStore((state) => state.well?.well_id)
+  const setSelectedFormationId = useWorkspaceStore((state) => state.setSelectedFormationId)
+  const setSelectedObject = useWorkspaceStore((state) => state.setSelectedObject)
   const [localY, setLocalY] = useState<number | null>(null)
+
+  const handleDragStart = useCallback(() => {
+    if (!wellId) return
+    setSelectedFormationId(formation.id)
+    setSelectedObject({ type: 'top-pick', wellId, formationId: formation.id })
+  }, [formation.id, setSelectedFormationId, setSelectedObject, wellId])
 
   const handleDepthChange = useCallback((depth: number) => {
     const { scrollDepth, depthPerPixel } = useViewStore.getState()
@@ -31,6 +40,7 @@ export function FormationTopLine({ formation, yPosition }: FormationTopLineProps
 
   const { isDragging, dragHandlers } = useFormationDrag({
     formation,
+    onDragStart: handleDragStart,
     onDepthChange: handleDepthChange,
     onDragEnd: handleDragEnd,
   })
