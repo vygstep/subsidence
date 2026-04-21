@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 
 import { CreateWellDialog } from './CreateWellDialog'
 import { FileOpenDialog } from './FileOpenDialog'
@@ -80,6 +80,8 @@ function SetFormationTypeDialog({
 export function ProjectToolbar() {
   const [activeDialog, setActiveDialog] = useState<DialogKind>('project-open')
   const [formationLinkTarget, setFormationLinkTarget] = useState<FormationTop | null>(null)
+  const [projectMenuOpen, setProjectMenuOpen] = useState(false)
+  const projectMenuRef = useRef<HTMLDivElement | null>(null)
 
   const well = useWellDataStore((state) => state.well)
   const formations = useWellDataStore((state) => state.formations)
@@ -107,9 +109,8 @@ export function ProjectToolbar() {
   const undoProject = useProjectStore((state) => state.undo)
   const redoProject = useProjectStore((state) => state.redo)
 
-  const activeToolbarMode = useWorkspaceStore((state) => state.activeToolbarMode)
+  const activeSidebarTab = useWorkspaceStore((state) => state.activeSidebarTab)
   const selectedFormationId = useWorkspaceStore((state) => state.selectedFormationId)
-  const setActiveToolbarMode = useWorkspaceStore((state) => state.setActiveToolbarMode)
   const setSelectedFormationId = useWorkspaceStore((state) => state.setSelectedFormationId)
   const updateWellViewState = useWorkspaceStore((state) => state.updateWellViewState)
   const dropWellViewState = useWorkspaceStore((state) => state.dropWellViewState)
@@ -136,14 +137,32 @@ export function ProjectToolbar() {
 
   useEffect(() => {
     if (!isProjectOpen) {
-      setActiveToolbarMode('project')
       if (activeDialog === null) setActiveDialog('project-open')
       return
     }
     if (activeDialog === 'project-open' || activeDialog === 'project-new') {
       setActiveDialog(null)
     }
-  }, [activeDialog, isProjectOpen, setActiveToolbarMode])
+  }, [activeDialog, isProjectOpen])
+
+  useEffect(() => {
+    if (!isProjectOpen) {
+      setProjectMenuOpen(false)
+    }
+  }, [isProjectOpen])
+
+  useEffect(() => {
+    if (!projectMenuOpen) return
+
+    const onPointerDown = (event: MouseEvent) => {
+      if (!projectMenuRef.current?.contains(event.target as Node)) {
+        setProjectMenuOpen(false)
+      }
+    }
+
+    window.addEventListener('mousedown', onPointerDown)
+    return () => window.removeEventListener('mousedown', onPointerDown)
+  }, [projectMenuOpen])
 
   useEffect(() => {
     const onKeyDown = (event: KeyboardEvent) => {
@@ -172,6 +191,7 @@ export function ProjectToolbar() {
   }, [canRedo, canUndo, isProjectOpen, redoProject, saveProject, undoProject])
 
   async function handleProjectClose(): Promise<void> {
+    setProjectMenuOpen(false)
     await closeProject()
     setActiveDialog('project-open')
   }
@@ -355,13 +375,13 @@ export function ProjectToolbar() {
     }
   }
 
-  const projectModeActions = (
+  const projectMenuActions = (
     <>
-      <button type="button" className="app-action-button" onClick={() => setActiveDialog('project-new')}>New project</button>
-      <button type="button" className="app-action-button" onClick={() => setActiveDialog('project-open')}>Open project</button>
-      <button type="button" className="app-action-button" onClick={() => void handleProjectClose()}>Close project</button>
-      <button type="button" className="app-action-button app-action-button--primary" onClick={() => void saveProject()}>Save project</button>
-      <button type="button" className="app-action-button" onClick={() => void createCheckpoint()}>Create checkpoint</button>
+      <button type="button" className="app-menu__item" onClick={() => { setProjectMenuOpen(false); setActiveDialog('project-new') }}>New project</button>
+      <button type="button" className="app-menu__item" onClick={() => { setProjectMenuOpen(false); setActiveDialog('project-open') }}>Open project</button>
+      <button type="button" className="app-menu__item" onClick={() => void handleProjectClose()}>Close project</button>
+      <button type="button" className="app-menu__item" onClick={() => { setProjectMenuOpen(false); void saveProject() }}>Save project</button>
+      <button type="button" className="app-menu__item" onClick={() => { setProjectMenuOpen(false); void createCheckpoint() }}>Create checkpoint</button>
     </>
   )
 
@@ -414,11 +434,20 @@ export function ProjectToolbar() {
 
           {isProjectOpen && (
             <div className="app-topbar__actions">
-              <button type="button" className={`app-action-button ${activeToolbarMode === 'project' ? 'app-action-button--mode-active' : ''}`} onClick={() => setActiveToolbarMode('project')}>Project</button>
-              <button type="button" className={`app-action-button ${activeToolbarMode === 'strat-chart' ? 'app-action-button--mode-active' : ''}`} onClick={() => setActiveToolbarMode('strat-chart')}>StratChart</button>
-              <button type="button" className={`app-action-button ${activeToolbarMode === 'wells' ? 'app-action-button--mode-active' : ''}`} onClick={() => setActiveToolbarMode('wells')}>Wells</button>
-              <button type="button" className={`app-action-button ${activeToolbarMode === 'tops' ? 'app-action-button--mode-active' : ''}`} onClick={() => setActiveToolbarMode('tops')}>Tops</button>
-              <span className="app-topbar__divider" />
+              <div className="app-menu" ref={projectMenuRef}>
+                <button
+                  type="button"
+                  className={`app-action-button ${projectMenuOpen ? 'app-action-button--mode-active' : ''}`}
+                  onClick={() => setProjectMenuOpen((open) => !open)}
+                >
+                  Project
+                </button>
+                {projectMenuOpen ? (
+                  <div className="app-menu__dropdown">
+                    {projectMenuActions}
+                  </div>
+                ) : null}
+              </div>
               <button type="button" className="app-action-button" onClick={() => void undoProject()} disabled={!canUndo}>Undo</button>
               <button type="button" className="app-action-button" onClick={() => void redoProject()} disabled={!canRedo}>Redo</button>
             </div>
@@ -434,10 +463,14 @@ export function ProjectToolbar() {
         {isProjectOpen && (
           <div className="app-topbar__row app-topbar__row--secondary">
             <div className="app-topbar__actions">
-              {activeToolbarMode === 'project' ? projectModeActions : null}
-              {activeToolbarMode === 'strat-chart' ? stratChartModeActions : null}
-              {activeToolbarMode === 'wells' ? wellsModeActions : null}
-              {activeToolbarMode === 'tops' ? topsModeActions : null}
+              {activeSidebarTab === 'strat-charts' ? stratChartModeActions : null}
+              {activeSidebarTab === 'wells' ? (
+                <>
+                  {wellsModeActions}
+                  <span className="app-topbar__divider" />
+                  {topsModeActions}
+                </>
+              ) : null}
             </div>
             <ZoomControl />
           </div>
