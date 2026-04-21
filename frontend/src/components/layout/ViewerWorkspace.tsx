@@ -1,7 +1,9 @@
 import { useMemo } from 'react'
 
 import { LogViewPanel } from '../logview'
-import { createDefaultWellView, useWellDataStore, useWorkspaceStore } from '@/stores'
+import { SubsidencePanel } from '../subsidence'
+import { SplitView } from './SplitView'
+import { createDefaultWellView, useViewStore, useWellDataStore, useWorkspaceStore } from '@/stores'
 
 export function ViewerWorkspace() {
   const well = useWellDataStore((state) => state.well)
@@ -10,6 +12,8 @@ export function ViewerWorkspace() {
   const colorOverrides = useWellDataStore((state) => state.colorOverrides)
   const error = useWellDataStore((state) => state.error)
   const wellViewStates = useWorkspaceStore((state) => state.wellViewStates)
+  const splitRatio = useViewStore((state) => state.splitRatio)
+  const setSplitRatio = useViewStore((state) => state.setSplitRatio)
 
   const activeWellView = useMemo(() => {
     if (!well?.well_id) return createDefaultWellView()
@@ -56,12 +60,19 @@ export function ViewerWorkspace() {
           {curves.length === 0 && (
             <p className="app-error-banner">Well loaded. No curves imported yet.</p>
           )}
-          <LogViewPanel
-            tracks={tracks}
-            curves={curves}
-            formations={visibleFormations}
-            minDepth={minDepth}
-            maxDepth={maxDepth}
+          <SplitView
+            ratio={splitRatio}
+            onRatioChange={setSplitRatio}
+            left={
+              <LogViewPanel
+                tracks={tracks}
+                curves={curves}
+                formations={visibleFormations}
+                minDepth={minDepth}
+                maxDepth={maxDepth}
+              />
+            }
+            right={<SubsidencePanel />}
           />
         </>
       )}

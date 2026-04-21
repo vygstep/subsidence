@@ -49,6 +49,7 @@ interface VisualConfigPayload {
   depthPerPixel?: number
   trackWidths?: Record<string, number>
   curveColors?: Record<string, string>
+  splitRatio?: number
 }
 
 interface ProjectStatusResponse {
@@ -174,6 +175,7 @@ function applyVisualConfigPayload(config: Record<string, unknown>): void {
   useViewStore.getState().applyVisualConfig({
     depthPerPixel: payload.depthPerPixel,
     trackWidths: payload.trackWidths,
+    splitRatio: payload.splitRatio,
   })
   useWellDataStore.getState().setColorOverrides(payload.curveColors ?? {})
 }
@@ -198,6 +200,7 @@ export function collectProjectVisualConfig(): VisualConfigPayload {
     depthPerPixel: useViewStore.getState().depthPerPixel,
     trackWidths: projectTrackWidths(),
     curveColors: useWellDataStore.getState().colorOverrides,
+    splitRatio: useViewStore.getState().splitRatio,
   }
 }
 

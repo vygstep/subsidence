@@ -8,6 +8,7 @@ interface VisibleDepthRange {
 interface VisualConfigPayload {
   depthPerPixel?: number
   trackWidths?: Record<string, number>
+  splitRatio?: number
 }
 
 export type SelectedElementType = 'curve' | 'track' | 'formation'
@@ -22,6 +23,7 @@ export interface ViewStore {
   selectedElementType: SelectedElementType | null
   trackWidths: Record<string, number>
   viewportHeight: number
+  splitRatio: number
   setScroll: (depth: number) => void
   setScale: (dpp: number) => void
   setCursorDepth: (depth: number | null) => void
@@ -30,6 +32,7 @@ export interface ViewStore {
   clearSelection: () => void
   setViewportHeight: (height: number) => void
   setTrackWidth: (id: string, width: number) => void
+  setSplitRatio: (ratio: number) => void
   applyActiveWellTrackWidths: (trackWidths: Record<string, number>) => void
   applyVisualConfig: (config: VisualConfigPayload) => void
   resetVisualConfig: () => void
@@ -46,6 +49,7 @@ function deriveVisibleDepthRange(scrollDepth: number, depthPerPixel: number, vie
 const initialScrollDepth = 0
 const initialDepthPerPixel = 0.2
 const initialViewportHeight = 800
+const initialSplitRatio = 0.55
 const minimumTrackWidth = 80
 const DEPTH_TRACK_ID = 'depth'
 const FORMATION_TRACK_ID = 'formations'
@@ -69,6 +73,7 @@ export const useViewStore = create<ViewStore>((set) => ({
   selectedElementType: null,
   trackWidths: {},
   viewportHeight: initialViewportHeight,
+  splitRatio: initialSplitRatio,
   setScroll(depth) {
     set((state) => ({
       scrollDepth: depth,
@@ -111,6 +116,9 @@ export const useViewStore = create<ViewStore>((set) => ({
       },
     }))
   },
+  setSplitRatio(ratio) {
+    set({ splitRatio: Math.max(0.2, Math.min(0.8, ratio)) })
+  },
   applyActiveWellTrackWidths(trackWidths) {
     set((state) => {
       const preserved: Record<string, number> = {}
@@ -131,9 +139,11 @@ export const useViewStore = create<ViewStore>((set) => ({
   applyVisualConfig(config) {
     set((state) => {
       const nextDepthPerPixel = config.depthPerPixel ?? state.depthPerPixel
+      const rawRatio = config.splitRatio ?? state.splitRatio
       return {
         depthPerPixel: nextDepthPerPixel,
         trackWidths: normalizeTrackWidths(config.trackWidths),
+        splitRatio: Math.max(0.2, Math.min(0.8, rawRatio)),
         visibleDepthRange: deriveVisibleDepthRange(state.scrollDepth, nextDepthPerPixel, state.viewportHeight),
       }
     })
