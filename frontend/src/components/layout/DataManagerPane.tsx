@@ -1,3 +1,5 @@
+import { useEffect } from 'react'
+
 import { DataManagerTopPane } from './DataManagerTopPane'
 import { SettingsPaneShell } from './SettingsPaneShell'
 import { useDataManagerController } from './useDataManagerController'
@@ -9,6 +11,29 @@ interface DataManagerPaneProps {
 
 export function DataManagerPane({ sidebarRef, onInternalSplitterMouseDown }: DataManagerPaneProps) {
   const controller = useDataManagerController()
+
+  useEffect(() => {
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key !== 'F2') return
+
+      const target = event.target as HTMLElement | null
+      const tagName = target?.tagName
+      if (
+        target?.isContentEditable
+        || tagName === 'INPUT'
+        || tagName === 'TEXTAREA'
+        || tagName === 'SELECT'
+      ) {
+        return
+      }
+
+      event.preventDefault()
+      controller.onRenameSelectedObject()
+    }
+
+    window.addEventListener('keydown', onKeyDown)
+    return () => window.removeEventListener('keydown', onKeyDown)
+  }, [controller])
 
   return (
     <aside

@@ -326,6 +326,50 @@ export function useDataManagerController() {
     await refreshWell(well.well_id)
   }
 
+  async function handleRenameSelectedObject(): Promise<void> {
+    if (!selectedObject) return
+
+    if (selectedObject.type === 'well') {
+      if (!well || well.well_id !== selectedObject.wellId) return
+      const nextName = window.prompt('Rename well', well.well_name)?.trim()
+      if (!nextName || nextName === well.well_name) return
+
+      const response = await fetch(`/api/wells/${well.well_id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ well_name: nextName }),
+      })
+      if (!response.ok) {
+        window.alert(await readError(response, `Failed to rename well '${well.well_name}' (${response.status})`))
+        return
+      }
+      await refreshWell(well.well_id)
+      return
+    }
+
+    if (selectedObject.type === 'top-pick') {
+      if (!selectedFormation || selectedFormation.id !== selectedObject.formationId) return
+      const nextName = window.prompt('Rename top', selectedFormation.name)?.trim()
+      if (!nextName || nextName === selectedFormation.name) return
+      await updateFormation(selectedFormation.id, { name: nextName })
+      return
+    }
+
+    if (selectedObject.type === 'compaction-model') {
+      if (!selectedCompactionModel || selectedCompactionModel.id !== selectedObject.modelId) return
+      const nextName = window.prompt('Rename model', selectedCompactionModel.name)?.trim()
+      if (!nextName || nextName === selectedCompactionModel.name) return
+      try {
+        await useWellDataStore.getState().renameCompactionModel(selectedCompactionModel.id, nextName)
+      } catch (error) {
+        window.alert(String(error))
+      }
+      return
+    }
+
+    window.alert('Rename is not implemented for the selected object yet.')
+  }
+
   function handleWellInspectorDraftChange(field: keyof typeof wellInspectorDraft, value: string): void {
     setWellInspectorDraft((current) => ({ ...current, [field]: value }))
   }
@@ -369,6 +413,7 @@ export function useDataManagerController() {
     onSelectModelsTab: () => setActiveSidebarTab('models'),
     onSelectStratChartsTab: () => setActiveSidebarTab('strat-charts'),
     onSelectWellsTab: () => setActiveSidebarTab('wells'),
+    onRenameSelectedObject: () => void handleRenameSelectedObject(),
     selectedChart,
     selectedChartId: selectedObject?.type === 'strat-chart' ? selectedObject.chartId : null,
     selectedCompactionModel,
