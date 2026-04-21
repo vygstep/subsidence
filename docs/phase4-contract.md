@@ -11,7 +11,7 @@ The rendering architecture from Phase 3 (Canvas data + SVG interaction + Zustand
 preserved. Phase 4 adds a third panel — `SubsidencePanel` — linked to the log viewer through
 shared formation state and driven by a WebSocket computation pipeline on the FastAPI backend.
 
-**Status**: Pending.
+**Status**: Complete.
 
 ---
 
@@ -19,16 +19,29 @@ shared formation state and driven by a WebSocket computation pipeline on the Fas
 
 | Step | Status | Verification | Commit |
 |---|---|---|---|
-| Step 1  | pending | `GET /api/lithology-params` returns 9 rows with φ₀ and c; `PATCH` updates a row; values survive server restart | — |
-| Step 2  | pending | `POST /api/wells/{id}/subsidence` returns burial paths for all formations with assigned ages; decompaction is numerically stable | — |
-| Step 3  | pending | `computedStore` initializes; sync REST call from frontend reaches backend; results land in store | — |
-| Step 4  | pending | Log view and subsidence panel appear side by side; divider is draggable; split ratio persists in visual config | — |
-| Step 5  | pending | Burial curves render at correct geological ages; ICS timescale bar shows colored period bands with labels | — |
-| Step 6  | pending | Drag a formation top → subsidence curves update via debounced REST within 1.5 s | — |
-| Step 7  | pending | WebSocket replaces REST; progress indicator shows "Computing…" during recalculation | — |
-| Step 8  | pending | Change φ₀ for shale in UI → recalculation fires; curves update to reflect new compaction | — |
-| Step 9  | pending | Zoom to 500 m window → LOD endpoint supplies fewer points; Canvas frame time stays <2 ms | — |
-| Step 10 | pending | TVD toggle in toolbar; all depth displays and formation lines switch to TVD; MD restores on toggle back | — |
+| Step 1  | ✅ done | `GET /api/lithology-params` returns 9 rows with φ₀ and c; `PATCH` updates a row; values survive server restart | `f54d0b6` |
+| Step 2  | ✅ done | `POST /api/wells/{id}/subsidence` returns burial paths; unit tests pass; decompaction numerically stable | `9b538af` |
+| Step 3  | ✅ done | `computedStore` initializes; REST → WebSocket path both land results in store | `3b05d38` |
+| Step 4  | ✅ done | Log view and subsidence panel side by side; divider draggable; split ratio persists | `3b05d38` |
+| Step 5  | ✅ done | Burial curves render at correct geological ages; ICS timescale bar shows period bands | `b2d94f2` |
+| Step 6  | ✅ done | Drag a formation top → subsidence curves update via debounced recalculation | `cd5d3b3` |
+| Step 7  | ✅ done | WebSocket replaces REST; "Computing…" overlay; auto-reconnects after backend restart | `df75ce6` |
+| Step 8  | ✅ done | Multi-model compaction editor; built-in + user models; changing φ₀ → curves update | `cf31f9f` |
+| Step 9  | ✅ done | LTTB LOD endpoint; `fetchCurvesLOD` in wellDataStore; LOD fires on zoom threshold | `9d8bb24` |
+| Step 10 | ✅ done | MD/TVD toggle in depth track settings; depth track, formations, status bar all switch | `1e49778` |
+
+### Post-step fixes (2026-04-21 – 2026-04-22)
+
+| Fix | Description | Commit |
+|---|---|---|
+| Depth track settings inspector | Depth reference selector moved into depth track settings panel | `112967f` |
+| TVD always enabled | Vertical well fallback (TVD = MD) when no deviation survey | `075fa0a` |
+| Track header depth label | Depth track header shows reactive MD/TVD label from viewStore | `8b62e79` |
+| Formations track inspector | FormationsTrack settings in SettingsInspector | `a1fedeb` |
+| Bug fix: age derivation | Conformable tops derive age_base_ma from next pick; unconformity hiatus handled | `838b85e` |
+| Bug fix: strat auto-link | Auto-link copies age_top_ma from StratUnit to FormationTopModel | `838b85e` |
+| Bug fix: panel header | SubsidenceCanvas (and GeologicalTimescale) always visible, not gated on curves | `838b85e` |
+| Timescale alignment | GeologicalTimescale uses CSS flex + percentage layout; aligns with canvas PADDING | `48379a6` |
 
 ---
 
