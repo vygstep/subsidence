@@ -143,7 +143,6 @@ function App() {
   return (
     <div className="app-layout">
       <ProjectToolbar />
-      <StatusBar />
       <main className={isProjectOpen ? 'app-main' : 'app-main app-main--gated'}>
         {isProjectOpen ? (
           <div ref={workspaceRef} className="app-workspace">
@@ -159,6 +158,7 @@ function App() {
           </div>
         ) : null}
       </main>
+      <StatusBar />
     </div>
   )
 }
