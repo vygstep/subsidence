@@ -326,7 +326,7 @@ export function SettingsInspector({
             onChange={(event) => setDepthType(event.target.value as 'MD' | 'TVD')}
           >
             <option value="MD">MD</option>
-            <option value="TVD" disabled={!tvdTable}>TVD</option>
+            <option value="TVD">TVD{!tvdTable ? ' (vertical)' : ''}</option>
           </select>
         </label>
         <label className="project-dialog__field">
