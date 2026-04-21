@@ -300,6 +300,9 @@ export function SettingsInspector({
   const updateDepthTrackConfig = useViewStore((state) => state.updateDepthTrackConfig)
   const formationsTrackConfig = useViewStore((state) => state.formationsTrackConfig)
   const updateFormationsTrackConfig = useViewStore((state) => state.updateFormationsTrackConfig)
+  const depthType = useViewStore((state) => state.depthType)
+  const setDepthType = useViewStore((state) => state.setDepthType)
+  const tvdTable = useWellDataStore((state) => state.tvdTable)
 
   if (!selectedObject) {
     return <EmptyInspector message="Select an object in Data Manager to inspect its settings." />
@@ -316,7 +319,16 @@ export function SettingsInspector({
           <div className="template-panel__label">Track</div>
           <div className="template-panel__value">DEPTH</div>
         </div>
-        <div className="tree-leaf"><span>Depth reference</span><span>{well.depth_reference}</span></div>
+        <label className="project-dialog__field">
+          <span>Depth reference</span>
+          <select
+            value={depthType}
+            onChange={(event) => setDepthType(event.target.value as 'MD' | 'TVD')}
+          >
+            <option value="MD">MD</option>
+            <option value="TVD" disabled={!tvdTable}>TVD</option>
+          </select>
+        </label>
         <label className="project-dialog__field">
           <span>Background color</span>
           <input
