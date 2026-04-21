@@ -77,17 +77,26 @@ def _compute_subsidence(manager, well_id: str) -> list[SubsidenceResultResponse]
         td_m = well.td_md if well.td_md is not None else 0.0
         inputs: list[FormationInput] = []
         for idx, f in enumerate(formations):
-            if idx + 1 < len(formations):
-                base_m = formations[idx + 1].depth_md
+            next_f = formations[idx + 1] if idx + 1 < len(formations) else None
+            base_m = next_f.depth_md if next_f is not None else max(td_m, f.depth_md + 1.0)
+
+            # Unconformity with both hiatus bounds defined: the interval below it starts
+            # at age_base_ma (older end of gap). Everything else uses age_top_ma directly.
+            if f.kind == 'unconformity' and f.age_top_ma is not None and f.age_base_ma is not None:
+                age_top = f.age_base_ma
             else:
-                base_m = max(td_m, f.depth_md + 1.0)
+                age_top = f.age_top_ma
+
+            # age_base is always derived from the next pick's age_top_ma:
+            # conformable → next strat age; unconformity contact → its age_top_ma (hiatus top).
+            age_base = next_f.age_top_ma if next_f is not None else None
 
             inputs.append(FormationInput(
                 name=f.name,
                 color=f.color,
                 lithology='',
-                age_top_ma=f.age_top_ma,
-                age_base_ma=f.age_base_ma,
+                age_top_ma=age_top,
+                age_base_ma=age_base,
                 current_top_m=f.depth_md,
                 current_base_m=base_m,
             ))

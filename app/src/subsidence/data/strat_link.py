@@ -70,6 +70,8 @@ def auto_link_formation_to_chart(session: Session, formation: FormationTopModel,
     current_color = (formation.color or '').strip().lower()
     if current_color in _FALLBACK_COLORS and unit.color_hex:
         formation.color = unit.color_hex
+    if formation.age_top_ma is None and unit.age_top_ma is not None:
+        formation.age_top_ma = unit.age_top_ma
     return True
 
 

@@ -11,18 +11,17 @@ export function SubsidencePanel() {
   return (
     <div className="subsidence-panel">
       {isComputing && (
-        <div className="subsidence-panel__overlay">Computing…</div>
+        <div className="subsidence-panel__overlay">Computing...</div>
       )}
       {computeError && !isComputing && (
         <div className="subsidence-panel__error">{computeError}</div>
       )}
-      {!hasData && !isComputing && !computeError ? (
-        <div className="subsidence-panel__empty">No data — formation ages required</div>
-      ) : (
-        <div className="subsidence-panel__content">
-          <SubsidenceCanvas />
-        </div>
-      )}
+      <div className="subsidence-panel__content">
+        <SubsidenceCanvas />
+        {!hasData && !isComputing && !computeError && (
+          <div className="subsidence-panel__empty">No data — formation ages required</div>
+        )}
+      </div>
       <SubsidenceControls />
     </div>
   )
