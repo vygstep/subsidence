@@ -170,7 +170,11 @@ export function DataManagerPane({ sidebarRef, onInternalSplitterMouseDown }: Dat
 
   async function handleSelectCurve(wellId: string, mnemonic: string): Promise<void> {
     if (wellId !== well?.well_id) await loadWell(wellId)
-    setSelectedObject({ type: 'curve', wellId, mnemonic })
+    if (selectedObject?.type === 'curve' && selectedObject.wellId === wellId && selectedObject.mnemonic === mnemonic) {
+      setSelectedObject(null)
+    } else {
+      setSelectedObject({ type: 'curve', wellId, mnemonic })
+    }
   }
 
   async function handleSelectTopsGroup(wellId: string): Promise<void> {
@@ -204,9 +208,14 @@ export function DataManagerPane({ sidebarRef, onInternalSplitterMouseDown }: Dat
 
   async function handleSelectFormation(wellId: string, formationId: string): Promise<void> {
     if (wellId !== well?.well_id) await loadWell(wellId)
-    setSelectedFormationId(formationId)
-    setSelectedObject({ type: 'top-pick', wellId, formationId })
-    setActiveToolbarMode('tops')
+    if (selectedObject?.type === 'top-pick' && selectedObject.wellId === wellId && selectedObject.formationId === formationId) {
+      setSelectedObject(null)
+      setSelectedFormationId(null)
+    } else {
+      setSelectedFormationId(formationId)
+      setSelectedObject({ type: 'top-pick', wellId, formationId })
+      setActiveToolbarMode('tops')
+    }
   }
 
   async function handleToggleCurve(wellId: string, mnemonic: string, nextValue: boolean): Promise<void> {

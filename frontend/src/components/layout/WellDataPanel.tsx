@@ -99,18 +99,16 @@ function CheckboxLeaf({
   onChange: (nextValue: boolean) => void
 }) {
   return (
-    <label className="tree-checkbox-leaf">
+    <div className="tree-checkbox-leaf">
       <input
         type="checkbox"
         checked={checked}
-        onChange={(event) => {
-          event.stopPropagation()
-          onChange(event.target.checked)
-        }}
+        onChange={(event) => onChange(event.target.checked)}
+        onClick={(event) => event.stopPropagation()}
       />
       <span className="tree-checkbox-leaf__label">{label}</span>
       <span className="tree-checkbox-leaf__meta">{secondary}</span>
-    </label>
+    </div>
   )
 }
 
