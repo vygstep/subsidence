@@ -67,6 +67,26 @@ def _normalize_well_name(name: str | None) -> str:
     return value or DEFAULT_WELL_NAME
 
 
+def _find_existing_well_by_identity(
+    session: Session,
+    *,
+    name: str | None = None,
+    uwi: str | None = None,
+) -> WellModel | None:
+    normalized_name = _normalize_text(name)
+    normalized_uwi = _normalize_text(uwi)
+    if not normalized_name and not normalized_uwi:
+        return None
+
+    wells = session.scalars(select(WellModel).order_by(WellModel.name.asc(), WellModel.id.asc())).all()
+    for well in wells:
+        if normalized_uwi and _normalize_text(well.uwi) == normalized_uwi:
+            return well
+        if normalized_name and _normalize_text(well.name) == normalized_name:
+            return well
+    return None
+
+
 def _header_curve_parts(column_name: str) -> tuple[str, str]:
     raw = column_name.strip()
     if not raw:
@@ -265,11 +285,16 @@ def _resolve_or_create_well_for_logs(
     *,
     well_id: str | None,
     td: float | None,
+    create_new_well: bool = False,
 ) -> WellModel:
     if well_id:
         return _resolve_well(session, well_id)
 
     first_name = _extract_text(rows[0], 'well_name') if rows else None
+    if not create_new_well:
+        existing = _find_existing_well_by_identity(session, name=first_name)
+        if existing is not None:
+            return existing
     return create_empty_well(session, name=first_name or DEFAULT_WELL_NAME, td=td, kb=DEFAULT_WELL_KB)
 
 
@@ -352,11 +377,21 @@ def _write_curve_payloads(
     session.flush()
 
 
-def _resolve_or_create_well_for_tops(session: Session, rows: list[dict[str, str]], well_id: str | None) -> WellModel:
+def _resolve_or_create_well_for_tops(
+    session: Session,
+    rows: list[dict[str, str]],
+    well_id: str | None,
+    *,
+    create_new_well: bool = False,
+) -> WellModel:
     if well_id:
         return _resolve_well(session, well_id)
 
     first_name = _extract_text(rows[0], 'well_name') if rows else None
+    if not create_new_well:
+        existing = _find_existing_well_by_identity(session, name=first_name)
+        if existing is not None:
+            return existing
     td = max((_extract_float(row, 'depth_md', 'depth') or 0.0) for row in rows) if rows else None
     return create_empty_well(session, name=first_name or DEFAULT_WELL_NAME, td=td, kb=DEFAULT_WELL_KB)
 
@@ -366,11 +401,17 @@ def _resolve_or_create_well_for_deviation(
     rows: list[dict[str, str]],
     depth_column: str,
     well_id: str | None,
+    *,
+    create_new_well: bool = False,
 ) -> WellModel:
     if well_id:
         return _resolve_well(session, well_id)
 
     first_name = _extract_text(rows[0], 'well_name', 'well', 'well_name_header') if rows else None
+    if not create_new_well:
+        existing = _find_existing_well_by_identity(session, name=first_name)
+        if existing is not None:
+            return existing
     td = _coerce_float(rows[-1].get(depth_column)) if rows else None
     return create_empty_well(session, name=first_name or DEFAULT_WELL_NAME, td=td, kb=DEFAULT_WELL_KB)
 
@@ -513,6 +554,7 @@ def import_las_file(
     las_path: Path | str,
     *,
     well_id: str | None = None,
+    create_new_well: bool = False,
 ) -> WellModel:
     bundle_path = Path(project_path)
     source_path = Path(las_path)
@@ -535,18 +577,38 @@ def import_las_file(
     metadata = _well_metadata_from_las(las, original_relative_path, final_depth=final_depth)
     if well_id:
         well = _resolve_well(session, well_id)
-        apply_imported_well_metadata(
-            well,
-            name=metadata['name'],
-            uwi=metadata['uwi'],
-            x=metadata['x'],
-            y=metadata['y'],
-            kb=metadata['kb'],
-            td=metadata['td'],
-            crs=metadata['crs'],
-            source_las_path=metadata['source_las_path'],
-            extra=metadata['extra'],
+    elif not create_new_well:
+        well = _find_existing_well_by_identity(
+            session,
+            name=str(metadata['name']),
+            uwi=metadata['uwi'] if isinstance(metadata['uwi'], str) else None,
         )
+        if well is None:
+            well = create_empty_well(
+                session,
+                name=str(metadata['name']),
+                uwi=metadata['uwi'] if isinstance(metadata['uwi'], str) else None,
+                x=metadata['x'] if isinstance(metadata['x'], (int, float)) else None,
+                y=metadata['y'] if isinstance(metadata['y'], (int, float)) else None,
+                kb=metadata['kb'] if isinstance(metadata['kb'], (int, float)) else None,
+                td=metadata['td'] if isinstance(metadata['td'], (int, float)) else None,
+                crs=str(metadata['crs']),
+                source_las_path=str(metadata['source_las_path']),
+                extra=metadata['extra'] if isinstance(metadata['extra'], dict) else None,
+            )
+        else:
+            apply_imported_well_metadata(
+                well,
+                name=metadata['name'],
+                uwi=metadata['uwi'],
+                x=metadata['x'],
+                y=metadata['y'],
+                kb=metadata['kb'],
+                td=metadata['td'],
+                crs=metadata['crs'],
+                source_las_path=metadata['source_las_path'],
+                extra=metadata['extra'],
+            )
     else:
         well = create_empty_well(
             session,
@@ -560,7 +622,19 @@ def import_las_file(
             source_las_path=str(metadata['source_las_path']),
             extra=metadata['extra'] if isinstance(metadata['extra'], dict) else None,
         )
-
+    if well_id:
+        apply_imported_well_metadata(
+            well,
+            name=metadata['name'],
+            uwi=metadata['uwi'],
+            x=metadata['x'],
+            y=metadata['y'],
+            kb=metadata['kb'],
+            td=metadata['td'],
+            crs=metadata['crs'],
+            source_las_path=metadata['source_las_path'],
+            extra=metadata['extra'],
+        )
     curve_payloads: list[dict[str, object]] = []
 
     for curve in las.curves:
@@ -621,6 +695,7 @@ def import_logs_csv(
     *,
     well_id: str | None = None,
     depth_column: str | None = None,
+    create_new_well: bool = False,
 ) -> WellModel:
     bundle_path = Path(project_path)
     source_path = Path(csv_path)
@@ -632,7 +707,7 @@ def import_logs_csv(
     resolved_depth_column = _detect_log_csv_depth_column(fieldnames, depth_column)
     depths = _validate_strictly_increasing_depth(rows, resolved_depth_column, source_path)
     final_depth = depths[-1] if depths else None
-    well = _resolve_or_create_well_for_logs(session, rows, well_id=well_id, td=final_depth)
+    well = _resolve_or_create_well_for_logs(session, rows, well_id=well_id, td=final_depth, create_new_well=create_new_well)
     apply_imported_well_metadata(well, td=final_depth)
 
     rules = load_curve_alias_rules(session)
@@ -705,6 +780,7 @@ def import_tops_csv(
     *,
     strat_units_path: Path | str | None = None,
     strat_ranks_path: Path | str | None = None,
+    create_new_well: bool = False,
 ) -> list[FormationTopModel]:
     if depth_ref.upper() not in ('MD',):
         raise NotImplementedError(
@@ -716,7 +792,7 @@ def import_tops_csv(
     missing = required.difference(set(fieldnames))
     if missing:
         raise ValueError(f'{path}: missing required columns: {sorted(missing)}')
-    well = _resolve_or_create_well_for_tops(session, rows, well_id)
+    well = _resolve_or_create_well_for_tops(session, rows, well_id, create_new_well=create_new_well)
     max_depth = max((_extract_float(row, 'depth_md', 'depth') or 0.0) for row in rows) if rows else None
     if max_depth is not None:
         apply_imported_well_metadata(well, td=max_depth)
@@ -862,7 +938,14 @@ def link_tops_to_unconformities(
     session.flush()
     return updated
 
-def import_deviation_csv(session: Session, project_path: Path | str, well_id: str | None, csv_path: Path | str) -> DeviationSurveyModel:
+def import_deviation_csv(
+    session: Session,
+    project_path: Path | str,
+    well_id: str | None,
+    csv_path: Path | str,
+    *,
+    create_new_well: bool = False,
+) -> DeviationSurveyModel:
     bundle_path = Path(project_path)
     path = Path(csv_path)
     deviation_dir = bundle_path / 'deviation'
@@ -875,7 +958,7 @@ def import_deviation_csv(session: Session, project_path: Path | str, well_id: st
     reference, depth_column = _detect_deviation_reference(fieldnames)
     mode, value_columns = _detect_deviation_mode(fieldnames)
     depths = _validate_strictly_increasing_depth(rows, depth_column, path)
-    well = _resolve_or_create_well_for_deviation(session, rows, depth_column, well_id)
+    well = _resolve_or_create_well_for_deviation(session, rows, depth_column, well_id, create_new_well=create_new_well)
     if depths:
         apply_imported_well_metadata(well, td=depths[-1])
 

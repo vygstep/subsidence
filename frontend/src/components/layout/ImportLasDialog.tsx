@@ -7,6 +7,7 @@ interface WellOption {
 
 interface ImportLasDialogProps {
   wells: WellOption[]
+  activeWellId?: string | null
   onClose: () => void
   onSuccess: (wellId: string) => Promise<void> | void
 }
@@ -29,8 +30,9 @@ async function readError(response: Response, fallback: string): Promise<string> 
   return fallback
 }
 
-export function ImportLasDialog({ wells, onClose, onSuccess }: ImportLasDialogProps) {
-  const [wellId, setWellId] = useState('')
+export function ImportLasDialog({ wells, activeWellId, onClose, onSuccess }: ImportLasDialogProps) {
+  const [wellId, setWellId] = useState(activeWellId ?? '')
+  const [createNewWell, setCreateNewWell] = useState(false)
   const [sourceType, setSourceType] = useState<LogSourceType>('las')
   const [sourcePath, setSourcePath] = useState('')
   const [depthColumn, setDepthColumn] = useState('')
@@ -56,11 +58,13 @@ export function ImportLasDialog({ wells, onClose, onSuccess }: ImportLasDialogPr
             ? {
                 las_path: nextPath,
                 well_id: wellId || null,
+                create_new_well: !wellId && createNewWell,
               }
             : {
                 csv_path: nextPath,
                 well_id: wellId || null,
                 depth_column: depthColumn.trim() || null,
+                create_new_well: !wellId && createNewWell,
               },
         ),
       })
@@ -108,12 +112,22 @@ export function ImportLasDialog({ wells, onClose, onSuccess }: ImportLasDialogPr
           <span>Target well</span>
           <select value={wellId} onChange={(event) => setWellId(event.target.value)}>
             <option value="">
-              {sourceType === 'las' ? 'Create from LAS header/defaults' : 'Create from CSV/defaults'}
+              {sourceType === 'las' ? 'Reuse by LAS header / create from defaults' : 'Reuse by CSV well_name / create from defaults'}
             </option>
             {wells.map((well) => (
               <option key={well.well_id} value={well.well_id}>{well.well_name}</option>
             ))}
           </select>
+        </label>
+
+        <label className="project-dialog__checkbox">
+          <input
+            type="checkbox"
+            checked={createNewWell}
+            disabled={Boolean(wellId)}
+            onChange={(event) => setCreateNewWell(event.target.checked)}
+          />
+          <span>Create new well if a matching well already exists</span>
         </label>
 
         <label className="project-dialog__field">

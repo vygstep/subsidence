@@ -303,11 +303,11 @@ export function ProjectToolbar() {
       case 'create-well':
         return <CreateWellDialog onClose={() => setActiveDialog(null)} onSuccess={handleWellMutation} />
       case 'load-las':
-        return <ImportLasDialog wells={wellOptions} onClose={() => setActiveDialog(null)} onSuccess={handleWellMutation} />
+        return <ImportLasDialog wells={wellOptions} activeWellId={well?.well_id} onClose={() => setActiveDialog(null)} onSuccess={handleWellMutation} />
       case 'load-tops':
-        return <ImportTopsDialog wells={wellOptions} onClose={() => setActiveDialog(null)} onSuccess={handleWellMutation} />
+        return <ImportTopsDialog wells={wellOptions} activeWellId={well?.well_id} onClose={() => setActiveDialog(null)} onSuccess={handleWellMutation} />
       case 'load-deviation':
-        return <ImportDeviationDialog wells={wellOptions} onClose={() => setActiveDialog(null)} onSuccess={handleWellMutation} />
+        return <ImportDeviationDialog wells={wellOptions} activeWellId={well?.well_id} onClose={() => setActiveDialog(null)} onSuccess={handleWellMutation} />
       case 'load-strat-chart':
         return (
           <LoadStratChartDialog

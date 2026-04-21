@@ -7,6 +7,7 @@ interface WellOption {
 
 interface ImportTopsDialogProps {
   wells: WellOption[]
+  activeWellId?: string | null
   onClose: () => void
   onSuccess: (wellId: string) => Promise<void> | void
 }
@@ -27,8 +28,9 @@ async function readError(response: Response, fallback: string): Promise<string> 
   return fallback
 }
 
-export function ImportTopsDialog({ wells, onClose, onSuccess }: ImportTopsDialogProps) {
-  const [wellId, setWellId] = useState('')
+export function ImportTopsDialog({ wells, activeWellId, onClose, onSuccess }: ImportTopsDialogProps) {
+  const [wellId, setWellId] = useState(activeWellId ?? '')
+  const [createNewWell, setCreateNewWell] = useState(false)
   const [csvPath, setCsvPath] = useState('')
   const [depthRef, setDepthRef] = useState<'MD' | 'TVD' | 'TVDSS'>('MD')
   const [error, setError] = useState<string | null>(null)
@@ -52,6 +54,7 @@ export function ImportTopsDialog({ wells, onClose, onSuccess }: ImportTopsDialog
           well_id: wellId || null,
           csv_path: nextPath,
           depth_ref: depthRef,
+          create_new_well: !wellId && createNewWell,
         }),
       })
       if (!response.ok) {
@@ -84,11 +87,21 @@ export function ImportTopsDialog({ wells, onClose, onSuccess }: ImportTopsDialog
         <label className="project-dialog__field">
           <span>Target well</span>
           <select value={wellId} onChange={(event) => setWellId(event.target.value)}>
-            <option value="">Create from file/defaults</option>
+            <option value="">Reuse by file well_name / create from defaults</option>
             {wells.map((well) => (
               <option key={well.well_id} value={well.well_id}>{well.well_name}</option>
             ))}
           </select>
+        </label>
+
+        <label className="project-dialog__checkbox">
+          <input
+            type="checkbox"
+            checked={createNewWell}
+            disabled={Boolean(wellId)}
+            onChange={(event) => setCreateNewWell(event.target.checked)}
+          />
+          <span>Create new well if a matching well already exists</span>
         </label>
 
         <label className="project-dialog__field">

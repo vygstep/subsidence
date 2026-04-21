@@ -52,18 +52,21 @@ class OpenProjectRequest(BaseModel):
 class ImportLasRequest(BaseModel):
     las_path: str
     well_id: str | None = None
+    create_new_well: bool = False
 
 
 class ImportLogsCsvRequest(BaseModel):
     csv_path: str
     well_id: str | None = None
     depth_column: str | None = None
+    create_new_well: bool = False
 
 
 class ImportTopsRequest(BaseModel):
     well_id: str | None = None
     csv_path: str
     depth_ref: str = 'MD'
+    create_new_well: bool = False
 
 
 class ImportUnconformitiesRequest(BaseModel):
@@ -74,6 +77,7 @@ class ImportUnconformitiesRequest(BaseModel):
 class ImportDeviationRequest(BaseModel):
     well_id: str | None = None
     csv_path: str
+    create_new_well: bool = False
 
 
 class CreateCheckpointRequest(BaseModel):
@@ -396,7 +400,13 @@ def import_las(payload: ImportLasRequest, request: Request) -> ImportLasResponse
     manager = _require_open_project(request)
     try:
         with manager.get_session() as session:
-            well = import_las_file(session, manager.project_path, Path(payload.las_path), well_id=payload.well_id)
+            well = import_las_file(
+                session,
+                manager.project_path,
+                Path(payload.las_path),
+                well_id=payload.well_id,
+                create_new_well=payload.create_new_well,
+            )
             session.flush()
             command = ImportWell.capture(session, manager.project_path, well.id)
             well_id = well.id
@@ -421,6 +431,7 @@ def import_logs_csv_route(payload: ImportLogsCsvRequest, request: Request) -> Im
                 Path(payload.csv_path),
                 well_id=payload.well_id,
                 depth_column=payload.depth_column,
+                create_new_well=payload.create_new_well,
             )
             session.flush()
             command = ImportWell.capture(session, manager.project_path, well.id)
@@ -440,7 +451,13 @@ def import_tops(payload: ImportTopsRequest, request: Request) -> ImportTopsRespo
     manager = _require_open_project(request)
     try:
         with manager.get_session() as session:
-            imported = import_tops_csv(session, payload.well_id, Path(payload.csv_path), payload.depth_ref)
+            imported = import_tops_csv(
+                session,
+                payload.well_id,
+                Path(payload.csv_path),
+                payload.depth_ref,
+                create_new_well=payload.create_new_well,
+            )
             target_well_id = imported[0].well_id if imported else payload.well_id
             if target_well_id is None:
                 raise HTTPException(status_code=500, detail='Import created no well')
@@ -473,7 +490,13 @@ def import_deviation(payload: ImportDeviationRequest, request: Request) -> Impor
     manager = _require_open_project(request)
     try:
         with manager.get_session() as session:
-            survey = import_deviation_csv(session, manager.project_path, payload.well_id, Path(payload.csv_path))
+            survey = import_deviation_csv(
+                session,
+                manager.project_path,
+                payload.well_id,
+                Path(payload.csv_path),
+                create_new_well=payload.create_new_well,
+            )
             target_well_id = survey.well_id
             reference = survey.reference
             mode = survey.mode
