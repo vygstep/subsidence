@@ -259,7 +259,41 @@ class LithologyDictEntry(Base):
 
 
 # ---------------------------------------------------------------------------
-# 10. calculation_results
+# 10. compaction_models + compaction_model_params
+# ---------------------------------------------------------------------------
+
+class CompactionModel(Base):
+    __tablename__ = "compaction_models"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    name: Mapped[str] = mapped_column(String(256), unique=True)
+    is_builtin: Mapped[bool] = mapped_column(Boolean, default=False)
+    is_active: Mapped[bool] = mapped_column(Boolean, default=False)
+    created_at: Mapped[datetime] = mapped_column(default=_now)
+
+    params: Mapped[list["CompactionModelParam"]] = relationship(
+        back_populates="model", cascade="all, delete-orphan"
+    )
+
+
+class CompactionModelParam(Base):
+    __tablename__ = "compaction_model_params"
+    __table_args__ = (UniqueConstraint("model_id", "lithology_code"),)
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    model_id: Mapped[int] = mapped_column(
+        Integer, ForeignKey("compaction_models.id", ondelete="CASCADE"), nullable=False
+    )
+    lithology_code: Mapped[str] = mapped_column(String(32), nullable=False)
+    density: Mapped[float] = mapped_column(Float, default=2650.0)
+    porosity_surface: Mapped[float] = mapped_column(Float, default=0.50)
+    compaction_coeff: Mapped[float] = mapped_column(Float, default=0.30)
+
+    model: Mapped[CompactionModel] = relationship(back_populates="params")
+
+
+# ---------------------------------------------------------------------------
+# 11. calculation_results
 # ---------------------------------------------------------------------------
 
 class CalculationResult(Base, AuditMixin):

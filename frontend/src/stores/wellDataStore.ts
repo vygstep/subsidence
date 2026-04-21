@@ -1,6 +1,6 @@
 import { create } from 'zustand'
 
-import type { CurveData, FormationTop, StratChartInfo, Well, WellInventory } from '@/types'
+import type { CompactionModel, CurveData, FormationTop, LithologyParam, StratChartInfo, Well, WellInventory } from '@/types'
 
 interface CurveResponse {
   mnemonic: string
@@ -56,6 +56,7 @@ export interface WellDataStore {
   formations: FormationTop[]
   colorOverrides: Record<string, string>
   stratCharts: StratChartInfo[]
+  compactionModels: CompactionModel[]
   isLoading: boolean
   error: string | null
   reset: () => void
@@ -71,6 +72,13 @@ export interface WellDataStore {
   activateChart: (chartId: number) => Promise<void>
   deleteChart: (chartId: number) => Promise<void>
   linkFormationToChart: (formationId: string, chartId: number, stratUnitId: number | null) => Promise<void>
+  loadCompactionModels: () => Promise<void>
+  createCompactionModel: (name: string, cloneFromId?: number) => Promise<CompactionModel>
+  activateCompactionModel: (id: number) => Promise<void>
+  renameCompactionModel: (id: number, name: string) => Promise<void>
+  deleteCompactionModel: (id: number) => Promise<void>
+  fetchCompactionModelParams: (modelId: number) => Promise<LithologyParam[]>
+  updateCompactionModelParam: (modelId: number, lithologyCode: string, patch: Partial<Pick<LithologyParam, 'density' | 'porosity_surface' | 'compaction_coeff'>>) => Promise<LithologyParam>
 }
 
 function toFloat32Array(values: number[]): Float32Array {
@@ -126,6 +134,7 @@ const emptyState = {
   formations: [],
   colorOverrides: {},
   stratCharts: [],
+  compactionModels: [],
   isLoading: false,
   error: null,
 }
@@ -363,6 +372,76 @@ export const useWellDataStore = create<WellDataStore>((set, get) => ({
     if (preferredWellId || nextWellId !== currentWellId) {
       await get().loadWell(nextWellId)
     }
+  },
+  async loadCompactionModels() {
+    const response = await fetch('/api/compaction-models')
+    if (!response.ok) return
+    set({ compactionModels: (await response.json()) as CompactionModel[] })
+  },
+  async createCompactionModel(name, cloneFromId) {
+    const response = await fetch('/api/compaction-models', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ name, clone_from_id: cloneFromId ?? null }),
+    })
+    if (!response.ok) {
+      throw new Error(await readError(response, `Failed to create compaction model (${response.status})`))
+    }
+    const created = (await response.json()) as CompactionModel
+    set((state) => ({ compactionModels: [...state.compactionModels, created] }))
+    return created
+  },
+  async activateCompactionModel(id) {
+    const response = await fetch(`/api/compaction-models/${id}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ is_active: true }),
+    })
+    if (!response.ok) return
+    const updated = (await response.json()) as CompactionModel
+    set((state) => ({
+      compactionModels: state.compactionModels.map((m) => ({
+        ...m,
+        is_active: m.id === updated.id,
+      })),
+    }))
+    const { useComputedStore } = await import('./computedStore')
+    useComputedStore.getState().triggerRecalculation()
+  },
+  async renameCompactionModel(id, name) {
+    const response = await fetch(`/api/compaction-models/${id}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ name }),
+    })
+    if (!response.ok) return
+    const updated = (await response.json()) as CompactionModel
+    set((state) => ({
+      compactionModels: state.compactionModels.map((m) => (m.id === updated.id ? updated : m)),
+    }))
+  },
+  async deleteCompactionModel(id) {
+    const response = await fetch(`/api/compaction-models/${id}`, { method: 'DELETE' })
+    if (!response.ok) {
+      throw new Error(await readError(response, `Failed to delete compaction model (${response.status})`))
+    }
+    set((state) => ({ compactionModels: state.compactionModels.filter((m) => m.id !== id) }))
+  },
+  async fetchCompactionModelParams(modelId) {
+    const response = await fetch(`/api/compaction-models/${modelId}/params`)
+    if (!response.ok) return []
+    return (await response.json()) as LithologyParam[]
+  },
+  async updateCompactionModelParam(modelId, lithologyCode, patch) {
+    const response = await fetch(`/api/compaction-models/${modelId}/params/${lithologyCode}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(patch),
+    })
+    if (!response.ok) {
+      throw new Error(await readError(response, `Failed to update param (${response.status})`))
+    }
+    return (await response.json()) as LithologyParam
   },
   async linkFormationToChart(formationId, chartId, stratUnitId) {
     const wellId = get().well?.well_id

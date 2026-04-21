@@ -11,7 +11,7 @@ from subsidence.data.backstrip import (
     LithologyParam,
     backstrip,
 )
-from subsidence.data.schema import FormationTopModel, LithologyDictEntry, WellModel
+from subsidence.data.schema import CompactionModel, CompactionModelParam, FormationTopModel, LithologyDictEntry, WellModel
 
 router = APIRouter(tags=['subsidence'])
 
@@ -47,15 +47,32 @@ def _compute_subsidence(manager, well_id: str) -> list[SubsidenceResultResponse]
             .order_by(FormationTopModel.depth_md.asc(), FormationTopModel.id.asc())
         ).all()
 
-        litho_rows = session.scalars(select(LithologyDictEntry)).all()
-        litho_params: dict[str, LithologyParam] = {
-            r.lithology_code: LithologyParam(
-                density=r.density,
-                porosity_surface=r.porosity_surface,
-                compaction_coeff=r.compaction_coeff,
-            )
-            for r in litho_rows
-        }
+        active_model = session.scalar(
+            select(CompactionModel).where(CompactionModel.is_active.is_(True))
+        )
+        if active_model is not None:
+            param_rows = session.scalars(
+                select(CompactionModelParam)
+                .where(CompactionModelParam.model_id == active_model.id)
+            ).all()
+            litho_params: dict[str, LithologyParam] = {
+                r.lithology_code: LithologyParam(
+                    density=r.density,
+                    porosity_surface=r.porosity_surface,
+                    compaction_coeff=r.compaction_coeff,
+                )
+                for r in param_rows
+            }
+        else:
+            litho_rows = session.scalars(select(LithologyDictEntry)).all()
+            litho_params = {
+                r.lithology_code: LithologyParam(
+                    density=r.density,
+                    porosity_surface=r.porosity_surface,
+                    compaction_coeff=r.compaction_coeff,
+                )
+                for r in litho_rows
+            }
 
         td_m = well.td_md if well.td_md is not None else 0.0
         inputs: list[FormationInput] = []

@@ -54,6 +54,7 @@ export function useDataManagerController() {
   const curves = useWellDataStore((state) => state.curves)
   const formations = useWellDataStore((state) => state.formations)
   const stratCharts = useWellDataStore((state) => state.stratCharts)
+  const compactionModels = useWellDataStore((state) => state.compactionModels)
   const wellInventories = useWellDataStore((state) => state.wellInventories)
   const loadWell = useWellDataStore((state) => state.loadWell)
   const updateFormation = useWellDataStore((state) => state.updateFormation)
@@ -61,6 +62,9 @@ export function useDataManagerController() {
   const activateChart = useWellDataStore((state) => state.activateChart)
   const deleteChart = useWellDataStore((state) => state.deleteChart)
   const refreshWell = useWellDataStore((state) => state.refreshWell)
+  const activateCompactionModel = useWellDataStore((state) => state.activateCompactionModel)
+  const createCompactionModel = useWellDataStore((state) => state.createCompactionModel)
+  const deleteCompactionModel = useWellDataStore((state) => state.deleteCompactionModel)
 
   const activeSidebarTab = useWorkspaceStore((state) => state.activeSidebarTab)
   const selectedFormationId = useWorkspaceStore((state) => state.selectedFormationId)
@@ -149,6 +153,11 @@ export function useDataManagerController() {
     if (selectedObject?.type !== 'strat-chart') return null
     return stratCharts.find((c) => c.id === selectedObject.chartId) ?? null
   }, [selectedObject, stratCharts])
+
+  const selectedCompactionModel = useMemo(() => {
+    if (selectedObject?.type !== 'compaction-model') return null
+    return compactionModels.find((m) => m.id === selectedObject.modelId) ?? null
+  }, [selectedObject, compactionModels])
 
   function handleSelectWell(wellId: string): void {
     setSelectedObject({ type: 'well', wellId })
@@ -321,10 +330,17 @@ export function useDataManagerController() {
     setWellInspectorDraft((current) => ({ ...current, [field]: value }))
   }
 
+  function handleCreateCompactionModel(): void {
+    const name = window.prompt('New compaction model name:')?.trim()
+    if (!name) return
+    void createCompactionModel(name)
+  }
+
   return {
     activeSidebarTab,
     activeWellId: well?.well_id ?? null,
     activeWellView,
+    compactionModels,
     curveCount: curves.length,
     deviationVisibilityByWellId,
     formations,
@@ -344,13 +360,19 @@ export function useDataManagerController() {
     maxDepth,
     minDepth,
     onActivateChart: (chartId: number) => void activateChart(chartId),
+    onActivateCompactionModel: (id: number) => void activateCompactionModel(id),
+    onCreateCompactionModel: handleCreateCompactionModel,
     onDeleteChart: (chartId: number) => void deleteChart(chartId),
+    onDeleteCompactionModel: (id: number) => void deleteCompactionModel(id).catch((e: unknown) => window.alert(String(e))),
     onSelectChart: (chartId: number) => setSelectedObject({ type: 'strat-chart', chartId }),
+    onSelectCompactionModel: (modelId: number) => setSelectedObject({ type: 'compaction-model', modelId }),
     onSelectModelsTab: () => setActiveSidebarTab('models'),
     onSelectStratChartsTab: () => setActiveSidebarTab('strat-charts'),
     onSelectWellsTab: () => setActiveSidebarTab('wells'),
     selectedChart,
     selectedChartId: selectedObject?.type === 'strat-chart' ? selectedObject.chartId : null,
+    selectedCompactionModel,
+    selectedCompactionModelId: selectedObject?.type === 'compaction-model' ? selectedObject.modelId : null,
     selectedCurveConfig,
     selectedFormation,
     selectedFormationId,

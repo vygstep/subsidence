@@ -6,7 +6,7 @@ from pathlib import Path
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
-from .schema import CurveDictEntry, LithologyDictEntry, StratChart, StratUnit
+from .schema import CompactionModel, CompactionModelParam, CurveDictEntry, LithologyDictEntry, StratChart, StratUnit
 
 
 def _seed_curve_entries(session: Session, csv_path: Path) -> None:
@@ -137,6 +137,30 @@ def _normalize_builtin_chart(session: Session, csv_path: Path) -> None:
             chart.source_path = str(csv_path)
 
 
+def _seed_builtin_compaction_model(session: Session) -> None:
+    """Create the built-in (read-only) compaction model from LithologyDictEntry values."""
+    existing = session.scalar(select(CompactionModel).where(CompactionModel.is_builtin.is_(True)))
+    if existing is not None:
+        return
+
+    litho_rows = session.scalars(select(LithologyDictEntry)).all()
+    if not litho_rows:
+        return
+
+    model = CompactionModel(name='Default (built-in)', is_builtin=True, is_active=True)
+    session.add(model)
+    session.flush()
+
+    for row in litho_rows:
+        session.add(CompactionModelParam(
+            model_id=model.id,
+            lithology_code=row.lithology_code,
+            density=row.density,
+            porosity_surface=row.porosity_surface,
+            compaction_coeff=row.compaction_coeff,
+        ))
+
+
 def seed_dictionaries(session: Session, db_path: Path) -> None:
     del db_path
     seed_dir = Path(__file__).parent / 'dictionaries'
@@ -164,3 +188,5 @@ def seed_dictionaries(session: Session, db_path: Path) -> None:
 
     if builtin_chart_path.exists():
         _normalize_builtin_chart(session, builtin_chart_path)
+
+    _seed_builtin_compaction_model(session)

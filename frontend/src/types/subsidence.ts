@@ -18,3 +18,10 @@ export interface LithologyParam {
   porosity_surface: number
   compaction_coeff: number
 }
+
+export interface CompactionModel {
+  id: number
+  name: string
+  is_builtin: boolean
+  is_active: boolean
+}

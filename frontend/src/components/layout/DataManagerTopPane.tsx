@@ -1,15 +1,21 @@
+import { CompactionModelsTab } from './CompactionModelsTab'
 import { StratChartTab } from './StratChartTab'
 import { WellDataPanel } from './WellDataPanel'
 import type { SelectedObject } from '@/stores/workspaceStore'
-import type { StratChartInfo, WellInventory } from '@/types'
+import type { CompactionModel, StratChartInfo, WellInventory } from '@/types'
 
 interface DataManagerTopPaneProps {
   activeSidebarTab: 'wells' | 'models' | 'strat-charts'
   activeWellId: string | null
+  compactionModels: CompactionModel[]
   deviationVisibilityByWellId: Record<string, boolean>
   onActivateChart: (chartId: number) => void
+  onActivateCompactionModel: (id: number) => void
+  onCreateCompactionModel: () => void
   onDeleteChart: (chartId: number) => void
+  onDeleteCompactionModel: (id: number) => void
   onSelectChart: (chartId: number) => void
+  onSelectCompactionModel: (id: number) => void
   onSelectCurve: (wellId: string, mnemonic: string) => void | Promise<void>
   onSelectFormation: (wellId: string, formationId: string) => void | Promise<void>
   onSelectLasGroup: (wellId: string) => void | Promise<void>
@@ -24,6 +30,7 @@ interface DataManagerTopPaneProps {
   onToggleDeviation: (wellId: string, nextValue: boolean) => void | Promise<void>
   onToggleFormation: (wellId: string, formationId: string, nextValue: boolean) => void | Promise<void>
   selectedChartId: number | null
+  selectedCompactionModelId: number | null
   selectedFormationId: string | null
   selectedObject: SelectedObject | null
   stratCharts: StratChartInfo[]
@@ -35,10 +42,15 @@ interface DataManagerTopPaneProps {
 export function DataManagerTopPane({
   activeSidebarTab,
   activeWellId,
+  compactionModels,
   deviationVisibilityByWellId,
   onActivateChart,
+  onActivateCompactionModel,
+  onCreateCompactionModel,
   onDeleteChart,
+  onDeleteCompactionModel,
   onSelectChart,
+  onSelectCompactionModel,
   onSelectCurve,
   onSelectFormation,
   onSelectLasGroup,
@@ -53,6 +65,7 @@ export function DataManagerTopPane({
   onToggleDeviation,
   onToggleFormation,
   selectedChartId,
+  selectedCompactionModelId,
   selectedFormationId,
   selectedObject,
   stratCharts,
@@ -115,9 +128,14 @@ export function DataManagerTopPane({
           onSelectTopsGroup={onSelectTopsGroup}
         />
       ) : (
-        <div className="sidebar-panel__body">
-          <p className="sidebar-panel__empty">Reserved for upcoming modelling workflows.</p>
-        </div>
+        <CompactionModelsTab
+          models={compactionModels}
+          selectedModelId={selectedCompactionModelId}
+          onSelect={onSelectCompactionModel}
+          onActivate={onActivateCompactionModel}
+          onDelete={onDeleteCompactionModel}
+          onCreate={onCreateCompactionModel}
+        />
       )}
     </section>
   )

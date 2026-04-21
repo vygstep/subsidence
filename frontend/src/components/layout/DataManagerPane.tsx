@@ -23,10 +23,15 @@ export function DataManagerPane({ sidebarRef, onInternalSplitterMouseDown }: Dat
         <DataManagerTopPane
           activeSidebarTab={controller.activeSidebarTab}
           activeWellId={controller.activeWellId}
+          compactionModels={controller.compactionModels}
           deviationVisibilityByWellId={controller.deviationVisibilityByWellId}
           onActivateChart={controller.onActivateChart}
+          onActivateCompactionModel={controller.onActivateCompactionModel}
+          onCreateCompactionModel={controller.onCreateCompactionModel}
           onDeleteChart={controller.onDeleteChart}
+          onDeleteCompactionModel={controller.onDeleteCompactionModel}
           onSelectChart={controller.onSelectChart}
+          onSelectCompactionModel={controller.onSelectCompactionModel}
           onSelectCurve={controller.handleSelectCurve}
           onSelectFormation={controller.handleSelectFormation}
           onSelectLasGroup={controller.handleSelectLasGroup}
@@ -41,6 +46,7 @@ export function DataManagerPane({ sidebarRef, onInternalSplitterMouseDown }: Dat
           onToggleDeviation={controller.handleSetDeviationVisible}
           onToggleFormation={controller.handleToggleFormation}
           selectedChartId={controller.selectedChartId}
+          selectedCompactionModelId={controller.selectedCompactionModelId}
           selectedFormationId={controller.selectedFormationId}
           selectedObject={controller.selectedObject}
           stratCharts={controller.stratCharts}
@@ -73,6 +79,7 @@ export function DataManagerPane({ sidebarRef, onInternalSplitterMouseDown }: Dat
           onFormationUpdate={controller.setFormationUpdate}
           onFormationMove={controller.setFormationMove}
           selectedChart={controller.selectedChart}
+          selectedCompactionModel={controller.selectedCompactionModel}
           curveCount={controller.curveCount}
           visibleCurveCount={controller.visibleCurveCount}
           minDepth={controller.minDepth}

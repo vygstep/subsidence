@@ -11,6 +11,7 @@ export type SelectedObject =
   | { type: 'tops-group'; wellId: string }
   | { type: 'top-pick'; wellId: string; formationId: string }
   | { type: 'strat-chart'; chartId: number }
+  | { type: 'compaction-model'; modelId: number }
 
 export interface WellViewState {
   tracks: TrackConfig[]

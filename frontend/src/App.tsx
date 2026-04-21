@@ -17,6 +17,7 @@ function App() {
   const loadWellInventories = useWellDataStore((state) => state.loadWellInventories)
   const resetWell = useWellDataStore((state) => state.reset)
   const loadStratCharts = useWellDataStore((state) => state.loadStratCharts)
+  const loadCompactionModels = useWellDataStore((state) => state.loadCompactionModels)
   const colorOverrides = useWellDataStore((state) => state.colorOverrides)
   const well = useWellDataStore((state) => state.well)
 
@@ -113,6 +114,11 @@ function App() {
     if (!isProjectOpen) return
     void loadStratCharts()
   }, [isProjectOpen, loadStratCharts])
+
+  useEffect(() => {
+    if (!isProjectOpen) return
+    void loadCompactionModels()
+  }, [isProjectOpen, loadCompactionModels])
 
   useEffect(() => {
     if (!isProjectOpen) {

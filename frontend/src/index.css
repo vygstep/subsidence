@@ -1275,3 +1275,58 @@ body.is-resizing {
   background: #1e293b;
   border-bottom: 1px solid #334155;
 }
+
+/* Compaction model params table */
+.compaction-table-wrapper {
+  overflow-x: auto;
+  margin-top: 4px;
+}
+
+.compaction-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.75rem;
+  color: #cbd5e1;
+}
+
+.compaction-table th,
+.compaction-table td {
+  padding: 3px 6px;
+  text-align: right;
+  border-bottom: 1px solid #1e293b;
+}
+
+.compaction-table th:first-child,
+.compaction-table td:first-child {
+  text-align: left;
+  max-width: 80px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.compaction-table th {
+  color: #64748b;
+  font-weight: 500;
+  border-bottom: 1px solid #334155;
+}
+
+.compaction-table tr:hover td {
+  background: #1e293b;
+}
+
+.compaction-table__input {
+  width: 100%;
+  background: transparent;
+  border: none;
+  border-bottom: 1px solid transparent;
+  color: inherit;
+  font-size: inherit;
+  text-align: right;
+  padding: 0;
+  outline: none;
+}
+
+.compaction-table__input:focus {
+  border-bottom-color: #3b82f6;
+}

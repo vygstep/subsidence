@@ -1,6 +1,6 @@
 import { SettingsInspector } from './SettingsInspector'
 import type { SelectedObject } from '@/stores/workspaceStore'
-import type { FormationTop, StratChartInfo, TrackConfig, Well } from '@/types'
+import type { CompactionModel, FormationTop, StratChartInfo, TrackConfig, Well } from '@/types'
 
 interface WellInspectorDraft {
   well_name: string
@@ -37,6 +37,7 @@ interface SettingsPaneShellProps {
   ) => void | Promise<void>
   onFormationMove: (formationId: string, depth: number) => void
   selectedChart: StratChartInfo | null
+  selectedCompactionModel: CompactionModel | null
   curveCount: number
   visibleCurveCount: number
   minDepth: number
