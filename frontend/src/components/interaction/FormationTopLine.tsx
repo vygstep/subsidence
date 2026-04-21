@@ -1,7 +1,7 @@
 import { useCallback, useState } from 'react'
 
 import { useFormationDrag } from '@/hooks'
-import { useWellDataStore } from '@/stores'
+import { useViewStore, useWellDataStore } from '@/stores'
 import type { FormationTop } from '@/types'
 
 interface FormationTopLineProps {
@@ -17,7 +17,8 @@ export function FormationTopLine({ formation, yPosition }: FormationTopLineProps
   const [localY, setLocalY] = useState<number | null>(null)
 
   const handleDepthChange = useCallback((depth: number) => {
-    setLocalY(depth)
+    const { scrollDepth, depthPerPixel } = useViewStore.getState()
+    setLocalY((depth - scrollDepth) / depthPerPixel)
   }, [])
 
   const handleDragEnd = useCallback(

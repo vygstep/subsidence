@@ -311,6 +311,10 @@ export const useProjectStore = create<ProjectStore>((set, get) => ({
       canUndo: payload.can_undo,
       canRedo: payload.can_redo,
     })
+    const wellId = useWellDataStore.getState().well?.well_id
+    if (wellId) {
+      await useWellDataStore.getState().loadWell(wellId)
+    }
   },
   async redo() {
     await postAction('/api/projects/redo')
@@ -323,5 +327,9 @@ export const useProjectStore = create<ProjectStore>((set, get) => ({
       canUndo: payload.can_undo,
       canRedo: payload.can_redo,
     })
+    const wellId = useWellDataStore.getState().well?.well_id
+    if (wellId) {
+      await useWellDataStore.getState().loadWell(wellId)
+    }
   },
 }))
