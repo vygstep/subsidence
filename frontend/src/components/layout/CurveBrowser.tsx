@@ -1,23 +1,5 @@
 import { buildTrackOrder, useViewStore, useWellDataStore, useWorkspaceStore, createEmptyTrack } from '@/stores'
-import type { TrackConfig } from '@/types'
-
-const TRACK_COLORS = ['#22c55e', '#ef4444', '#2563eb', '#f59e0b', '#8b5cf6', '#0f766e', '#dc2626', '#475569']
-
-function computeBounds(values: Float32Array, nullValue: number) {
-  let min = Number.POSITIVE_INFINITY
-  let max = Number.NEGATIVE_INFINITY
-  for (let i = 0; i < values.length; i++) {
-    const v = values[i]
-    if (!Number.isFinite(v) || v === nullValue) continue
-    min = Math.min(min, v)
-    max = Math.max(max, v)
-  }
-  if (!Number.isFinite(min) || !Number.isFinite(max) || min === max) {
-    const fallback = Number.isFinite(min) ? min : 0
-    return { min: fallback, max: fallback + 1 }
-  }
-  return { min, max }
-}
+import { buildCurveDefaults } from '@/utils/curvePresets'
 
 export function CurveBrowser() {
   const well = useWellDataStore((s) => s.well)
@@ -40,17 +22,7 @@ export function CurveBrowser() {
       if (state.tracks.some((t) => t.curves.some((c) => c.mnemonic === mnemonic))) return state
 
       const existingCount = state.tracks.reduce((n, t) => n + t.curves.length, 0)
-      const bounds = computeBounds(curve.values, curve.null_value)
-      const curveConfig: TrackConfig['curves'][number] = {
-        mnemonic: curve.mnemonic,
-        unit: curve.unit,
-        color: TRACK_COLORS[existingCount % TRACK_COLORS.length],
-        lineWidth: 1.5,
-        lineStyle: 'solid',
-        scaleMin: bounds.min,
-        scaleMax: bounds.max,
-        scaleReversed: false,
-      }
+      const { curveConfig, scaleType } = buildCurveDefaults(curve, existingCount)
 
       if (selectedTrackId && state.tracks.some((t) => t.id === selectedTrackId)) {
         return {
@@ -72,6 +44,7 @@ export function CurveBrowser() {
           ...state.tracks.filter((t) => t.curves.length > 0 || t.id === (state.tracks[0]?.id)),
           {
             ...createEmptyTrack(`track-${nextNum}`, `Track ${nextNum}`),
+            scaleType,
             curves: [curveConfig],
           },
         ],

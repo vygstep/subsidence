@@ -2,8 +2,7 @@ import { useEffect, useMemo, useState } from 'react'
 
 import { buildTrackOrder, createDefaultWellView, createEmptyTrack, useViewStore, useWellDataStore, useWorkspaceStore } from '@/stores'
 import type { TrackConfig } from '@/types'
-
-const TRACK_COLORS = ['#22c55e', '#ef4444', '#2563eb', '#f59e0b', '#8b5cf6', '#0f766e', '#dc2626', '#475569']
+import { buildCurveDefaults } from '@/utils/curvePresets'
 
 async function readError(response: Response, fallback: string): Promise<string> {
   try {
@@ -13,22 +12,6 @@ async function readError(response: Response, fallback: string): Promise<string> 
     // ignore non-JSON payloads
   }
   return fallback
-}
-
-function computeCurveBounds(values: Float32Array, nullValue: number) {
-  let min = Number.POSITIVE_INFINITY
-  let max = Number.NEGATIVE_INFINITY
-  for (let i = 0; i < values.length; i += 1) {
-    const v = values[i]
-    if (!Number.isFinite(v) || v === nullValue) continue
-    min = Math.min(min, v)
-    max = Math.max(max, v)
-  }
-  if (!Number.isFinite(min) || !Number.isFinite(max) || min === max) {
-    const fallback = Number.isFinite(min) ? min : 0
-    return { min: fallback, max: fallback + 1 }
-  }
-  return { min, max }
 }
 
 function nextTrackNumber(tracks: TrackConfig[]): number {
@@ -276,17 +259,7 @@ export function useDataManagerController() {
       }
 
       const existingCount = state.tracks.reduce((n, t) => n + t.curves.length, 0)
-      const bounds = computeCurveBounds(curve.values, curve.null_value)
-      const curveConfig: TrackConfig['curves'][number] = {
-        mnemonic: curve.mnemonic,
-        unit: curve.unit,
-        color: TRACK_COLORS[existingCount % TRACK_COLORS.length],
-        lineWidth: 1.5,
-        lineStyle: 'solid',
-        scaleMin: bounds.min,
-        scaleMax: bounds.max,
-        scaleReversed: false,
-      }
+      const { curveConfig, scaleType } = buildCurveDefaults(curve, existingCount)
 
       if (selectedTrackId && state.tracks.some((t) => t.id === selectedTrackId)) {
         return {
@@ -306,7 +279,7 @@ export function useDataManagerController() {
             id: `track-${trackNumber}`,
             title: `Track ${trackNumber}`,
             width: 200,
-            scaleType: 'linear',
+            scaleType,
             gridDivisions: 3,
             showGrid: true,
             curves: [curveConfig],
