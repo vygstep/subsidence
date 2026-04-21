@@ -425,21 +425,21 @@ body.is-resizing {
 .tree-list {
   display: flex;
   flex-direction: column;
-  gap: 6px;
+  gap: 3px;
 }
 
 .tree-node {
   display: flex;
   flex-direction: column;
-  gap: 4px;
+  gap: 2px;
 }
 
 .tree-node__row {
   display: flex;
   align-items: center;
   gap: 2px;
-  min-height: 30px;
-  padding: 3px 0;
+  min-height: 24px;
+  padding: 1px 0;
 }
 
 .tree-node__row--root {
@@ -509,7 +509,7 @@ body.is-resizing {
   margin-left: 16px;
   display: flex;
   flex-direction: column;
-  gap: 4px;
+  gap: 2px;
 }
 
 .tree-leaf {
@@ -518,7 +518,7 @@ body.is-resizing {
   gap: 12px;
   font-size: 0.78rem;
   color: #314155;
-  padding: 2px 0;
+  padding: 1px 0;
 }
 
 .tree-leaf--interactive {
@@ -545,7 +545,7 @@ body.is-resizing {
   align-items: center;
   gap: 8px;
   width: 100%;
-  padding: 6px 8px;
+  padding: 3px 8px;
   border-radius: 8px;
   font-size: 0.78rem;
   color: #314155;
@@ -571,8 +571,8 @@ body.is-resizing {
   position: relative;
   display: flex;
   flex-direction: column;
-  gap: 6px;
-  padding: 6px 8px;
+  gap: 3px;
+  padding: 3px 8px;
   border-radius: 8px;
   cursor: pointer;
   background: #ffffff;
@@ -582,8 +582,8 @@ body.is-resizing {
   content: '';
   position: absolute;
   left: 0;
-  top: 4px;
-  bottom: 4px;
+  top: 2px;
+  bottom: 2px;
   width: 10px;
   border-radius: 6px;
   background: var(--top-leaf-color, #9ca3af);
