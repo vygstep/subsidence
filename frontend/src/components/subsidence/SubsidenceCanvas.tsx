@@ -1,4 +1,4 @@
-import { useCallback, useMemo, useRef, useState, useEffect } from 'react'
+import { useCallback, useMemo, useRef } from 'react'
 
 import { useCanvasRenderer } from '@/hooks/useCanvasRenderer'
 import { drawBurialCurves, drawFormationFills } from '@/renderers/subsidenceRenderer'
@@ -82,18 +82,6 @@ function niceStep(range: number, targetTicks: number): number {
 
 export function SubsidenceCanvas() {
   const containerRef = useRef<HTMLDivElement>(null)
-  const [containerWidth, setContainerWidth] = useState(0)
-
-  useEffect(() => {
-    const el = containerRef.current
-    if (!el) return
-    const obs = new ResizeObserver((entries) => {
-      setContainerWidth(entries[0]?.contentRect.width ?? 0)
-    })
-    obs.observe(el)
-    setContainerWidth(el.clientWidth)
-    return () => obs.disconnect()
-  }, [])
 
   const subsidenceCurves = useComputedStore((s) => s.subsidenceCurves)
 
@@ -146,7 +134,6 @@ export function SubsidenceCanvas() {
     <div ref={containerRef} className="subsidence-canvas-container">
       <GeologicalTimescale
         timeRange={{ min_ma: minAge, max_ma: maxAge }}
-        width={containerWidth}
         height={TIMESCALE_HEIGHT}
         paddingLeft={PADDING.left}
         paddingRight={PADDING.right}

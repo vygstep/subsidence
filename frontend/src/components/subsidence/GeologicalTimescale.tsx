@@ -7,7 +7,6 @@ interface TimeRange {
 
 interface GeologicalTimescaleProps {
   timeRange: TimeRange
-  width: number
   height?: number
   paddingLeft?: number
   paddingRight?: number
@@ -15,68 +14,69 @@ interface GeologicalTimescaleProps {
 
 export function GeologicalTimescale({
   timeRange,
-  width,
   height = 40,
   paddingLeft = 0,
   paddingRight = 0,
 }: GeologicalTimescaleProps) {
   const { min_ma, max_ma } = timeRange
-  const span = max_ma - min_ma
-  const plotW = width - paddingLeft - paddingRight
+  const span = max_ma - min_ma || 1
 
   const blocks = GEOLOGIC_PERIODS.flatMap((period) => {
     const overlapStart = Math.max(period.end_ma, min_ma)
     const overlapEnd = Math.min(period.start_ma, max_ma)
     if (overlapStart >= overlapEnd) return []
 
-    // X: oldest (max_ma) at left edge of plot area, present (min_ma) at right edge
-    const left = paddingLeft + ((max_ma - overlapEnd) / span) * plotW
-    const blockWidth = ((overlapEnd - overlapStart) / span) * plotW
+    // Percentage of the plot area: oldest at left, youngest at right
+    const leftPct = ((max_ma - overlapEnd) / span) * 100
+    const widthPct = ((overlapEnd - overlapStart) / span) * 100
 
-    return [{ period, left, blockWidth }]
+    return [{ period, leftPct, widthPct }]
   })
 
   return (
     <div
       className="geological-timescale"
-      style={{ width, height, position: 'relative', overflow: 'hidden', flexShrink: 0 }}
+      style={{ height, display: 'flex', alignItems: 'stretch', flexShrink: 0 }}
     >
-      {blocks.map(({ period, left, blockWidth }) => (
-        <div
-          key={period.name}
-          className="geological-timescale__block"
-          style={{
-            position: 'absolute',
-            left,
-            top: 0,
-            width: blockWidth,
-            height,
-            background: period.color,
-            borderRight: '1px solid rgba(0,0,0,0.25)',
-            overflow: 'hidden',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-          }}
-          title={`${period.name} (${period.start_ma}–${period.end_ma} Ma)`}
-        >
-          <span
+      {paddingLeft > 0 && (
+        <div style={{ width: paddingLeft, flexShrink: 0 }} />
+      )}
+      <div style={{ flex: 1, position: 'relative', overflow: 'hidden', marginRight: paddingRight }}>
+        {blocks.map(({ period, leftPct, widthPct }) => (
+          <div
+            key={period.name}
             style={{
-              fontSize: 10,
-              fontWeight: 600,
-              color: '#111',
-              whiteSpace: 'nowrap',
+              position: 'absolute',
+              left: `${leftPct}%`,
+              top: 0,
+              width: `${widthPct}%`,
+              height: '100%',
+              background: period.color,
+              borderRight: '1px solid rgba(0,0,0,0.25)',
               overflow: 'hidden',
-              textOverflow: 'clip',
-              maxWidth: blockWidth - 4,
-              display: 'block',
-              textAlign: 'center',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
             }}
+            title={`${period.name} (${period.start_ma}–${period.end_ma} Ma)`}
           >
-            {blockWidth >= 28 ? period.abbreviation : ''}
-          </span>
-        </div>
-      ))}
+            <span
+              style={{
+                fontSize: 10,
+                fontWeight: 600,
+                color: '#111',
+                whiteSpace: 'nowrap',
+                overflow: 'hidden',
+                textOverflow: 'clip',
+                display: 'block',
+                textAlign: 'center',
+              }}
+            >
+              {widthPct > 4 ? period.abbreviation : ''}
+            </span>
+          </div>
+        ))}
+      </div>
     </div>
   )
 }
