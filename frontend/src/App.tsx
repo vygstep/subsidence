@@ -1,6 +1,6 @@
 import { useEffect, useRef } from 'react'
 
-import { DataManagerPane, ProjectToolbar, PropertyPanel, StatusBar, ViewerWorkspace } from '@/components'
+import { DataManagerPane, ProjectToolbar, StatusBar, ViewerWorkspace } from '@/components'
 import { useSidebarResize } from '@/hooks'
 import {
   useProjectStore,
@@ -26,6 +26,8 @@ function App() {
   const depthPerPixel = useViewStore((state) => state.depthPerPixel)
   const selectTrack = useViewStore((state) => state.selectTrack)
   const clearSelection = useViewStore((state) => state.clearSelection)
+  const selectedElementId = useViewStore((state) => state.selectedElementId)
+  const selectedElementType = useViewStore((state) => state.selectedElementType)
   const trackWidths = useViewStore((state) => state.trackWidths)
   const resetVisualConfig = useViewStore((state) => state.resetVisualConfig)
 
@@ -53,6 +55,18 @@ function App() {
     window.addEventListener('keydown', onKeyDown)
     return () => window.removeEventListener('keydown', onKeyDown)
   }, [clearSelection])
+
+  useEffect(() => {
+    if (!selectedElementId || !selectedElementType) return
+    const wellId = well?.well_id
+    if (!wellId) return
+    if (selectedElementType === 'curve') {
+      setSelectedObject({ type: 'curve', wellId, mnemonic: selectedElementId })
+    } else if (selectedElementType === 'formation') {
+      setSelectedObject({ type: 'top-pick', wellId, formationId: selectedElementId })
+      setSelectedFormationId(selectedElementId)
+    }
+  }, [selectedElementId, selectedElementType, well?.well_id, setSelectedObject, setSelectedFormationId])
 
   useEffect(() => {
     if (!isProjectOpen) {
@@ -162,7 +176,6 @@ function App() {
               onMouseDown={startWidthDrag}
             />
             <ViewerWorkspace />
-            <PropertyPanel />
           </div>
         ) : null}
       </main>
