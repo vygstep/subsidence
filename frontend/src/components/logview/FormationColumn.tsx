@@ -10,6 +10,7 @@ interface FormationColumnProps {
   height: number
   maxDepth: number
   width?: number
+  isSelected?: boolean
 }
 
 function toRenderableLithology(lithology: LithologyType | undefined) {
@@ -19,8 +20,9 @@ function toRenderableLithology(lithology: LithologyType | undefined) {
   return lithology
 }
 
-export function FormationColumn({ formations, height, maxDepth, width = 80 }: FormationColumnProps) {
+export function FormationColumn({ formations, height, maxDepth, width = 80, isSelected = false }: FormationColumnProps) {
   const visibleDepthRange = useViewStore((state) => state.visibleDepthRange)
+  const formationsTrackConfig = useViewStore((state) => state.formationsTrackConfig)
 
   const orderedFormations = useMemo(
     () => [...formations].sort((left, right) => left.depth_md - right.depth_md),
@@ -31,7 +33,7 @@ export function FormationColumn({ formations, height, maxDepth, width = 80 }: Fo
 
   const canvasRef = useCanvasRenderer(
     (ctx, canvasWidth, canvasHeight) => {
-      ctx.fillStyle = '#ffffff'
+      ctx.fillStyle = formationsTrackConfig.backgroundColor
       ctx.fillRect(0, 0, canvasWidth, canvasHeight)
 
       if (orderedFormations.length === 0) {
@@ -70,12 +72,23 @@ export function FormationColumn({ formations, height, maxDepth, width = 80 }: Fo
         ctx.font = '600 11px Segoe UI'
         ctx.textAlign = 'center'
         ctx.textBaseline = 'middle'
-        ctx.fillText(formation.name, canvasWidth / 2, yTop + blockHeight / 2, canvasWidth - 8)
+        const label = formationsTrackConfig.nameSource === 'linked-strat-unit'
+          ? formation.active_strat_unit_name ?? formation.name
+          : formation.name
+        ctx.fillText(label, canvasWidth / 2, yTop + blockHeight / 2, canvasWidth - 8)
         ctx.restore()
       })
     },
-    [depthScale, maxDepth, orderedFormations, visibleDepthRange.max, visibleDepthRange.min],
+    [
+      depthScale,
+      formationsTrackConfig.backgroundColor,
+      formationsTrackConfig.nameSource,
+      maxDepth,
+      orderedFormations,
+      visibleDepthRange.max,
+      visibleDepthRange.min,
+    ],
   )
 
-  return <canvas ref={canvasRef} className="formation-column" style={{ width, height }} />
+  return <canvas ref={canvasRef} className={`formation-column ${isSelected ? 'formation-column--selected' : ''}`} style={{ width, height }} />
 }

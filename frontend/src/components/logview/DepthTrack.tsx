@@ -5,9 +5,10 @@ import { useViewStore } from '@/stores'
 interface DepthTrackProps {
   height: number
   width?: number
+  isSelected?: boolean
 }
 
-export function DepthTrack({ height, width = 60 }: DepthTrackProps) {
+export function DepthTrack({ height, width = 60, isSelected = false }: DepthTrackProps) {
   const visibleDepthRange = useViewStore((state) => state.visibleDepthRange)
   const depthTrackConfig = useViewStore((state) => state.depthTrackConfig)
   const { scale: depthScale } = useDepthScale(visibleDepthRange, height)
@@ -26,5 +27,5 @@ export function DepthTrack({ height, width = 60 }: DepthTrackProps) {
     [depthScale, depthTrackConfig.backgroundColor, depthTrackConfig.unit, majorInterval, minorInterval],
   )
 
-  return <canvas ref={canvasRef} className="depth-track" style={{ width, height }} />
+  return <canvas ref={canvasRef} className={`depth-track ${isSelected ? 'depth-track--selected' : ''}`} style={{ width, height }} />
 }

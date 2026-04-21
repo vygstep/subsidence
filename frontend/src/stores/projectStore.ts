@@ -2,7 +2,7 @@ import { create } from 'zustand'
 
 import { rememberProjectBundlePath } from '@/components/layout/pathMemory'
 
-import { useViewStore, type DepthTrackConfig } from './viewStore'
+import { useViewStore, type DepthTrackConfig, type FormationsTrackConfig } from './viewStore'
 import { useWellDataStore } from './wellDataStore'
 import { useWorkspaceStore } from './workspaceStore'
 
@@ -53,6 +53,7 @@ interface VisualConfigPayload {
   curveColors?: Record<string, string>
   splitRatio?: number
   depthTrackConfig?: Partial<DepthTrackConfig>
+  formationsTrackConfig?: Partial<FormationsTrackConfig>
 }
 
 interface ProjectStatusResponse {
@@ -180,6 +181,7 @@ function applyVisualConfigPayload(config: Record<string, unknown>): void {
     trackWidths: payload.trackWidths,
     splitRatio: payload.splitRatio,
     depthTrackConfig: payload.depthTrackConfig,
+    formationsTrackConfig: payload.formationsTrackConfig,
   })
   useWellDataStore.getState().setColorOverrides(payload.curveColors ?? {})
 }
@@ -206,6 +208,7 @@ export function collectProjectVisualConfig(): VisualConfigPayload {
     curveColors: useWellDataStore.getState().colorOverrides,
     splitRatio: useViewStore.getState().splitRatio,
     depthTrackConfig: useViewStore.getState().depthTrackConfig,
+    formationsTrackConfig: useViewStore.getState().formationsTrackConfig,
   }
 }
 

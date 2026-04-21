@@ -10,6 +10,7 @@ interface VisualConfigPayload {
   trackWidths?: Record<string, number>
   splitRatio?: number
   depthTrackConfig?: Partial<DepthTrackConfig>
+  formationsTrackConfig?: Partial<FormationsTrackConfig>
 }
 
 export type SelectedElementType = 'curve' | 'track' | 'formation'
@@ -21,6 +22,11 @@ export interface DepthTrackConfig {
   unit: 'm' | 'km' | 'ft'
 }
 
+export interface FormationsTrackConfig {
+  backgroundColor: string
+  nameSource: 'formation-name' | 'linked-strat-unit'
+}
+
 export interface ViewStore {
   scrollDepth: number
   depthPerPixel: number
@@ -30,6 +36,7 @@ export interface ViewStore {
   curveTooltipVisible: boolean
   interactionMode: 'view' | 'edit-tops'
   depthTrackConfig: DepthTrackConfig
+  formationsTrackConfig: FormationsTrackConfig
   selectedTrackId: string | null
   selectedElementId: string | null
   selectedElementType: SelectedElementType | null
@@ -43,6 +50,7 @@ export interface ViewStore {
   setCurveTooltipVisible: (visible: boolean) => void
   setInteractionMode: (mode: 'view' | 'edit-tops') => void
   updateDepthTrackConfig: (patch: Partial<DepthTrackConfig>) => void
+  updateFormationsTrackConfig: (patch: Partial<FormationsTrackConfig>) => void
   selectTrack: (trackId: string | null) => void
   selectElement: (id: string, type: SelectedElementType) => void
   clearSelection: () => void
@@ -75,6 +83,10 @@ const initialDepthTrackConfig: DepthTrackConfig = {
   minorInterval: 10,
   unit: 'm',
 }
+const initialFormationsTrackConfig: FormationsTrackConfig = {
+  backgroundColor: '#ffffff',
+  nameSource: 'formation-name',
+}
 
 function normalizeTrackWidths(trackWidths: Record<string, number> | undefined): Record<string, number> {
   if (!trackWidths) {
@@ -94,6 +106,7 @@ export const useViewStore = create<ViewStore>((set) => ({
   curveTooltipVisible: true,
   interactionMode: 'view',
   depthTrackConfig: initialDepthTrackConfig,
+  formationsTrackConfig: initialFormationsTrackConfig,
   selectedTrackId: null,
   selectedElementId: null,
   selectedElementType: null,
@@ -128,6 +141,14 @@ export const useViewStore = create<ViewStore>((set) => ({
     set((state) => ({
       depthTrackConfig: {
         ...state.depthTrackConfig,
+        ...patch,
+      },
+    }))
+  },
+  updateFormationsTrackConfig(patch) {
+    set((state) => ({
+      formationsTrackConfig: {
+        ...state.formationsTrackConfig,
         ...patch,
       },
     }))
@@ -192,6 +213,11 @@ export const useViewStore = create<ViewStore>((set) => ({
           ...state.depthTrackConfig,
           ...(config.depthTrackConfig ?? {}),
         },
+        formationsTrackConfig: {
+          ...initialFormationsTrackConfig,
+          ...state.formationsTrackConfig,
+          ...(config.formationsTrackConfig ?? {}),
+        },
         visibleDepthRange: deriveVisibleDepthRange(state.scrollDepth, nextDepthPerPixel, state.viewportHeight),
       }
     })
@@ -201,6 +227,7 @@ export const useViewStore = create<ViewStore>((set) => ({
       depthPerPixel: initialDepthPerPixel,
       trackWidths: {},
       depthTrackConfig: initialDepthTrackConfig,
+      formationsTrackConfig: initialFormationsTrackConfig,
       visibleDepthRange: deriveVisibleDepthRange(state.scrollDepth, initialDepthPerPixel, state.viewportHeight),
     }))
   },

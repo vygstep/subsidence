@@ -88,7 +88,7 @@ export function TrackHeaderRow({ tracks, trackOrder }: TrackHeaderRowProps) {
               <button
                 type="button"
                 draggable
-                className={`track-header-row__depth-header ${dropTargetTrackId === trackId && draggedTrackId !== trackId ? 'track-header-row__special-header--drag-over' : ''}`}
+                className={`track-header-row__depth-header ${selectedTrackId === DEPTH_TRACK_ID ? 'track-header-row__special-header--selected' : ''} ${dropTargetTrackId === trackId && draggedTrackId !== trackId ? 'track-header-row__special-header--drag-over' : ''}`}
                 style={{ width: depthWidth }}
                 onClick={() => selectTrack(DEPTH_TRACK_ID)}
                 {...sharedDragProps}
@@ -106,7 +106,7 @@ export function TrackHeaderRow({ tracks, trackOrder }: TrackHeaderRowProps) {
               <button
                 type="button"
                 draggable
-                className={`track-header-row__formation-header ${dropTargetTrackId === trackId && draggedTrackId !== trackId ? 'track-header-row__special-header--drag-over' : ''}`}
+                className={`track-header-row__formation-header ${selectedTrackId === FORMATION_TRACK_ID ? 'track-header-row__special-header--selected' : ''} ${dropTargetTrackId === trackId && draggedTrackId !== trackId ? 'track-header-row__special-header--drag-over' : ''}`}
                 style={{ width: formationWidth }}
                 onClick={() => selectTrack(FORMATION_TRACK_ID)}
                 {...sharedDragProps}

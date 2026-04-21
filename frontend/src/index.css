@@ -761,6 +761,11 @@ body.is-resizing {
   border-right: 1px solid #c4d0dc;
 }
 
+.depth-track--selected {
+  outline: 2px solid #2563eb;
+  outline-offset: -2px;
+}
+
 .data-track,
 .formation-column {
   display: block;
@@ -770,6 +775,11 @@ body.is-resizing {
 .formation-column {
   border-left: 1px solid #c4d0dc;
   border-right: 1px solid #c4d0dc;
+}
+
+.formation-column--selected {
+  outline: 2px solid #2563eb;
+  outline-offset: -2px;
 }
 
 .track-resize-handle,
@@ -833,6 +843,12 @@ body.is-resizing {
   background: rgba(37, 99, 235, 0.1);
   outline: 2px dashed rgba(37, 99, 235, 0.55);
   outline-offset: -2px;
+}
+
+.track-header-row__special-header--selected {
+  outline: 2px solid #2563eb;
+  outline-offset: -2px;
+  background: rgba(124, 184, 232, 0.12);
 }
 
 .track-header {

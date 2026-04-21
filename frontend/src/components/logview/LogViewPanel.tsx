@@ -35,6 +35,7 @@ export function LogViewPanel({ tracks, trackOrder, curves, formations, minDepth,
   const depthPerPixel = useViewStore((state) => state.depthPerPixel)
   const cursorDepth = useViewStore((state) => state.cursorDepth)
   const setCursorDepth = useViewStore((state) => state.setCursorDepth)
+  const selectedTrackId = useViewStore((state) => state.selectedTrackId)
   const overviewVisible = useViewStore((state) => state.overviewVisible)
   const curveTooltipVisible = useViewStore((state) => state.curveTooltipVisible)
   const interactionMode = useViewStore((state) => state.interactionMode)
@@ -94,7 +95,11 @@ export function LogViewPanel({ tracks, trackOrder, curves, formations, minDepth,
               if (trackId === DEPTH_TRACK_ID) {
                 return (
                   <Fragment key={trackId}>
-                    <DepthTrack height={trackHeight} width={depthWidth} />
+                    <DepthTrack
+                      height={trackHeight}
+                      width={depthWidth}
+                      isSelected={selectedTrackId === DEPTH_TRACK_ID}
+                    />
                     <TrackResizeHandle trackId={DEPTH_TRACK_ID} initialWidth={depthWidth} />
                   </Fragment>
                 )
@@ -103,7 +108,13 @@ export function LogViewPanel({ tracks, trackOrder, curves, formations, minDepth,
               if (trackId === FORMATION_TRACK_ID) {
                 return (
                   <Fragment key={trackId}>
-                    <FormationColumn formations={formations} height={trackHeight} maxDepth={maxDepth} width={formationWidth} />
+                    <FormationColumn
+                      formations={formations}
+                      height={trackHeight}
+                      maxDepth={maxDepth}
+                      width={formationWidth}
+                      isSelected={selectedTrackId === FORMATION_TRACK_ID}
+                    />
                     <TrackResizeHandle trackId={FORMATION_TRACK_ID} initialWidth={formationWidth} />
                   </Fragment>
                 )

@@ -79,6 +79,8 @@ function App() {
       setSelectedFormationId(selectedElementId)
     } else if (selectedElementType === 'track' && selectedElementId === 'depth') {
       setSelectedObject({ type: 'depth-track', wellId })
+    } else if (selectedElementType === 'track' && selectedElementId === 'formations') {
+      setSelectedObject({ type: 'formations-track', wellId })
     }
   }, [selectedElementId, selectedElementType, well?.well_id, setSelectedObject, setSelectedFormationId])
 

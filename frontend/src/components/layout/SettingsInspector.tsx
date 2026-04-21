@@ -193,6 +193,8 @@ export function SettingsInspector({
 }: SettingsInspectorProps) {
   const depthTrackConfig = useViewStore((state) => state.depthTrackConfig)
   const updateDepthTrackConfig = useViewStore((state) => state.updateDepthTrackConfig)
+  const formationsTrackConfig = useViewStore((state) => state.formationsTrackConfig)
+  const updateFormationsTrackConfig = useViewStore((state) => state.updateFormationsTrackConfig)
 
   if (!selectedObject) {
     return <EmptyInspector message="Select an object in Data Manager to inspect its settings." />
@@ -317,6 +319,42 @@ export function SettingsInspector({
             Save well
           </button>
         </div>
+      </div>
+    )
+  }
+
+  if (selectedObject.type === 'formations-track') {
+    if (!well || well.well_id !== selectedObject.wellId) {
+      return <EmptyInspector message="Selected FORMATIONS track settings are not loaded yet." />
+    }
+
+    return (
+      <div className="template-panel">
+        <div className="template-panel__group">
+          <div className="template-panel__label">Track</div>
+          <div className="template-panel__value">FORMATIONS</div>
+        </div>
+        <div className="tree-leaf"><span>Visible tops</span><span>{visibleFormationIds.length}</span></div>
+        <label className="project-dialog__field">
+          <span>Background color</span>
+          <input
+            type="color"
+            value={formationsTrackConfig.backgroundColor}
+            onChange={(event) => updateFormationsTrackConfig({ backgroundColor: event.target.value })}
+          />
+        </label>
+        <label className="project-dialog__field">
+          <span>Name source</span>
+          <select
+            value={formationsTrackConfig.nameSource}
+            onChange={(event) => updateFormationsTrackConfig({
+              nameSource: event.target.value as 'formation-name' | 'linked-strat-unit',
+            })}
+          >
+            <option value="formation-name">Top name</option>
+            <option value="linked-strat-unit">Linked strat unit</option>
+          </select>
+        </label>
       </div>
     )
   }
