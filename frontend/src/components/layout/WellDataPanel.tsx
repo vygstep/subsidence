@@ -15,11 +15,22 @@ interface WellDataPanelProps {
   onToggleAllFormations: (wellId: string, nextValue: boolean) => void
   onToggleAllCurves: (wellId: string, nextValue: boolean) => void
   onToggleDeviation: (wellId: string, nextValue: boolean) => void
+  onFocusCurveObject: (wellId: string, mnemonic: string) => void
+  onFocusFormationObject: (wellId: string, formationId: string) => void
+  onFocusLasGroupObject: (wellId: string) => void
+  onFocusTopsGroupObject: (wellId: string) => void
+  onFocusWellObject: (wellId: string) => void
   onSelectFormation: (wellId: string, formationId: string) => void
   selectedObject: { type: string; [key: string]: unknown } | null
   onSelectLasGroup: (wellId: string) => void
   onSelectCurve: (wellId: string, mnemonic: string) => void
   onSelectTopsGroup: (wellId: string) => void
+  onContextMenuCurve: (event: React.MouseEvent, wellId: string, curve: { mnemonic: string; unit: string }) => void
+  onContextMenuDeviation: (event: React.MouseEvent, wellId: string) => void
+  onContextMenuFormation: (event: React.MouseEvent, wellId: string, formation: FormationInventoryItem) => void
+  onContextMenuLasGroup: (event: React.MouseEvent, wellId: string) => void
+  onContextMenuTopsGroup: (event: React.MouseEvent, wellId: string) => void
+  onContextMenuWell: (event: React.MouseEvent, well: WellInventory) => void
 }
 
 type ToggleState = 'none' | 'partial' | 'all'
@@ -123,11 +134,22 @@ export function WellDataPanel({
   onToggleAllFormations,
   onToggleAllCurves,
   onToggleDeviation,
+  onFocusCurveObject,
+  onFocusFormationObject,
+  onFocusLasGroupObject,
+  onFocusTopsGroupObject,
+  onFocusWellObject,
   onSelectFormation,
   selectedObject,
   onSelectLasGroup,
   onSelectCurve,
   onSelectTopsGroup,
+  onContextMenuCurve,
+  onContextMenuDeviation,
+  onContextMenuFormation,
+  onContextMenuLasGroup,
+  onContextMenuTopsGroup,
+  onContextMenuWell,
 }: WellDataPanelProps) {
   const [expandedNodes, setExpandedNodes] = useState<Record<string, boolean>>({})
 
@@ -185,6 +207,10 @@ export function WellDataPanel({
                 className={`tree-node__row tree-node__row--root ${isActive ? 'tree-node__row--active' : ''} ${
                   selectedObject?.type === 'well' && selectedObject.wellId === item.well_id ? 'tree-node__row--selected' : ''
                 }`}
+                onContextMenu={(event) => {
+                  onFocusWellObject(item.well_id)
+                  onContextMenuWell(event, item)
+                }}
               >
                 <TreeToggleButton isOpen={showDetails} onToggle={() => toggleNode(rootId)} />
                 <input
@@ -209,6 +235,10 @@ export function WellDataPanel({
                       className={`tree-node__row ${
                         selectedObject?.type === 'las-group' && selectedObject.wellId === item.well_id ? 'tree-node__row--selected' : ''
                       }`}
+                      onContextMenu={(event) => {
+                        onFocusLasGroupObject(item.well_id)
+                        onContextMenuLasGroup(event, item.well_id)
+                      }}
                     >
                       <TreeToggleButton
                         isOpen={isOpen(`${rootId}:las`)}
@@ -233,6 +263,10 @@ export function WellDataPanel({
                                   : ''
                               }
                               onClick={() => onSelectCurve(item.well_id, curve.mnemonic)}
+                              onContextMenu={(event) => {
+                                onFocusCurveObject(item.well_id, curve.mnemonic)
+                                onContextMenuCurve(event, item.well_id, curve)
+                              }}
                             >
                               <CheckboxLeaf
                                 checked={visibleCurveMnemonics.includes(curve.mnemonic)}
@@ -254,6 +288,10 @@ export function WellDataPanel({
                       className={`tree-node__row ${
                         selectedObject?.type === 'tops-group' && selectedObject.wellId === item.well_id ? 'tree-node__row--selected' : ''
                       }`}
+                      onContextMenu={(event) => {
+                        onFocusTopsGroupObject(item.well_id)
+                        onContextMenuTopsGroup(event, item.well_id)
+                      }}
                     >
                       <TreeToggleButton
                         isOpen={isOpen(`${rootId}:tops`)}
@@ -273,6 +311,10 @@ export function WellDataPanel({
                               className={`top-leaf ${selectedFormationId === formation.id && isActive ? 'top-leaf--selected' : ''}`}
                               style={{ backgroundColor: topBackgroundColor(formation) }}
                               onClick={() => onSelectFormation(item.well_id, formation.id)}
+                              onContextMenu={(event) => {
+                                onFocusFormationObject(item.well_id, formation.id)
+                                onContextMenuFormation(event, item.well_id, formation)
+                              }}
                             >
                               <CheckboxLeaf
                                 checked={visibleFormationIds.includes(formation.id)}
@@ -290,7 +332,7 @@ export function WellDataPanel({
                   </div>
 
                   <div className="tree-node">
-                    <div className="tree-node__row">
+                    <div className="tree-node__row" onContextMenu={(event) => onContextMenuDeviation(event, item.well_id)}>
                       <TreeToggleButton
                         isOpen={isOpen(`${rootId}:dev`)}
                         onToggle={() => toggleNode(`${rootId}:dev`)}

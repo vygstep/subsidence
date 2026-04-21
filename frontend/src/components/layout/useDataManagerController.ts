@@ -62,6 +62,7 @@ export function useDataManagerController() {
   const activateChart = useWellDataStore((state) => state.activateChart)
   const deleteChart = useWellDataStore((state) => state.deleteChart)
   const refreshWell = useWellDataStore((state) => state.refreshWell)
+  const loadWellInventories = useWellDataStore((state) => state.loadWellInventories)
   const activateCompactionModel = useWellDataStore((state) => state.activateCompactionModel)
   const createCompactionModel = useWellDataStore((state) => state.createCompactionModel)
   const deleteCompactionModel = useWellDataStore((state) => state.deleteCompactionModel)
@@ -77,8 +78,10 @@ export function useDataManagerController() {
   const setSelectedFormationId = useWorkspaceStore((state) => state.setSelectedFormationId)
   const setSelectedObject = useWorkspaceStore((state) => state.setSelectedObject)
   const updateWellViewState = useWorkspaceStore((state) => state.updateWellViewState)
+  const dropWellViewState = useWorkspaceStore((state) => state.dropWellViewState)
 
   const selectedTrackId = useViewStore((state) => state.selectedTrackId)
+  const selectTrack = useViewStore((state) => state.selectTrack)
 
   useEffect(() => {
     if (!well) return
@@ -159,28 +162,50 @@ export function useDataManagerController() {
     return compactionModels.find((m) => m.id === selectedObject.modelId) ?? null
   }, [selectedObject, compactionModels])
 
-  function handleSelectWell(wellId: string): void {
-    setSelectedObject({ type: 'well', wellId })
-    void loadWell(wellId)
+  function loadWellInBackground(wellId: string): void {
+    if (wellId !== well?.well_id) {
+      void loadWell(wellId)
+    }
   }
 
-  async function handleSelectLasGroup(wellId: string): Promise<void> {
-    if (wellId !== well?.well_id) await loadWell(wellId)
+  function handleSelectWell(wellId: string): void {
+    setSelectedObject({ type: 'well', wellId })
+    loadWellInBackground(wellId)
+  }
+
+  function handleFocusWellObject(wellId: string): void {
+    setSelectedObject({ type: 'well', wellId })
+  }
+
+  function handleFocusLasGroupObject(wellId: string): void {
     setSelectedObject({ type: 'las-group', wellId })
   }
 
+  function handleFocusCurveObject(wellId: string, mnemonic: string): void {
+    setSelectedObject({ type: 'curve', wellId, mnemonic })
+  }
+
+  function handleFocusTopsGroupObject(wellId: string): void {
+    setSelectedObject({ type: 'tops-group', wellId })
+  }
+
+  async function handleSelectLasGroup(wellId: string): Promise<void> {
+    setSelectedObject({ type: 'las-group', wellId })
+    loadWellInBackground(wellId)
+  }
+
   async function handleSelectCurve(wellId: string, mnemonic: string): Promise<void> {
-    if (wellId !== well?.well_id) await loadWell(wellId)
     if (selectedObject?.type === 'curve' && selectedObject.wellId === wellId && selectedObject.mnemonic === mnemonic) {
       setSelectedObject(null)
     } else {
       setSelectedObject({ type: 'curve', wellId, mnemonic })
     }
+    loadWellInBackground(wellId)
   }
 
   async function handleSelectTopsGroup(wellId: string): Promise<void> {
-    if (wellId !== well?.well_id) await loadWell(wellId)
     setSelectedObject({ type: 'tops-group', wellId })
+    loadWellInBackground(wellId)
   }
 
   async function handleSetDeviationVisible(wellId: string, nextValue: boolean): Promise<void> {
@@ -208,7 +233,6 @@ export function useDataManagerController() {
   }
 
   async function handleSelectFormation(wellId: string, formationId: string): Promise<void> {
-    if (wellId !== well?.well_id) await loadWell(wellId)
     if (selectedObject?.type === 'top-pick' && selectedObject.wellId === wellId && selectedObject.formationId === formationId) {
       setSelectedObject(null)
       setSelectedFormationId(null)
@@ -217,6 +241,12 @@ export function useDataManagerController() {
       setSelectedObject({ type: 'top-pick', wellId, formationId })
       setActiveToolbarMode('tops')
     }
+    loadWellInBackground(wellId)
+  }
+
+  function handleFocusFormationObject(wellId: string, formationId: string): void {
+    setSelectedFormationId(formationId)
+    setSelectedObject({ type: 'top-pick', wellId, formationId })
   }
 
   async function handleToggleCurve(wellId: string, mnemonic: string, nextValue: boolean): Promise<void> {
@@ -370,6 +400,138 @@ export function useDataManagerController() {
     window.alert('Rename is not implemented for the selected object yet.')
   }
 
+  async function handleRenameWell(wellId: string, currentName: string): Promise<void> {
+    const nextName = window.prompt('Rename well', currentName)?.trim()
+    if (!nextName || nextName === currentName) return
+
+    const response = await fetch(`/api/wells/${wellId}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ well_name: nextName }),
+    })
+    if (!response.ok) {
+      window.alert(await readError(response, `Failed to rename well '${currentName}' (${response.status})`))
+      return
+    }
+    await loadWellInventories()
+    if (well?.well_id === wellId) {
+      await refreshWell(wellId)
+    }
+  }
+
+  async function handleDeleteWell(wellId: string, wellName: string): Promise<void> {
+    if (!window.confirm(`Delete well "${wellName}"?`)) return
+
+    const response = await fetch(`/api/projects/wells/${wellId}`, { method: 'DELETE' })
+    if (!response.ok) {
+      window.alert(await readError(response, `Failed to delete well '${wellName}' (${response.status})`))
+      return
+    }
+
+    dropWellViewState(wellId)
+    setSelectedFormationId(null)
+    setSelectedObject(null)
+    selectTrack(null)
+    await refreshWell()
+  }
+
+  async function handleRenameFormation(wellId: string, formationId: string, currentName: string): Promise<void> {
+    const nextName = window.prompt('Rename top', currentName)?.trim()
+    if (!nextName || nextName === currentName) return
+
+    const response = await fetch(`/api/wells/${wellId}/formations/${formationId}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ name: nextName }),
+    })
+    if (!response.ok) {
+      window.alert(await readError(response, `Failed to rename top '${currentName}' (${response.status})`))
+      return
+    }
+
+    await loadWellInventories()
+    if (well?.well_id === wellId) {
+      await refreshWell(wellId)
+    }
+  }
+
+  async function handleDeleteFormation(wellId: string, formationId: string, name: string): Promise<void> {
+    if (!window.confirm(`Delete top "${name}"?`)) return
+
+    const response = await fetch(`/api/wells/${wellId}/formations/${formationId}`, { method: 'DELETE' })
+    if (!response.ok) {
+      window.alert(await readError(response, `Failed to delete top '${name}' (${response.status})`))
+      return
+    }
+
+    await loadWellInventories()
+    if (well?.well_id === wellId) {
+      await refreshWell(wellId)
+    }
+    if (selectedFormationId === formationId) {
+      setSelectedFormationId(null)
+      setSelectedObject(null)
+    }
+  }
+
+  async function handleDuplicateFormation(
+    wellId: string,
+    formation: { name: string; depth_md: number; active_strat_color: string | null },
+  ): Promise<void> {
+    const response = await fetch(`/api/wells/${wellId}/formations`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        name: `${formation.name} copy`,
+        depth_md: formation.depth_md,
+        color: formation.active_strat_color ?? '#9ca3af',
+      }),
+    })
+    if (!response.ok) {
+      window.alert(await readError(response, `Failed to duplicate top '${formation.name}' (${response.status})`))
+      return
+    }
+
+    await loadWellInventories()
+    if (well?.well_id === wellId) {
+      await refreshWell(wellId)
+    }
+  }
+
+  async function handleDeleteChartById(chartId: number, name: string, isBuiltin: boolean): Promise<void> {
+    if (isBuiltin) {
+      window.alert('Built-in ICS chart cannot be deleted.')
+      return
+    }
+    if (!window.confirm(`Delete strat chart "${name}"?`)) return
+    await deleteChart(chartId)
+    setSelectedObject(null)
+  }
+
+  async function handleDuplicateCompactionModel(modelId: number, name: string): Promise<void> {
+    const created = await createCompactionModel(`${name} copy`, modelId)
+    setSelectedObject({ type: 'compaction-model', modelId: created.id })
+  }
+
+  async function handleDeleteCompactionModelById(
+    modelId: number,
+    name: string,
+    isBuiltin: boolean,
+    isActive: boolean,
+  ): Promise<void> {
+    if (isBuiltin) {
+      window.alert('Built-in compaction model cannot be deleted.')
+      return
+    }
+    if (isActive) {
+      window.alert('Activate another compaction model first.')
+      return
+    }
+    if (!window.confirm(`Delete compaction model "${name}"?`)) return
+    await deleteCompactionModel(modelId)
+    setSelectedObject(null)
+  }
+
   function handleWellInspectorDraftChange(field: keyof typeof wellInspectorDraft, value: string): void {
     setWellInspectorDraft((current) => ({ ...current, [field]: value }))
   }
@@ -389,6 +551,11 @@ export function useDataManagerController() {
     deviationVisibilityByWellId,
     formations,
     handleCurveSettingUpdate,
+    handleFocusCurveObject,
+    handleFocusFormationObject,
+    handleFocusLasGroupObject,
+    handleFocusTopsGroupObject,
+    handleFocusWellObject,
     handleSaveWellInspector,
     handleSelectCurve,
     handleSelectFormation,
@@ -408,12 +575,25 @@ export function useDataManagerController() {
     onCreateCompactionModel: handleCreateCompactionModel,
     onDeleteChart: (chartId: number) => void deleteChart(chartId),
     onDeleteCompactionModel: (id: number) => void deleteCompactionModel(id).catch((e: unknown) => window.alert(String(e))),
+    onDeleteCompactionModelById: (id: number, name: string, isBuiltin: boolean, isActive: boolean) =>
+      void handleDeleteCompactionModelById(id, name, isBuiltin, isActive),
+    onDeleteFormation: (wellId: string, formationId: string, name: string) => void handleDeleteFormation(wellId, formationId, name),
+    onDeleteStratChartById: (chartId: number, name: string, isBuiltin: boolean) => void handleDeleteChartById(chartId, name, isBuiltin),
+    onDeleteWellById: (wellId: string, wellName: string) => void handleDeleteWell(wellId, wellName),
+    onDuplicateCompactionModel: (id: number, name: string) => void handleDuplicateCompactionModel(id, name),
+    onDuplicateFormation: (
+      wellId: string,
+      formation: { name: string; depth_md: number; active_strat_color: string | null },
+    ) => void handleDuplicateFormation(wellId, formation),
+    onRenameFormation: (wellId: string, formationId: string, currentName: string) =>
+      void handleRenameFormation(wellId, formationId, currentName),
+    onRenameSelectedObject: () => void handleRenameSelectedObject(),
+    onRenameWellById: (wellId: string, currentName: string) => void handleRenameWell(wellId, currentName),
     onSelectChart: (chartId: number) => setSelectedObject({ type: 'strat-chart', chartId }),
     onSelectCompactionModel: (modelId: number) => setSelectedObject({ type: 'compaction-model', modelId }),
     onSelectModelsTab: () => setActiveSidebarTab('models'),
     onSelectStratChartsTab: () => setActiveSidebarTab('strat-charts'),
     onSelectWellsTab: () => setActiveSidebarTab('wells'),
-    onRenameSelectedObject: () => void handleRenameSelectedObject(),
     selectedChart,
     selectedChartId: selectedObject?.type === 'strat-chart' ? selectedObject.chartId : null,
     selectedCompactionModel,

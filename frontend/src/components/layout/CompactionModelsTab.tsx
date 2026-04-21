@@ -5,8 +5,9 @@ interface CompactionModelsTabProps {
   selectedModelId: number | null
   onSelect: (modelId: number) => void
   onActivate: (modelId: number) => void
-  onDelete: (modelId: number) => void
+  onDeleteById: (modelId: number, name: string, isBuiltin: boolean, isActive: boolean) => void
   onCreate: () => void
+  onContextMenu: (event: React.MouseEvent, model: CompactionModel) => void
 }
 
 export function CompactionModelsTab({
@@ -14,8 +15,9 @@ export function CompactionModelsTab({
   selectedModelId,
   onSelect,
   onActivate,
-  onDelete,
+  onDeleteById,
   onCreate,
+  onContextMenu,
 }: CompactionModelsTabProps) {
   return (
     <div className="sidebar-panel__body">
@@ -25,6 +27,10 @@ export function CompactionModelsTab({
             key={model.id}
             className={`strat-chart-item ${model.is_active ? 'strat-chart-item--active' : ''} ${selectedModelId === model.id ? 'strat-chart-item--selected' : ''}`}
             onClick={() => onSelect(model.id)}
+            onContextMenu={(event) => {
+              onSelect(model.id)
+              onContextMenu(event, model)
+            }}
           >
             <label className="strat-chart-item__radio-label">
               <input
@@ -51,7 +57,7 @@ export function CompactionModelsTab({
               onClick={(e) => {
                 e.stopPropagation()
                 if (window.confirm(`Delete compaction model "${model.name}"?`)) {
-                  onDelete(model.id)
+                  onDeleteById(model.id, model.name, model.is_builtin, model.is_active)
                 }
               }}
             >

@@ -3,12 +3,13 @@ import type { StratChartInfo } from '@/types'
 interface StratChartTabProps {
   charts: StratChartInfo[]
   onActivate: (chartId: number) => void
-  onDelete: (chartId: number) => void
+  onDeleteById: (chartId: number, name: string, isBuiltin: boolean) => void
+  onContextMenu: (event: React.MouseEvent, chart: StratChartInfo) => void
   selectedChartId: number | null
   onSelect: (chartId: number) => void
 }
 
-export function StratChartTab({ charts, onActivate, onDelete, selectedChartId, onSelect }: StratChartTabProps) {
+export function StratChartTab({ charts, onActivate, onDeleteById, onContextMenu, selectedChartId, onSelect }: StratChartTabProps) {
   if (charts.length === 0) {
     return (
       <div className="sidebar-panel__body">
@@ -25,6 +26,10 @@ export function StratChartTab({ charts, onActivate, onDelete, selectedChartId, o
             key={chart.id}
             className={`strat-chart-item ${chart.is_active ? 'strat-chart-item--active' : ''} ${selectedChartId === chart.id ? 'strat-chart-item--selected' : ''}`}
             onClick={() => onSelect(chart.id)}
+            onContextMenu={(event) => {
+              onSelect(chart.id)
+              onContextMenu(event, chart)
+            }}
           >
             <label className="strat-chart-item__radio-label">
               <input
@@ -45,7 +50,7 @@ export function StratChartTab({ charts, onActivate, onDelete, selectedChartId, o
               onClick={(event) => {
                 event.stopPropagation()
                 if (window.confirm(`Delete strat chart "${chart.name}"?`)) {
-                  onDelete(chart.id)
+                  onDeleteById(chart.id, chart.name, chart.is_builtin)
                 }
               }}
             >

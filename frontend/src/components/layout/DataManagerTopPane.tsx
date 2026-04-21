@@ -2,7 +2,7 @@ import { CompactionModelsTab } from './CompactionModelsTab'
 import { StratChartTab } from './StratChartTab'
 import { WellDataPanel } from './WellDataPanel'
 import type { SelectedObject } from '@/stores/workspaceStore'
-import type { CompactionModel, StratChartInfo, WellInventory } from '@/types'
+import type { CompactionModel, FormationInventoryItem, StratChartInfo, WellInventory } from '@/types'
 
 interface DataManagerTopPaneProps {
   activeSidebarTab: 'wells' | 'models' | 'strat-charts'
@@ -11,9 +11,22 @@ interface DataManagerTopPaneProps {
   deviationVisibilityByWellId: Record<string, boolean>
   onActivateChart: (chartId: number) => void
   onActivateCompactionModel: (id: number) => void
+  onContextMenuCompactionModel: (event: React.MouseEvent, model: CompactionModel) => void
+  onContextMenuCurve: (event: React.MouseEvent, wellId: string, curve: { mnemonic: string; unit: string }) => void
+  onContextMenuDeviation: (event: React.MouseEvent, wellId: string) => void
+  onContextMenuFormation: (event: React.MouseEvent, wellId: string, formation: FormationInventoryItem) => void
+  onContextMenuLasGroup: (event: React.MouseEvent, wellId: string) => void
+  onContextMenuStratChart: (event: React.MouseEvent, chart: StratChartInfo) => void
+  onContextMenuTopsGroup: (event: React.MouseEvent, wellId: string) => void
+  onContextMenuWell: (event: React.MouseEvent, well: WellInventory) => void
   onCreateCompactionModel: () => void
-  onDeleteChart: (chartId: number) => void
-  onDeleteCompactionModel: (id: number) => void
+  onDeleteCompactionModelById: (id: number, name: string, isBuiltin: boolean, isActive: boolean) => void
+  onDeleteStratChartById: (chartId: number, name: string, isBuiltin: boolean) => void
+  onFocusCurveObject: (wellId: string, mnemonic: string) => void
+  onFocusFormationObject: (wellId: string, formationId: string) => void
+  onFocusLasGroupObject: (wellId: string) => void
+  onFocusTopsGroupObject: (wellId: string) => void
+  onFocusWellObject: (wellId: string) => void
   onSelectChart: (chartId: number) => void
   onSelectCompactionModel: (id: number) => void
   onSelectCurve: (wellId: string, mnemonic: string) => void | Promise<void>
@@ -46,9 +59,22 @@ export function DataManagerTopPane({
   deviationVisibilityByWellId,
   onActivateChart,
   onActivateCompactionModel,
+  onContextMenuCompactionModel,
+  onContextMenuCurve,
+  onContextMenuDeviation,
+  onContextMenuFormation,
+  onContextMenuLasGroup,
+  onContextMenuStratChart,
+  onContextMenuTopsGroup,
+  onContextMenuWell,
   onCreateCompactionModel,
-  onDeleteChart,
-  onDeleteCompactionModel,
+  onDeleteCompactionModelById,
+  onDeleteStratChartById,
+  onFocusCurveObject,
+  onFocusFormationObject,
+  onFocusLasGroupObject,
+  onFocusTopsGroupObject,
+  onFocusWellObject,
   onSelectChart,
   onSelectCompactionModel,
   onSelectCurve,
@@ -103,7 +129,8 @@ export function DataManagerTopPane({
         <StratChartTab
           charts={stratCharts}
           onActivate={onActivateChart}
-          onDelete={onDeleteChart}
+          onDeleteById={onDeleteStratChartById}
+          onContextMenu={onContextMenuStratChart}
           selectedChartId={selectedChartId}
           onSelect={onSelectChart}
         />
@@ -121,11 +148,22 @@ export function DataManagerTopPane({
           onToggleAllFormations={onToggleAllFormations}
           onToggleAllCurves={onToggleAllCurves}
           onToggleDeviation={onToggleDeviation}
+          onFocusCurveObject={onFocusCurveObject}
           onSelectFormation={onSelectFormation}
+          onFocusFormationObject={onFocusFormationObject}
+          onFocusLasGroupObject={onFocusLasGroupObject}
+          onFocusTopsGroupObject={onFocusTopsGroupObject}
+          onFocusWellObject={onFocusWellObject}
           selectedObject={selectedObject}
           onSelectLasGroup={onSelectLasGroup}
           onSelectCurve={onSelectCurve}
           onSelectTopsGroup={onSelectTopsGroup}
+          onContextMenuCurve={onContextMenuCurve}
+          onContextMenuDeviation={onContextMenuDeviation}
+          onContextMenuFormation={onContextMenuFormation}
+          onContextMenuLasGroup={onContextMenuLasGroup}
+          onContextMenuTopsGroup={onContextMenuTopsGroup}
+          onContextMenuWell={onContextMenuWell}
         />
       ) : (
         <CompactionModelsTab
@@ -133,8 +171,9 @@ export function DataManagerTopPane({
           selectedModelId={selectedCompactionModelId}
           onSelect={onSelectCompactionModel}
           onActivate={onActivateCompactionModel}
-          onDelete={onDeleteCompactionModel}
           onCreate={onCreateCompactionModel}
+          onDeleteById={onDeleteCompactionModelById}
+          onContextMenu={onContextMenuCompactionModel}
         />
       )}
     </section>
