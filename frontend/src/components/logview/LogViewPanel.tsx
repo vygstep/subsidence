@@ -1,7 +1,7 @@
 import { Fragment, useCallback, useEffect, useMemo, useRef, useState } from 'react'
 
 import { useSynchronizedScroll } from '@/hooks'
-import { useViewStore } from '@/stores'
+import { useViewStore, useWellDataStore } from '@/stores'
 import type { CurveData, FormationTop, TrackConfig } from '@/types'
 
 import { InteractionOverlay } from '../interaction'
@@ -66,7 +66,20 @@ export function LogViewPanel({ tracks, trackOrder, curves, formations, minDepth,
     setMouseClient(null)
   }, [setCursorDepth])
 
+  const visibleDepthRange = useViewStore((state) => state.visibleDepthRange)
+  const fetchCurvesLOD = useWellDataStore((state) => state.fetchCurvesLOD)
+
   useSynchronizedScroll(containerRef, minDepth, maxDepth)
+
+  // LOD: when zoomed out past 1 m/px, fetch downsampled curves for the visible window
+  useEffect(() => {
+    if (depthPerPixel <= 1.0) return
+    const resolution = Math.ceil(trackHeight / 2)
+    const timer = window.setTimeout(() => {
+      void fetchCurvesLOD(visibleDepthRange.min, visibleDepthRange.max, resolution)
+    }, 200)
+    return () => window.clearTimeout(timer)
+  }, [depthPerPixel, visibleDepthRange.min, visibleDepthRange.max, trackHeight, fetchCurvesLOD])
 
   useEffect(() => {
     const element = containerRef.current

@@ -79,6 +79,7 @@ export interface WellDataStore {
   deleteCompactionModel: (id: number) => Promise<void>
   fetchCompactionModelParams: (modelId: number) => Promise<LithologyParam[]>
   updateCompactionModelParam: (modelId: number, lithologyCode: string, patch: Partial<Pick<LithologyParam, 'density' | 'porosity_surface' | 'compaction_coeff'>>) => Promise<LithologyParam>
+  fetchCurvesLOD: (depthMin: number, depthMax: number, resolution: number) => Promise<void>
 }
 
 function toFloat32Array(values: number[]): Float32Array {
@@ -442,6 +443,26 @@ export const useWellDataStore = create<WellDataStore>((set, get) => ({
       throw new Error(await readError(response, `Failed to update param (${response.status})`))
     }
     return (await response.json()) as LithologyParam
+  },
+  async fetchCurvesLOD(depthMin, depthMax, resolution) {
+    const wellId = get().well?.well_id
+    if (!wellId) return
+    const url = `/api/wells/${wellId}/curves?depth_min=${depthMin}&depth_max=${depthMax}&resolution=${resolution}`
+    const response = await fetch(url)
+    if (!response.ok) return
+    const lodCurves = (await response.json()) as WellResponse['curves']
+    const lodByMnemonic = new Map(lodCurves.map((c) => [c.mnemonic, c]))
+    set((state) => ({
+      curves: state.curves.map((curve) => {
+        const lod = lodByMnemonic.get(curve.mnemonic)
+        if (!lod) return curve
+        return {
+          ...curve,
+          depths: toFloat32Array(lod.depths),
+          values: toFloat32Array(lod.values),
+        }
+      }),
+    }))
   },
   async linkFormationToChart(formationId, chartId, stratUnitId) {
     const wellId = get().well?.well_id

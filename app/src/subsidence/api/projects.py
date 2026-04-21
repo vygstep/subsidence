@@ -37,6 +37,7 @@ from subsidence.data import (
     load_curve_alias_rules,
     load_lithology_entries,
 )
+from subsidence.data.dict_resolver import resolve_curve_alias
 from subsidence.data.schema import CurveDictEntry, CurveMetadata, FormationTopModel, LithologyDictEntry, ProjectMeta, VisualConfig, WellModel
 
 router = APIRouter(tags=['projects'])
@@ -661,6 +662,29 @@ def list_curve_rules(request: Request) -> list[CurveRuleResponse]:
     with manager.get_session() as session:
         rows = load_curve_alias_rules(session)
         return [CurveRuleResponse(id=row.id, scope=row.scope, pattern=row.pattern, is_regex=row.is_regex, priority=row.priority, family_code=row.family_code, canonical_mnemonic=row.canonical_mnemonic, canonical_unit=row.canonical_unit, is_active=row.is_active) for row in rows]
+
+
+class CurveMatchResponse(BaseModel):
+    mnemonic: str
+    family_code: str | None
+    canonical_mnemonic: str | None
+    canonical_unit: str | None
+    matched: bool
+
+
+@router.get('/dictionary/curves/match', response_model=CurveMatchResponse)
+def match_curve(mnemonic: str, request: Request) -> CurveMatchResponse:
+    manager = _require_open_project(request)
+    with manager.get_session() as session:
+        rules = load_curve_alias_rules(session)
+        result = resolve_curve_alias(mnemonic, rules)
+    return CurveMatchResponse(
+        mnemonic=mnemonic,
+        family_code=result.family_code,
+        canonical_mnemonic=result.canonical_mnemonic,
+        canonical_unit=result.canonical_unit,
+        matched=result.matched,
+    )
 
 
 @router.post('/dictionary/curves', response_model=CurveRuleResponse)

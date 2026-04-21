@@ -2,12 +2,14 @@ from __future__ import annotations
 
 import math
 
-from fastapi import APIRouter, HTTPException, Request
+import numpy as np
+from fastapi import APIRouter, HTTPException, Query, Request
 from pydantic import BaseModel
 from sqlalchemy import select
 from sqlalchemy.orm import selectinload
 
 from subsidence.data import UpdateWell, load_curves_from_parquet
+from subsidence.data.lttb import lttb
 from subsidence.data.schema import CurveMetadata, DeviationSurveyModel, FormationStratLink, FormationTopModel, WellModel
 
 router = APIRouter(tags=['wells'])
@@ -300,6 +302,62 @@ def get_well(well_id: str, request: Request) -> WellResponse:
             curves=curves,
             formations=formations,
         )
+
+
+@router.get('/wells/{well_id}/curves', response_model=list[CurveResponse])
+def get_curves_lod(
+    well_id: str,
+    request: Request,
+    depth_min: float = Query(...),
+    depth_max: float = Query(...),
+    resolution: int = Query(..., ge=10),
+) -> list[CurveResponse]:
+    manager = _require_open_project(request)
+    with manager.get_session() as session:
+        well = session.get(WellModel, well_id)
+        if well is None:
+            raise HTTPException(status_code=404, detail=f'Well not found: {well_id}')
+
+        curve_rows = list(
+            session.scalars(
+                select(CurveMetadata)
+                .where(CurveMetadata.well_id == well.id)
+                .order_by(CurveMetadata.id.asc())
+            )
+        )
+        if not curve_rows:
+            return []
+
+        # 5% buffer so curves don't clip at edge of viewport
+        span = depth_max - depth_min
+        buf = span * 0.05
+        lo, hi = depth_min - buf, depth_max + buf
+
+        curve_map = load_curves_from_parquet(manager.project_path, curve_rows[0].data_uri)
+        results: list[CurveResponse] = []
+        for row in curve_rows:
+            entry = curve_map.get(row.mnemonic)
+            if entry is None:
+                continue
+            depths, values = entry
+            # Clip to buffered window
+            mask = (depths >= lo) & (depths <= hi)
+            d_clip = depths[mask]
+            v_clip = values[mask]
+            if len(d_clip) == 0:
+                continue
+            # LTTB downsample
+            idx = lttb(d_clip.astype(np.float64), v_clip.astype(np.float64), resolution)
+            results.append(
+                CurveResponse(
+                    mnemonic=row.mnemonic,
+                    unit=row.unit,
+                    depths=d_clip[idx].tolist(),
+                    values=v_clip[idx].tolist(),
+                    null_value=row.null_value,
+                )
+            )
+        return results
 
 
 @router.patch('/wells/{well_id}', response_model=WellResponse)
