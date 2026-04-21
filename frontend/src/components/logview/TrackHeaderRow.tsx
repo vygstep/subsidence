@@ -20,7 +20,7 @@ export function TrackHeaderRow({ tracks, trackOrder }: TrackHeaderRowProps) {
   const selectTrack = useViewStore((state) => state.selectTrack)
   const updateWellViewState = useWorkspaceStore((state) => state.updateWellViewState)
   const activeWellId = useWellDataStore((state) => state.well?.well_id ?? null)
-  const depthReference = useWellDataStore((state) => state.well?.depth_reference ?? 'MD')
+  const depthType = useViewStore((state) => state.depthType)
   const depthWidth = trackWidths[DEPTH_TRACK_ID] ?? DEFAULT_DEPTH_TRACK_WIDTH
   const formationWidth = trackWidths[FORMATION_TRACK_ID] ?? DEFAULT_FORMATION_COLUMN_WIDTH
   const [draggedTrackId, setDraggedTrackId] = useState<string | null>(null)
@@ -93,7 +93,7 @@ export function TrackHeaderRow({ tracks, trackOrder }: TrackHeaderRowProps) {
                 onClick={() => selectTrack(DEPTH_TRACK_ID)}
                 {...sharedDragProps}
               >
-                {depthReference}
+                {depthType}
               </button>
               <div className="track-header-row__resize-spacer" style={{ width: TRACK_RESIZE_HANDLE_WIDTH }} aria-hidden="true" />
             </div>
