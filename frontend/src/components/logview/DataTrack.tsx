@@ -76,8 +76,31 @@ function clipCurve(curve: CurveData, minDepth: number, maxDepth: number): CurveD
   }
 }
 
+function bisectLeft(arr: Float32Array, target: number): number {
+  let lo = 0
+  let hi = arr.length
+  while (lo < hi) {
+    const mid = (lo + hi) >>> 1
+    if (arr[mid] < target) lo = mid + 1
+    else hi = mid
+  }
+  return lo
+}
+
+function interpolateAtDepth(depths: Float32Array, values: Float32Array, target: number): number | null {
+  const idx = bisectLeft(depths, target)
+  if (idx === 0 || idx >= depths.length) return null
+  const t = (target - depths[idx - 1]) / (depths[idx] - depths[idx - 1])
+  const v = values[idx - 1] + t * (values[idx] - values[idx - 1])
+  return Number.isFinite(v) ? v : null
+}
+
 export function DataTrack({ config, curves, width, height }: DataTrackProps) {
   const visibleDepthRange = useViewStore((state) => state.visibleDepthRange)
+  const selectedElementId = useViewStore((state) => state.selectedElementId)
+  const selectedElementType = useViewStore((state) => state.selectedElementType)
+  const selectElement = useViewStore((state) => state.selectElement)
+  const clearSelection = useViewStore((state) => state.clearSelection)
 
   const visibleCurves = useMemo<VisibleCurve[]>(() => {
     const requestedMnemonics = new Map(config.curves.map((curve) => [curve.mnemonic, curve]))
@@ -213,7 +236,8 @@ export function DataTrack({ config, curves, width, height }: DataTrackProps) {
           return
         }
 
-        drawCurve(ctx, curve.depths, curve.values, depthScale, valueScale, style, curve.null_value)
+        const isSelected = selectedElementType === 'curve' && selectedElementId === style.mnemonic
+        drawCurve(ctx, curve.depths, curve.values, depthScale, valueScale, style, curve.null_value, isSelected)
       })
     },
     [
@@ -225,8 +249,37 @@ export function DataTrack({ config, curves, width, height }: DataTrackProps) {
       config.showGrid,
       curveScales,
       depthScale,
+      selectedElementId,
+      selectedElementType,
     ],
   )
 
-  return <canvas ref={canvasRef} className="data-track" style={{ width, height }} />
+  function handleClick(e: React.MouseEvent<HTMLCanvasElement>) {
+    const rect = e.currentTarget.getBoundingClientRect()
+    const clickX = e.clientX - rect.left
+    const clickY = e.clientY - rect.top
+    const { scrollDepth, depthPerPixel } = useViewStore.getState()
+    const depth = scrollDepth + clickY * depthPerPixel
+
+    let closest: { mnemonic: string; dist: number } | null = null
+    for (const { curve, style } of clippedCurves) {
+      const valueScale = curveScales.get(style.mnemonic)
+      if (!valueScale) continue
+      const value = interpolateAtDepth(curve.depths, curve.values, depth)
+      if (value === null) continue
+      const pixelX = valueScale(value)
+      const dist = Math.abs(clickX - pixelX)
+      if (dist <= 5 && (!closest || dist < closest.dist)) {
+        closest = { mnemonic: style.mnemonic, dist }
+      }
+    }
+
+    if (closest) {
+      selectElement(closest.mnemonic, 'curve')
+    } else {
+      clearSelection()
+    }
+  }
+
+  return <canvas ref={canvasRef} className="data-track" style={{ width, height }} onClick={handleClick} />
 }

@@ -25,6 +25,7 @@ function App() {
 
   const depthPerPixel = useViewStore((state) => state.depthPerPixel)
   const selectTrack = useViewStore((state) => state.selectTrack)
+  const clearSelection = useViewStore((state) => state.clearSelection)
   const trackWidths = useViewStore((state) => state.trackWidths)
   const resetVisualConfig = useViewStore((state) => state.resetVisualConfig)
 
@@ -46,6 +47,12 @@ function App() {
     const timer = window.setInterval(() => void pollStatus(), 2000)
     return () => window.clearInterval(timer)
   }, [pollStatus])
+
+  useEffect(() => {
+    const onKeyDown = (e: KeyboardEvent) => { if (e.key === 'Escape') clearSelection() }
+    window.addEventListener('keydown', onKeyDown)
+    return () => window.removeEventListener('keydown', onKeyDown)
+  }, [clearSelection])
 
   useEffect(() => {
     if (!isProjectOpen) {

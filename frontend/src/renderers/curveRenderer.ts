@@ -25,6 +25,7 @@ export function drawCurve(
   valueScale: ScaleLinear<number, number> | ScaleLogarithmic<number, number>,
   style: CurveStyle,
   nullValue: number | null = null,
+  isSelected = false,
 ): void {
   if (depths.length === 0 || values.length === 0) {
     return
@@ -32,8 +33,12 @@ export function drawCurve(
 
   ctx.save()
   ctx.strokeStyle = style.color
-  ctx.lineWidth = style.lineWidth
+  ctx.lineWidth = isSelected ? style.lineWidth * 2 : style.lineWidth
   ctx.setLineDash(lineDash(style.lineStyle))
+  if (isSelected) {
+    ctx.shadowBlur = 8
+    ctx.shadowColor = style.color
+  }
 
   let path = new Path2D()
   let hasSegment = false

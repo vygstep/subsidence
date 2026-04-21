@@ -10,18 +10,24 @@ interface VisualConfigPayload {
   trackWidths?: Record<string, number>
 }
 
+export type SelectedElementType = 'curve' | 'track' | 'formation'
+
 export interface ViewStore {
   scrollDepth: number
   depthPerPixel: number
   visibleDepthRange: VisibleDepthRange
   cursorDepth: number | null
   selectedTrackId: string | null
+  selectedElementId: string | null
+  selectedElementType: SelectedElementType | null
   trackWidths: Record<string, number>
   viewportHeight: number
   setScroll: (depth: number) => void
   setScale: (dpp: number) => void
   setCursorDepth: (depth: number | null) => void
   selectTrack: (trackId: string | null) => void
+  selectElement: (id: string, type: SelectedElementType) => void
+  clearSelection: () => void
   setViewportHeight: (height: number) => void
   setTrackWidth: (id: string, width: number) => void
   applyVisualConfig: (config: VisualConfigPayload) => void
@@ -56,6 +62,8 @@ export const useViewStore = create<ViewStore>((set) => ({
   visibleDepthRange: deriveVisibleDepthRange(initialScrollDepth, initialDepthPerPixel, initialViewportHeight),
   cursorDepth: null,
   selectedTrackId: null,
+  selectedElementId: null,
+  selectedElementType: null,
   trackWidths: {},
   viewportHeight: initialViewportHeight,
   setScroll(depth) {
@@ -74,7 +82,17 @@ export const useViewStore = create<ViewStore>((set) => ({
     set({ cursorDepth })
   },
   selectTrack(selectedTrackId) {
-    set({ selectedTrackId })
+    set({ selectedTrackId, selectedElementId: selectedTrackId, selectedElementType: selectedTrackId ? 'track' : null })
+  },
+  selectElement(id, type) {
+    set({
+      selectedElementId: id,
+      selectedElementType: type,
+      selectedTrackId: type === 'track' ? id : null,
+    })
+  },
+  clearSelection() {
+    set({ selectedElementId: null, selectedElementType: null, selectedTrackId: null })
   },
   setViewportHeight(viewportHeight) {
     set((state) => ({
