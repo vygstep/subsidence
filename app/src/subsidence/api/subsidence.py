@@ -1,6 +1,8 @@
 from __future__ import annotations
 
-from fastapi import APIRouter, HTTPException, Request
+import json
+
+from fastapi import APIRouter, HTTPException, Request, WebSocket, WebSocketDisconnect
 from pydantic import BaseModel
 from sqlalchemy import select
 
@@ -33,13 +35,11 @@ def _require_open_project(request: Request):
     return manager
 
 
-@router.post('/wells/{well_id}/subsidence', response_model=list[SubsidenceResultResponse])
-def calculate_subsidence(well_id: str, request: Request) -> list[SubsidenceResultResponse]:
-    manager = _require_open_project(request)
+def _compute_subsidence(manager, well_id: str) -> list[SubsidenceResultResponse]:
     with manager.get_session() as session:
         well = session.get(WellModel, well_id)
         if well is None:
-            raise HTTPException(status_code=404, detail=f'Well not found: {well_id}')
+            raise ValueError(f'Well not found: {well_id}')
 
         formations = session.scalars(
             select(FormationTopModel)
@@ -57,8 +57,6 @@ def calculate_subsidence(well_id: str, request: Request) -> list[SubsidenceResul
             for r in litho_rows
         }
 
-        # Derive base depth for each formation from the next formation's top.
-        # The deepest formation uses well TD or a 1 m sentinel if TD is unknown.
         td_m = well.td_md if well.td_md is not None else 0.0
         inputs: list[FormationInput] = []
         for idx, f in enumerate(formations):
@@ -70,7 +68,7 @@ def calculate_subsidence(well_id: str, request: Request) -> list[SubsidenceResul
             inputs.append(FormationInput(
                 name=f.name,
                 color=f.color,
-                lithology='',  # per-formation lithology added in Step 6
+                lithology='',
                 age_top_ma=f.age_top_ma,
                 age_base_ma=f.age_base_ma,
                 current_top_m=f.depth_md,
@@ -78,12 +76,6 @@ def calculate_subsidence(well_id: str, request: Request) -> list[SubsidenceResul
             ))
 
         results = backstrip(inputs, litho_params)
-
-    if not results:
-        raise HTTPException(
-            status_code=400,
-            detail='Fewer than 2 formations have both ages assigned',
-        )
 
     return [
         SubsidenceResultResponse(
@@ -97,3 +89,45 @@ def calculate_subsidence(well_id: str, request: Request) -> list[SubsidenceResul
         )
         for r in results
     ]
+
+
+@router.post('/wells/{well_id}/subsidence', response_model=list[SubsidenceResultResponse])
+def calculate_subsidence(well_id: str, request: Request) -> list[SubsidenceResultResponse]:
+    manager = _require_open_project(request)
+    results = _compute_subsidence(manager, well_id)
+    if not results:
+        raise HTTPException(
+            status_code=400,
+            detail='Fewer than 2 formations have both ages assigned',
+        )
+    return results
+
+
+@router.websocket('/ws/recalculate')
+async def ws_recalculate(websocket: WebSocket) -> None:
+    manager = websocket.app.state.project_manager
+    await websocket.accept()
+    try:
+        while True:
+            raw = await websocket.receive_text()
+            data = json.loads(raw)
+            well_id = data.get('well_id')
+            if not well_id:
+                await websocket.send_json({'status': 'error', 'message': 'well_id required'})
+                continue
+
+            if not manager.is_open:
+                await websocket.send_json({'status': 'error', 'message': 'No project is open'})
+                continue
+
+            await websocket.send_json({'status': 'computing', 'progress': 0.0})
+            try:
+                results = _compute_subsidence(manager, well_id)
+                await websocket.send_json({
+                    'status': 'complete',
+                    'results': [r.model_dump() for r in results],
+                })
+            except Exception as exc:
+                await websocket.send_json({'status': 'error', 'message': str(exc)})
+    except WebSocketDisconnect:
+        pass
