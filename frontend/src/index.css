@@ -938,6 +938,66 @@ body.is-resizing {
   user-select: none;
 }
 
+.log-view-panel__workspace {
+  display: flex;
+  flex: 1;
+  min-height: 0;
+}
+
+.log-view-panel__content {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  min-width: 0;
+  min-height: 0;
+}
+
+.well-viewer-toolbar {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  width: 25px;
+  padding: 6px 2px;
+  border-right: 1px solid #d9e2ec;
+  background: #f8fafc;
+  flex-shrink: 0;
+}
+
+.well-viewer-toolbar__button {
+  border: 1px solid #d6e0eb;
+  background: #ffffff;
+  color: #314155;
+  border-radius: 5px;
+  width: 20px;
+  height: 56px;
+  padding: 0;
+  font-size: 10px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.well-viewer-toolbar__button-label {
+  display: inline-block;
+  transform: rotate(-90deg);
+  white-space: nowrap;
+  transform-origin: center;
+}
+
+.well-viewer-toolbar__button:hover {
+  background: #eff6ff;
+  border-color: #93c5fd;
+}
+
+.well-viewer-toolbar__button--active {
+  background: #dbeafe;
+  border-color: #60a5fa;
+  color: #1d4ed8;
+}
+
 .log-view-panel__tracks {
   position: relative;
   display: flex;

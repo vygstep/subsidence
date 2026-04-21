@@ -11,6 +11,7 @@ import { FormationColumn } from './FormationColumn'
 import { TrackHeaderRow } from './TrackHeaderRow'
 import { DEPTH_TRACK_ID, FORMATION_TRACK_ID, TrackResizeHandle } from './TrackResizeHandle'
 import { WellOverviewMinimap } from './WellOverviewMinimap'
+import { WellViewerToolbar } from './WellViewerToolbar'
 
 interface LogViewPanelProps {
   tracks: TrackConfig[]
@@ -34,6 +35,9 @@ export function LogViewPanel({ tracks, trackOrder, curves, formations, minDepth,
   const depthPerPixel = useViewStore((state) => state.depthPerPixel)
   const cursorDepth = useViewStore((state) => state.cursorDepth)
   const setCursorDepth = useViewStore((state) => state.setCursorDepth)
+  const overviewVisible = useViewStore((state) => state.overviewVisible)
+  const curveTooltipVisible = useViewStore((state) => state.curveTooltipVisible)
+  const interactionMode = useViewStore((state) => state.interactionMode)
 
   const depthWidth = trackWidths[DEPTH_TRACK_ID] ?? DEFAULT_DEPTH_WIDTH
   const formationWidth = trackWidths[FORMATION_TRACK_ID] ?? DEFAULT_FORMATION_WIDTH
@@ -81,48 +85,55 @@ export function LogViewPanel({ tracks, trackOrder, curves, formations, minDepth,
 
   return (
     <div ref={containerRef} className="log-view-panel">
-      <TrackHeaderRow tracks={tracks} trackOrder={trackOrder} />
-      <div className="log-view-panel__tracks" onMouseMove={handleMouseMove} onMouseLeave={handleMouseLeave}>
-        {trackOrder.map((trackId) => {
-          if (trackId === DEPTH_TRACK_ID) {
-            return (
-              <Fragment key={trackId}>
-                <DepthTrack height={trackHeight} width={depthWidth} />
-                <TrackResizeHandle trackId={DEPTH_TRACK_ID} initialWidth={depthWidth} />
-              </Fragment>
-            )
-          }
+      <div className="log-view-panel__workspace">
+        <WellViewerToolbar />
+        <div className="log-view-panel__content">
+          <TrackHeaderRow tracks={tracks} trackOrder={trackOrder} />
+          <div className="log-view-panel__tracks" onMouseMove={handleMouseMove} onMouseLeave={handleMouseLeave}>
+            {trackOrder.map((trackId) => {
+              if (trackId === DEPTH_TRACK_ID) {
+                return (
+                  <Fragment key={trackId}>
+                    <DepthTrack height={trackHeight} width={depthWidth} />
+                    <TrackResizeHandle trackId={DEPTH_TRACK_ID} initialWidth={depthWidth} />
+                  </Fragment>
+                )
+              }
 
-          if (trackId === FORMATION_TRACK_ID) {
-            return (
-              <Fragment key={trackId}>
-                <FormationColumn formations={formations} height={trackHeight} maxDepth={maxDepth} width={formationWidth} />
-                <TrackResizeHandle trackId={FORMATION_TRACK_ID} initialWidth={formationWidth} />
-              </Fragment>
-            )
-          }
+              if (trackId === FORMATION_TRACK_ID) {
+                return (
+                  <Fragment key={trackId}>
+                    <FormationColumn formations={formations} height={trackHeight} maxDepth={maxDepth} width={formationWidth} />
+                    <TrackResizeHandle trackId={FORMATION_TRACK_ID} initialWidth={formationWidth} />
+                  </Fragment>
+                )
+              }
 
-          const track = tracksById.get(trackId)
-          if (!track) {
-            return null
-          }
-          const width = trackWidths[track.id] ?? track.width
-          return (
-            <Fragment key={track.id}>
-              <DataTrack config={track} curves={curves} width={width} height={trackHeight} />
-              <TrackResizeHandle trackId={track.id} initialWidth={width} />
-            </Fragment>
-          )
-        })}
-        <InteractionOverlay
-          height={trackHeight}
-          formations={formations}
-          curves={curves}
-          depthToPixel={depthToPixel}
-          cursorDepth={cursorDepth}
-          mouseClient={mouseClient}
-        />
-        <WellOverviewMinimap height={trackHeight} />
+              const track = tracksById.get(trackId)
+              if (!track) {
+                return null
+              }
+              const width = trackWidths[track.id] ?? track.width
+              return (
+                <Fragment key={track.id}>
+                  <DataTrack config={track} curves={curves} width={width} height={trackHeight} />
+                  <TrackResizeHandle trackId={track.id} initialWidth={width} />
+                </Fragment>
+              )
+            })}
+            <InteractionOverlay
+              height={trackHeight}
+              formations={formations}
+              curves={curves}
+              depthToPixel={depthToPixel}
+              cursorDepth={cursorDepth}
+              mouseClient={mouseClient}
+              tooltipVisible={curveTooltipVisible}
+              topsEditable={interactionMode === 'edit-tops'}
+            />
+            {overviewVisible ? <WellOverviewMinimap height={trackHeight} /> : null}
+          </div>
+        </div>
       </div>
     </div>
   )

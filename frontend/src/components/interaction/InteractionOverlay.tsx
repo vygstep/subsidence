@@ -11,6 +11,8 @@ interface InteractionOverlayProps {
   depthToPixel: (depth: number) => number
   cursorDepth: number | null
   mouseClient: { x: number; y: number } | null
+  tooltipVisible: boolean
+  topsEditable: boolean
 }
 
 export function InteractionOverlay({
@@ -20,6 +22,8 @@ export function InteractionOverlay({
   depthToPixel,
   cursorDepth,
   mouseClient,
+  tooltipVisible,
+  topsEditable,
 }: InteractionOverlayProps) {
   return (
     <>
@@ -38,7 +42,7 @@ export function InteractionOverlay({
         {formations.map((formation) => {
           const y = depthToPixel(formation.depth_md)
           if (y < -30 || y > height + 30) return null
-          return <FormationTopLine key={formation.id} formation={formation} yPosition={y} />
+          return <FormationTopLine key={formation.id} formation={formation} yPosition={y} editable={topsEditable} />
         })}
         {cursorDepth !== null && <DepthCursor yPosition={depthToPixel(cursorDepth)} />}
       </svg>
@@ -48,7 +52,7 @@ export function InteractionOverlay({
           y={mouseClient.y}
           depth={cursorDepth}
           curves={curves}
-          visible
+          visible={tooltipVisible}
         />
       )}
     </>

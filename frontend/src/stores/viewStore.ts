@@ -18,6 +18,9 @@ export interface ViewStore {
   depthPerPixel: number
   visibleDepthRange: VisibleDepthRange
   cursorDepth: number | null
+  overviewVisible: boolean
+  curveTooltipVisible: boolean
+  interactionMode: 'view' | 'edit-tops'
   selectedTrackId: string | null
   selectedElementId: string | null
   selectedElementType: SelectedElementType | null
@@ -27,6 +30,9 @@ export interface ViewStore {
   setScroll: (depth: number) => void
   setScale: (dpp: number) => void
   setCursorDepth: (depth: number | null) => void
+  setOverviewVisible: (visible: boolean) => void
+  setCurveTooltipVisible: (visible: boolean) => void
+  setInteractionMode: (mode: 'view' | 'edit-tops') => void
   selectTrack: (trackId: string | null) => void
   selectElement: (id: string, type: SelectedElementType) => void
   clearSelection: () => void
@@ -68,6 +74,9 @@ export const useViewStore = create<ViewStore>((set) => ({
   depthPerPixel: initialDepthPerPixel,
   visibleDepthRange: deriveVisibleDepthRange(initialScrollDepth, initialDepthPerPixel, initialViewportHeight),
   cursorDepth: null,
+  overviewVisible: true,
+  curveTooltipVisible: true,
+  interactionMode: 'view',
   selectedTrackId: null,
   selectedElementId: null,
   selectedElementType: null,
@@ -88,6 +97,15 @@ export const useViewStore = create<ViewStore>((set) => ({
   },
   setCursorDepth(cursorDepth) {
     set({ cursorDepth })
+  },
+  setOverviewVisible(overviewVisible) {
+    set({ overviewVisible })
+  },
+  setCurveTooltipVisible(curveTooltipVisible) {
+    set({ curveTooltipVisible })
+  },
+  setInteractionMode(interactionMode) {
+    set({ interactionMode })
   },
   selectTrack(selectedTrackId) {
     set({ selectedTrackId, selectedElementId: selectedTrackId, selectedElementType: selectedTrackId ? 'track' : null })

@@ -5,6 +5,7 @@ import type { FormationTop } from '@/types'
 
 interface UseFormationDragOptions {
   formation: FormationTop
+  enabled?: boolean
   onDepthChange: (depth: number) => void
   onDragEnd: (finalDepth: number) => void
   onDragStart?: () => void
@@ -19,6 +20,7 @@ interface UseFormationDragResult {
 
 export function useFormationDrag({
   formation,
+  enabled = true,
   onDepthChange,
   onDragEnd,
   onDragStart,
@@ -38,6 +40,7 @@ export function useFormationDrag({
 
   const onPointerDown = useCallback(
     (e: React.PointerEvent) => {
+      if (!enabled) return
       if (formation.is_locked) return
       onDragStart?.()
       e.currentTarget.setPointerCapture(e.pointerId)
@@ -69,7 +72,7 @@ export function useFormationDrag({
       window.addEventListener('pointermove', handlePointerMove)
       window.addEventListener('pointerup', handlePointerUp)
     },
-    [formation.is_locked, formation.depth_md, onDepthChange, onDragEnd, onDragStart],
+    [enabled, formation.is_locked, formation.depth_md, onDepthChange, onDragEnd, onDragStart],
   )
 
   return { isDragging, dragHandlers: { onPointerDown } }

@@ -7,12 +7,13 @@ import type { FormationTop } from '@/types'
 interface FormationTopLineProps {
   formation: FormationTop
   yPosition: number
+  editable: boolean
 }
 
 const LABEL_HEIGHT = 18
 const LABEL_PADDING = 5
 
-export function FormationTopLine({ formation, yPosition }: FormationTopLineProps) {
+export function FormationTopLine({ formation, yPosition, editable }: FormationTopLineProps) {
   const updateFormationDepth = useWellDataStore((state) => state.updateFormationDepth)
   const wellId = useWellDataStore((state) => state.well?.well_id)
   const setSelectedFormationId = useWorkspaceStore((state) => state.setSelectedFormationId)
@@ -40,6 +41,7 @@ export function FormationTopLine({ formation, yPosition }: FormationTopLineProps
 
   const { isDragging, dragHandlers } = useFormationDrag({
     formation,
+    enabled: editable,
     onDragStart: handleDragStart,
     onDepthChange: handleDepthChange,
     onDragEnd: handleDragEnd,
@@ -47,7 +49,7 @@ export function FormationTopLine({ formation, yPosition }: FormationTopLineProps
 
   const color = formation.active_strat_color ?? formation.color
   const displayY = localY !== null ? localY : yPosition
-  const cursor = formation.is_locked ? 'not-allowed' : 'ns-resize'
+  const cursor = !editable ? 'default' : formation.is_locked ? 'not-allowed' : 'ns-resize'
   const strokeOpacity = isDragging ? 1.0 : 0.75
 
   return (
