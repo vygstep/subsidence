@@ -205,6 +205,8 @@ export const useWellDataStore = create<WellDataStore>((set, get) => ({
       error: null,
     }))
     await get().loadWellInventories()
+    const { useComputedStore } = await import('./computedStore')
+    useComputedStore.getState().triggerRecalculation()
   },
   async updateFormation(formationId, patch) {
     const wellId = get().well?.well_id
@@ -276,6 +278,8 @@ export const useWellDataStore = create<WellDataStore>((set, get) => ({
           await get().loadWellInventories()
           const { useProjectStore } = await import('./projectStore')
           await useProjectStore.getState().pollStatus()
+          const { useComputedStore } = await import('./computedStore')
+          useComputedStore.getState().triggerRecalculation()
         })
         .catch((error) => {
           set({ error: error instanceof Error ? error.message : 'Unknown error' })
@@ -305,6 +309,8 @@ export const useWellDataStore = create<WellDataStore>((set, get) => ({
       error: null,
     }))
     await get().loadWellInventories()
+    const { useComputedStore } = await import('./computedStore')
+    useComputedStore.getState().triggerRecalculation()
   },
   async loadStratCharts() {
     const response = await fetch('/api/strat-charts')

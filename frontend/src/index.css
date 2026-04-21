@@ -90,6 +90,11 @@ textarea {
   font-size: 9px;
 }
 
+.status-bar__computing {
+  color: #93c5fd;
+  font-style: italic;
+}
+
 .app-topbar {
   flex-shrink: 0;
   display: flex;
