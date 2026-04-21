@@ -4,6 +4,7 @@ import csv
 import hashlib
 import json
 import math
+import re
 from pathlib import Path
 from uuid import uuid4
 
@@ -26,6 +27,7 @@ DEFAULT_WELL_X = 0.0
 DEFAULT_WELL_Y = 0.0
 DEFAULT_WELL_KB = 10.0
 DEFAULT_WELL_CRS = 'unset'
+_CSV_EXCLUDED_COLUMNS = {'well_name'}
 
 
 def _sha256(path: Path) -> str:
@@ -63,6 +65,22 @@ def _header_float(las: lasio.LASFile, name: str, default: float | None = None) -
 def _normalize_well_name(name: str | None) -> str:
     value = (name or '').strip()
     return value or DEFAULT_WELL_NAME
+
+
+def _header_curve_parts(column_name: str) -> tuple[str, str]:
+    raw = column_name.strip()
+    if not raw:
+        return '', ''
+
+    bracket_match = re.match(r'^(?P<mnemonic>.+?)\s*\[(?P<unit>[^\]]+)\]\s*$', raw)
+    if bracket_match:
+        return bracket_match.group('mnemonic').strip(), bracket_match.group('unit').strip()
+
+    paren_match = re.match(r'^(?P<mnemonic>.+?)\s*\((?P<unit>[^)]+)\)\s*$', raw)
+    if paren_match:
+        return paren_match.group('mnemonic').strip(), paren_match.group('unit').strip()
+
+    return raw, ''
 
 
 def _normalized_crs(crs: str | None) -> str:
@@ -193,7 +211,7 @@ def _read_csv_rows(path: Path | str) -> tuple[list[str], list[dict[str, str]]]:
         handle.seek(0)
         delimiter = ','
         try:
-            dialect = csv.Sniffer().sniff(sample, delimiters=',;')
+            dialect = csv.Sniffer().sniff(sample, delimiters=',;\t')
             delimiter = dialect.delimiter
         except csv.Error:
             pass
@@ -239,6 +257,99 @@ def _resolve_well(session: Session, well_id: str) -> WellModel:
     if well is None:
         raise ValueError(f'Well not found: {well_id}')
     return well
+
+
+def _resolve_or_create_well_for_logs(
+    session: Session,
+    rows: list[dict[str, str]],
+    *,
+    well_id: str | None,
+    td: float | None,
+) -> WellModel:
+    if well_id:
+        return _resolve_well(session, well_id)
+
+    first_name = _extract_text(rows[0], 'well_name') if rows else None
+    return create_empty_well(session, name=first_name or DEFAULT_WELL_NAME, td=td, kb=DEFAULT_WELL_KB)
+
+
+def _detect_log_csv_depth_column(fieldnames: list[str], explicit_depth_column: str | None = None) -> str:
+    if explicit_depth_column:
+        candidate = explicit_depth_column.strip()
+        if candidate in fieldnames:
+            return candidate
+        lowered = candidate.casefold()
+        for field in fieldnames:
+            if field.casefold() == lowered:
+                return field
+        raise ValueError(f'CSV log file is missing explicit depth column: {explicit_depth_column}')
+
+    for mnemonic in _DEPTH_MNEMONICS:
+        lowered = mnemonic.casefold()
+        for field in fieldnames:
+            if field.casefold() == lowered:
+                return field
+    raise ValueError('CSV log file must contain a depth column: DEPT, DEPTH, MD, TVD, or TVDSS')
+
+
+def _write_curve_payloads(
+    session: Session,
+    bundle_path: Path,
+    well: WellModel,
+    curve_payloads: list[dict[str, object]],
+) -> None:
+    curves_dir = bundle_path / 'curves'
+    curves_dir.mkdir(parents=True, exist_ok=True)
+
+    parquet_relative_path = f'curves/{well.id}.parquet'
+    parquet_path = bundle_path / parquet_relative_path
+
+    existing_curve_rows = list(session.scalars(select(CurveMetadata).where(CurveMetadata.well_id == well.id).order_by(CurveMetadata.id.asc())))
+    frame_by_depth = pd.DataFrame(columns=['DEPT']).set_index('DEPT')
+    if existing_curve_rows and parquet_path.exists():
+        existing_frame = pd.read_parquet(parquet_path)
+        if 'DEPT' not in existing_frame.columns:
+            raise ValueError(f'Curve parquet is missing DEPT column for well: {well.id}')
+        frame_by_depth = existing_frame.set_index('DEPT')
+
+    replacement_mnemonics = {str(payload['mnemonic']) for payload in curve_payloads}
+    for row in existing_curve_rows:
+        if row.mnemonic in replacement_mnemonics:
+            session.delete(row)
+
+    for payload in curve_payloads:
+        mnemonic = str(payload['mnemonic'])
+        clean_depths = payload['depths']
+        clean_values = payload['values']
+        frame_by_depth[mnemonic] = pd.Series(
+            clean_values,
+            index=pd.Index(clean_depths, name='DEPT'),
+            dtype='float32',
+        )
+
+        session.add(
+            CurveMetadata(
+                well_id=well.id,
+                mnemonic=mnemonic,
+                standard_mnemonic=payload['standard_mnemonic'],
+                family_code=payload['family_code'],
+                unit=str(payload['unit']),
+                original_unit=(str(payload['original_unit']) or None),
+                curve_type='continuous',
+                depth_min=min(clean_depths),
+                depth_max=max(clean_depths),
+                n_samples=len(clean_depths),
+                data_uri=parquet_relative_path,
+                source_hash=str(payload['source_hash']),
+                null_value=float(payload['null_value']),
+            )
+        )
+
+    merged_frame = frame_by_depth.sort_index().reset_index()
+    merged_frame['DEPT'] = pd.to_numeric(merged_frame['DEPT'], errors='coerce').astype('float32')
+    table = pa.Table.from_pandas(merged_frame, preserve_index=False)
+    pq.write_table(table, parquet_path, compression='snappy')
+    session.flush()
 
 
 def _resolve_or_create_well_for_tops(session: Session, rows: list[dict[str, str]], well_id: str | None) -> WellModel:
@@ -450,8 +561,7 @@ def import_las_file(
             extra=metadata['extra'] if isinstance(metadata['extra'], dict) else None,
         )
 
-    curve_series: dict[str, pd.Series] = {}
-    parquet_relative_path = f'curves/{well.id}.parquet'
+    curve_payloads: list[dict[str, object]] = []
 
     for curve in las.curves:
         mnemonic = curve.mnemonic.strip()
@@ -485,34 +595,105 @@ def import_las_file(
             except ValueError:
                 target_unit = source_unit
 
-        curve_series[mnemonic] = pd.Series(values, index=pd.Index(clean_depths, name='DEPT'), dtype='float32')
-        session.add(
-            CurveMetadata(
-                well_id=well.id,
-                mnemonic=mnemonic,
-                standard_mnemonic=standard_mnemonic,
-                family_code=family_code,
-                unit=target_unit,
-                original_unit=source_unit,
-                curve_type='continuous',
-                depth_min=min(clean_depths),
-                depth_max=max(clean_depths),
-                n_samples=len(clean_depths),
-                data_uri=parquet_relative_path,
-                source_hash=source_hash,
-                null_value=null_value if null_value is not None else -999.25,
-            )
-        )
+        curve_payloads.append({
+            'mnemonic': mnemonic,
+            'standard_mnemonic': standard_mnemonic,
+            'family_code': family_code,
+            'unit': target_unit,
+            'original_unit': source_unit,
+            'depths': clean_depths,
+            'values': values,
+            'source_hash': source_hash,
+            'null_value': null_value if null_value is not None else -999.25,
+        })
 
-    if not curve_series:
+    if not curve_payloads:
         raise ValueError(f'No importable curves were found in LAS file: {source_path}')
 
-    frame = pd.concat(curve_series, axis=1).sort_index().reset_index()
-    frame['DEPT'] = frame['DEPT'].astype('float32')
-    parquet_path = bundle_path / parquet_relative_path
-    table = pa.Table.from_pandas(frame, preserve_index=False)
-    pq.write_table(table, parquet_path, compression='snappy')
-    session.flush()
+    _write_curve_payloads(session, bundle_path, well, curve_payloads)
+    return well
+
+
+def import_logs_csv(
+    session: Session,
+    project_path: Path | str,
+    csv_path: Path | str,
+    *,
+    well_id: str | None = None,
+    depth_column: str | None = None,
+) -> WellModel:
+    bundle_path = Path(project_path)
+    source_path = Path(csv_path)
+    source_hash = _sha256(source_path)
+    fieldnames, rows = _read_csv_rows(source_path)
+    if not rows:
+        raise ValueError(f'{source_path}: log CSV is empty')
+
+    resolved_depth_column = _detect_log_csv_depth_column(fieldnames, depth_column)
+    depths = _validate_strictly_increasing_depth(rows, resolved_depth_column, source_path)
+    final_depth = depths[-1] if depths else None
+    well = _resolve_or_create_well_for_logs(session, rows, well_id=well_id, td=final_depth)
+    apply_imported_well_metadata(well, td=final_depth)
+
+    rules = load_curve_alias_rules(session)
+    curve_columns = [
+        column for column in fieldnames
+        if column != resolved_depth_column and column.casefold() not in _CSV_EXCLUDED_COLUMNS
+    ]
+
+    curve_payloads: list[dict[str, object]] = []
+    for column in curve_columns:
+        mnemonic, source_unit = _header_curve_parts(column)
+        if not mnemonic or mnemonic.upper() in _DEPTH_MNEMONICS:
+            continue
+
+        clean_pairs: dict[float, float] = {}
+        for row_index, (depth, row) in enumerate(zip(depths, rows, strict=False), start=2):
+            raw_value = row.get(column)
+            if raw_value in (None, ''):
+                continue
+            value = _coerce_float(raw_value)
+            if value is None:
+                raise ValueError(f'{source_path}: invalid curve value in column {column!r} at row {row_index}: {raw_value!r}')
+            if math.isfinite(value):
+                clean_pairs[depth] = value
+
+        if len(clean_pairs) < 2:
+            continue
+
+        clean_depths = sorted(clean_pairs)
+        clean_values = [clean_pairs[depth] for depth in clean_depths]
+        match = resolve_curve_alias(mnemonic, rules)
+        family_code = match.family_code
+        standard_mnemonic = match.canonical_mnemonic
+        target_unit = match.canonical_unit or source_unit
+
+        if family_code == 'gamma_ray':
+            target_unit = canonicalize_gamma_unit(target_unit)
+
+        values = clean_values
+        if source_unit and target_unit and normalize_unit_name(source_unit) != normalize_unit_name(target_unit):
+            try:
+                values = convert_curve_units(values, source_unit, target_unit, family_code)
+            except ValueError:
+                target_unit = source_unit
+
+        curve_payloads.append({
+            'mnemonic': mnemonic,
+            'standard_mnemonic': standard_mnemonic,
+            'family_code': family_code,
+            'unit': target_unit,
+            'original_unit': source_unit,
+            'depths': clean_depths,
+            'values': values,
+            'source_hash': source_hash,
+            'null_value': -999.25,
+        })
+
+    if not curve_payloads:
+        raise ValueError(f'No importable curves were found in CSV file: {source_path}')
+
+    _write_curve_payloads(session, bundle_path, well, curve_payloads)
     return well
 
 

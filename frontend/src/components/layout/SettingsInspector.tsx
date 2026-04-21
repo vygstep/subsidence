@@ -92,11 +92,11 @@ export function SettingsInspector({
         </label>
         <div className="project-dialog__grid">
           <label className="project-dialog__field">
-            <span>X</span>
+            <span>Project X</span>
             <input value={wellInspectorDraft.x} onChange={(event) => onWellInspectorDraftChange('x', event.target.value)} />
           </label>
           <label className="project-dialog__field">
-            <span>Y</span>
+            <span>Project Y</span>
             <input value={wellInspectorDraft.y} onChange={(event) => onWellInspectorDraftChange('y', event.target.value)} />
           </label>
           <label className="project-dialog__field">
@@ -140,16 +140,16 @@ export function SettingsInspector({
 
   if (selectedObject.type === 'las-group') {
     if (!well || well.well_id !== selectedObject.wellId) {
-      return <EmptyInspector message="Selected LAS source is not loaded yet." />
+      return <EmptyInspector message="Selected logs group is not loaded yet." />
     }
 
     return (
       <div className="template-panel">
         <div className="template-panel__group">
           <div className="template-panel__label">Object</div>
-          <div className="template-panel__value">LAS</div>
+          <div className="template-panel__value">Logs</div>
         </div>
-        <div className="tree-leaf"><span>Source</span><span>{well.source_las_path ?? 'unset'}</span></div>
+        <div className="tree-leaf"><span>Source</span><span>{well.source_las_path ?? 'mixed / unset'}</span></div>
         <div className="tree-leaf"><span>Curves</span><span>{curveCount}</span></div>
         <div className="tree-leaf"><span>Visible</span><span>{visibleCurveCount}</span></div>
         <div className="tree-leaf"><span>Depth range</span><span>{minDepth.toFixed(1)} - {maxDepth.toFixed(1)}</span></div>

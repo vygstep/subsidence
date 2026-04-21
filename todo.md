@@ -49,4 +49,4 @@ Primary references:
 
 ## Immediate Next Step
 
-Execute Phase 3 cleanup stabilization from `docs/phase3-cleanup-contract.md`.
+Execute Phase 3 cleanup 2 stabilization from `docs/phase3-cleanup2-contract.md`.

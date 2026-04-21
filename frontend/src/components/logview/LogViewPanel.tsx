@@ -10,6 +10,7 @@ import { DepthTrack } from './DepthTrack'
 import { FormationColumn } from './FormationColumn'
 import { TrackHeaderRow } from './TrackHeaderRow'
 import { DEPTH_TRACK_ID, FORMATION_TRACK_ID, TrackResizeHandle } from './TrackResizeHandle'
+import { WellOverviewMinimap } from './WellOverviewMinimap'
 
 interface LogViewPanelProps {
   tracks: TrackConfig[]
@@ -104,6 +105,7 @@ export function LogViewPanel({ tracks, curves, formations, minDepth, maxDepth }:
             cursorDepth={cursorDepth}
             mouseClient={mouseClient}
           />
+          <WellOverviewMinimap height={trackHeight} />
         </div>
         <FormationColumn formations={formations} height={trackHeight} maxDepth={maxDepth} width={formationWidth} />
         <TrackResizeHandle trackId={FORMATION_TRACK_ID} initialWidth={formationWidth} />

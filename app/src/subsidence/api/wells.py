@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import math
+
 from fastapi import APIRouter, HTTPException, Request
 from pydantic import BaseModel
 from sqlalchemy import select
@@ -14,6 +16,7 @@ router = APIRouter(tags=['wells'])
 class WellListItem(BaseModel):
     well_id: str
     well_name: str
+    td_md: float
 
 
 class CurveInventoryItem(BaseModel):
@@ -64,6 +67,7 @@ class WellResponse(BaseModel):
     td_md: float
     x: float
     y: float
+    coordinate_semantics: str = 'project_xy'
     crs: str
     depth_reference: str
     source_las_path: str | None = None
@@ -80,6 +84,7 @@ class WellInventoryResponse(BaseModel):
     td_md: float
     x: float
     y: float
+    coordinate_semantics: str = 'project_xy'
     crs: str
     source_las_path: str | None = None
     deviation: DeviationSummaryResponse | None = None
@@ -95,6 +100,18 @@ class WellPatchRequest(BaseModel):
     x: float | None = None
     y: float | None = None
     crs: str | None = None
+
+
+def _require_finite_number(value: float, field_name: str) -> float:
+    if not math.isfinite(value):
+        raise HTTPException(status_code=400, detail=f'{field_name} must be a finite number')
+    return value
+
+
+def _require_non_negative_number(value: float, field_name: str) -> float:
+    if _require_finite_number(value, field_name) < 0:
+        raise HTTPException(status_code=400, detail=f'{field_name} must be >= 0')
+    return value
 
 
 
@@ -138,7 +155,7 @@ def list_wells(request: Request) -> list[WellListItem]:
     manager = _require_open_project(request)
     with manager.get_session() as session:
         rows = session.scalars(select(WellModel).order_by(WellModel.name.asc(), WellModel.id.asc())).all()
-        return [WellListItem(well_id=row.id, well_name=row.name) for row in rows]
+        return [WellListItem(well_id=row.id, well_name=row.name, td_md=row.td_md or 0.0) for row in rows]
 
 
 @router.get('/wells/inventory', response_model=list[WellInventoryResponse])
@@ -175,6 +192,7 @@ def list_well_inventories(request: Request) -> list[WellInventoryResponse]:
                     td_md=well.td_md or 0.0,
                     x=well.lon if well.lon is not None else 0.0,
                     y=well.lat if well.lat is not None else 0.0,
+                    coordinate_semantics='project_xy',
                     crs=well.crs,
                     source_las_path=well.source_las_path,
                     deviation=DeviationSummaryResponse(
@@ -270,6 +288,7 @@ def get_well(well_id: str, request: Request) -> WellResponse:
             td_md=td_md,
             x=well.lon if well.lon is not None else 0.0,
             y=well.lat if well.lat is not None else 0.0,
+            coordinate_semantics='project_xy',
             crs=well.crs,
             depth_reference='MD',
             source_las_path=well.source_las_path,
@@ -302,29 +321,37 @@ def patch_well(well_id: str, payload: WellPatchRequest, request: Request) -> Wel
                 old_values['name'] = well.name
                 new_values['name'] = next_name
         if payload.kb_elev is not None:
-            if well.kb_elev != payload.kb_elev:
+            next_kb = _require_non_negative_number(payload.kb_elev, 'KB')
+            if well.kb_elev != next_kb:
                 old_values['kb_elev'] = well.kb_elev
-                new_values['kb_elev'] = payload.kb_elev
+                new_values['kb_elev'] = next_kb
         if payload.gl_elev is not None:
-            if well.gl_elev != payload.gl_elev:
+            next_gl = _require_finite_number(payload.gl_elev, 'GL')
+            if well.gl_elev != next_gl:
                 old_values['gl_elev'] = well.gl_elev
-                new_values['gl_elev'] = payload.gl_elev
+                new_values['gl_elev'] = next_gl
         if payload.td_md is not None:
-            if well.td_md != payload.td_md:
+            next_td = _require_non_negative_number(payload.td_md, 'TD')
+            if well.td_md != next_td:
                 old_values['td_md'] = well.td_md
-                new_values['td_md'] = payload.td_md
+                new_values['td_md'] = next_td
         if payload.x is not None:
-            if well.lon != payload.x:
+            next_x = _require_finite_number(payload.x, 'Project X')
+            if well.lon != next_x:
                 old_values['lon'] = well.lon
-                new_values['lon'] = payload.x
+                new_values['lon'] = next_x
         if payload.y is not None:
-            if well.lat != payload.y:
+            next_y = _require_finite_number(payload.y, 'Project Y')
+            if well.lat != next_y:
                 old_values['lat'] = well.lat
-                new_values['lat'] = payload.y
+                new_values['lat'] = next_y
         if payload.crs is not None:
-            if well.crs != payload.crs:
+            next_crs = payload.crs.strip()
+            if not next_crs:
+                raise HTTPException(status_code=400, detail='CRS cannot be empty')
+            if well.crs != next_crs:
                 old_values['crs'] = well.crs
-                new_values['crs'] = payload.crs
+                new_values['crs'] = next_crs
 
     if new_values:
         manager.execute_command(UpdateWell(well_id, old_values, new_values))

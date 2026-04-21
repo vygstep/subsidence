@@ -2,6 +2,7 @@ import { create } from 'zustand'
 
 import { useViewStore } from './viewStore'
 import { useWellDataStore } from './wellDataStore'
+import { useWorkspaceStore } from './workspaceStore'
 
 export interface RecentProject {
   name: string
@@ -14,9 +15,12 @@ export interface ProjectStore {
   projectName: string | null
   projectPath: string | null
   isDirty: boolean
+  backendDirty: boolean
+  pendingVisualConfigDirty: boolean
   canUndo: boolean
   canRedo: boolean
   visualConfig: Record<string, unknown>
+  visualConfigSaveToken: number
   recentProjects: RecentProject[]
   pollStatus: () => Promise<void>
   loadRecentProjects: () => Promise<void>
@@ -25,10 +29,14 @@ export interface ProjectStore {
   closeProject: () => Promise<void>
   loadVisualConfig: () => Promise<void>
   saveVisualConfig: (patch: Record<string, unknown>) => Promise<void>
+  loadScopedVisualConfig: (scope: 'project' | 'well', scopeId?: string) => Promise<Record<string, unknown>>
+  saveScopedVisualConfig: (scope: 'project' | 'well', patch: Record<string, unknown>, scopeId?: string) => Promise<Record<string, unknown>>
   saveProject: () => Promise<void>
   createCheckpoint: (name?: string, description?: string) => Promise<void>
   undo: () => Promise<void>
   redo: () => Promise<void>
+  markVisualConfigDirty: () => void
+  clearVisualConfigDirty: () => void
 }
 
 interface VisualConfigResponse {
@@ -137,19 +145,23 @@ async function postJsonAction(path: string, payload: Record<string, unknown>): P
   }
 }
 
-async function fetchVisualConfig(): Promise<VisualConfigResponse> {
-  const response = await fetch('/api/projects/visual-config?scope=project')
+async function fetchVisualConfig(scope: 'project' | 'well' = 'project', scopeId?: string): Promise<VisualConfigResponse> {
+  const query = new URLSearchParams({ scope })
+  if (scopeId) {
+    query.set('scope_id', scopeId)
+  }
+  const response = await fetch(`/api/projects/visual-config?${query.toString()}`)
   if (!response.ok) {
     throw new Error(`Failed to read visual config (${response.status})`)
   }
   return (await response.json()) as VisualConfigResponse
 }
 
-async function patchVisualConfig(patch: Record<string, unknown>): Promise<VisualConfigResponse> {
+async function patchVisualConfig(scope: 'project' | 'well', patch: Record<string, unknown>, scopeId?: string): Promise<VisualConfigResponse> {
   const response = await fetch('/api/projects/visual-config', {
     method: 'PATCH',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ scope: 'project', config: patch }),
+    body: JSON.stringify({ scope, scope_id: scopeId, config: patch }),
   })
   if (!response.ok) {
     throw new Error(`Failed to save visual config (${response.status})`)
@@ -174,14 +186,39 @@ function mapRecentProjects(payload: RecentProjectResponse[]): RecentProject[] {
   }))
 }
 
+function projectTrackWidths(): Record<string, number> {
+  const { trackWidths } = useViewStore.getState()
+  return Object.fromEntries(
+    Object.entries(trackWidths).filter(([trackId]) => trackId === 'depth' || trackId === 'formations'),
+  )
+}
+
+export function collectProjectVisualConfig(): VisualConfigPayload {
+  return {
+    depthPerPixel: useViewStore.getState().depthPerPixel,
+    trackWidths: projectTrackWidths(),
+    curveColors: useWellDataStore.getState().colorOverrides,
+  }
+}
+
+export function collectWellVisualConfigs(): Record<string, Record<string, unknown>> {
+  const { wellViewStates } = useWorkspaceStore.getState()
+  return Object.fromEntries(
+    Object.entries(wellViewStates).map(([wellId, state]) => [wellId, state as unknown as Record<string, unknown>]),
+  )
+}
+
 export const useProjectStore = create<ProjectStore>((set, get) => ({
   isOpen: false,
   projectName: null,
   projectPath: null,
   isDirty: false,
+  backendDirty: false,
+  pendingVisualConfigDirty: false,
   canUndo: false,
   canRedo: false,
   visualConfig: {},
+  visualConfigSaveToken: 0,
   recentProjects: [],
   async pollStatus() {
     try {
@@ -190,7 +227,8 @@ export const useProjectStore = create<ProjectStore>((set, get) => ({
         isOpen: payload.is_open,
         projectName: payload.project_name,
         projectPath: payload.project_path,
-        isDirty: payload.is_dirty,
+        backendDirty: payload.is_dirty,
+        isDirty: payload.is_dirty || get().pendingVisualConfigDirty,
         canUndo: payload.can_undo,
         canRedo: payload.can_redo,
       })
@@ -200,9 +238,12 @@ export const useProjectStore = create<ProjectStore>((set, get) => ({
         projectName: null,
         projectPath: null,
         isDirty: false,
+        backendDirty: false,
+        pendingVisualConfigDirty: false,
         canUndo: false,
         canRedo: false,
         visualConfig: {},
+        visualConfigSaveToken: 0,
       })
       applyVisualConfigPayload({})
     }
@@ -219,9 +260,12 @@ export const useProjectStore = create<ProjectStore>((set, get) => ({
         projectName: null,
         projectPath: null,
         isDirty: false,
+        backendDirty: false,
+        pendingVisualConfigDirty: false,
         canUndo: false,
         canRedo: false,
         visualConfig: {},
+        visualConfigSaveToken: 0,
       })
       applyVisualConfigPayload({})
     }
@@ -231,9 +275,12 @@ export const useProjectStore = create<ProjectStore>((set, get) => ({
       projectName: payload.project_name,
       projectPath: payload.project_path,
       isDirty: false,
+      backendDirty: false,
+      pendingVisualConfigDirty: false,
       canUndo: false,
       canRedo: false,
       visualConfig: {},
+      visualConfigSaveToken: 0,
     })
     try {
       await get().loadRecentProjects()
@@ -252,9 +299,12 @@ export const useProjectStore = create<ProjectStore>((set, get) => ({
       projectName: null,
       projectPath: null,
       isDirty: false,
+      backendDirty: false,
+      pendingVisualConfigDirty: false,
       canUndo: false,
       canRedo: false,
       visualConfig: {},
+      visualConfigSaveToken: 0,
     })
     applyVisualConfigPayload({})
   },
@@ -264,24 +314,58 @@ export const useProjectStore = create<ProjectStore>((set, get) => ({
     applyVisualConfigPayload(payload.config)
   },
   async saveVisualConfig(patch) {
-    const current = get().visualConfig
+    await get().saveScopedVisualConfig('project', patch)
+  },
+  async loadScopedVisualConfig(scope, scopeId) {
+    const payload = await fetchVisualConfig(scope, scopeId)
+    if (scope === 'project') {
+      set({ visualConfig: payload.config })
+      applyVisualConfigPayload(payload.config)
+    }
+    return payload.config
+  },
+  async saveScopedVisualConfig(scope, patch, scopeId) {
+    const current = scope === 'project' ? get().visualConfig : {}
     const next = { ...current, ...patch }
-    const payload = await patchVisualConfig(patch)
-    set({ visualConfig: payload.config ?? next })
-    // Do not call applyVisualConfigPayload here: values are already live in the
-    // stores when the user changed them. Re-applying creates a new colorOverrides
-    // reference that triggers the save effect again (infinite loop).
+    const payload = await patchVisualConfig(scope, patch, scopeId)
+    if (scope === 'project') {
+      set({ visualConfig: payload.config ?? next })
+      // Do not call applyVisualConfigPayload here: values are already live in the
+      // stores when the user changed them. Re-applying creates a new colorOverrides
+      // reference that triggers the save effect again (infinite loop).
+    }
+    const status = await fetchStatus()
+    set({
+      isOpen: status.is_open,
+      projectName: status.project_name,
+      projectPath: status.project_path,
+      backendDirty: status.is_dirty,
+      isDirty: status.is_dirty || get().pendingVisualConfigDirty,
+      canUndo: status.can_undo,
+      canRedo: status.can_redo,
+    })
+    return payload.config ?? next
   },
   async saveProject() {
+    const projectConfig = collectProjectVisualConfig()
+    const wellConfigs = collectWellVisualConfigs()
+    await patchVisualConfig('project', projectConfig as unknown as Record<string, unknown>)
+    await Promise.all(
+      Object.entries(wellConfigs).map(([wellId, config]) => patchVisualConfig('well', config, wellId)),
+    )
     await postAction('/api/projects/save')
     const payload = await fetchStatus()
     set({
       isOpen: payload.is_open,
       projectName: payload.project_name,
       projectPath: payload.project_path,
+      backendDirty: payload.is_dirty,
+      pendingVisualConfigDirty: false,
       isDirty: payload.is_dirty,
       canUndo: payload.can_undo,
       canRedo: payload.can_redo,
+      visualConfig: projectConfig as unknown as Record<string, unknown>,
+      visualConfigSaveToken: get().visualConfigSaveToken + 1,
     })
   },
   async createCheckpoint(name, description = '') {
@@ -295,7 +379,8 @@ export const useProjectStore = create<ProjectStore>((set, get) => ({
       isOpen: payload.is_open,
       projectName: payload.project_name,
       projectPath: payload.project_path,
-      isDirty: payload.is_dirty,
+      backendDirty: payload.is_dirty,
+      isDirty: payload.is_dirty || get().pendingVisualConfigDirty,
       canUndo: payload.can_undo,
       canRedo: payload.can_redo,
     })
@@ -307,7 +392,8 @@ export const useProjectStore = create<ProjectStore>((set, get) => ({
       isOpen: payload.is_open,
       projectName: payload.project_name,
       projectPath: payload.project_path,
-      isDirty: payload.is_dirty,
+      backendDirty: payload.is_dirty,
+      isDirty: payload.is_dirty || get().pendingVisualConfigDirty,
       canUndo: payload.can_undo,
       canRedo: payload.can_redo,
     })
@@ -323,7 +409,8 @@ export const useProjectStore = create<ProjectStore>((set, get) => ({
       isOpen: payload.is_open,
       projectName: payload.project_name,
       projectPath: payload.project_path,
-      isDirty: payload.is_dirty,
+      backendDirty: payload.is_dirty,
+      isDirty: payload.is_dirty || get().pendingVisualConfigDirty,
       canUndo: payload.can_undo,
       canRedo: payload.can_redo,
     })
@@ -331,5 +418,21 @@ export const useProjectStore = create<ProjectStore>((set, get) => ({
     if (wellId) {
       await useWellDataStore.getState().loadWell(wellId)
     }
+  },
+  markVisualConfigDirty() {
+    set((state) => (
+      state.pendingVisualConfigDirty
+        ? state
+        : {
+            pendingVisualConfigDirty: true,
+            isDirty: true,
+          }
+    ))
+  },
+  clearVisualConfigDirty() {
+    set((state) => ({
+      pendingVisualConfigDirty: false,
+      isDirty: state.backendDirty,
+    }))
   },
 }))

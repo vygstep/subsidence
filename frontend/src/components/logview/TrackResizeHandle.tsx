@@ -1,6 +1,6 @@
 import { useCallback } from 'react'
 
-import { useViewStore } from '@/stores'
+import { useViewStore, useWellDataStore, useWorkspaceStore } from '@/stores'
 
 export const TRACK_RESIZE_HANDLE_WIDTH = 2
 export const DEPTH_TRACK_ID = 'depth'
@@ -14,6 +14,8 @@ interface TrackResizeHandleProps {
 
 export function TrackResizeHandle({ trackId, initialWidth, edge = 'right' }: TrackResizeHandleProps) {
   const setTrackWidth = useViewStore((state) => state.setTrackWidth)
+  const activeWellId = useWellDataStore((state) => state.well?.well_id)
+  const updateWellViewState = useWorkspaceStore((state) => state.updateWellViewState)
 
   const handleMouseDown = useCallback((event: React.MouseEvent<HTMLDivElement>) => {
     event.preventDefault()
@@ -25,6 +27,16 @@ export function TrackResizeHandle({ trackId, initialWidth, edge = 'right' }: Tra
       const deltaX = moveEvent.clientX - startX
       const nextWidth = edge === 'left' ? originWidth - deltaX : originWidth + deltaX
       setTrackWidth(trackId, nextWidth)
+      if (activeWellId && trackId !== DEPTH_TRACK_ID && trackId !== FORMATION_TRACK_ID) {
+        updateWellViewState(activeWellId, (state) => ({
+          ...state,
+          tracks: state.tracks.map((track) => (
+            track.id === trackId
+              ? { ...track, width: Math.max(80, Math.round(nextWidth)) }
+              : track
+          )),
+        }))
+      }
     }
 
     const handleMouseUp = () => {
@@ -34,7 +46,7 @@ export function TrackResizeHandle({ trackId, initialWidth, edge = 'right' }: Tra
 
     document.addEventListener('mousemove', handleMouseMove)
     document.addEventListener('mouseup', handleMouseUp)
-  }, [edge, initialWidth, setTrackWidth, trackId])
+  }, [activeWellId, edge, initialWidth, setTrackWidth, trackId, updateWellViewState])
 
   return (
     <div

@@ -3,6 +3,7 @@ from __future__ import annotations
 import csv
 import io
 import json
+import math
 from pathlib import Path
 from uuid import uuid4
 
@@ -26,6 +27,7 @@ from subsidence.data import (
     create_empty_well,
     import_deviation_csv,
     import_las_file,
+    import_logs_csv,
     import_tops_csv,
     import_unconformities_csv,
     link_tops_to_unconformities,
@@ -50,6 +52,12 @@ class OpenProjectRequest(BaseModel):
 class ImportLasRequest(BaseModel):
     las_path: str
     well_id: str | None = None
+
+
+class ImportLogsCsvRequest(BaseModel):
+    csv_path: str
+    well_id: str | None = None
+    depth_column: str | None = None
 
 
 class ImportTopsRequest(BaseModel):
@@ -270,6 +278,20 @@ def _status_payload(manager: ProjectManager) -> ProjectStatusResponse:
     )
 
 
+def _require_finite_number(value: float, field_name: str) -> float:
+    if not math.isfinite(value):
+        raise HTTPException(status_code=400, detail=f'{field_name} must be a finite number')
+    return value
+
+
+def _require_non_negative_number(value: float | None, field_name: str) -> float | None:
+    if value is None:
+        return None
+    if _require_finite_number(value, field_name) < 0:
+        raise HTTPException(status_code=400, detail=f'{field_name} must be >= 0')
+    return value
+
+
 def _select_export_well(session, well_id: str | None) -> WellModel:
     if well_id:
         well = session.get(WellModel, well_id)
@@ -302,16 +324,23 @@ def create_well(payload: CreateWellRequest, request: Request) -> CreateWellRespo
     well_name = payload.name.strip()
     if not well_name:
         raise HTTPException(status_code=400, detail='Well name is required')
+    x = _require_finite_number(payload.x, 'Project X')
+    y = _require_finite_number(payload.y, 'Project Y')
+    kb = _require_non_negative_number(payload.kb, 'KB')
+    td = _require_non_negative_number(payload.td, 'TD')
+    crs = payload.crs.strip()
+    if not crs:
+        raise HTTPException(status_code=400, detail='CRS cannot be empty')
 
     with manager.get_session() as session:
         row = create_empty_well(
             session,
             name=well_name,
-            x=payload.x,
-            y=payload.y,
-            kb=payload.kb,
-            td=payload.td,
-            crs=payload.crs,
+            x=x,
+            y=y,
+            kb=kb,
+            td=td,
+            crs=crs,
         )
         session.flush()
         command = ImportWell.capture(session, manager.project_path, row.id)
@@ -368,6 +397,31 @@ def import_las(payload: ImportLasRequest, request: Request) -> ImportLasResponse
     try:
         with manager.get_session() as session:
             well = import_las_file(session, manager.project_path, Path(payload.las_path), well_id=payload.well_id)
+            session.flush()
+            command = ImportWell.capture(session, manager.project_path, well.id)
+            well_id = well.id
+            well_name = well.name
+            curve_count = len(list(session.scalars(select(CurveMetadata).where(CurveMetadata.well_id == well_id))))
+            session.commit()
+        manager.execute_command(command)  # apply() is no-op: well already in DB
+        manager.save_project()
+    except (ValueError, FileNotFoundError) as error:
+        raise HTTPException(status_code=400, detail=str(error)) from error
+    return ImportLasResponse(well_id=well_id, well_name=well_name, curve_count=curve_count)
+
+
+@router.post('/import-logs-csv', response_model=ImportLasResponse)
+def import_logs_csv_route(payload: ImportLogsCsvRequest, request: Request) -> ImportLasResponse:
+    manager = _require_open_project(request)
+    try:
+        with manager.get_session() as session:
+            well = import_logs_csv(
+                session,
+                manager.project_path,
+                Path(payload.csv_path),
+                well_id=payload.well_id,
+                depth_column=payload.depth_column,
+            )
             session.flush()
             command = ImportWell.capture(session, manager.project_path, well.id)
             well_id = well.id
@@ -548,6 +602,8 @@ def patch_visual_config(payload: VisualConfigPatchRequest, request: Request) -> 
         existing = session.scalar(select(VisualConfig).where(VisualConfig.scope == payload.scope, VisualConfig.scope_id == resolved_scope_id))
         old_config = json.loads(existing.config) if existing is not None else {}
         merged_config = {**old_config, **payload.config}
+        if merged_config == old_config:
+            return VisualConfigResponse(scope=payload.scope, scope_id=resolved_scope_id, config=old_config)
     manager.execute_command(UpdateVisualConfig(payload.scope, resolved_scope_id, old_config, merged_config))
     return VisualConfigResponse(scope=payload.scope, scope_id=resolved_scope_id, config=merged_config)
 

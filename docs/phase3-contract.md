@@ -6,7 +6,18 @@ depth, edit curve and formation properties in a panel, and manage formations thr
 The Canvas tracks remain read-only renderers; all interaction is handled by an SVG overlay and
 React panels communicating through Zustand stores and the Phase 2.5 REST API.
 
-**Status**: In progress.
+**Status**: historical roadmap with current status snapshot.
+
+**Current source of truth**:
+
+- `docs/phase3-cleanup-contract.md`
+- `docs/phase3-cleanup2-contract.md`
+- `docs/phase3-verification.md`
+
+This file remains useful as the original Phase 3 roadmap and detailed step specification, but it is
+no longer the primary cleanup/status ledger. The progress table below is the truthful current
+snapshot; detailed sections below may preserve earlier planning language and are superseded where
+cleanup docs say otherwise.
 
 ---
 
@@ -19,7 +30,7 @@ React panels communicating through Zustand stores and the Phase 2.5 REST API.
 | Step 2.5 | done | Toolbar, Data Manager, per-well viewer composition, Settings inspector, project-wide well inventory, save/autosave semantics normalized | `6e75ec2` |
 | Step 2.5-A | done | StratChart toolbar mode (Load/Delete); import-las/tops/deviation auto-save to canonical db; route normalized to `/strat-charts/import` | `3ef7aec` |
 | Step 2.5-B | done | `strat_charts` + `formation_strat_links` tables; active-chart switching; StratChart sidebar tab; Link top → active chart; built-in ICS protection | `d177cf4` |
-| Step 3  | done | formations CRUD API + store wired; undo coverage for add/move/delete | — |
+| Step 3  | done | formations CRUD API + store wired; undo coverage for add/move/delete; remaining verification is tracked in cleanup docs | `dbec34e` |
 | Step 4  | pending | formation lines render at correct depths and move with scroll; crosshair tracks mouse | — |
 | Step 5  | pending | drag top 50 m → depth commits; Ctrl+Z reverts in one undo step | — |
 | Step 6  | pending | StatusBar shows MD at cursor; tooltip shows interpolated GR / ILD values | — |
@@ -123,7 +134,7 @@ React panels communicating through Zustand stores and the Phase 2.5 REST API.
 - [x] 2.5.B10 `GET /api/wells/{id}/formations` response gains `strat_links: [{chart_id, chart_name, strat_unit_id, strat_unit_name, color_hex}]` and computed `active_strat_color: string | null`, `active_strat_unit_name: string | null`
 - [x] 2.5.B11 Auto-link priority on `import_tops_csv` and `import_unconformities_csv`: (1) name match case-insensitive against active chart; (2) age fallback — if top has `age_top_ma`, find narrowest-rank unit in active chart where `unit.age_top_ma ≤ top.age_top_ma ≤ unit.age_base_ma`; runs only against the **active** chart
 - [x] 2.5.B12 On `POST /api/strat-charts/import` success: run auto-link (name + age) for **all** existing formation tops in all wells against the newly imported chart; if the chart is active, update formation colors accordingly
-- [x] 2.5.B13 Formation top display color = `active_strat_color ?? formation.color`; applied in `WellDataPanel` and `FormationColumn`; `FormationTopLine` is part of Step 4
+- [x] 2.5.B13 Formation top display color = `active_strat_color ? formation.color`; applied in `WellDataPanel` and `FormationColumn`; `FormationTopLine` is part of Step 4
 - [x] 2.5.B14 `LinkStratChartDialog` filters unit search to the **active** chart only; disabled and shows tooltip `"No active chart"` when `is_active` chart does not exist; `Link top` toolbar button disabled when no active chart
 - [x] 2.5.B15 Add `StratChart` tab to left sidebar (between `Wells` and `Models`): scrollable list of loaded charts; each row shows chart name, unit count, import date, radio button for active, trash button; empty state shows `"No charts loaded — use Load StratChart"`
 - [x] 2.5.B16 Clicking a radio in the `StratChart` tab calls `PATCH .../activate`, refreshes chart list and all formation tops (colors update without page reload)
@@ -180,7 +191,7 @@ React panels communicating through Zustand stores and the Phase 2.5 REST API.
 
 ### Step 9 — FormationTopsList sidebar + CurveBrowser
 - [ ] 9.1 Write `src/components/sidebar/FormationTopsList.tsx`: scrollable list of all `wellDataStore.formations`, sorted by depth; each row shows depth, color swatch, name, lock icon, delete button
-- [ ] 9.2 Add "＋ Add formation" button: creates a new top at `viewStore.cursorDepth ?? midDepth` via `wellDataStore.addFormation`; new row highlighted and scrolled into view
+- [ ] 9.2 Add "＋ Add formation" button: creates a new top at `viewStore.cursorDepth ? midDepth` via `wellDataStore.addFormation`; new row highlighted and scrolled into view
 - [ ] 9.3 Row click → `viewStore.selectElement(id, 'formation')` + `viewStore.setScroll(depth - halfViewport)` (scroll to center formation in view)
 - [ ] 9.4 Lock/unlock toggle → `wellDataStore.updateFormation(id, { is_locked: !current })` → `PATCH`
 - [ ] 9.5 Write `src/components/sidebar/CurveBrowser.tsx`: lists all curves available from `wellDataStore.well.curves` not yet in the selected track; click adds curve to selected track with default `CurveConfig`; grays out curves already shown
@@ -199,6 +210,11 @@ React panels communicating through Zustand stores and the Phase 2.5 REST API.
 ---
 
 ## Detailed step specifications
+
+> Historical note:
+> the detailed sections below preserve the original Phase 3 implementation plan.
+> For the stabilized current state, defer to `phase3-cleanup-contract.md`,
+> `phase3-cleanup2-contract.md`, and `phase3-verification.md`.
 
 ### Step 1 — Visual config persistence and export integration
 
@@ -268,9 +284,9 @@ Shows `Recent projects` list (from `GET /api/projects/recent`) plus a manual pat
 
 ### Step 2.5 — Well import actions UI
 
-Status: pending
+Status: implemented and later stabilized through cleanup
 Verification: top row exposes `Project`, `Wells`, `Tops`, `Undo`, `Redo`; second row switches contextual actions by mode; `StratCharts`, `Wells`, `Models`, and `Settings` drive active-well selection, chart management, and per-well viewer composition
-Commit: —
+Commit: `6e75ec2` + later cleanup commits
 
 **Goal:** Close the current product gap between project selection and interactive work. A user who has opened a project must be able to manage the project, save/undo/redo, and create or populate a well from the UI before entering formation editing and overlay interaction steps.
 
@@ -662,9 +678,9 @@ frontend to:
 
 ### Step 2.5-B — StratChart multi-chart system
 
-Status: pending
+Status: implemented and later hardened through cleanup
 Verification: see checklist 2.5.B17
-Commit: —
+Commit: `d177cf4` + `42d051c` + later fixes
 
 **Schema additions:**
 
@@ -803,9 +819,9 @@ Activating a chart (`PATCH .../activate`) triggers `wellDataStore.loadFormations
 
 ### Step 3 — Formation tops API + store CRUD
 
-Status: pending
+Status: implemented; verification partially delegated to cleanup docs
 Verification: PATCH depth → GET reflects new value; DELETE → row absent; undo reverts delete
-Commit: —
+Commit: `dbec34e`
 
 **`app/src/subsidence/api/formations.py`:**
 
@@ -1069,7 +1085,7 @@ function handleClick(e: React.MouseEvent<HTMLCanvasElement>) {
   const depth = pixelToDepth(e.clientY - rect.top);
   let closest: { mnemonic: string; dist: number } | null = null;
   for (const { curve, style } of clippedCurves) {
-    const pixelX = valueScales.get(style.mnemonic)!(interpolateAtDepth(curve.depths, curve.values, depth) ?? NaN);
+    const pixelX = valueScales.get(style.mnemonic)!(interpolateAtDepth(curve.depths, curve.values, depth) ? NaN);
     const dist = Math.abs(clickX - pixelX);
     if (dist <= 5 && (!closest || dist < closest.dist))
       closest = { mnemonic: style.mnemonic, dist };
@@ -1190,7 +1206,7 @@ Reads `wellDataStore.formations` sorted by `depth_md`. Renders a scrollable `<ul
 - `🔒` toggle button
 - `✕` delete button
 
-"＋ Add formation" button at top: calls `wellDataStore.addFormation({ name: 'New formation', depth_md: viewStore.cursorDepth ?? midDepth, color: '#808080', is_locked: false })`. New row scrolls into view and its name field activates for inline rename.
+"＋ Add formation" button at top: calls `wellDataStore.addFormation({ name: 'New formation', depth_md: viewStore.cursorDepth ? midDepth, color: '#808080', is_locked: false })`. New row scrolls into view and its name field activates for inline rename.
 
 Row click:
 

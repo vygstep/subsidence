@@ -223,7 +223,7 @@ export function WellDataPanel({
                     {isOpen(`${rootId}:metadata`) ? (
                       <div className="tree-node__children">
                         <div className="tree-leaf"><span>Name</span><span>{item.well_name}</span></div>
-                        <div className="tree-leaf"><span>Location (X, Y)</span><span>{formatNumber(item.x)}, {formatNumber(item.y)}</span></div>
+                        <div className="tree-leaf"><span>Project X / Y</span><span>{formatNumber(item.x)}, {formatNumber(item.y)}</span></div>
                         <div className="tree-leaf"><span>KB / GL</span><span>{formatNumber(item.kb_elev)} / {formatNumber(item.gl_elev)}</span></div>
                         <div className="tree-leaf"><span>TD</span><span>{formatNumber(item.td_md)}</span></div>
                         <div className="tree-leaf"><span>CRS</span><span>{item.crs || 'unset'}</span></div>
@@ -243,7 +243,7 @@ export function WellDataPanel({
                       />
                       <TriStateCheckbox state={curvesCheckboxState} onToggle={(nextValue) => onToggleAllCurves(item.well_id, nextValue)} />
                       <button type="button" className="tree-node__section-label" onClick={() => onSelectLasGroup(item.well_id)}>
-                        LAS
+                        Logs
                       </button>
                     </div>
                     {isOpen(`${rootId}:las`) ? (
@@ -270,7 +270,7 @@ export function WellDataPanel({
                             </div>
                           ))
                         ) : (
-                          <p className="sidebar-panel__empty">No LAS loaded.</p>
+                          <p className="sidebar-panel__empty">No logs loaded.</p>
                         )}
                       </div>
                     ) : null}

@@ -6,6 +6,7 @@ export interface Well {
   td_md: number
   x: number
   y: number
+  coordinate_semantics?: 'project_xy'
   crs: string
   depth_reference: 'MD' | 'TVD' | 'TVDSS'
   source_las_path?: string | null
@@ -83,6 +84,7 @@ export interface WellInventory {
   td_md: number
   x: number
   y: number
+  coordinate_semantics?: 'project_xy'
   crs: string
   source_las_path?: string | null
   deviation?: {

@@ -43,6 +43,57 @@ export function createDefaultWellView(): WellViewState {
   }
 }
 
+function isCurveConfig(value: unknown): value is TrackConfig['curves'][number] {
+  if (!value || typeof value !== 'object') return false
+  const row = value as Record<string, unknown>
+  return typeof row.mnemonic === 'string'
+    && typeof row.color === 'string'
+    && typeof row.lineWidth === 'number'
+    && typeof row.lineStyle === 'string'
+    && typeof row.scaleMin === 'number'
+    && typeof row.scaleMax === 'number'
+    && typeof row.scaleReversed === 'boolean'
+}
+
+function isTrackConfig(value: unknown): value is TrackConfig {
+  if (!value || typeof value !== 'object') return false
+  const row = value as Record<string, unknown>
+  return typeof row.id === 'string'
+    && typeof row.title === 'string'
+    && typeof row.width === 'number'
+    && Array.isArray(row.curves)
+    && row.curves.every(isCurveConfig)
+    && (row.scaleType === 'linear' || row.scaleType === 'logarithmic')
+    && typeof row.gridDivisions === 'number'
+    && typeof row.showGrid === 'boolean'
+}
+
+export function coerceWellViewState(raw: unknown): WellViewState {
+  const fallback = createDefaultWellView()
+  if (!raw || typeof raw !== 'object') {
+    return fallback
+  }
+
+  const value = raw as Record<string, unknown>
+  const tracks = Array.isArray(value.tracks) ? value.tracks.filter(isTrackConfig) : fallback.tracks
+  const visibleFormationIds = Array.isArray(value.visibleFormationIds)
+    ? value.visibleFormationIds.filter((id): id is string => typeof id === 'string')
+    : fallback.visibleFormationIds
+  const hiddenTrackIds = Array.isArray(value.hiddenTrackIds)
+    ? value.hiddenTrackIds.filter((id): id is string => typeof id === 'string')
+    : fallback.hiddenTrackIds
+  const deviationVisible = typeof value.deviationVisible === 'boolean'
+    ? value.deviationVisible
+    : fallback.deviationVisible
+
+  return {
+    tracks: tracks.length > 0 ? tracks : fallback.tracks,
+    visibleFormationIds,
+    deviationVisible,
+    hiddenTrackIds,
+  }
+}
+
 interface WorkspaceStore {
   activeSidebarTab: SidebarTab
   activeToolbarMode: ToolbarMode
@@ -59,6 +110,7 @@ interface WorkspaceStore {
   setSidebarTopRatio: (ratio: number) => void
   resetWorkspace: () => void
   updateWellViewState: (wellId: string, updater: (state: WellViewState) => WellViewState) => void
+  replaceWellViewStates: (nextStates: Record<string, WellViewState>) => void
   ensureWellViewState: (wellId: string) => void
   dropWellViewState: (wellId: string) => void
 }
@@ -103,6 +155,9 @@ export const useWorkspaceStore = create<WorkspaceStore>((set) => ({
         [wellId]: updater(state.wellViewStates[wellId] ?? createDefaultWellView()),
       },
     }))
+  },
+  replaceWellViewStates(nextStates) {
+    set({ wellViewStates: nextStates })
   },
   ensureWellViewState(wellId) {
     set((state) => (

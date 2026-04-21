@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach, vi, afterEach } from 'vitest'
-import { renderHook, act, waitFor } from '@testing-library/react'
+import { renderHook, act } from '@testing-library/react'
 import { useWellDataStore } from '@/stores/wellDataStore'
 import { createMockFormations, createMockWell, createMockCurveData } from '../fixtures'
 
@@ -167,8 +167,6 @@ describe('FormationDepthDrag - Debounce + Optimistic Update', () => {
     })
 
     const formationId = mockFormations[0].id
-    const originalDepth = mockFormations[0].depth_md
-
     // Act: update and wait for debounce
     act(() => {
       result.current.updateFormationDepth(formationId, 1500)

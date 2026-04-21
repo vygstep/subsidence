@@ -1,46 +1,6 @@
-import { useEffect, useMemo, useRef, useState } from 'react'
-
-import { SettingsInspector } from './SettingsInspector'
-import { StratChartTab } from './StratChartTab'
-import { WellDataPanel } from './WellDataPanel'
-import { createDefaultWellView, createEmptyTrack, useViewStore, useWellDataStore, useWorkspaceStore } from '@/stores'
-import type { TrackConfig } from '@/types'
-
-const TRACK_COLORS = ['#22c55e', '#ef4444', '#2563eb', '#f59e0b', '#8b5cf6', '#0f766e', '#dc2626', '#475569']
-
-async function readError(response: Response, fallback: string): Promise<string> {
-  try {
-    const payload = (await response.json()) as { detail?: string }
-    if (payload.detail) return payload.detail
-  } catch {
-    // ignore non-JSON payloads
-  }
-  return fallback
-}
-
-function computeCurveBounds(depths: Float32Array, values: Float32Array, nullValue: number) {
-  let min = Number.POSITIVE_INFINITY
-  let max = Number.NEGATIVE_INFINITY
-  for (let i = 0; i < values.length; i += 1) {
-    const v = values[i]
-    if (!Number.isFinite(v) || v === nullValue) continue
-    min = Math.min(min, v)
-    max = Math.max(max, v)
-  }
-  if (!Number.isFinite(min) || !Number.isFinite(max) || min === max) {
-    const fallback = Number.isFinite(min) ? min : 0
-    return { min: fallback, max: fallback + 1 }
-  }
-  return { min, max }
-}
-
-function nextTrackNumber(tracks: TrackConfig[]): number {
-  const numbers = tracks.map((track) => {
-    const match = /^track-(\d+)$/.exec(track.id)
-    return match ? Number(match[1]) : 0
-  })
-  return Math.max(0, ...numbers) + 1
-}
+import { DataManagerTopPane } from './DataManagerTopPane'
+import { SettingsPaneShell } from './SettingsPaneShell'
+import { useDataManagerController } from './useDataManagerController'
 
 interface DataManagerPaneProps {
   sidebarRef: React.RefObject<HTMLElement | null>
@@ -48,392 +8,77 @@ interface DataManagerPaneProps {
 }
 
 export function DataManagerPane({ sidebarRef, onInternalSplitterMouseDown }: DataManagerPaneProps) {
-  const [wellInspectorDraft, setWellInspectorDraft] = useState({
-    well_name: '',
-    x: '',
-    y: '',
-    kb_elev: '',
-    gl_elev: '',
-    td_md: '',
-    crs: '',
-  })
-
-  const well = useWellDataStore((state) => state.well)
-  const curves = useWellDataStore((state) => state.curves)
-  const formations = useWellDataStore((state) => state.formations)
-  const stratCharts = useWellDataStore((state) => state.stratCharts)
-  const wellInventories = useWellDataStore((state) => state.wellInventories)
-  const loadWell = useWellDataStore((state) => state.loadWell)
-  const updateFormation = useWellDataStore((state) => state.updateFormation)
-  const updateFormationDepth = useWellDataStore((state) => state.updateFormationDepth)
-  const activateChart = useWellDataStore((state) => state.activateChart)
-  const deleteChart = useWellDataStore((state) => state.deleteChart)
-  const refreshWell = useWellDataStore((state) => state.refreshWell)
-
-  const activeSidebarTab = useWorkspaceStore((state) => state.activeSidebarTab)
-  const selectedFormationId = useWorkspaceStore((state) => state.selectedFormationId)
-  const selectedObject = useWorkspaceStore((state) => state.selectedObject)
-  const sidebarTopRatio = useWorkspaceStore((state) => state.sidebarTopRatio)
-  const wellViewStates = useWorkspaceStore((state) => state.wellViewStates)
-  const sidebarWidth = useWorkspaceStore((state) => state.sidebarWidth)
-  const setActiveSidebarTab = useWorkspaceStore((state) => state.setActiveSidebarTab)
-  const setActiveToolbarMode = useWorkspaceStore((state) => state.setActiveToolbarMode)
-  const setSelectedFormationId = useWorkspaceStore((state) => state.setSelectedFormationId)
-  const setSelectedObject = useWorkspaceStore((state) => state.setSelectedObject)
-  const updateWellViewState = useWorkspaceStore((state) => state.updateWellViewState)
-
-  const selectedTrackId = useViewStore((state) => state.selectedTrackId)
-
-  useEffect(() => {
-    if (!well) return
-    setWellInspectorDraft({
-      well_name: well.well_name,
-      x: String(well.x ?? 0),
-      y: String(well.y ?? 0),
-      kb_elev: String(well.kb_elev ?? 0),
-      gl_elev: String(well.gl_elev ?? 0),
-      td_md: String(well.td_md ?? 0),
-      crs: well.crs ?? '',
-    })
-  }, [well])
-
-  const activeWellView = useMemo(() => {
-    if (!well?.well_id) return createDefaultWellView()
-    return wellViewStates[well.well_id] ?? createDefaultWellView()
-  }, [well?.well_id, wellViewStates])
-
-  const { minDepth, maxDepth } = useMemo(() => {
-    if (curves.length === 0) return { minDepth: 0, maxDepth: 1000 }
-    let min = Infinity
-    let max = -Infinity
-    for (const curve of curves) {
-      if (curve.depths.length > 0) {
-        min = Math.min(min, curve.depths[0])
-        max = Math.max(max, curve.depths[curve.depths.length - 1])
-      }
-    }
-    return { minDepth: min, maxDepth: max }
-  }, [curves])
-
-  const visibleCurveMnemonics = useMemo(() => (
-    Array.from(new Set(activeWellView.tracks.flatMap((track) => track.curves.map((curve) => curve.mnemonic))))
-  ), [activeWellView.tracks])
-
-  const visibleCurveMnemonicsByWellId = useMemo(
-    () => Object.fromEntries(
-      Object.entries(wellViewStates).map(([wellId, state]) => [
-        wellId,
-        Array.from(new Set(state.tracks.flatMap((track) => track.curves.map((curve) => curve.mnemonic)))),
-      ]),
-    ),
-    [wellViewStates],
-  )
-
-  const visibleFormationIdsByWellId = useMemo(
-    () => Object.fromEntries(
-      Object.entries(wellViewStates).map(([wellId, state]) => [wellId, state.visibleFormationIds]),
-    ),
-    [wellViewStates],
-  )
-
-  const deviationVisibilityByWellId = useMemo(
-    () => Object.fromEntries(
-      Object.entries(wellViewStates).map(([wellId, state]) => [wellId, state.deviationVisible]),
-    ),
-    [wellViewStates],
-  )
-
-  const selectedFormation = useMemo(
-    () => formations.find((f) => f.id === selectedFormationId) ?? null,
-    [formations, selectedFormationId],
-  )
-
-  const selectedCurveConfig = useMemo(() => {
-    if (selectedObject?.type !== 'curve') return null
-    return activeWellView.tracks.flatMap((t) => t.curves).find((c) => c.mnemonic === selectedObject.mnemonic) ?? null
-  }, [activeWellView.tracks, selectedObject])
-
-  const selectedChart = useMemo(() => {
-    if (selectedObject?.type !== 'strat-chart') return null
-    return stratCharts.find((c) => c.id === selectedObject.chartId) ?? null
-  }, [selectedObject, stratCharts])
-
-  function handleSelectWell(wellId: string): void {
-    setSelectedObject({ type: 'well', wellId })
-    void loadWell(wellId)
-  }
-
-  async function handleSelectLasGroup(wellId: string): Promise<void> {
-    if (wellId !== well?.well_id) await loadWell(wellId)
-    setSelectedObject({ type: 'las-group', wellId })
-  }
-
-  async function handleSelectCurve(wellId: string, mnemonic: string): Promise<void> {
-    if (wellId !== well?.well_id) await loadWell(wellId)
-    if (selectedObject?.type === 'curve' && selectedObject.wellId === wellId && selectedObject.mnemonic === mnemonic) {
-      setSelectedObject(null)
-    } else {
-      setSelectedObject({ type: 'curve', wellId, mnemonic })
-    }
-  }
-
-  async function handleSelectTopsGroup(wellId: string): Promise<void> {
-    if (wellId !== well?.well_id) await loadWell(wellId)
-    setSelectedObject({ type: 'tops-group', wellId })
-  }
-
-  async function handleSetDeviationVisible(wellId: string, nextValue: boolean): Promise<void> {
-    if (wellId !== well?.well_id) await loadWell(wellId)
-    updateWellViewState(wellId, (state) => ({ ...state, deviationVisible: nextValue }))
-  }
-
-  async function handleToggleFormation(wellId: string, formationId: string, nextValue: boolean): Promise<void> {
-    if (wellId !== well?.well_id) await loadWell(wellId)
-    updateWellViewState(wellId, (state) => ({
-      ...state,
-      visibleFormationIds: nextValue
-        ? Array.from(new Set([...state.visibleFormationIds, formationId]))
-        : state.visibleFormationIds.filter((id) => id !== formationId),
-    }))
-  }
-
-  async function handleToggleAllFormations(wellId: string, nextValue: boolean): Promise<void> {
-    if (wellId !== well?.well_id) await loadWell(wellId)
-    const currentFormations = useWellDataStore.getState().formations
-    updateWellViewState(wellId, (state) => ({
-      ...state,
-      visibleFormationIds: nextValue ? currentFormations.map((f) => f.id) : [],
-    }))
-  }
-
-  async function handleSelectFormation(wellId: string, formationId: string): Promise<void> {
-    if (wellId !== well?.well_id) await loadWell(wellId)
-    if (selectedObject?.type === 'top-pick' && selectedObject.wellId === wellId && selectedObject.formationId === formationId) {
-      setSelectedObject(null)
-      setSelectedFormationId(null)
-    } else {
-      setSelectedFormationId(formationId)
-      setSelectedObject({ type: 'top-pick', wellId, formationId })
-      setActiveToolbarMode('tops')
-    }
-  }
-
-  async function handleToggleCurve(wellId: string, mnemonic: string, nextValue: boolean): Promise<void> {
-    if (wellId !== well?.well_id) await loadWell(wellId)
-    const activeWellId = useWellDataStore.getState().well?.well_id
-    if (!activeWellId) return
-    const curve = useWellDataStore.getState().curves.find((c) => c.mnemonic === mnemonic)
-    if (!curve) return
-
-    updateWellViewState(activeWellId, (state) => {
-      if (!nextValue) {
-        const nextTracks = state.tracks.map((track) => ({
-          ...track,
-          curves: track.curves.filter((c) => c.mnemonic !== mnemonic),
-        }))
-        const hasAnyCurve = nextTracks.some((track) => track.curves.length > 0)
-        return { ...state, tracks: hasAnyCurve ? nextTracks : [createEmptyTrack()] }
-      }
-
-      if (state.tracks.some((track) => track.curves.some((c) => c.mnemonic === mnemonic))) {
-        return state
-      }
-
-      const existingCount = state.tracks.reduce((n, t) => n + t.curves.length, 0)
-      const bounds = computeCurveBounds(curve.depths, curve.values, curve.null_value)
-      const curveConfig: TrackConfig['curves'][number] = {
-        mnemonic: curve.mnemonic,
-        unit: curve.unit,
-        color: TRACK_COLORS[existingCount % TRACK_COLORS.length],
-        lineWidth: 1.5,
-        lineStyle: 'solid',
-        scaleMin: bounds.min,
-        scaleMax: bounds.max,
-        scaleReversed: false,
-      }
-
-      if (selectedTrackId && state.tracks.some((t) => t.id === selectedTrackId)) {
-        return {
-          ...state,
-          tracks: state.tracks.map((track) =>
-            track.id !== selectedTrackId ? track : { ...track, curves: [...track.curves, curveConfig] },
-          ),
-        }
-      }
-
-      const trackNumber = nextTrackNumber(state.tracks)
-      return {
-        ...state,
-        tracks: [
-          ...state.tracks,
-          {
-            id: `track-${trackNumber}`,
-            title: `Track ${trackNumber}`,
-            width: 200,
-            scaleType: 'linear',
-            gridDivisions: 3,
-            showGrid: true,
-            curves: [curveConfig],
-          },
-        ],
-      }
-    })
-  }
-
-  async function handleToggleAllCurves(wellId: string, nextValue: boolean): Promise<void> {
-    if (wellId !== well?.well_id) await loadWell(wellId)
-    if (!nextValue) {
-      updateWellViewState(wellId, (state) => ({ ...state, tracks: [createEmptyTrack()] }))
-      return
-    }
-    useWellDataStore.getState().curves.forEach((curve) => {
-      void handleToggleCurve(wellId, curve.mnemonic, true)
-    })
-  }
-
-  function handleCurveSettingUpdate(mnemonic: string, patch: Partial<TrackConfig['curves'][number]>): void {
-    if (!well?.well_id) return
-    updateWellViewState(well.well_id, (state) => ({
-      ...state,
-      tracks: state.tracks.map((track) => ({
-        ...track,
-        curves: track.curves.map((curve) => (curve.mnemonic === mnemonic ? { ...curve, ...patch } : curve)),
-      })),
-    }))
-  }
-
-  async function handleSaveWellInspector(): Promise<void> {
-    if (!well?.well_id) return
-    const payload = {
-      well_name: wellInspectorDraft.well_name.trim(),
-      x: Number(wellInspectorDraft.x),
-      y: Number(wellInspectorDraft.y),
-      kb_elev: Number(wellInspectorDraft.kb_elev),
-      gl_elev: Number(wellInspectorDraft.gl_elev),
-      td_md: Number(wellInspectorDraft.td_md),
-      crs: wellInspectorDraft.crs.trim(),
-    }
-    const response = await fetch(`/api/wells/${well.well_id}`, {
-      method: 'PATCH',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(payload),
-    })
-    if (!response.ok) {
-      window.alert(await readError(response, `Failed to update well '${well.well_name}' (${response.status})`))
-      return
-    }
-    await refreshWell(well.well_id)
-  }
-
-  function handleWellInspectorDraftChange(field: keyof typeof wellInspectorDraft, value: string): void {
-    setWellInspectorDraft((current) => ({ ...current, [field]: value }))
-  }
+  const controller = useDataManagerController()
 
   return (
     <aside
       ref={sidebarRef as React.RefObject<HTMLElement>}
       className="app-sidebar"
-      style={{ width: `${sidebarWidth}px` }}
+      style={{ width: `${controller.sidebarWidth}px` }}
     >
-      <section
-        className="sidebar-panel app-sidebar__zone"
-        style={{ flex: `${sidebarTopRatio} 1 0%` }}
+      <div
+        className="app-sidebar__zone"
+        style={{ flex: `${controller.sidebarTopRatio} 1 0%`, minHeight: 0 }}
       >
-        <header className="sidebar-tabs">
-          <button
-            type="button"
-            className={`sidebar-tab ${activeSidebarTab === 'strat-charts' ? 'sidebar-tab--active' : ''}`}
-            onClick={() => setActiveSidebarTab('strat-charts')}
-          >
-            StratCharts
-          </button>
-          <button
-            type="button"
-            className={`sidebar-tab ${activeSidebarTab === 'wells' ? 'sidebar-tab--active' : ''}`}
-            onClick={() => setActiveSidebarTab('wells')}
-          >
-            Wells
-          </button>
-          <button
-            type="button"
-            className={`sidebar-tab ${activeSidebarTab === 'models' ? 'sidebar-tab--active' : ''}`}
-            onClick={() => setActiveSidebarTab('models')}
-          >
-            Models
-          </button>
-        </header>
-
-        {activeSidebarTab === 'strat-charts' ? (
-          <StratChartTab
-            charts={stratCharts}
-            onActivate={(chartId) => void activateChart(chartId)}
-            onDelete={(chartId) => void deleteChart(chartId)}
-            selectedChartId={selectedObject?.type === 'strat-chart' ? selectedObject.chartId : null}
-            onSelect={(chartId) => setSelectedObject({ type: 'strat-chart', chartId })}
-          />
-        ) : activeSidebarTab === 'wells' ? (
-          <WellDataPanel
-            wells={wellInventories}
-            activeWellId={well?.well_id ?? null}
-            visibleCurveMnemonicsByWellId={visibleCurveMnemonicsByWellId}
-            visibleFormationIdsByWellId={visibleFormationIdsByWellId}
-            deviationVisibilityByWellId={deviationVisibilityByWellId}
-            selectedFormationId={selectedFormationId}
-            onSelectWell={handleSelectWell}
-            onToggleCurve={handleToggleCurve}
-            onToggleFormation={handleToggleFormation}
-            onToggleAllFormations={handleToggleAllFormations}
-            onToggleAllCurves={handleToggleAllCurves}
-            onToggleDeviation={handleSetDeviationVisible}
-            onSelectFormation={handleSelectFormation}
-            selectedObject={selectedObject}
-            onSelectLasGroup={handleSelectLasGroup}
-            onSelectCurve={handleSelectCurve}
-            onSelectTopsGroup={handleSelectTopsGroup}
-          />
-        ) : (
-          <div className="sidebar-panel__body">
-            <p className="sidebar-panel__empty">Reserved for upcoming modelling workflows.</p>
-          </div>
-        )}
-      </section>
+        <DataManagerTopPane
+          activeSidebarTab={controller.activeSidebarTab}
+          activeWellId={controller.activeWellId}
+          deviationVisibilityByWellId={controller.deviationVisibilityByWellId}
+          onActivateChart={controller.onActivateChart}
+          onDeleteChart={controller.onDeleteChart}
+          onSelectChart={controller.onSelectChart}
+          onSelectCurve={controller.handleSelectCurve}
+          onSelectFormation={controller.handleSelectFormation}
+          onSelectLasGroup={controller.handleSelectLasGroup}
+          onSelectModelsTab={controller.onSelectModelsTab}
+          onSelectStratChartsTab={controller.onSelectStratChartsTab}
+          onSelectTopsGroup={controller.handleSelectTopsGroup}
+          onSelectWell={controller.handleSelectWell}
+          onSelectWellsTab={controller.onSelectWellsTab}
+          onToggleAllCurves={controller.handleToggleAllCurves}
+          onToggleAllFormations={controller.handleToggleAllFormations}
+          onToggleCurve={controller.handleToggleCurve}
+          onToggleDeviation={controller.handleSetDeviationVisible}
+          onToggleFormation={controller.handleToggleFormation}
+          selectedChartId={controller.selectedChartId}
+          selectedFormationId={controller.selectedFormationId}
+          selectedObject={controller.selectedObject}
+          stratCharts={controller.stratCharts}
+          visibleCurveMnemonicsByWellId={controller.visibleCurveMnemonicsByWellId}
+          visibleFormationIdsByWellId={controller.visibleFormationIdsByWellId}
+          wellInventories={controller.wellInventories}
+        />
+      </div>
 
       <div
         className="app-sidebar__splitter"
         onMouseDown={onInternalSplitterMouseDown}
       />
 
-      <section
-        className="sidebar-panel app-sidebar__zone"
-        style={{ flex: `${1 - sidebarTopRatio} 1 0%` }}
+      <div
+        className="app-sidebar__zone"
+        style={{ flex: `${1 - controller.sidebarTopRatio} 1 0%`, minHeight: 0 }}
       >
-        <header className="sidebar-panel__header">
-          <h2 className="sidebar-panel__title">Settings</h2>
-        </header>
-        <div className="sidebar-panel__body">
-          <SettingsInspector
-            selectedObject={selectedObject}
-            well={well}
-            wellInspectorDraft={wellInspectorDraft}
-            onWellInspectorDraftChange={handleWellInspectorDraftChange}
-            onSaveWellInspector={handleSaveWellInspector}
-            selectedCurveConfig={selectedCurveConfig}
-            onCurveSettingUpdate={handleCurveSettingUpdate}
-            formations={formations}
-            visibleFormationIds={activeWellView.visibleFormationIds}
-            selectedFormation={selectedFormation}
-            onFormationUpdate={(formationId, patch) => void updateFormation(formationId, patch)}
-            onFormationMove={(formationId, depth) => {
-              if (Number.isFinite(depth)) void updateFormationDepth(formationId, depth)
-            }}
-            selectedChart={selectedChart}
-            curveCount={curves.length}
-            visibleCurveCount={visibleCurveMnemonics.length}
-            minDepth={minDepth}
-            maxDepth={maxDepth}
-          />
-        </div>
-      </section>
+        <SettingsPaneShell
+          selectedObject={controller.selectedObject}
+          well={controller.well}
+          wellInspectorDraft={controller.wellInspectorDraft}
+          onWellInspectorDraftChange={controller.handleWellInspectorDraftChange}
+          onSaveWellInspector={controller.handleSaveWellInspector}
+          selectedCurveConfig={controller.selectedCurveConfig}
+          onCurveSettingUpdate={controller.handleCurveSettingUpdate}
+          formations={controller.formations}
+          visibleFormationIds={controller.visibleFormationIds}
+          selectedFormation={controller.selectedFormation}
+          onFormationUpdate={controller.setFormationUpdate}
+          onFormationMove={controller.setFormationMove}
+          selectedChart={controller.selectedChart}
+          curveCount={controller.curveCount}
+          visibleCurveCount={controller.visibleCurveCount}
+          minDepth={controller.minDepth}
+          maxDepth={controller.maxDepth}
+        />
+      </div>
     </aside>
   )
 }

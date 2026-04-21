@@ -102,8 +102,6 @@ describe('Curve Clipping - Binary Search Bounds', () => {
   describe('Clipping with buffer', () => {
     it('should clip curve with 10% buffer correctly', () => {
       const depths = new Float32Array([0, 100, 200, 300, 400, 500])
-      const values = new Float32Array([10, 20, 30, 40, 50, 60])
-
       const visibleMin = 150
       const visibleMax = 350
       const span = visibleMax - visibleMin

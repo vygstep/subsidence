@@ -30,6 +30,7 @@ export interface ViewStore {
   clearSelection: () => void
   setViewportHeight: (height: number) => void
   setTrackWidth: (id: string, width: number) => void
+  applyActiveWellTrackWidths: (trackWidths: Record<string, number>) => void
   applyVisualConfig: (config: VisualConfigPayload) => void
   resetVisualConfig: () => void
 }
@@ -46,6 +47,8 @@ const initialScrollDepth = 0
 const initialDepthPerPixel = 0.2
 const initialViewportHeight = 800
 const minimumTrackWidth = 80
+const DEPTH_TRACK_ID = 'depth'
+const FORMATION_TRACK_ID = 'formations'
 
 function normalizeTrackWidths(trackWidths: Record<string, number> | undefined): Record<string, number> {
   if (!trackWidths) {
@@ -107,6 +110,23 @@ export const useViewStore = create<ViewStore>((set) => ({
         [id]: Math.max(minimumTrackWidth, Math.round(width)),
       },
     }))
+  },
+  applyActiveWellTrackWidths(trackWidths) {
+    set((state) => {
+      const preserved: Record<string, number> = {}
+      if (state.trackWidths[DEPTH_TRACK_ID] !== undefined) {
+        preserved[DEPTH_TRACK_ID] = state.trackWidths[DEPTH_TRACK_ID]
+      }
+      if (state.trackWidths[FORMATION_TRACK_ID] !== undefined) {
+        preserved[FORMATION_TRACK_ID] = state.trackWidths[FORMATION_TRACK_ID]
+      }
+      return {
+        trackWidths: {
+          ...preserved,
+          ...normalizeTrackWidths(trackWidths),
+        },
+      }
+    })
   },
   applyVisualConfig(config) {
     set((state) => {

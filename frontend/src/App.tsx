@@ -3,6 +3,9 @@ import { useEffect, useRef } from 'react'
 import { DataManagerPane, ProjectToolbar, StatusBar, ViewerWorkspace } from '@/components'
 import { useSidebarResize } from '@/hooks'
 import {
+  collectProjectVisualConfig,
+  coerceWellViewState,
+  createDefaultWellView,
   useProjectStore,
   useViewStore,
   useWellDataStore,
@@ -20,8 +23,10 @@ function App() {
   const isProjectOpen = useProjectStore((state) => state.isOpen)
   const projectPath = useProjectStore((state) => state.projectPath)
   const pollStatus = useProjectStore((state) => state.pollStatus)
-  const loadVisualConfig = useProjectStore((state) => state.loadVisualConfig)
-  const saveVisualConfig = useProjectStore((state) => state.saveVisualConfig)
+  const loadScopedVisualConfig = useProjectStore((state) => state.loadScopedVisualConfig)
+  const markVisualConfigDirty = useProjectStore((state) => state.markVisualConfigDirty)
+  const clearVisualConfigDirty = useProjectStore((state) => state.clearVisualConfigDirty)
+  const visualConfigSaveToken = useProjectStore((state) => state.visualConfigSaveToken)
 
   const depthPerPixel = useViewStore((state) => state.depthPerPixel)
   const selectTrack = useViewStore((state) => state.selectTrack)
@@ -29,6 +34,7 @@ function App() {
   const selectedElementId = useViewStore((state) => state.selectedElementId)
   const selectedElementType = useViewStore((state) => state.selectedElementType)
   const trackWidths = useViewStore((state) => state.trackWidths)
+  const applyActiveWellTrackWidths = useViewStore((state) => state.applyActiveWellTrackWidths)
   const resetVisualConfig = useViewStore((state) => state.resetVisualConfig)
 
   const formations = useWellDataStore((state) => state.formations)
@@ -37,10 +43,15 @@ function App() {
   const setSelectedObject = useWorkspaceStore((state) => state.setSelectedObject)
   const resetWorkspace = useWorkspaceStore((state) => state.resetWorkspace)
   const ensureWellViewState = useWorkspaceStore((state) => state.ensureWellViewState)
+  const replaceWellViewStates = useWorkspaceStore((state) => state.replaceWellViewStates)
+  const wellViewStates = useWorkspaceStore((state) => state.wellViewStates)
   const wellInventories = useWellDataStore((state) => state.wellInventories)
 
   const configHydratedRef = useRef(false)
+  const wellViewsHydratedRef = useRef(false)
   const lastProjectPathRef = useRef<string | null>(null)
+  const lastSerializedProjectVisualConfigRef = useRef<string>('')
+  const lastSerializedWellViewsRef = useRef<Record<string, string>>({})
 
   const { workspaceRef, sidebarRef, startWidthDrag, startSplitDrag } = useSidebarResize()
 
@@ -71,6 +82,9 @@ function App() {
   useEffect(() => {
     if (!isProjectOpen) {
       configHydratedRef.current = false
+      wellViewsHydratedRef.current = false
+      lastSerializedProjectVisualConfigRef.current = ''
+      lastSerializedWellViewsRef.current = {}
       resetWell()
       resetVisualConfig()
       selectTrack(null)
@@ -81,7 +95,10 @@ function App() {
     let cancelled = false
     const hydrate = async () => {
       try {
-        await loadVisualConfig()
+        await loadScopedVisualConfig('project')
+        if (!cancelled) {
+          lastSerializedProjectVisualConfigRef.current = JSON.stringify(collectProjectVisualConfig())
+        }
       } catch {
         if (!cancelled) resetVisualConfig()
       } finally {
@@ -90,20 +107,12 @@ function App() {
     }
     void hydrate()
     return () => { cancelled = true }
-  }, [isProjectOpen, loadVisualConfig, resetVisualConfig, resetWell, resetWorkspace, selectTrack])
+  }, [isProjectOpen, loadScopedVisualConfig, resetVisualConfig, resetWell, resetWorkspace, selectTrack])
 
   useEffect(() => {
     if (!isProjectOpen) return
     void loadStratCharts()
   }, [isProjectOpen, loadStratCharts])
-
-  useEffect(() => {
-    if (!isProjectOpen || !configHydratedRef.current) return
-    const timer = window.setTimeout(() => {
-      void saveVisualConfig({ depthPerPixel, trackWidths, curveColors: colorOverrides })
-    }, 500)
-    return () => window.clearTimeout(timer)
-  }, [colorOverrides, depthPerPixel, isProjectOpen, saveVisualConfig, trackWidths])
 
   useEffect(() => {
     if (!isProjectOpen) {
@@ -120,7 +129,28 @@ function App() {
         const wells = useWellDataStore.getState().wellInventories
         if (cancelled) return
         lastProjectPathRef.current = projectPath
-        if (wells.length === 0) { resetWell(); return }
+        if (wells.length === 0) {
+          replaceWellViewStates({})
+          wellViewsHydratedRef.current = true
+          lastSerializedWellViewsRef.current = {}
+          resetWell()
+          return
+        }
+
+        const viewEntries = await Promise.all(
+          wells.map(async (entry) => {
+            const rawConfig = await loadScopedVisualConfig('well', entry.well_id)
+            return [entry.well_id, coerceWellViewState(rawConfig)] as const
+          }),
+        )
+        if (cancelled) return
+        const nextWellViews = Object.fromEntries(viewEntries)
+        replaceWellViewStates(nextWellViews)
+        lastSerializedProjectVisualConfigRef.current = JSON.stringify(collectProjectVisualConfig())
+        lastSerializedWellViewsRef.current = Object.fromEntries(
+          Object.entries(nextWellViews).map(([wellId, state]) => [wellId, JSON.stringify(state)]),
+        )
+        wellViewsHydratedRef.current = true
 
         const currentWellId = well?.well_id
         const hasCurrent = !projectChanged && currentWellId ? wells.some((w) => w.well_id === currentWellId) : false
@@ -135,7 +165,7 @@ function App() {
     }
     void loadCurrentProject()
     return () => { cancelled = true }
-  }, [isProjectOpen, projectPath, loadWell, loadWellInventories, resetWell, selectTrack, well, setSelectedFormationId])
+  }, [isProjectOpen, projectPath, loadScopedVisualConfig, loadWell, loadWellInventories, replaceWellViewStates, resetWell, selectTrack, well, setSelectedFormationId])
 
   useEffect(() => {
     if (selectedFormationId && !formations.some((f) => f.id === selectedFormationId)) {
@@ -145,6 +175,7 @@ function App() {
 
   useEffect(() => {
     if (!well?.well_id) {
+      applyActiveWellTrackWidths({})
       selectTrack(null)
       setSelectedFormationId(null)
       setSelectedObject(null)
@@ -154,12 +185,59 @@ function App() {
     selectTrack(null)
     setSelectedFormationId(null)
     setSelectedObject({ type: 'well', wellId: well.well_id })
-  }, [ensureWellViewState, selectTrack, well?.well_id, setSelectedFormationId, setSelectedObject])
+  }, [applyActiveWellTrackWidths, ensureWellViewState, selectTrack, well?.well_id, setSelectedFormationId, setSelectedObject])
 
   useEffect(() => {
     if (wellInventories.length === 0) return
     wellInventories.forEach((inventory) => ensureWellViewState(inventory.well_id))
   }, [ensureWellViewState, wellInventories])
+
+  useEffect(() => {
+    if (!well?.well_id) {
+      applyActiveWellTrackWidths({})
+      return
+    }
+    const activeWellView = wellViewStates[well.well_id] ?? createDefaultWellView()
+    applyActiveWellTrackWidths(
+      Object.fromEntries(activeWellView.tracks.map((track) => [track.id, track.width])),
+    )
+  }, [applyActiveWellTrackWidths, well?.well_id, wellViewStates])
+
+  useEffect(() => {
+    if (!isProjectOpen || !configHydratedRef.current || !wellViewsHydratedRef.current) return
+
+    const projectChanged = lastSerializedProjectVisualConfigRef.current !== JSON.stringify(collectProjectVisualConfig())
+    const currentWellIds = new Set(Object.keys(wellViewStates))
+    const baselineWellIds = new Set(Object.keys(lastSerializedWellViewsRef.current))
+    const wellViewsChanged = (
+      Object.entries(wellViewStates).some(([wellId, state]) => lastSerializedWellViewsRef.current[wellId] !== JSON.stringify(state))
+      || Array.from(baselineWellIds).some((wellId) => !currentWellIds.has(wellId))
+    )
+
+    if (projectChanged || wellViewsChanged) {
+      markVisualConfigDirty()
+    } else {
+      clearVisualConfigDirty()
+    }
+  }, [
+    clearVisualConfigDirty,
+    colorOverrides,
+    configHydratedRef,
+    depthPerPixel,
+    isProjectOpen,
+    markVisualConfigDirty,
+    trackWidths,
+    wellViewStates,
+  ])
+
+  useEffect(() => {
+    if (!isProjectOpen || visualConfigSaveToken === 0) return
+    lastSerializedProjectVisualConfigRef.current = JSON.stringify(collectProjectVisualConfig())
+    lastSerializedWellViewsRef.current = Object.fromEntries(
+      Object.entries(wellViewStates).map(([wellId, state]) => [wellId, JSON.stringify(state)]),
+    )
+    clearVisualConfigDirty()
+  }, [clearVisualConfigDirty, isProjectOpen, visualConfigSaveToken, wellViewStates])
 
   return (
     <div className="app-layout">

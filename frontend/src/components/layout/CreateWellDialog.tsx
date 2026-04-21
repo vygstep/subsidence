@@ -104,11 +104,11 @@ export function CreateWellDialog({ onClose, onSuccess }: CreateWellDialogProps) 
 
         <div className="project-dialog__grid">
           <label className="project-dialog__field">
-            <span>X</span>
+            <span>Project X</span>
             <input type="number" value={x} onChange={(event) => setX(event.target.value)} />
           </label>
           <label className="project-dialog__field">
-            <span>Y</span>
+            <span>Project Y</span>
             <input type="number" value={y} onChange={(event) => setY(event.target.value)} />
           </label>
           <label className="project-dialog__field">

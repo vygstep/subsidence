@@ -2,6 +2,10 @@
 
 This file records the verification outcomes after the cleanup pass.
 
+For the second stabilization pass, see also:
+
+- `docs/phase3-cleanup2-verification.md`
+
 It is not a planning document. It exists to show which checks were actually run,
 which bugs were fixed during verification, and which items still require manual UI
 coverage.

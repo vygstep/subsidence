@@ -1,7 +1,6 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest'
 import { renderHook, act, waitFor } from '@testing-library/react'
 import { useWellDataStore } from '@/stores/wellDataStore'
-import { useWorkspaceStore } from '@/stores/workspaceStore'
 import { createMockWell, createMockFormations, createMockCurveData } from '../fixtures'
 
 describe('WellSwitching - Selection Cleanup + Data Reload', () => {

@@ -3,7 +3,7 @@ import type { TrackConfig } from '@/types'
 
 const TRACK_COLORS = ['#22c55e', '#ef4444', '#2563eb', '#f59e0b', '#8b5cf6', '#0f766e', '#dc2626', '#475569']
 
-function computeBounds(depths: Float32Array, values: Float32Array, nullValue: number) {
+function computeBounds(values: Float32Array, nullValue: number) {
   let min = Number.POSITIVE_INFINITY
   let max = Number.NEGATIVE_INFINITY
   for (let i = 0; i < values.length; i++) {
@@ -40,7 +40,7 @@ export function CurveBrowser() {
       if (state.tracks.some((t) => t.curves.some((c) => c.mnemonic === mnemonic))) return state
 
       const existingCount = state.tracks.reduce((n, t) => n + t.curves.length, 0)
-      const bounds = computeBounds(curve.depths, curve.values, curve.null_value)
+      const bounds = computeBounds(curve.values, curve.null_value)
       const curveConfig: TrackConfig['curves'][number] = {
         mnemonic: curve.mnemonic,
         unit: curve.unit,
