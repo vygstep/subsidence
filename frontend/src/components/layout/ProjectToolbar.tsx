@@ -116,6 +116,9 @@ export function ProjectToolbar() {
   const dropWellViewState = useWorkspaceStore((state) => state.dropWellViewState)
 
   const selectTrack = useViewStore((state) => state.selectTrack)
+  const depthType = useViewStore((state) => state.depthType)
+  const setDepthType = useViewStore((state) => state.setDepthType)
+  const tvdTable = useWellDataStore((state) => state.tvdTable)
 
   const wellOptions = useMemo(
     () => wellInventories.map((item) => ({ well_id: item.well_id, well_name: item.well_name })),
@@ -471,6 +474,17 @@ export function ProjectToolbar() {
                   {topsModeActions}
                 </>
               ) : null}
+            </div>
+            <div className="app-topbar__right-actions">
+              <button
+                type="button"
+                className={`app-topbar__toggle ${depthType === 'TVD' ? 'app-topbar__toggle--active' : ''}`}
+                disabled={!tvdTable}
+                title={tvdTable ? 'Toggle MD / TVD depth display' : 'No deviation survey — TVD unavailable'}
+                onClick={() => setDepthType(depthType === 'MD' ? 'TVD' : 'MD')}
+              >
+                TVD
+              </button>
             </div>
             <ZoomControl />
           </div>

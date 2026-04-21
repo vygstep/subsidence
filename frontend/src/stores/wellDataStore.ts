@@ -1,6 +1,7 @@
 import { create } from 'zustand'
 
 import type { CompactionModel, CurveData, FormationTop, LithologyParam, StratChartInfo, Well, WellInventory } from '@/types'
+import { minCurvatureToTVD, type TVDTable } from '@/utils/depthTransform'
 
 interface CurveResponse {
   mnemonic: string
@@ -57,6 +58,7 @@ export interface WellDataStore {
   colorOverrides: Record<string, string>
   stratCharts: StratChartInfo[]
   compactionModels: CompactionModel[]
+  tvdTable: TVDTable | null
   isLoading: boolean
   error: string | null
   reset: () => void
@@ -136,6 +138,7 @@ const emptyState = {
   colorOverrides: {},
   stratCharts: [],
   compactionModels: [],
+  tvdTable: null,
   isLoading: false,
   error: null,
 }
@@ -181,9 +184,33 @@ export const useWellDataStore = create<WellDataStore>((set, get) => ({
           null_value: curve.null_value,
         })),
         formations: sortFormations(formationPayload.map(mapFormation)),
+        tvdTable: null,
         isLoading: false,
         error: null,
       })
+
+      // Load TVD table if INCL_AZIM deviation survey exists
+      if (well.deviation?.mode === 'INCL_AZIM') {
+        try {
+          const devResponse = await fetch(`/api/wells/${wellId}/deviation`)
+          if (devResponse.ok) {
+            const devData = (await devResponse.json()) as {
+              md: number[]
+              inclination_deg: number[]
+              azimuth_deg: number[]
+            }
+            const survey = devData.md.map((md, i) => ({
+              md,
+              inclination_deg: devData.inclination_deg[i],
+              azimuth_deg: devData.azimuth_deg[i],
+            }))
+            set({ tvdTable: minCurvatureToTVD(survey) })
+          }
+        } catch {
+          // TVD is optional — silently ignore fetch errors
+        }
+      }
+
       await get().loadWellInventories()
     } catch (error) {
       const inventories = get().wellInventories

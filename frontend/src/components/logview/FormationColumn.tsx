@@ -1,9 +1,10 @@
 import { useMemo } from 'react'
 
 import { useCanvasRenderer, useDepthScale } from '@/hooks'
-import { useViewStore } from '@/stores'
+import { useViewStore, useWellDataStore } from '@/stores'
 import { drawLithologyBlock } from '@/renderers'
 import type { FormationTop, LithologyType } from '@/types'
+import { mdToTvd } from '@/utils/depthTransform'
 
 interface FormationColumnProps {
   formations: FormationTop[]
@@ -23,6 +24,13 @@ function toRenderableLithology(lithology: LithologyType | undefined) {
 export function FormationColumn({ formations, height, maxDepth, width = 80, isSelected = false }: FormationColumnProps) {
   const visibleDepthRange = useViewStore((state) => state.visibleDepthRange)
   const formationsTrackConfig = useViewStore((state) => state.formationsTrackConfig)
+  const depthType = useViewStore((state) => state.depthType)
+  const tvdTable = useWellDataStore((state) => state.tvdTable)
+
+  const toDisplayDepth = useMemo(
+    () => (depthType === 'TVD' && tvdTable ? (md: number) => mdToTvd(md, tvdTable) : (md: number) => md),
+    [depthType, tvdTable],
+  )
 
   const orderedFormations = useMemo(
     () => [...formations].sort((left, right) => left.depth_md - right.depth_md),
@@ -41,8 +49,8 @@ export function FormationColumn({ formations, height, maxDepth, width = 80, isSe
       }
 
       orderedFormations.forEach((formation, index) => {
-        const nextDepth = orderedFormations[index + 1]?.depth_md ?? maxDepth
-        const blockTop = Math.max(formation.depth_md, visibleDepthRange.min)
+        const nextDepth = toDisplayDepth(orderedFormations[index + 1]?.depth_md ?? maxDepth)
+        const blockTop = Math.max(toDisplayDepth(formation.depth_md), visibleDepthRange.min)
         const blockBottom = Math.min(nextDepth, visibleDepthRange.max)
 
         if (blockBottom <= blockTop) {
@@ -85,6 +93,7 @@ export function FormationColumn({ formations, height, maxDepth, width = 80, isSe
       formationsTrackConfig.nameSource,
       maxDepth,
       orderedFormations,
+      toDisplayDepth,
       visibleDepthRange.max,
       visibleDepthRange.min,
     ],

@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import math
 
+import pandas as pd
 import numpy as np
 from fastapi import APIRouter, HTTPException, Query, Request
 from pydantic import BaseModel
@@ -415,3 +416,34 @@ def patch_well(well_id: str, payload: WellPatchRequest, request: Request) -> Wel
         manager.execute_command(UpdateWell(well_id, old_values, new_values))
 
     return get_well(well_id, request)
+
+
+class DeviationSurveyResponse(BaseModel):
+    md: list[float]
+    inclination_deg: list[float]
+    azimuth_deg: list[float]
+
+
+@router.get('/wells/{well_id}/deviation', response_model=DeviationSurveyResponse)
+def get_deviation(well_id: str, request: Request) -> DeviationSurveyResponse:
+    manager = _require_open_project(request)
+    with manager.get_session() as session:
+        well = session.get(WellModel, well_id)
+        if well is None:
+            raise HTTPException(status_code=404, detail=f'Well not found: {well_id}')
+        survey = session.scalar(select(DeviationSurveyModel).where(DeviationSurveyModel.well_id == well.id))
+        if survey is None or survey.mode != 'INCL_AZIM':
+            raise HTTPException(status_code=404, detail='No INCL_AZIM deviation survey for this well')
+
+    parquet_path = manager.project_path / survey.data_uri
+    frame: pd.DataFrame = pd.read_parquet(parquet_path)
+    # Depth column is named 'md', 'tvd', or 'tvdss' depending on what was imported
+    depth_col = next((c for c in frame.columns if c.lower() in ('md', 'tvd', 'tvdss')), None)
+    if depth_col is None or 'incl_deg' not in frame.columns or 'azim_deg' not in frame.columns:
+        raise HTTPException(status_code=422, detail='Deviation parquet missing required columns')
+
+    return DeviationSurveyResponse(
+        md=frame[depth_col].tolist(),
+        inclination_deg=frame['incl_deg'].tolist(),
+        azimuth_deg=frame['azim_deg'].tolist(),
+    )

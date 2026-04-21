@@ -6,6 +6,7 @@ export function drawDepthLabels(
   width: number,
   majorInterval: number,
   unit: 'm' | 'km' | 'ft' = 'm',
+  labelTransform?: (md: number) => number,
 ): void {
   const [depthStart, depthEnd] = depthScale.domain()
   const firstLabel = Math.ceil(depthStart / majorInterval) * majorInterval
@@ -18,8 +19,9 @@ export function drawDepthLabels(
 
   for (let depth = firstLabel; depth <= depthEnd; depth += majorInterval) {
     const y = depthScale(depth)
+    const rawValue = labelTransform ? labelTransform(depth) : depth
     const displayValue =
-      unit === 'km' ? depth / 1000 : unit === 'ft' ? depth * 3.28084 : depth
+      unit === 'km' ? rawValue / 1000 : unit === 'ft' ? rawValue * 3.28084 : rawValue
     const digits = unit === 'm' ? 0 : 2
     ctx.fillText(`${displayValue.toFixed(digits)} ${unit}`, width - 10, y)
   }

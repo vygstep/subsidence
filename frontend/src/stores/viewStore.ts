@@ -43,6 +43,7 @@ export interface ViewStore {
   trackWidths: Record<string, number>
   viewportHeight: number
   splitRatio: number
+  depthType: 'MD' | 'TVD'
   setScroll: (depth: number) => void
   setScale: (dpp: number) => void
   setCursorDepth: (depth: number | null) => void
@@ -57,6 +58,7 @@ export interface ViewStore {
   setViewportHeight: (height: number) => void
   setTrackWidth: (id: string, width: number) => void
   setSplitRatio: (ratio: number) => void
+  setDepthType: (t: 'MD' | 'TVD') => void
   applyActiveWellTrackWidths: (trackWidths: Record<string, number>) => void
   applyVisualConfig: (config: VisualConfigPayload) => void
   resetVisualConfig: () => void
@@ -113,6 +115,7 @@ export const useViewStore = create<ViewStore>((set) => ({
   trackWidths: {},
   viewportHeight: initialViewportHeight,
   splitRatio: initialSplitRatio,
+  depthType: 'MD',
   setScroll(depth) {
     set((state) => ({
       scrollDepth: depth,
@@ -183,6 +186,9 @@ export const useViewStore = create<ViewStore>((set) => ({
   setSplitRatio(ratio) {
     set({ splitRatio: Math.max(0.2, Math.min(0.8, ratio)) })
   },
+  setDepthType(t) {
+    set({ depthType: t })
+  },
   applyActiveWellTrackWidths(trackWidths) {
     set((state) => {
       const preserved: Record<string, number> = {}
@@ -228,6 +234,7 @@ export const useViewStore = create<ViewStore>((set) => ({
       trackWidths: {},
       depthTrackConfig: initialDepthTrackConfig,
       formationsTrackConfig: initialFormationsTrackConfig,
+      depthType: 'MD',
       visibleDepthRange: deriveVisibleDepthRange(state.scrollDepth, initialDepthPerPixel, state.viewportHeight),
     }))
   },

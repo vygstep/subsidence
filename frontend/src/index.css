@@ -191,6 +191,36 @@ textarea {
   background: rgba(255, 255, 255, 0.14);
 }
 
+.app-topbar__right-actions {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  margin-left: auto;
+}
+
+.app-topbar__toggle {
+  border: 1px solid rgba(124, 184, 232, 0.24);
+  background: rgba(255, 255, 255, 0.06);
+  color: #d7e8f7;
+  font-size: 0.72rem;
+  font-weight: 700;
+  padding: 3px 10px;
+  border-radius: 6px;
+  cursor: pointer;
+  letter-spacing: 0.05em;
+}
+
+.app-topbar__toggle:disabled {
+  opacity: 0.35;
+  cursor: not-allowed;
+}
+
+.app-topbar__toggle--active {
+  background: rgba(37, 99, 235, 0.28);
+  border-color: #3b82f6;
+  color: #93c5fd;
+}
+
 .app-action-button,
 .app-well-selector {
   border: 1px solid rgba(124, 184, 232, 0.24);
