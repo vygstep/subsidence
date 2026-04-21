@@ -1,6 +1,9 @@
 import type { SelectedObject } from '@/stores/workspaceStore'
 import type { FormationTop, StratChartInfo, TrackConfig, Well } from '@/types'
 
+import { CurveBrowser } from './CurveBrowser'
+import { FormationTopsList } from './FormationTopsList'
+
 interface WellInspectorDraft {
   well_name: string
   x: string
@@ -150,6 +153,10 @@ export function SettingsInspector({
         <div className="tree-leaf"><span>Curves</span><span>{curveCount}</span></div>
         <div className="tree-leaf"><span>Visible</span><span>{visibleCurveCount}</span></div>
         <div className="tree-leaf"><span>Depth range</span><span>{minDepth.toFixed(1)} - {maxDepth.toFixed(1)}</span></div>
+        <div className="template-panel__group" style={{ marginTop: 8 }}>
+          <div className="template-panel__label">Add to viewer</div>
+        </div>
+        <CurveBrowser />
       </div>
     )
   }
@@ -231,6 +238,7 @@ export function SettingsInspector({
           <span>Linked picks</span>
           <span>{formations.filter((formation) => Boolean(formation.active_strat_unit_name)).length}</span>
         </div>
+        <FormationTopsList />
       </div>
     )
   }
