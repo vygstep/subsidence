@@ -1,6 +1,6 @@
 import { useEffect, useRef } from 'react'
 
-import { DataManagerPane, ProjectToolbar, StatusBar, ViewerWorkspace } from '@/components'
+import { DataManagerPane, ProjectToolbar, PropertyPanel, StatusBar, ViewerWorkspace } from '@/components'
 import { useSidebarResize } from '@/hooks'
 import {
   useProjectStore,
@@ -162,6 +162,7 @@ function App() {
               onMouseDown={startWidthDrag}
             />
             <ViewerWorkspace />
+            <PropertyPanel />
           </div>
         ) : null}
       </main>
