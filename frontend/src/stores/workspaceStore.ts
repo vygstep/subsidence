@@ -9,6 +9,7 @@ export type SidebarTab = 'wells' | 'models' | 'strat-charts'
 export type ToolbarMode = 'project' | 'strat-chart' | 'wells' | 'tops'
 export type SelectedObject =
   | { type: 'well'; wellId: string }
+  | { type: 'depth-track'; wellId: string }
   | { type: 'las-group'; wellId: string }
   | { type: 'curve'; wellId: string; mnemonic: string }
   | { type: 'tops-group'; wellId: string }

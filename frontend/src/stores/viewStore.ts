@@ -9,9 +9,17 @@ interface VisualConfigPayload {
   depthPerPixel?: number
   trackWidths?: Record<string, number>
   splitRatio?: number
+  depthTrackConfig?: Partial<DepthTrackConfig>
 }
 
 export type SelectedElementType = 'curve' | 'track' | 'formation'
+
+export interface DepthTrackConfig {
+  backgroundColor: string
+  majorInterval: number
+  minorInterval: number
+  unit: 'm' | 'km' | 'ft'
+}
 
 export interface ViewStore {
   scrollDepth: number
@@ -21,6 +29,7 @@ export interface ViewStore {
   overviewVisible: boolean
   curveTooltipVisible: boolean
   interactionMode: 'view' | 'edit-tops'
+  depthTrackConfig: DepthTrackConfig
   selectedTrackId: string | null
   selectedElementId: string | null
   selectedElementType: SelectedElementType | null
@@ -33,6 +42,7 @@ export interface ViewStore {
   setOverviewVisible: (visible: boolean) => void
   setCurveTooltipVisible: (visible: boolean) => void
   setInteractionMode: (mode: 'view' | 'edit-tops') => void
+  updateDepthTrackConfig: (patch: Partial<DepthTrackConfig>) => void
   selectTrack: (trackId: string | null) => void
   selectElement: (id: string, type: SelectedElementType) => void
   clearSelection: () => void
@@ -59,6 +69,12 @@ const initialSplitRatio = 0.55
 const minimumTrackWidth = 80
 const DEPTH_TRACK_ID = 'depth'
 const FORMATION_TRACK_ID = 'formations'
+const initialDepthTrackConfig: DepthTrackConfig = {
+  backgroundColor: '#ffffff',
+  majorInterval: 100,
+  minorInterval: 10,
+  unit: 'm',
+}
 
 function normalizeTrackWidths(trackWidths: Record<string, number> | undefined): Record<string, number> {
   if (!trackWidths) {
@@ -77,6 +93,7 @@ export const useViewStore = create<ViewStore>((set) => ({
   overviewVisible: true,
   curveTooltipVisible: true,
   interactionMode: 'view',
+  depthTrackConfig: initialDepthTrackConfig,
   selectedTrackId: null,
   selectedElementId: null,
   selectedElementType: null,
@@ -106,6 +123,14 @@ export const useViewStore = create<ViewStore>((set) => ({
   },
   setInteractionMode(interactionMode) {
     set({ interactionMode })
+  },
+  updateDepthTrackConfig(patch) {
+    set((state) => ({
+      depthTrackConfig: {
+        ...state.depthTrackConfig,
+        ...patch,
+      },
+    }))
   },
   selectTrack(selectedTrackId) {
     set({ selectedTrackId, selectedElementId: selectedTrackId, selectedElementType: selectedTrackId ? 'track' : null })
@@ -162,6 +187,11 @@ export const useViewStore = create<ViewStore>((set) => ({
         depthPerPixel: nextDepthPerPixel,
         trackWidths: normalizeTrackWidths(config.trackWidths),
         splitRatio: Math.max(0.2, Math.min(0.8, rawRatio)),
+        depthTrackConfig: {
+          ...initialDepthTrackConfig,
+          ...state.depthTrackConfig,
+          ...(config.depthTrackConfig ?? {}),
+        },
         visibleDepthRange: deriveVisibleDepthRange(state.scrollDepth, nextDepthPerPixel, state.viewportHeight),
       }
     })
@@ -170,6 +200,7 @@ export const useViewStore = create<ViewStore>((set) => ({
     set((state) => ({
       depthPerPixel: initialDepthPerPixel,
       trackWidths: {},
+      depthTrackConfig: initialDepthTrackConfig,
       visibleDepthRange: deriveVisibleDepthRange(state.scrollDepth, initialDepthPerPixel, state.viewportHeight),
     }))
   },

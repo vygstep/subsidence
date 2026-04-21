@@ -2,7 +2,7 @@ import { create } from 'zustand'
 
 import { rememberProjectBundlePath } from '@/components/layout/pathMemory'
 
-import { useViewStore } from './viewStore'
+import { useViewStore, type DepthTrackConfig } from './viewStore'
 import { useWellDataStore } from './wellDataStore'
 import { useWorkspaceStore } from './workspaceStore'
 
@@ -52,6 +52,7 @@ interface VisualConfigPayload {
   trackWidths?: Record<string, number>
   curveColors?: Record<string, string>
   splitRatio?: number
+  depthTrackConfig?: Partial<DepthTrackConfig>
 }
 
 interface ProjectStatusResponse {
@@ -178,6 +179,7 @@ function applyVisualConfigPayload(config: Record<string, unknown>): void {
     depthPerPixel: payload.depthPerPixel,
     trackWidths: payload.trackWidths,
     splitRatio: payload.splitRatio,
+    depthTrackConfig: payload.depthTrackConfig,
   })
   useWellDataStore.getState().setColorOverrides(payload.curveColors ?? {})
 }
@@ -203,6 +205,7 @@ export function collectProjectVisualConfig(): VisualConfigPayload {
     trackWidths: projectTrackWidths(),
     curveColors: useWellDataStore.getState().colorOverrides,
     splitRatio: useViewStore.getState().splitRatio,
+    depthTrackConfig: useViewStore.getState().depthTrackConfig,
   }
 }
 

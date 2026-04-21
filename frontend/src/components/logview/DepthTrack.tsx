@@ -9,16 +9,21 @@ interface DepthTrackProps {
 
 export function DepthTrack({ height, width = 60 }: DepthTrackProps) {
   const visibleDepthRange = useViewStore((state) => state.visibleDepthRange)
+  const depthTrackConfig = useViewStore((state) => state.depthTrackConfig)
   const { scale: depthScale } = useDepthScale(visibleDepthRange, height)
+
+  const unitFactor = depthTrackConfig.unit === 'km' ? 1000 : depthTrackConfig.unit === 'ft' ? 0.3048 : 1
+  const majorInterval = Math.max(depthTrackConfig.majorInterval * unitFactor, unitFactor)
+  const minorInterval = Math.max(depthTrackConfig.minorInterval * unitFactor, unitFactor / 10)
 
   const canvasRef = useCanvasRenderer(
     (ctx, canvasWidth, canvasHeight) => {
-      ctx.fillStyle = '#ffffff'
+      ctx.fillStyle = depthTrackConfig.backgroundColor
       ctx.fillRect(0, 0, canvasWidth, canvasHeight)
-      drawDepthGridlines(ctx, depthScale, canvasWidth, 100, 10)
-      drawDepthLabels(ctx, depthScale, canvasWidth, 100)
+      drawDepthGridlines(ctx, depthScale, canvasWidth, majorInterval, minorInterval)
+      drawDepthLabels(ctx, depthScale, canvasWidth, majorInterval, depthTrackConfig.unit)
     },
-    [depthScale],
+    [depthScale, depthTrackConfig.backgroundColor, depthTrackConfig.unit, majorInterval, minorInterval],
   )
 
   return <canvas ref={canvasRef} className="depth-track" style={{ width, height }} />
