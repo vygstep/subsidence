@@ -103,14 +103,12 @@ export function ProjectToolbar() {
       }
 
       if (event.key.toLowerCase() === 'z' && event.shiftKey) {
-        if (!canRedo) return
         event.preventDefault()
         void redoProject()
         return
       }
 
       if (event.key.toLowerCase() === 'z') {
-        if (!canUndo) return
         event.preventDefault()
         void undoProject()
       }

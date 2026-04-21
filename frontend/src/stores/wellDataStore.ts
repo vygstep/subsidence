@@ -274,6 +274,8 @@ export const useWellDataStore = create<WellDataStore>((set, get) => ({
             error: null,
           }))
           await get().loadWellInventories()
+          const { useProjectStore } = await import('./projectStore')
+          await useProjectStore.getState().pollStatus()
         })
         .catch((error) => {
           set({ error: error instanceof Error ? error.message : 'Unknown error' })
