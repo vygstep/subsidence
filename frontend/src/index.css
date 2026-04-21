@@ -568,12 +568,29 @@ body.is-resizing {
 }
 
 .top-leaf {
+  position: relative;
   display: flex;
   flex-direction: column;
   gap: 6px;
   padding: 6px 8px;
   border-radius: 8px;
   cursor: pointer;
+  background: #ffffff;
+}
+
+.top-leaf::before {
+  content: '';
+  position: absolute;
+  left: 0;
+  top: 4px;
+  bottom: 4px;
+  width: 10px;
+  border-radius: 6px;
+  background: var(--top-leaf-color, #9ca3af);
+}
+
+.top-leaf .tree-checkbox-leaf {
+  padding-left: 16px;
 }
 
 .top-leaf--selected {

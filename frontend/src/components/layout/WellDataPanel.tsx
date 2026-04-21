@@ -309,7 +309,7 @@ export function WellDataPanel({
                             <div
                               key={formation.id}
                               className={`top-leaf ${selectedFormationId === formation.id && isActive ? 'top-leaf--selected' : ''}`}
-                              style={{ backgroundColor: topBackgroundColor(formation) }}
+                              style={{ ['--top-leaf-color' as string]: topBackgroundColor(formation) }}
                               onClick={() => onSelectFormation(item.well_id, formation.id)}
                               onContextMenu={(event) => {
                                 onFocusFormationObject(item.well_id, formation.id)
