@@ -3,6 +3,7 @@ import { useCallback, useMemo, useRef } from 'react'
 import { useCanvasRenderer } from '@/hooks/useCanvasRenderer'
 import { drawBurialCurves, drawFormationFills } from '@/renderers/subsidenceRenderer'
 import { useComputedStore } from '@/stores'
+import { useWellDataStore } from '@/stores/wellDataStore'
 import type { SubsidenceResult } from '@/types/subsidence'
 import { GeologicalTimescale } from './GeologicalTimescale'
 
@@ -13,11 +14,10 @@ function drawAxes(
   ctx: CanvasRenderingContext2D,
   width: number,
   height: number,
-  minAge: number,
   maxAge: number,
-  maxDepth: number,
+  maxDepthM: number,
   timeToX: (age: number) => number,
-  depthToY: (depth: number) => number,
+  depthToY: (depthM: number) => number,
 ) {
   const plotW = width - PADDING.left - PADDING.right
   const plotH = height - PADDING.top - PADDING.bottom
@@ -43,23 +43,25 @@ function drawAxes(
   ctx.textAlign = 'right'
   ctx.textBaseline = 'middle'
 
-  // Y tick marks (depth)
-  const depthStep = niceStep(maxDepth, 5)
-  for (let d = 0; d <= maxDepth; d += depthStep) {
-    const y = depthToY(d)
+  // Y tick marks — depth in km
+  const maxDepthKm = maxDepthM / 1000
+  const depthStepKm = niceStep(maxDepthKm, 5)
+  for (let dKm = 0; dKm <= maxDepthKm + depthStepKm * 0.01; dKm += depthStepKm) {
+    const y = depthToY(dKm * 1000)
     ctx.beginPath()
     ctx.moveTo(PADDING.left - 4, y)
     ctx.lineTo(PADDING.left, y)
     ctx.stroke()
-    ctx.fillText(`${d}`, PADDING.left - 6, y)
+    const label = Number.isInteger(depthStepKm) ? `${dKm}` : dKm.toFixed(1)
+    ctx.fillText(label, PADDING.left - 6, y)
   }
 
   ctx.textAlign = 'center'
   ctx.textBaseline = 'top'
 
-  // X tick marks (age Ma)
-  const ageStep = niceStep(maxAge - minAge, 5)
-  for (let age = Math.ceil(minAge / ageStep) * ageStep; age <= maxAge; age += ageStep) {
+  // X tick marks — age Ma, right=0, left=maxAge
+  const ageStep = niceStep(maxAge, 5)
+  for (let age = 0; age <= maxAge + ageStep * 0.01; age += ageStep) {
     const x = timeToX(age)
     ctx.beginPath()
     ctx.moveTo(x, PADDING.top + plotH)
@@ -68,7 +70,7 @@ function drawAxes(
     ctx.fillText(`${age}`, x, PADDING.top + plotH + 6)
   }
 
-  // Y axis label — "Depth (m)" rotated counter-clockwise
+  // Y axis label — "Depth (km)"
   ctx.save()
   ctx.font = '11px system-ui, sans-serif'
   ctx.fillStyle = '#94a3b8'
@@ -77,10 +79,10 @@ function drawAxes(
   const midY = PADDING.top + plotH / 2
   ctx.translate(14, midY)
   ctx.rotate(-Math.PI / 2)
-  ctx.fillText('Depth (m)', 0, 0)
+  ctx.fillText('Depth (km)', 0, 0)
   ctx.restore()
 
-  // X axis label — "Age (Ma)" centered below tick labels
+  // X axis label — "Age (Ma)"
   ctx.font = '11px system-ui, sans-serif'
   ctx.fillStyle = '#94a3b8'
   ctx.textAlign = 'center'
@@ -138,18 +140,20 @@ export function SubsidenceCanvas() {
   const showFormationFills = useComputedStore((s) => s.showFormationFills)
   const showBurialCurves = useComputedStore((s) => s.showBurialCurves)
 
-  const { minAge, maxAge, maxDepth } = useMemo(() => {
-    if (subsidenceCurves.length === 0) return { minAge: 0, maxAge: 100, maxDepth: 3000 }
-    let minA = Infinity, maxA = 0, maxD = 0
-    for (const curve of subsidenceCurves) {
-      for (const pt of curve.burial_path) {
-        if (pt.age_ma < minA) minA = pt.age_ma
-        if (pt.age_ma > maxA) maxA = pt.age_ma
-        if (pt.depth_m > maxD) maxD = pt.depth_m
-      }
+  const tdMd = useWellDataStore((s) => s.well?.td_md ?? 0)
+  const formations = useWellDataStore((s) => s.formations)
+
+  // X axis: 0 (present, right) → oldest formation age (left)
+  const maxAge = useMemo(() => {
+    let max = 0
+    for (const f of formations) {
+      if (f.age_ma != null && f.age_ma > max) max = f.age_ma
     }
-    return { minAge: Math.max(0, minA), maxAge: maxA * 1.02, maxDepth: maxD * 1.1 }
-  }, [subsidenceCurves])
+    return max > 0 ? max : 100
+  }, [formations])
+
+  // Y axis: well TD in metres; labels in km
+  const maxDepthM = tdMd > 0 ? tdMd : 3000
 
   const draw = useCallback((ctx: CanvasRenderingContext2D, width: number, height: number) => {
     ctx.fillStyle = '#ffffff'
@@ -159,17 +163,16 @@ export function SubsidenceCanvas() {
     const plotH = height - PADDING.top - PADDING.bottom
     if (plotW <= 0 || plotH <= 0) return
 
-    // Oldest (maxAge) at left, present (0) at right
+    // Present (0 Ma) is rightmost, oldest age is leftmost
     const timeToX = (age: number) =>
-      PADDING.left + ((maxAge - age) / (maxAge - minAge || 1)) * plotW
+      PADDING.left + ((maxAge - age) / (maxAge || 1)) * plotW
 
-    // 0 at top, maxDepth at bottom
-    const depthToY = (depth: number) =>
-      PADDING.top + (depth / (maxDepth || 1)) * plotH
+    // 0 at top, well TD at bottom; depths are in metres internally
+    const depthToY = (depthM: number) =>
+      PADDING.top + (depthM / (maxDepthM || 1)) * plotH
 
-    drawAxes(ctx, width, height, minAge, maxAge, maxDepth, timeToX, depthToY)
+    drawAxes(ctx, width, height, maxAge, maxDepthM, timeToX, depthToY)
 
-    // Clip to plot area
     ctx.save()
     ctx.beginPath()
     ctx.rect(PADDING.left, PADDING.top, plotW, plotH)
@@ -180,16 +183,15 @@ export function SubsidenceCanvas() {
 
     ctx.restore()
 
-    // Formation name labels sit outside the clip region, to the right of the plot
     drawFormationLabels(ctx, subsidenceCurves, PADDING.left + plotW, depthToY)
-  }, [subsidenceCurves, minAge, maxAge, maxDepth, showFormationFills, showBurialCurves])
+  }, [subsidenceCurves, maxAge, maxDepthM, showFormationFills, showBurialCurves])
 
   const canvasRef = useCanvasRenderer(draw, [draw])
 
   return (
     <div ref={containerRef} className="subsidence-canvas-container">
       <GeologicalTimescale
-        timeRange={{ min_ma: minAge, max_ma: maxAge }}
+        timeRange={{ min_ma: 0, max_ma: maxAge }}
         height={TIMESCALE_HEIGHT}
         paddingLeft={PADDING.left}
         paddingRight={PADDING.right}
