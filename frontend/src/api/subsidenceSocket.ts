@@ -30,10 +30,7 @@ function onMessage(event: MessageEvent): void {
     } else if (data.status === 'complete') {
       useComputedStore.getState().setResults(data.results as SubsidenceResult[])
     } else if (data.status === 'error') {
-      useComputedStore.setState({
-        isComputing: false,
-        computeError: (data.message as string) ?? 'Unknown error',
-      })
+      useComputedStore.getState().setComputeError((data.message as string) ?? 'Unknown error')
     }
   })
 }
