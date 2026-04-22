@@ -1,10 +1,10 @@
 """
-Airy backstripping with Athy decompaction.
+Burial history with Athy decompaction.
 
 Decompaction math (integrate_porosity, calculate_matrix_thickness, _compact_layer)
 follows the algorithm in repos/pybasin/lib/pybasin_lib.py (Athy 1930 exponential
-porosity-depth model). Constants (RHO_MANTLE, RHO_WATER) match pyBacktrack/well.py.
-Backstripping loop follows the pattern in repos/Stratya2D/backstripping.py.
+porosity-depth model). Burial history loop follows the pattern in
+repos/Stratya2D/backstripping.py.
 
 Unit convention
 ---------------
@@ -17,9 +17,6 @@ from __future__ import annotations
 
 import math
 from dataclasses import dataclass, field
-
-RHO_MANTLE = 3330.0   # kg/m³ — matches pyBacktrack well.py
-RHO_WATER  = 1030.0   # kg/m³
 
 
 # ---------------------------------------------------------------------------
@@ -166,9 +163,8 @@ def backstrip(
         # Build paleo column from basement upward (reversed = youngest on top)
         z_top = 0.0
         paleo_tops: dict[int, float] = {}
-        rho_sum = 0.0
 
-        for i in reversed(active_indices):  # oldest (deepest) first
+        for i in reversed(active_indices):  # youngest first — sits at surface (z_top = 0)
             f = valid[i]
             lp = _litho(f)
             c_m = lp.compaction_coeff / 1000.0
@@ -177,14 +173,6 @@ def backstrip(
             thickness = _layer_thickness_at_depth(bm, lp.porosity_surface, c_m, z_top, initial_guess)
             paleo_tops[i] = z_top
             z_top += thickness
-            rho_sum += lp.density
-
-        # Weighted average grain density for Airy correction
-        rho_s_avg = rho_sum / len(active_indices)
-
-        # Airy isostatic correction (simplified, no sea-level term)
-        total_col = z_top
-        _ = total_col * (RHO_MANTLE - rho_s_avg) / (RHO_MANTLE - RHO_WATER) + water_depth_m
 
         # Record burial depths
         for i in active_indices:
