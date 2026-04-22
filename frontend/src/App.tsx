@@ -1,7 +1,7 @@
 import { useEffect, useRef } from 'react'
 
 import { DataManagerPane, ProjectToolbar, StatusBar, ViewerWorkspace } from '@/components'
-import { useSidebarResize } from '@/hooks'
+import { useKeyboardShortcuts, useSidebarResize } from '@/hooks'
 import {
   collectProjectVisualConfig,
   coerceWellViewState,
@@ -31,7 +31,6 @@ function App() {
 
   const depthPerPixel = useViewStore((state) => state.depthPerPixel)
   const selectTrack = useViewStore((state) => state.selectTrack)
-  const clearSelection = useViewStore((state) => state.clearSelection)
   const selectedElementId = useViewStore((state) => state.selectedElementId)
   const selectedElementType = useViewStore((state) => state.selectedElementType)
   const trackWidths = useViewStore((state) => state.trackWidths)
@@ -65,11 +64,7 @@ function App() {
     return () => window.clearInterval(timer)
   }, [isProjectOpen, pollStatus])
 
-  useEffect(() => {
-    const onKeyDown = (e: KeyboardEvent) => { if (e.key === 'Escape') clearSelection() }
-    window.addEventListener('keydown', onKeyDown)
-    return () => window.removeEventListener('keydown', onKeyDown)
-  }, [clearSelection])
+  useKeyboardShortcuts()
 
   useEffect(() => {
     if (!selectedElementId || !selectedElementType) return

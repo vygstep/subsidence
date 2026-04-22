@@ -1,4 +1,5 @@
 export * from './useCanvasRenderer'
+export * from './useKeyboardShortcuts'
 export * from './useDepthScale'
 export * from './useFormationDrag'
 export * from './useSidebarResize'
