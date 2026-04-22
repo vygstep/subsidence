@@ -3,27 +3,28 @@ import { useCallback, useRef } from 'react'
 interface SplitViewProps {
   left: React.ReactNode
   right: React.ReactNode
-  ratio: number
-  onRatioChange: (r: number) => void
+  subsidenceWidth: number
+  onWidthChange: (w: number) => void
 }
 
-export function SplitView({ left, right, ratio, onRatioChange }: SplitViewProps) {
-  const containerRef = useRef<HTMLDivElement>(null)
+export function SplitView({ left, right, subsidenceWidth, onWidthChange }: SplitViewProps) {
   const isDraggingRef = useRef(false)
+  const startXRef = useRef(0)
+  const startWidthRef = useRef(0)
 
   const onPointerDown = useCallback((e: React.PointerEvent<HTMLDivElement>) => {
     e.currentTarget.setPointerCapture(e.pointerId)
     isDraggingRef.current = true
-  }, [])
+    startXRef.current = e.clientX
+    startWidthRef.current = subsidenceWidth
+  }, [subsidenceWidth])
 
   const onPointerMove = useCallback((e: React.PointerEvent<HTMLDivElement>) => {
     if (!isDraggingRef.current) return
-    const container = containerRef.current
-    if (!container) return
-    const rect = container.getBoundingClientRect()
-    const newRatio = (e.clientX - rect.left) / rect.width
-    onRatioChange(newRatio)
-  }, [onRatioChange])
+    // Drag left → divider moves left → subsidence panel gets wider
+    const deltaX = e.clientX - startXRef.current
+    onWidthChange(startWidthRef.current - deltaX)
+  }, [onWidthChange])
 
   const onPointerUp = useCallback((e: React.PointerEvent<HTMLDivElement>) => {
     e.currentTarget.releasePointerCapture(e.pointerId)
@@ -31,8 +32,8 @@ export function SplitView({ left, right, ratio, onRatioChange }: SplitViewProps)
   }, [])
 
   return (
-    <div ref={containerRef} className="split-view">
-      <div className="split-view__pane" style={{ flexBasis: `${ratio * 100}%` }}>
+    <div className="split-view">
+      <div className="split-view__pane split-view__pane--left">
         {left}
       </div>
       <div
@@ -41,7 +42,7 @@ export function SplitView({ left, right, ratio, onRatioChange }: SplitViewProps)
         onPointerMove={onPointerMove}
         onPointerUp={onPointerUp}
       />
-      <div className="split-view__pane split-view__pane--right">
+      <div className="split-view__pane split-view__pane--right" style={{ width: subsidenceWidth }}>
         {right}
       </div>
     </div>

@@ -10,7 +10,7 @@ interface VisibleDepthRange {
 interface VisualConfigPayload {
   depthPerPixel?: number
   trackWidths?: Record<string, number>
-  splitRatio?: number
+  subsidenceWidth?: number
   depthTrackConfig?: Partial<DepthTrackConfig>
   formationsTrackConfig?: Partial<FormationsTrackConfig>
 }
@@ -44,10 +44,11 @@ export interface ViewStore {
   selectedElementType: SelectedElementType | null
   trackWidths: Record<string, number>
   viewportHeight: number
-  splitRatio: number
+  subsidenceWidth: number
   depthType: 'MD' | 'TVD'
   setScroll: (depth: number) => void
   setScale: (dpp: number) => void
+
   setCursorDepth: (depth: number | null) => void
   setOverviewVisible: (visible: boolean) => void
   setCurveTooltipVisible: (visible: boolean) => void
@@ -59,7 +60,7 @@ export interface ViewStore {
   clearSelection: () => void
   setViewportHeight: (height: number) => void
   setTrackWidth: (id: string, width: number) => void
-  setSplitRatio: (ratio: number) => void
+  setSubsidenceWidth: (width: number) => void
   setDepthType: (t: 'MD' | 'TVD') => void
   applyActiveWellTrackWidths: (trackWidths: Record<string, number>) => void
   applyVisualConfig: (config: VisualConfigPayload) => void
@@ -77,7 +78,9 @@ function deriveVisibleDepthRange(scrollDepth: number, depthPerPixel: number, vie
 const initialScrollDepth = 0
 const initialDepthPerPixel = 0.2
 const initialViewportHeight = 800
-const initialSplitRatio = 0.55
+const initialSubsidenceWidth = 420
+const MIN_SUBSIDENCE_WIDTH = 150
+const MAX_SUBSIDENCE_WIDTH = 900
 const minimumTrackWidth = 80
 const initialDepthTrackConfig: DepthTrackConfig = {
   backgroundColor: '#ffffff',
@@ -114,7 +117,7 @@ export const useViewStore = create<ViewStore>((set) => ({
   selectedElementType: null,
   trackWidths: {},
   viewportHeight: initialViewportHeight,
-  splitRatio: initialSplitRatio,
+  subsidenceWidth: initialSubsidenceWidth,
   depthType: 'MD',
   setScroll(depth) {
     set((state) => ({
@@ -183,8 +186,8 @@ export const useViewStore = create<ViewStore>((set) => ({
       },
     }))
   },
-  setSplitRatio(ratio) {
-    set({ splitRatio: Math.max(0.2, Math.min(0.8, ratio)) })
+  setSubsidenceWidth(width) {
+    set({ subsidenceWidth: Math.max(MIN_SUBSIDENCE_WIDTH, Math.min(MAX_SUBSIDENCE_WIDTH, width)) })
   },
   setDepthType(t) {
     set({ depthType: t })
@@ -209,11 +212,11 @@ export const useViewStore = create<ViewStore>((set) => ({
   applyVisualConfig(config) {
     set((state) => {
       const nextDepthPerPixel = config.depthPerPixel ?? state.depthPerPixel
-      const rawRatio = config.splitRatio ?? state.splitRatio
+      const rawWidth = config.subsidenceWidth ?? state.subsidenceWidth
       return {
         depthPerPixel: nextDepthPerPixel,
         trackWidths: normalizeTrackWidths(config.trackWidths),
-        splitRatio: Math.max(0.2, Math.min(0.8, rawRatio)),
+        subsidenceWidth: Math.max(MIN_SUBSIDENCE_WIDTH, Math.min(MAX_SUBSIDENCE_WIDTH, rawWidth)),
         depthTrackConfig: {
           ...initialDepthTrackConfig,
           ...state.depthTrackConfig,

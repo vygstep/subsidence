@@ -1424,15 +1424,17 @@ body.is-resizing {
   overflow: hidden;
 }
 
-.split-view__pane {
+.split-view__pane--left {
+  flex: 1 1 0;
   min-width: 0;
   min-height: 0;
   overflow: hidden;
-  flex-shrink: 0;
 }
 
 .split-view__pane--right {
-  flex: 1 1 0;
+  flex-shrink: 0;
+  min-height: 0;
+  overflow: hidden;
 }
 
 .split-view__divider {

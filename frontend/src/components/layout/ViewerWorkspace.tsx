@@ -12,8 +12,8 @@ export function ViewerWorkspace() {
   const colorOverrides = useWellDataStore((state) => state.colorOverrides)
   const error = useWellDataStore((state) => state.error)
   const wellViewStates = useWorkspaceStore((state) => state.wellViewStates)
-  const splitRatio = useViewStore((state) => state.splitRatio)
-  const setSplitRatio = useViewStore((state) => state.setSplitRatio)
+  const subsidenceWidth = useViewStore((state) => state.subsidenceWidth)
+  const setSubsidenceWidth = useViewStore((state) => state.setSubsidenceWidth)
 
   const activeWellView = useMemo(() => {
     if (!well?.well_id) return createDefaultWellView()
@@ -66,8 +66,8 @@ export function ViewerWorkspace() {
             <p className="app-error-banner">Well loaded. No curves imported yet.</p>
           )}
           <SplitView
-            ratio={splitRatio}
-            onRatioChange={setSplitRatio}
+            subsidenceWidth={subsidenceWidth}
+            onWidthChange={setSubsidenceWidth}
             left={
               <LogViewPanel
                 tracks={tracks}

@@ -51,7 +51,7 @@ interface VisualConfigPayload {
   depthPerPixel?: number
   trackWidths?: Record<string, number>
   curveColors?: Record<string, string>
-  splitRatio?: number
+  subsidenceWidth?: number
   depthTrackConfig?: Partial<DepthTrackConfig>
   formationsTrackConfig?: Partial<FormationsTrackConfig>
 }
@@ -179,7 +179,7 @@ function applyVisualConfigPayload(config: Record<string, unknown>): void {
   useViewStore.getState().applyVisualConfig({
     depthPerPixel: payload.depthPerPixel,
     trackWidths: payload.trackWidths,
-    splitRatio: payload.splitRatio,
+    subsidenceWidth: payload.subsidenceWidth,
     depthTrackConfig: payload.depthTrackConfig,
     formationsTrackConfig: payload.formationsTrackConfig,
   })
@@ -206,7 +206,7 @@ export function collectProjectVisualConfig(): VisualConfigPayload {
     depthPerPixel: useViewStore.getState().depthPerPixel,
     trackWidths: projectTrackWidths(),
     curveColors: useWellDataStore.getState().colorOverrides,
-    splitRatio: useViewStore.getState().splitRatio,
+    subsidenceWidth: useViewStore.getState().subsidenceWidth,
     depthTrackConfig: useViewStore.getState().depthTrackConfig,
     formationsTrackConfig: useViewStore.getState().formationsTrackConfig,
   }
