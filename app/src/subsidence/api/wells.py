@@ -153,6 +153,13 @@ def _formation_load_options():
     ]
 
 
+def _load_curve_maps(project_path, curve_rows: list[CurveMetadata]) -> dict[str, dict[str, tuple[np.ndarray, np.ndarray]]]:
+    curve_maps: dict[str, dict[str, tuple[np.ndarray, np.ndarray]]] = {}
+    for data_uri in dict.fromkeys(row.data_uri for row in curve_rows):
+        curve_maps[data_uri] = load_curves_from_parquet(project_path, data_uri)
+    return curve_maps
+
+
 @router.get('/wells', response_model=list[WellListItem])
 def list_wells(request: Request) -> list[WellListItem]:
     manager = _require_open_project(request)
@@ -235,9 +242,9 @@ def get_well(well_id: str, request: Request) -> WellResponse:
         curves: list[CurveResponse] = []
         td_md = well.td_md or 0.0
         if curve_rows:
-            curve_map = load_curves_from_parquet(manager.project_path, curve_rows[0].data_uri)
+            curve_maps = _load_curve_maps(manager.project_path, curve_rows)
             for row in curve_rows:
-                values = curve_map.get(row.mnemonic)
+                values = curve_maps.get(row.data_uri, {}).get(row.mnemonic)
                 if values is None:
                     continue
                 depths, curve_values = values
@@ -334,10 +341,10 @@ def get_curves_lod(
         buf = span * 0.05
         lo, hi = depth_min - buf, depth_max + buf
 
-        curve_map = load_curves_from_parquet(manager.project_path, curve_rows[0].data_uri)
+        curve_maps = _load_curve_maps(manager.project_path, curve_rows)
         results: list[CurveResponse] = []
         for row in curve_rows:
-            entry = curve_map.get(row.mnemonic)
+            entry = curve_maps.get(row.data_uri, {}).get(row.mnemonic)
             if entry is None:
                 continue
             depths, values = entry
