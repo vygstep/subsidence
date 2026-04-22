@@ -23,7 +23,7 @@ function drawAxes(
   const plotH = height - PADDING.top - PADDING.bottom
 
   ctx.save()
-  ctx.strokeStyle = '#475569'
+  ctx.strokeStyle = '#94a3b8'
   ctx.lineWidth = 1
 
   // Y axis
@@ -38,7 +38,7 @@ function drawAxes(
   ctx.lineTo(PADDING.left + plotW, PADDING.top + plotH)
   ctx.stroke()
 
-  ctx.fillStyle = '#94a3b8'
+  ctx.fillStyle = '#64748b'
   ctx.font = '10px system-ui, sans-serif'
   ctx.textAlign = 'right'
   ctx.textBaseline = 'middle'
@@ -71,7 +71,7 @@ function drawAxes(
   // Y axis label — "Depth (m)" rotated counter-clockwise
   ctx.save()
   ctx.font = '11px system-ui, sans-serif'
-  ctx.fillStyle = '#64748b'
+  ctx.fillStyle = '#94a3b8'
   ctx.textAlign = 'center'
   ctx.textBaseline = 'middle'
   const midY = PADDING.top + plotH / 2
@@ -82,7 +82,7 @@ function drawAxes(
 
   // X axis label — "Age (Ma)" centered below tick labels
   ctx.font = '11px system-ui, sans-serif'
-  ctx.fillStyle = '#64748b'
+  ctx.fillStyle = '#94a3b8'
   ctx.textAlign = 'center'
   ctx.textBaseline = 'bottom'
   ctx.fillText('Age (Ma)', PADDING.left + plotW / 2, height - 4)
@@ -114,7 +114,7 @@ function drawFormationLabels(
     ctx.arc(x + 3, y, 3, 0, Math.PI * 2)
     ctx.fill()
 
-    ctx.fillStyle = '#cbd5e1'
+    ctx.fillStyle = '#334155'
     ctx.fillText(curve.formation_name, x + 10, y)
   }
 
@@ -152,7 +152,7 @@ export function SubsidenceCanvas() {
   }, [subsidenceCurves])
 
   const draw = useCallback((ctx: CanvasRenderingContext2D, width: number, height: number) => {
-    ctx.fillStyle = '#0f172a'
+    ctx.fillStyle = '#ffffff'
     ctx.fillRect(0, 0, width, height)
 
     const plotW = width - PADDING.left - PADDING.right

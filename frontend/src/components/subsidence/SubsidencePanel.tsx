@@ -1,6 +1,6 @@
 import { useComputedStore } from '@/stores'
 import { SubsidenceCanvas } from './SubsidenceCanvas'
-import { SubsidenceControls } from './SubsidenceControls'
+import { SubsidenceToolbar } from './SubsidenceToolbar'
 
 export function SubsidencePanel() {
   const isComputing = useComputedStore((s) => s.isComputing)
@@ -10,14 +10,14 @@ export function SubsidencePanel() {
 
   return (
     <div className="subsidence-panel">
-      {isComputing && (
-        <div className="subsidence-panel__overlay">Computing...</div>
-      )}
-      {computeError && !isComputing && (
-        <div className="subsidence-panel__error">{computeError}</div>
-      )}
-      <SubsidenceControls />
+      <SubsidenceToolbar />
       <div className="subsidence-panel__content">
+        {isComputing && (
+          <div className="subsidence-panel__overlay">Computing...</div>
+        )}
+        {computeError && !isComputing && (
+          <div className="subsidence-panel__error">{computeError}</div>
+        )}
         <SubsidenceCanvas />
         {!hasData && !isComputing && !computeError && (
           <div className="subsidence-panel__empty">No data — formation ages required</div>
