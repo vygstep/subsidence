@@ -1,12 +1,14 @@
-import { useRef } from 'react'
+import { useRef, useState } from 'react'
 
-import { useViewStore, useWellDataStore } from '@/stores'
+import { useComputedStore, useViewStore, useWellDataStore } from '@/stores'
+import type { FormationTop } from '@/types'
 
 export function FormationTopsList() {
   const formations = useWellDataStore((s) => s.formations)
   const addFormation = useWellDataStore((s) => s.addFormation)
   const updateFormation = useWellDataStore((s) => s.updateFormation)
   const removeFormation = useWellDataStore((s) => s.removeFormation)
+  const triggerRecalculation = useComputedStore((s) => s.triggerRecalculation)
 
   const cursorDepth = useViewStore((s) => s.cursorDepth)
   const visibleDepthRange = useViewStore((s) => s.visibleDepthRange)
@@ -14,6 +16,9 @@ export function FormationTopsList() {
   const selectElement = useViewStore((s) => s.selectElement)
 
   const listRef = useRef<HTMLUListElement | null>(null)
+
+  const [editingAgeId, setEditingAgeId] = useState<string | null>(null)
+  const [draftAge, setDraftAge] = useState('')
 
   const midDepth = (visibleDepthRange.min + visibleDepthRange.max) / 2
   const halfViewport = (visibleDepthRange.max - visibleDepthRange.min) / 2
@@ -26,6 +31,25 @@ export function FormationTopsList() {
   function handleRowClick(id: string, depth: number) {
     selectElement(id, 'formation')
     setScroll(depth - halfViewport)
+  }
+
+  function startAgeEdit(e: React.MouseEvent, f: FormationTop) {
+    e.stopPropagation()
+    setEditingAgeId(f.id)
+    setDraftAge(f.age_ma != null ? String(f.age_ma) : '')
+  }
+
+  function commitAge(f: FormationTop) {
+    const val = parseFloat(draftAge)
+    if (!isNaN(val) && val >= 0 && val !== f.age_ma) {
+      void updateFormation(f.id, { age_ma: val }).then(() => triggerRecalculation())
+    }
+    setEditingAgeId(null)
+  }
+
+  function handleAgeKeyDown(e: React.KeyboardEvent, f: FormationTop) {
+    if (e.key === 'Enter') commitAge(f)
+    if (e.key === 'Escape') setEditingAgeId(null)
   }
 
   return (
@@ -47,6 +71,28 @@ export function FormationTopsList() {
               />
               <span className="formations-list__depth">{f.depth_md.toFixed(1)}</span>
               <span className="formations-list__name">{f.name}</span>
+              {editingAgeId === f.id ? (
+                <input
+                  className="formations-list__age-input"
+                  type="number"
+                  step="0.1"
+                  min="0"
+                  autoFocus
+                  value={draftAge}
+                  onChange={(e) => setDraftAge(e.target.value)}
+                  onBlur={() => commitAge(f)}
+                  onKeyDown={(e) => handleAgeKeyDown(e, f)}
+                  onClick={(e) => e.stopPropagation()}
+                />
+              ) : (
+                <span
+                  className="formations-list__age"
+                  title="Click to set age (Ma)"
+                  onClick={(e) => startAgeEdit(e, f)}
+                >
+                  {f.age_ma != null ? `${f.age_ma.toFixed(1)} Ma` : '— Ma'}
+                </span>
+              )}
               <button
                 type="button"
                 className="formations-list__icon-btn"

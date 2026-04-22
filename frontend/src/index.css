@@ -46,6 +46,9 @@ textarea {
 .formations-list__icon-btn { flex-shrink: 0; border: none; background: transparent; cursor: pointer; font-size: 11px; padding: 0 2px; opacity: 0.6; }
 .formations-list__icon-btn:hover { opacity: 1; }
 .formations-list__icon-btn--danger:hover { color: #ef4444; }
+.formations-list__age { flex-shrink: 0; width: 52px; color: #3b82f6; font-variant-numeric: tabular-nums; cursor: pointer; text-align: right; }
+.formations-list__age:hover { color: #60a5fa; text-decoration: underline; }
+.formations-list__age-input { flex-shrink: 0; width: 58px; padding: 0 3px; border: 1px solid #3b82f6; border-radius: 3px; background: #1e3a5f; color: #e2e8f0; font-size: 11px; font-variant-numeric: tabular-nums; text-align: right; outline: none; }
 
 .curve-browser { display: flex; flex-direction: column; margin-top: 4px; }
 .curve-browser__rows { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 1px; max-height: 200px; overflow-y: auto; }
