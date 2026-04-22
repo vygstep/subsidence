@@ -1,4 +1,4 @@
-# Phase 4: Subsidence Integration — Burial History and Real-Time Recalculation
+﻿# Phase 4: Subsidence Integration — Burial History and Real-Time Recalculation
 
 **Goal**: Connect formation tops, lithology, and age data to the core subsidence computation
 engine. A user who has picked and aged formation tops in the log viewer can activate the
@@ -11,7 +11,7 @@ The rendering architecture from Phase 3 (Canvas data + SVG interaction + Zustand
 preserved. Phase 4 adds a third panel — `SubsidencePanel` — linked to the log viewer through
 shared formation state and driven by a WebSocket computation pipeline on the FastAPI backend.
 
-**Status**: Complete.
+**Status**: Complete. Audited 2026-04-22.
 
 ---
 
@@ -45,7 +45,10 @@ shared formation state and driven by a WebSocket computation pipeline on the Fas
 
 ---
 
-## Task Checklist
+## Historical Task Checklist
+
+This checklist is retained as the original implementation spec.
+Current truth source for completion is the Progress table above plus the post-step fixes table.
 
 ### Step 1 — Compaction parameters: schema + API
 
@@ -241,7 +244,7 @@ shared formation state and driven by a WebSocket computation pipeline on the Fas
 
 ### Step 1 — Compaction parameters: schema + API
 
-Status: pending
+Status: done
 Verification: 9-row response with density/φ₀/c; PATCH persists across restart
 Commit: —
 
@@ -313,7 +316,7 @@ in the undo stack.
 
 ### Step 2 — Backstripping engine backend
 
-Status: pending
+Status: done
 Verification: REST endpoint returns geologically plausible burial paths
 Commit: —
 
@@ -433,7 +436,7 @@ class SubsidenceResultResponse(BaseModel):
 
 ### Step 3 — Frontend types + computedStore
 
-Status: pending
+Status: done
 Verification: results land in store after REST call
 Commit: —
 
@@ -506,7 +509,7 @@ completion.
 
 ### Step 4 — SplitView resizable layout
 
-Status: pending
+Status: done
 Verification: split persists; divider draggable
 Commit: —
 
@@ -542,7 +545,7 @@ Pydantic `VisualConfigPatch` model to include `split_ratio: float | None = None`
 
 ### Step 5 — SubsidenceCanvas + GeologicalTimescale
 
-Status: pending
+Status: done
 Verification: burial curves + ICS timescale render from mock data
 Commit: —
 
@@ -644,7 +647,7 @@ export function drawFormationFills(
 
 ### Step 6 — Formation drag → debounced REST recalculation
 
-Status: pending
+Status: done
 Verification: drag → curves update within 1.5 s
 Commit: —
 
@@ -672,7 +675,7 @@ const isComputing = useComputedStore((s) => s.isComputing)
 
 ### Step 7 — WebSocket recalculation pipeline
 
-Status: pending
+Status: done
 Verification: WS replaces REST; reconnects after backend restart
 Commit: —
 
@@ -765,7 +768,7 @@ triggerRecalculation() {
 
 ### Step 8 — Compaction parameters editor UI
 
-Status: pending
+Status: done
 Verification: φ₀ change → curves update; value persists
 Commit: —
 
@@ -821,7 +824,7 @@ Add a static `"Compaction params"` row under the `Models` tab. Clicking it calls
 
 ### Step 9 — LTTB server-side LOD
 
-Status: pending
+Status: done
 Verification: Canvas frame time < 2 ms; LOD fires on zoom out
 Commit: —
 
@@ -891,7 +894,7 @@ When `depthPerPixel ≤ 1.0`, reload full resolution data via `wellDataStore.loa
 
 ### Step 10 — MD ↔ TVD depth toggle
 
-Status: pending
+Status: done
 Verification: TVD labels correct; formation lines shift; undoing toggle restores MD
 Commit: —
 
