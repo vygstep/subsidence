@@ -173,26 +173,39 @@ def list_well_inventories(request: Request) -> list[WellInventoryResponse]:
     manager = _require_open_project(request)
     with manager.get_session() as session:
         wells = session.scalars(select(WellModel).order_by(WellModel.name.asc(), WellModel.id.asc())).all()
+        well_ids = [well.id for well in wells]
+        curve_rows_by_well: dict[str, list[CurveMetadata]] = {well_id: [] for well_id in well_ids}
+        formation_rows_by_well: dict[str, list[FormationTopModel]] = {well_id: [] for well_id in well_ids}
+        deviation_by_well: dict[str, DeviationSurveyModel] = {}
+
+        if well_ids:
+            curve_rows = session.scalars(
+                select(CurveMetadata)
+                .where(CurveMetadata.well_id.in_(well_ids))
+                .order_by(CurveMetadata.well_id.asc(), CurveMetadata.id.asc())
+            ).all()
+            for row in curve_rows:
+                curve_rows_by_well.setdefault(row.well_id, []).append(row)
+
+            formation_rows = session.scalars(
+                select(FormationTopModel)
+                .where(FormationTopModel.well_id.in_(well_ids))
+                .order_by(FormationTopModel.well_id.asc(), FormationTopModel.depth_md.asc(), FormationTopModel.id.asc())
+                .options(*_formation_load_options())
+            ).all()
+            for row in formation_rows:
+                formation_rows_by_well.setdefault(row.well_id, []).append(row)
+
+            deviations = session.scalars(
+                select(DeviationSurveyModel).where(DeviationSurveyModel.well_id.in_(well_ids))
+            ).all()
+            deviation_by_well = {row.well_id: row for row in deviations}
+
         payload: list[WellInventoryResponse] = []
         for well in wells:
-            curve_rows = list(
-                session.scalars(
-                    select(CurveMetadata)
-                    .where(CurveMetadata.well_id == well.id)
-                    .order_by(CurveMetadata.id.asc())
-                )
-            )
-            formation_rows = list(
-                session.scalars(
-                    select(FormationTopModel)
-                    .where(FormationTopModel.well_id == well.id)
-                    .order_by(FormationTopModel.depth_md.asc(), FormationTopModel.id.asc())
-                    .options(*_formation_load_options())
-                )
-            )
-            deviation = session.scalar(
-                select(DeviationSurveyModel).where(DeviationSurveyModel.well_id == well.id)
-            )
+            curve_rows = curve_rows_by_well.get(well.id, [])
+            formation_rows = formation_rows_by_well.get(well.id, [])
+            deviation = deviation_by_well.get(well.id)
             payload.append(
                 WellInventoryResponse(
                     well_id=well.id,
