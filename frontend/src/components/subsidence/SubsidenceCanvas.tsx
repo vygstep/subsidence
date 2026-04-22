@@ -3,10 +3,11 @@ import { useCallback, useMemo, useRef } from 'react'
 import { useCanvasRenderer } from '@/hooks/useCanvasRenderer'
 import { drawBurialCurves, drawFormationFills } from '@/renderers/subsidenceRenderer'
 import { useComputedStore } from '@/stores'
+import type { SubsidenceResult } from '@/types/subsidence'
 import { GeologicalTimescale } from './GeologicalTimescale'
 
 const TIMESCALE_HEIGHT = 40
-const PADDING = { top: 12, right: 16, bottom: 32, left: 52 }
+const PADDING = { top: 12, right: 100, bottom: 48, left: 64 }
 
 function drawAxes(
   ctx: CanvasRenderingContext2D,
@@ -65,6 +66,56 @@ function drawAxes(
     ctx.lineTo(x, PADDING.top + plotH + 4)
     ctx.stroke()
     ctx.fillText(`${age}`, x, PADDING.top + plotH + 6)
+  }
+
+  // Y axis label — "Depth (m)" rotated counter-clockwise
+  ctx.save()
+  ctx.font = '11px system-ui, sans-serif'
+  ctx.fillStyle = '#64748b'
+  ctx.textAlign = 'center'
+  ctx.textBaseline = 'middle'
+  const midY = PADDING.top + plotH / 2
+  ctx.translate(14, midY)
+  ctx.rotate(-Math.PI / 2)
+  ctx.fillText('Depth (m)', 0, 0)
+  ctx.restore()
+
+  // X axis label — "Age (Ma)" centered below tick labels
+  ctx.font = '11px system-ui, sans-serif'
+  ctx.fillStyle = '#64748b'
+  ctx.textAlign = 'center'
+  ctx.textBaseline = 'bottom'
+  ctx.fillText('Age (Ma)', PADDING.left + plotW / 2, height - 4)
+
+  ctx.restore()
+}
+
+function drawFormationLabels(
+  ctx: CanvasRenderingContext2D,
+  curves: SubsidenceResult[],
+  plotRight: number,
+  depthToY: (depth: number) => number,
+) {
+  ctx.save()
+  ctx.font = '10px system-ui, sans-serif'
+  ctx.textAlign = 'left'
+  ctx.textBaseline = 'middle'
+
+  for (const curve of curves) {
+    if (curve.burial_path.length === 0) continue
+    // youngest point = rightmost on chart (smallest age_ma)
+    const youngest = curve.burial_path.reduce((a, b) => (a.age_ma < b.age_ma ? a : b))
+    const y = depthToY(youngest.depth_m)
+    const x = plotRight + 6
+
+    // colored dot
+    ctx.fillStyle = curve.color
+    ctx.beginPath()
+    ctx.arc(x + 3, y, 3, 0, Math.PI * 2)
+    ctx.fill()
+
+    ctx.fillStyle = '#cbd5e1'
+    ctx.fillText(curve.formation_name, x + 10, y)
   }
 
   ctx.restore()
@@ -128,6 +179,9 @@ export function SubsidenceCanvas() {
     if (showBurialCurves) drawBurialCurves(ctx, subsidenceCurves, timeToX, depthToY)
 
     ctx.restore()
+
+    // Formation name labels sit outside the clip region, to the right of the plot
+    drawFormationLabels(ctx, subsidenceCurves, PADDING.left + plotW, depthToY)
   }, [subsidenceCurves, minAge, maxAge, maxDepth, showFormationFills, showBurialCurves])
 
   const canvasRef = useCanvasRenderer(draw, [draw])
