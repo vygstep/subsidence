@@ -1,4 +1,4 @@
-import { useCallback, useRef, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 
 import { useViewStore } from '@/stores'
 import type { FormationTop } from '@/types'
@@ -28,9 +28,11 @@ export function useFormationDrag({
   const [isDragging, setIsDragging] = useState(false)
 
   const depthPerPixelRef = useRef(useViewStore.getState().depthPerPixel)
-  useViewStore.subscribe((state) => {
-    depthPerPixelRef.current = state.depthPerPixel
-  })
+  useEffect(() => {
+    return useViewStore.subscribe((state) => {
+      depthPerPixelRef.current = state.depthPerPixel
+    })
+  }, [])
 
   const dragState = useRef<{
     startY: number

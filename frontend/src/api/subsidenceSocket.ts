@@ -9,10 +9,11 @@ let socket: WebSocket | null = null
 let reconnectTimer: ReturnType<typeof setTimeout> | null = null
 let backoffMs = 1_000
 const MAX_BACKOFF_MS = 30_000
+const pendingMessages: string[] = []
 
 function wsUrl(): string {
   const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:'
-  return `${protocol}//${window.location.host}/ws/recalculate`
+  return `${protocol}//${window.location.host}/api/ws/recalculate`
 }
 
 function onMessage(event: MessageEvent): void {
@@ -44,6 +45,11 @@ function connect(): void {
 
   socket.onopen = () => {
     backoffMs = 1_000
+    const ws = socket
+    if (ws) {
+      for (const msg of pendingMessages) ws.send(msg)
+      pendingMessages.length = 0
+    }
   }
 
   socket.onmessage = onMessage
@@ -74,12 +80,9 @@ export function sendRecalculation(wellId: string): void {
   const msg = JSON.stringify({ well_id: wellId })
   if (socket?.readyState === WebSocket.OPEN) {
     socket.send(msg)
-  } else if (socket) {
-    // Opening — wait for open event then send
-    const origOnOpen = socket.onopen
-    socket.onopen = (event) => {
-      origOnOpen?.call(socket!, event)
-      socket?.send(msg)
-    }
+  } else {
+    // CONNECTING or transiently unavailable — onopen will flush pendingMessages
+    pendingMessages.length = 0  // only latest request matters
+    pendingMessages.push(msg)
   }
 }
