@@ -969,3 +969,68 @@ Key optimizations baked into the architecture: Canvas renders only visible depth
 Three architectural decisions set this design apart from existing open-source well log viewers. First, the **layered Canvas + SVG rendering** solves the fundamental tension between dense data performance and rich annotation interactivity — no single rendering technology handles both well, but layering them eliminates the compromise. Second, the **three-store Zustand pattern** (data / view / computed) ensures that high-frequency UI events like scrolling never cascade into expensive data operations, while still enabling reactive updates when formation tops change. Third, the **WebSocket-based recalculation pipeline** bridges the frontend interaction model with Python's scientific computing ecosystem, enabling real-time geological interpretation workflows that previously required desktop software like Techlog or PetroMod.
 
 The phased roadmap deliberately front-loads the rendering foundation (Phases 1–2) before adding interactivity (Phase 3) and computation (Phase 4). This ensures each phase produces a testable, visually verifiable artifact. By Phase 4's end, the core value proposition — drag a formation top and watch subsidence curves recalculate — is fully operational. Phase 5 adds production polish without changing the architecture.
+
+---
+
+## Implementation Status (updated 2026-04-22, after Phase 4)
+
+Phases 1–4 are complete. The table below shows which original compass items were built as specified, which diverged, and which are still pending.
+
+### What was built as specified
+
+| Item | Compass location | Notes |
+|---|---|---|
+| Canvas + SVG layered rendering | Rendering pattern | Implemented exactly as specified |
+| `useCanvasRenderer` hook | Step 4 | ResizeObserver + rAF + devicePixelRatio |
+| `useDepthScale` / `useValueScale` | Step 4 | d3-scale, log + linear + reversed |
+| `gridRenderer`, `curveRenderer`, `depthLabelsRenderer` | Step 4 | Pure canvas functions |
+| `LogViewPanel` + `TrackHeaderRow` | Step 6 | Synchronized scroll via wheel handler |
+| `InteractionOverlay` SVG | Step 7 | Absolute SVG over canvas tracks |
+| `FormationTopLine` draggable | Step 7 | Pointer capture + `useFormationDrag` |
+| `DepthCursor` + `CurveTooltip` | Step 7 | Hover crosshair + depth-interpolated values |
+| `SubsidenceCanvas` | Step 9 | Canvas: time (x) × depth (y), oldest left |
+| `GeologicalTimescale` | Step 9 | ICS CSS flex bar, percentage-positioned |
+| `SplitView` resizable | Step 9 | Pointer-capture divider, ratio persisted |
+| Backstripping engine | Step 8 | `backstrip.py` — Athy + Airy, standalone |
+| WebSocket recalculation | Step 7/9 | `/api/ws/recalculate`, reconnect + backoff |
+| LTTB LOD | Step 3 backend | `lttb.py` + LOD endpoint + `fetchCurvesLOD` |
+| TVD toggle | Step 10 | Minimum curvature, `mdToTvd`, all panels |
+| Zustand three-store pattern | Store spec | Extended to five stores (+ workspace + project) |
+
+### What diverged from the spec
+
+| Original spec | Actual implementation | Reason |
+|---|---|---|
+| `@visx/drag` for formation dragging | Custom `useFormationDrag` with pointer events | visx/drag was not installed; pointer API simpler and sufficient |
+| Tailwind CSS | Plain CSS (`index.css`) + CSS custom properties | Tailwind adds build complexity; plain CSS adequate for this app |
+| `ImageBitmap` caching | Not implemented | Canvas re-renders are fast enough (<2 ms); caching premature |
+| Three stores | Five stores: wellData + view + computed + workspace + project | Workspace (UI state) and project (file lifecycle) needed separation |
+| `useWebSocket` hook used for subsidence | Module-level `subsidenceSocket.ts` singleton | Avoids circular dependency: computedStore ↔ socket |
+| `repos/pybasin` imported at runtime | Standalone implementation in `backstrip.py` | pybasin import was fragile (sys.path); math re-implemented cleanly |
+| CORS allows all origins | Localhost-only (5173) | Not yet production-configured |
+| `WellOverviewMinimap` | Built | ✅ |
+| `CurveBrowser` with drag-to-track | Built (click to add only; no drag) | Drag-to-track deferred |
+| `PropertyPanel` | `SettingsInspector` (right panel, context-sensitive) | Same purpose, different name; integrated into main layout |
+| Per-file CSS Modules | Single `index.css` | All styles consolidated; refactor deferred |
+
+### What is still pending (Phase 5+)
+
+| Item | Original phase | Current status |
+|---|---|---|
+| Curve fill renderer (crossover, baseline) | Phase 2 / Phase 5 | `fillRenderer.ts` has `drawFill` stub; not wired |
+| Right-click context menus | Phase 3 (deferred) | Not started |
+| Layout template save/load | Phase 5 | Split ratio saved; full track template deferred |
+| PNG / SVG export | Phase 5 | Not started |
+| Water depth history in subsidence | Phase 5 | `backstrip.py` has `water_depth_m` param; no UI |
+| Sea-level correction | Phase 5 | Not started |
+| Maturity / temperature overlays | Phase 5 | Not started |
+| Multi-well comparison | Phase 5 | Not started |
+| Discrete curve import + renderer | Phase 5 | Schema has `curve_type` field; importer not built |
+| Dark / light theme | Phase 5 | CSS variable skeleton exists |
+| Alembic migrations | Phase 5 | SQLAlchemy creates tables directly; no migration history |
+| `asyncio.to_thread` for backstrip | Phase 5 | Currently blocking event loop |
+| `tkinter` dialogs in executor | Phase 5 audit | Currently blocks event loop |
+| `pendingDepthPatches` cleanup on well switch | Phase 5 audit | Memory / stale-patch risk |
+| `isComputing` timeout | Phase 5 audit | Can stick true if WS drops |
+| Formation top comments / metadata | — | Not in original spec; geological need |
+| Strat chart age editing inline | — | Currently only editable in dialog |
