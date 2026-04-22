@@ -37,7 +37,7 @@ changes.
 The `fillRenderer.ts` file exists with a `drawFill` stub. This step implements the two fill
 modes used in real petrophysical interpretation.
 
-- [ ] 1.1 Implement `drawCrossoverFill` in `frontend/src/renderers/fillRenderer.ts`:
+- [x] 1.1 Implement `drawCrossoverFill` in `frontend/src/renderers/fillRenderer.ts`:
       ```ts
       drawCrossoverFill(
         ctx: CanvasRenderingContext2D,
@@ -52,7 +52,7 @@ modes used in real petrophysical interpretation.
       draw a closed polygon for each segment. Crossings (where curves swap order) must be
       interpolated to find the exact crossing depth and split the polygon there.
 
-- [ ] 1.2 Implement `drawBaselineFill` in `fillRenderer.ts`:
+- [x] 1.2 Implement `drawBaselineFill` in `fillRenderer.ts`:
       ```ts
       drawBaselineFill(
         ctx: CanvasRenderingContext2D,
@@ -65,7 +65,7 @@ modes used in real petrophysical interpretation.
       Simpler than crossover: fill between the curve and a constant `baseline` value.
       Same polygon-per-segment approach with crossing interpolation.
 
-- [ ] 1.3 Extend `CurveConfig` in `frontend/src/types/index.ts`:
+- [x] 1.3 Extend `CurveConfig` in `frontend/src/types/index.ts`:
       ```ts
       export interface CurveFillConfig {
         type: 'crossover' | 'baseline'
@@ -78,20 +78,20 @@ modes used in real petrophysical interpretation.
       ```
       Add `fill?: CurveFillConfig` to `CurveConfig`.
 
-- [ ] 1.4 In `DataTrack.tsx`, after drawing all curves, iterate `config.curves` again; for
+- [x] 1.4 In `DataTrack.tsx`, after drawing all curves, iterate `config.curves` again; for
       any curve with `curve.fill` set, call the appropriate fill function. Order: fills drawn
       before curves (so fills appear behind lines).
 
-- [ ] 1.5 In `SettingsInspector.tsx` curve branch: add a "Fill" subsection with a type
+- [x] 1.5 In `SettingsInspector.tsx` curve branch: add a "Fill" subsection with a type
       dropdown (`none` / `baseline` / `crossover`), paired mnemonic selector (for crossover),
       baseline value input (for baseline), and two color pickers. On change, update
       `workspaceStore.updateWellViewState` with the new curve config.
 
-- [ ] 1.6 In `CurvePresetLibrary` (or equivalent preset mechanism): set density-neutron
+- [x] 1.6 In `CurvePresetLibrary` (or equivalent preset mechanism): set density-neutron
       crossover as the default fill for the RHOB/NPHI pair — yellow (`#ffe066`) when
       NPHI > RHOB (gas), gray (`#94a3b8`) when NPHI < RHOB (brine/wet).
 
-- [ ] 1.7 Verify: add RHOB + NPHI to the same track → crossover fill appears between them;
+- [x] 1.7 Verify: add RHOB + NPHI to the same track → crossover fill appears between them;
       fill switches color at crossing depths; toggling fill type to `none` removes the fill;
       fill persists on project save/reload.
 
@@ -102,28 +102,28 @@ modes used in real petrophysical interpretation.
 Deferred from Phase 3. Context menus are the standard way to add/remove curves and formations
 in a log viewer.
 
-- [ ] 2.1 Create `frontend/src/components/layout/ContextMenu.tsx`: a generic positioned menu
+- [x] 2.1 Create `frontend/src/components/layout/ContextMenu.tsx`: a generic positioned menu
       component. Props: `items: { label: string; icon?: string; action: () => void; disabled?: boolean; separator?: boolean }[]`,
       `position: { x: number; y: number }`, `onClose: () => void`.
       Rendered as a fixed-position `<div>` with `z-index: 1000`, dismissed on click-outside or
       Escape. No external library.
 
-- [ ] 2.2 Track right-click → "Add curve…" and "Delete track":
+- [x] 2.2 Track right-click → "Add curve…" and "Delete track":
       In `TrackHeader.tsx`, add `onContextMenu` handler. Menu items:
       - **Add curve…** → opens `CurveBrowser` in select mode (modal or inline popover)
       - **Rename track** → inline text edit on the header title
       - **Delete track** → `workspaceStore.updateWellViewState` removes the track; undo records it
 
-- [ ] 2.3 Curve right-click in `TrackHeader.tsx` curve slot → "Edit properties", "Remove from track":
+- [x] 2.3 Curve right-click in `TrackHeader.tsx` curve slot → "Edit properties", "Remove from track":
       - **Edit properties** → selects the curve in `viewStore` (already opens SettingsInspector)
       - **Remove from track** → removes `CurveConfig` from the track in `wellViewState`
 
-- [ ] 2.4 Formation top right-click in `FormationTopLine.tsx`:
+- [x] 2.4 Formation top right-click in `FormationTopLine.tsx`:
       Menu items: **Lock / Unlock**, **Set age…** (opens inline age input), **Delete**.
       - Lock/unlock: toggle `is_locked` via `PATCH /api/wells/{id}/formations/{fid}` with undo
       - Delete: `DELETE /api/wells/{id}/formations/{fid}` with undo
 
-- [ ] 2.5 Verify: right-click a track header → menu appears at cursor; clicking "Delete track"
+- [x] 2.5 Verify: right-click a track header → menu appears at cursor; clicking "Delete track"
       removes it; right-clicking a formation line shows lock/delete; Escape dismisses without action.
 
 ---
@@ -133,7 +133,7 @@ in a log viewer.
 `SubsidenceControls.tsx` is currently an empty stub. This step fills it with controls that
 affect how the subsidence panel renders.
 
-- [ ] 3.1 Add to `computedStore.ts`:
+- [x] 3.1 Add to `computedStore.ts`:
       ```ts
       showFormationFills: boolean    // default true
       showBurialCurves: boolean      // default true
@@ -142,10 +142,10 @@ affect how the subsidence panel renders.
       ```
       Actions: `setShowFormationFills`, `setShowBurialCurves`, `setShowAxesLabels`, `setWaterDepthM`.
 
-- [ ] 3.2 Wire toggles into `SubsidenceCanvas.tsx`: guard `drawFormationFills` call with
+- [x] 3.2 Wire toggles into `SubsidenceCanvas.tsx`: guard `drawFormationFills` call with
       `showFormationFills`; guard `drawBurialCurves` with `showBurialCurves`.
 
-- [ ] 3.3 Implement `SubsidenceControls.tsx`:
+- [x] 3.3 Implement `SubsidenceControls.tsx`:
       ```tsx
       <div className="subsidence-controls">
         <label><input type="checkbox" checked={showFormationFills} onChange={…} /> Formation fills</label>
@@ -159,11 +159,11 @@ affect how the subsidence panel renders.
       ```
       Changing `waterDepthM` calls `computedStore.triggerRecalculation()`.
 
-- [ ] 3.4 Pass `waterDepthM` through the WebSocket message: add `water_depth_m` field to the
+- [x] 3.4 Pass `waterDepthM` through the WebSocket message: add `water_depth_m` field to the
       JSON sent by `sendRecalculation`. Backend `ws_recalculate` reads it from the message and
       passes it to `backstrip(formations, litho_params, water_depth_m=water_depth_m)`.
 
-- [ ] 3.5 Verify: toggle "Formation fills" → fills disappear without re-triggering computation;
+- [x] 3.5 Verify: toggle "Formation fills" → fills disappear without re-triggering computation;
       set water depth to 200 m → curves shift (deeper paleo-depths); set back to 0 → original.
 
 ---
@@ -172,28 +172,28 @@ affect how the subsidence panel renders.
 
 Currently the subsidence canvas has bare axes. This step improves legibility for export.
 
-- [ ] 4.1 Add axis title labels to `SubsidenceCanvas.tsx`:
+- [x] 4.1 Add axis title labels to `SubsidenceCanvas.tsx`:
       - Y-axis: rotated text "Depth (m)" drawn left of the Y axis
       - X-axis: text "Age (Ma)" centered below the X axis
       Both rendered in `drawAxes`, using `ctx.save() / ctx.rotate() / ctx.restore()`.
 
-- [ ] 4.2 Add formation name labels at the right edge of each burial curve (at age = 0, i.e.,
+- [x] 4.2 Add formation name labels at the right edge of each burial curve (at age = 0, i.e.,
       the present): draw small text labels aligned to the rightmost point of each curve.
       Guard with `showAxesLabels` from Step 3.
 
-- [ ] 4.3 Make the Y-axis direction configurable — currently `depth` increases downward (burial
+- [x] 4.3 Make the Y-axis direction configurable — currently `depth` increases downward (burial
       view). Add `yAxisMode: 'depth' | 'elevation'` to `computedStore`. In elevation mode,
       Y = 0 at bottom, depths are negative (geological elevation above datum). Update `depthToY`
       mapping accordingly.
 
-- [ ] 4.4 Verify: axis labels appear; formation names appear at present-day endpoints; toggling
+- [x] 4.4 Verify: axis labels appear; formation names appear at present-day endpoints; toggling
       yAxisMode flips the Y axis.
 
 ---
 
 ### Step 5 — PNG export
 
-- [ ] 5.1 Add `frontend/src/utils/exportPng.ts`:
+- [x] 5.1 Add `frontend/src/utils/exportPng.ts`:
       ```ts
       export async function exportLogViewPng(
         logCanvas: HTMLCanvasElement,
@@ -204,15 +204,15 @@ Currently the subsidence canvas has bare axes. This step improves legibility for
       Composites both canvases onto a single off-screen canvas (log left, subsidence right at
       current split ratio). Triggers browser download via `<a download>`.
 
-- [ ] 5.2 Add `frontend/src/utils/exportSvg.ts` — export the subsidence canvas as an SVG path
+- [x] 5.2 Add `frontend/src/utils/exportSvg.ts` — export the subsidence canvas as an SVG path
       description. Use the same `draw*` functions but targeting a `Path2D` serializer.
       *Note: This is complex — limit Phase 5 to PNG only; SVG deferred to Phase 6.*
 
-- [ ] 5.3 Add an "Export PNG" button to `WellViewerToolbar.tsx`. On click, call `exportLogViewPng`
+- [x] 5.3 Add an "Export PNG" button to `WellViewerToolbar.tsx`. On click, call `exportLogViewPng`
       with refs to both canvases. Expose the canvas ref from `SubsidenceCanvas.tsx` via
       `useImperativeHandle` or a ref stored in `computedStore`.
 
-- [ ] 5.4 Verify: click "Export PNG" → browser downloads a PNG; file contains both log and
+- [x] 5.4 Verify: click "Export PNG" → browser downloads a PNG; file contains both log and
       subsidence panels at screen resolution × `devicePixelRatio`; formation top lines from the
       SVG overlay are NOT included (Canvas only).
 
@@ -224,22 +224,22 @@ Currently, formation ages can only be set via the strat chart link or by importi
 pre-assigned ages. This step adds inline age editing directly from the formation top line
 context menu.
 
-- [ ] 6.1 Add "Set age…" in the formation top context menu (Step 2.4). Clicking opens a small
+- [x] 6.1 Add "Set age…" in the formation top context menu (Step 2.4). Clicking opens a small
       popover anchored to the formation line with two numeric inputs:
       - **Age top (Ma)**: `age_top_ma` of this formation
       - For `unconformity` kind only: **Age base (Ma)**: `age_base_ma` (top of the hiatus)
       - **Formation kind**: dropdown — `strat` / `unconformity`
 
-- [ ] 6.2 On confirm, `PATCH /api/wells/{id}/formations/{fid}` with
+- [x] 6.2 On confirm, `PATCH /api/wells/{id}/formations/{fid}` with
       `{ age_top_ma, age_base_ma?, kind }`. Route already exists in `formations.py`; verify it
       accepts these fields (add if missing).
 
-- [ ] 6.3 After successful PATCH, call `triggerRecalculation()` to update subsidence curves.
+- [x] 6.3 After successful PATCH, call `triggerRecalculation()` to update subsidence curves.
 
-- [ ] 6.4 In `SettingsInspector.tsx` formation branch (when a top-pick is selected): show age
+- [x] 6.4 In `SettingsInspector.tsx` formation branch (when a top-pick is selected): show age
       fields and kind dropdown as well. Any change triggers recalculation.
 
-- [ ] 6.5 Verify: select a formation, set age to 50 Ma → subsidence curves update; set kind to
+- [x] 6.5 Verify: select a formation, set age to 50 Ma → subsidence curves update; set kind to
       `unconformity`, set base age to 55 Ma → hiatus appears in burial history; set kind back to
       `strat` → gap disappears.
 
@@ -249,7 +249,7 @@ context menu.
 
 Issues from `аудит кода после фазы 4.md` that are production-relevant.
 
-- [ ] 7.1 **`pendingDepthPatches` stale cleanup**: in `wellDataStore.ts` `reset()`, iterate
+- [x] 7.1 **`pendingDepthPatches` stale cleanup**: in `wellDataStore.ts` `reset()`, iterate
       `pendingDepthPatches` and `clearTimeout` each timer before clearing the map.
       ```ts
       reset() {
@@ -259,7 +259,7 @@ Issues from `аудит кода после фазы 4.md` that are production-r
       }
       ```
 
-- [ ] 7.2 **`isComputing` timeout**: in `computedStore.ts` `triggerRecalculation()`, set a
+- [x] 7.2 **`isComputing` timeout**: in `computedStore.ts` `triggerRecalculation()`, set a
       30-second timeout that clears `isComputing` and sets `computeError` to `'Computation timed out'`.
       Cancel the timeout in `setResults()` and `clearResults()`:
       ```ts
@@ -273,7 +273,7 @@ Issues from `аудит кода после фазы 4.md` that are production-r
       }
       ```
 
-- [ ] 7.3 **`tkinter` in executor**: in `projects.py`, wrap all `filedialog` calls in
+- [x] 7.3 **`tkinter` in executor**: in `projects.py`, wrap all `filedialog` calls in
       `asyncio.to_thread`:
       ```python
       import asyncio
@@ -282,10 +282,10 @@ Issues from `аудит кода после фазы 4.md` that are production-r
       where `_pick_file_sync` is a synchronous helper that creates the tkinter root, calls
       `filedialog`, destroys the root, and returns the path.
 
-- [ ] 7.4 **`activate_strat_chart` undo**: wrap the activation DB write in an `UndoCommand`
+- [x] 7.4 **`activate_strat_chart` undo**: wrap the activation DB write in an `UndoCommand`
       so that undo after chart activation restores the previous active chart.
 
-- [ ] 7.5 **`get_deviation` session safety**: move the parquet `data_uri` read inside the
+- [x] 7.5 **`get_deviation` session safety**: move the parquet `data_uri` read inside the
       `with session:` block:
       ```python
       with session:
@@ -296,7 +296,7 @@ Issues from `аудит кода после фазы 4.md` that are production-r
       df = pd.read_parquet(data_uri, …)
       ```
 
-- [ ] 7.6 Verify: rapidly switch between two wells while dragging a formation → no stale PATCH
+- [x] 7.6 Verify: rapidly switch between two wells while dragging a formation → no stale PATCH
       fires for the previous well; kill backend during subsidence computation → `isComputing`
       clears after 30 s with error message; clicking "Open file" → dialog appears without
       blocking other API requests.
@@ -307,26 +307,26 @@ Issues from `аудит кода после фазы 4.md` that are production-r
 
 When the well has many formations, `_compute_subsidence` blocks the FastAPI event loop.
 
-- [ ] 8.1 Make `ws_recalculate` in `subsidence.py` run `_compute_subsidence` in a thread pool:
+- [x] 8.1 Make `ws_recalculate` in `subsidence.py` run `_compute_subsidence` in a thread pool:
       ```python
       import asyncio
       results = await asyncio.to_thread(_compute_subsidence, manager, well_id, water_depth_m)
       ```
       `_compute_subsidence` is already synchronous; wrapping it in `to_thread` is sufficient.
 
-- [ ] 8.2 Stream a `{ status: 'computing', progress: 0.5 }` message after each major
+- [x] 8.2 Stream a `{ status: 'computing', progress: 0.5 }` message after each major
       computation phase. With `to_thread` this requires a callback or a queue; use a simple
       approach: send `progress: 0.0` before the call, `progress: 1.0` with the complete
       results (no in-progress streaming needed for Phase 5).
 
-- [ ] 8.3 Verify: while subsidence is computing, other API endpoints (e.g., `GET /api/projects/status`)
+- [x] 8.3 Verify: while subsidence is computing, other API endpoints (e.g., `GET /api/projects/status`)
       respond without blocking; computation still completes and results appear in the UI.
 
 ---
 
 ### Step 9 — Keyboard shortcuts
 
-- [ ] 9.1 Add global keydown handler in `App.tsx` (already has one for Escape):
+- [x] 9.1 Add global keydown handler in `App.tsx` (already has one for Escape):
       | Key | Action |
       |---|---|
       | `+` / `=` | zoom in (`depthPerPixel * 0.85`) |
@@ -339,13 +339,13 @@ When the well has many formations, `_compute_subsidence` blocks the FastAPI even
       | `Delete` | delete selected formation top (with confirmation if `is_locked`) |
       | `L` | toggle lock on selected formation top |
 
-- [ ] 9.2 Prevent shortcuts from firing when focus is inside an `<input>`, `<textarea>`, or
+- [x] 9.2 Prevent shortcuts from firing when focus is inside an `<input>`, `<textarea>`, or
       `<select>` — check `document.activeElement.tagName`.
 
-- [ ] 9.3 Show keyboard shortcut hints in the UI: tooltip on zoom buttons showing `+` / `-`,
+- [x] 9.3 Show keyboard shortcut hints in the UI: tooltip on zoom buttons showing `+` / `-`,
       tooltip on undo/redo buttons showing `Ctrl+Z` / `Ctrl+Y`.
 
-- [ ] 9.4 Verify: pressing `+` while hovering the log view zooms in; `Ctrl+Z` undoes the last
+- [x] 9.4 Verify: pressing `+` while hovering the log view zooms in; `Ctrl+Z` undoes the last
       formation move; `Delete` with a formation selected removes it; shortcuts don't fire when
       typing in an age input.
 
