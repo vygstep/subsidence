@@ -174,9 +174,9 @@ def backstrip(
             paleo_tops[i] = z_top
             z_top += thickness
 
-        # Record burial depths
+        # Record burial depths (water_depth_m shifts the whole column downward)
         for i in active_indices:
-            results[i].burial_path.append(BurialPoint(age_ma=t_ma, depth_m=paleo_tops[i]))
+            results[i].burial_path.append(BurialPoint(age_ma=t_ma, depth_m=paleo_tops[i] + water_depth_m))
 
     # Sort burial paths chronologically (oldest → present)
     for r in results:

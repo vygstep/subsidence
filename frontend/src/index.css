@@ -1520,6 +1520,57 @@ body.is-resizing {
   flex-shrink: 0;
 }
 
+/* ── SubsidenceControls ─────────────────────────────────────────────────────── */
+
+.subsidence-controls {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  padding: 6px 12px;
+  background: #1e293b;
+  border-bottom: 1px solid #334155;
+  flex-shrink: 0;
+  font-size: 12px;
+  color: #94a3b8;
+}
+
+.subsidence-controls__check {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  cursor: pointer;
+  user-select: none;
+}
+
+.subsidence-controls__check input[type='checkbox'] {
+  width: 14px;
+  height: 14px;
+  cursor: pointer;
+  accent-color: #3b82f6;
+}
+
+.subsidence-controls__water {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.subsidence-controls__water input[type='number'] {
+  width: 72px;
+  padding: 2px 6px;
+  background: #0f172a;
+  border: 1px solid #334155;
+  border-radius: 4px;
+  color: #e2e8f0;
+  font-size: 12px;
+  text-align: right;
+}
+
+.subsidence-controls__water input[type='number']:focus {
+  outline: none;
+  border-color: #3b82f6;
+}
+
 /* Compaction model params table */
 .compaction-table-wrapper {
   overflow-x: auto;

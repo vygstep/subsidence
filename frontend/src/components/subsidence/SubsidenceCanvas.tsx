@@ -84,6 +84,8 @@ export function SubsidenceCanvas() {
   const containerRef = useRef<HTMLDivElement>(null)
 
   const subsidenceCurves = useComputedStore((s) => s.subsidenceCurves)
+  const showFormationFills = useComputedStore((s) => s.showFormationFills)
+  const showBurialCurves = useComputedStore((s) => s.showBurialCurves)
 
   const { minAge, maxAge, maxDepth } = useMemo(() => {
     if (subsidenceCurves.length === 0) return { minAge: 0, maxAge: 100, maxDepth: 3000 }
@@ -122,11 +124,11 @@ export function SubsidenceCanvas() {
     ctx.rect(PADDING.left, PADDING.top, plotW, plotH)
     ctx.clip()
 
-    drawFormationFills(ctx, subsidenceCurves, timeToX, depthToY)
-    drawBurialCurves(ctx, subsidenceCurves, timeToX, depthToY)
+    if (showFormationFills) drawFormationFills(ctx, subsidenceCurves, timeToX, depthToY)
+    if (showBurialCurves) drawBurialCurves(ctx, subsidenceCurves, timeToX, depthToY)
 
     ctx.restore()
-  }, [subsidenceCurves, minAge, maxAge, maxDepth])
+  }, [subsidenceCurves, minAge, maxAge, maxDepth, showFormationFills, showBurialCurves])
 
   const canvasRef = useCanvasRenderer(draw, [draw])
 

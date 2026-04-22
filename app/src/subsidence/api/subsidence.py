@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import asyncio
 import json
 
 from fastapi import APIRouter, HTTPException, Request, WebSocket, WebSocketDisconnect
@@ -35,7 +36,7 @@ def _require_open_project(request: Request):
     return manager
 
 
-def _compute_subsidence(manager, well_id: str) -> list[SubsidenceResultResponse]:
+def _compute_subsidence(manager, well_id: str, water_depth_m: float = 0.0) -> list[SubsidenceResultResponse]:
     with manager.get_session() as session:
         well = session.get(WellModel, well_id)
         if well is None:
@@ -101,7 +102,7 @@ def _compute_subsidence(manager, well_id: str) -> list[SubsidenceResultResponse]
                 current_base_m=base_m,
             ))
 
-        results = backstrip(inputs, litho_params)
+        results = backstrip(inputs, litho_params, water_depth_m=water_depth_m)
 
     return [
         SubsidenceResultResponse(
@@ -146,9 +147,10 @@ async def ws_recalculate(websocket: WebSocket) -> None:
                 await websocket.send_json({'status': 'error', 'message': 'No project is open'})
                 continue
 
+            water_depth_m = float(data.get('water_depth_m', 0.0))
             await websocket.send_json({'status': 'computing', 'progress': 0.0})
             try:
-                results = _compute_subsidence(manager, well_id)
+                results = await asyncio.to_thread(_compute_subsidence, manager, well_id, water_depth_m)
                 await websocket.send_json({
                     'status': 'complete',
                     'results': [r.model_dump() for r in results],

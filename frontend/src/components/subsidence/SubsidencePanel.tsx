@@ -16,13 +16,13 @@ export function SubsidencePanel() {
       {computeError && !isComputing && (
         <div className="subsidence-panel__error">{computeError}</div>
       )}
+      <SubsidenceControls />
       <div className="subsidence-panel__content">
         <SubsidenceCanvas />
         {!hasData && !isComputing && !computeError && (
           <div className="subsidence-panel__empty">No data — formation ages required</div>
         )}
       </div>
-      <SubsidenceControls />
     </div>
   )
 }
