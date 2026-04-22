@@ -302,7 +302,6 @@ export function SettingsInspector({
   const updateFormationsTrackConfig = useViewStore((state) => state.updateFormationsTrackConfig)
   const depthType = useViewStore((state) => state.depthType)
   const setDepthType = useViewStore((state) => state.setDepthType)
-  const tvdTable = useWellDataStore((state) => state.tvdTable)
 
   if (!selectedObject) {
     return <EmptyInspector message="Select an object in Data Manager to inspect its settings." />

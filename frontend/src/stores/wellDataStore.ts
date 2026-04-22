@@ -130,6 +130,13 @@ async function fetchFormations(wellId: string): Promise<FormationResponse[]> {
 
 const pendingDepthPatches = new Map<string, number>()
 
+function clearPendingDepthPatches(): void {
+  for (const timeoutId of pendingDepthPatches.values()) {
+    window.clearTimeout(timeoutId)
+  }
+  pendingDepthPatches.clear()
+}
+
 const emptyState = {
   well: null,
   wellInventories: [],
@@ -146,6 +153,7 @@ const emptyState = {
 export const useWellDataStore = create<WellDataStore>((set, get) => ({
   ...emptyState,
   reset() {
+    clearPendingDepthPatches()
     set(emptyState)
   },
   setColorOverrides(overrides) {
@@ -160,6 +168,7 @@ export const useWellDataStore = create<WellDataStore>((set, get) => ({
     set({ wellInventories: payload })
   },
   async loadWell(wellId: string) {
+    clearPendingDepthPatches()
     set({ isLoading: true, error: null })
 
     try {
