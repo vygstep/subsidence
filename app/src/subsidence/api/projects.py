@@ -4,6 +4,7 @@ import csv
 import io
 import json
 import math
+import platform
 import subprocess
 import tkinter as tk
 from tkinter import filedialog
@@ -432,10 +433,21 @@ def reveal_path(payload: RevealPathRequest, request: Request) -> DictionaryUpdat
         raise HTTPException(status_code=404, detail=f'Path does not exist: {raw_path}')
 
     try:
-        if target.is_file():
-            subprocess.Popen(['explorer', f'/select,{target.resolve()}'])
+        resolved = str(target.resolve())
+        system = platform.system()
+        if system == 'Windows':
+            if target.is_file():
+                subprocess.Popen(['explorer', f'/select,{resolved}'])
+            else:
+                subprocess.Popen(['explorer', resolved])
+        elif system == 'Darwin':
+            if target.is_file():
+                subprocess.Popen(['open', '-R', resolved])
+            else:
+                subprocess.Popen(['open', resolved])
         else:
-            subprocess.Popen(['explorer', str(target.resolve())])
+            directory = str(target.parent.resolve() if target.is_file() else target.resolve())
+            subprocess.Popen(['xdg-open', directory])
     except OSError as error:
         raise HTTPException(status_code=500, detail=f'Failed to open Explorer: {error}') from error
 
