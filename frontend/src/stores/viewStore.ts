@@ -1,5 +1,7 @@
 import { create } from 'zustand'
 
+import { DEPTH_TRACK_ID, FORMATION_TRACK_ID } from './workspaceStore'
+
 interface VisibleDepthRange {
   min: number
   max: number
@@ -77,8 +79,6 @@ const initialDepthPerPixel = 0.2
 const initialViewportHeight = 800
 const initialSplitRatio = 0.55
 const minimumTrackWidth = 80
-const DEPTH_TRACK_ID = 'depth'
-const FORMATION_TRACK_ID = 'formations'
 const initialDepthTrackConfig: DepthTrackConfig = {
   backgroundColor: '#ffffff',
   majorInterval: 100,

@@ -454,8 +454,9 @@ def get_deviation(well_id: str, request: Request) -> DeviationSurveyResponse:
         survey = session.scalar(select(DeviationSurveyModel).where(DeviationSurveyModel.well_id == well.id))
         if survey is None or survey.mode != 'INCL_AZIM':
             raise HTTPException(status_code=404, detail='No INCL_AZIM deviation survey for this well')
+        data_uri = survey.data_uri
 
-    parquet_path = manager.project_path / survey.data_uri
+    parquet_path = manager.project_path / data_uri
     frame: pd.DataFrame = pd.read_parquet(parquet_path)
     # Depth column is named 'md', 'tvd', or 'tvdss' depending on what was imported
     depth_col = next((c for c in frame.columns if c.lower() in ('md', 'tvd', 'tvdss')), None)

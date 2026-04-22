@@ -2,6 +2,7 @@ import { Fragment, useCallback, useEffect, useMemo, useRef, useState } from 'rea
 
 import { useSynchronizedScroll } from '@/hooks'
 import { useViewStore, useWellDataStore } from '@/stores'
+import { DEPTH_TRACK_ID, FORMATION_TRACK_ID } from '@/stores/workspaceStore'
 import type { CurveData, FormationTop, TrackConfig } from '@/types'
 
 import { InteractionOverlay } from '../interaction'
@@ -9,7 +10,7 @@ import { DataTrack } from './DataTrack'
 import { DepthTrack } from './DepthTrack'
 import { FormationColumn } from './FormationColumn'
 import { TrackHeaderRow } from './TrackHeaderRow'
-import { DEPTH_TRACK_ID, FORMATION_TRACK_ID, TrackResizeHandle } from './TrackResizeHandle'
+import { TrackResizeHandle } from './TrackResizeHandle'
 import { WellOverviewMinimap } from './WellOverviewMinimap'
 import { WellViewerToolbar } from './WellViewerToolbar'
 

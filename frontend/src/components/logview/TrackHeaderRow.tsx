@@ -1,9 +1,10 @@
 import { useState } from 'react'
 
 import { buildTrackOrder, useWellDataStore, useViewStore, useWorkspaceStore } from '@/stores'
+import { DEPTH_TRACK_ID, FORMATION_TRACK_ID } from '@/stores/workspaceStore'
 import type { TrackConfig } from '@/types'
 
-import { DEPTH_TRACK_ID, FORMATION_TRACK_ID, TRACK_RESIZE_HANDLE_WIDTH } from './TrackResizeHandle'
+import { TRACK_RESIZE_HANDLE_WIDTH } from './TrackResizeHandle'
 import { TrackHeader } from './TrackHeader'
 
 const DEFAULT_DEPTH_TRACK_WIDTH = 60

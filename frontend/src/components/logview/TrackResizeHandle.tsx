@@ -1,10 +1,9 @@
 import { useCallback } from 'react'
 
 import { useViewStore, useWellDataStore, useWorkspaceStore } from '@/stores'
+import { DEPTH_TRACK_ID, FORMATION_TRACK_ID } from '@/stores/workspaceStore'
 
 export const TRACK_RESIZE_HANDLE_WIDTH = 2
-export const DEPTH_TRACK_ID = 'depth'
-export const FORMATION_TRACK_ID = 'formations'
 
 interface TrackResizeHandleProps {
   trackId: string
