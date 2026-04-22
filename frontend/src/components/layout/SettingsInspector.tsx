@@ -261,6 +261,8 @@ interface SettingsInspectorProps {
       age_ma?: number
       kind?: string
       color?: string
+      water_depth_m?: number
+      eroded_thickness_m?: number
     },
   ) => void | Promise<void>
   onFormationMove: (formationId: string, depth: number) => void
@@ -575,6 +577,28 @@ export function SettingsInspector({
               onChange={(event) => void onFormationUpdate(selectedFormation.id, { color: event.target.value })}
             />
           </label>
+          <label className="project-dialog__field">
+            <span>Water depth (m)</span>
+            <input
+              type="number"
+              min="0"
+              step="1"
+              value={selectedFormation.water_depth_m}
+              onChange={(event) => void onFormationUpdate(selectedFormation.id, { water_depth_m: Number(event.target.value) })}
+            />
+          </label>
+          {selectedFormation.kind === 'unconformity' && (
+            <label className="project-dialog__field">
+              <span>Eroded thickness (m)</span>
+              <input
+                type="number"
+                min="0"
+                step="1"
+                value={selectedFormation.eroded_thickness_m}
+                onChange={(event) => void onFormationUpdate(selectedFormation.id, { eroded_thickness_m: Number(event.target.value) })}
+              />
+            </label>
+          )}
         </div>
         <div className="tree-leaf"><span>Linked unit</span><span>{selectedFormation.active_strat_unit_name ?? 'Unlinked'}</span></div>
       </div>

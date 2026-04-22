@@ -24,6 +24,8 @@ interface FormationResponse {
   color: string
   kind: string
   is_locked: boolean
+  water_depth_m: number
+  eroded_thickness_m: number
   lithology?: FormationTop['lithology']
   strat_links: FormationTop['strat_links']
   active_strat_color: string | null
@@ -48,6 +50,8 @@ interface FormationPatchPayload {
   lithology?: FormationTop['lithology']
   age_ma?: number
   is_locked?: boolean
+  water_depth_m?: number
+  eroded_thickness_m?: number
 }
 
 export interface WellDataStore {
@@ -113,6 +117,8 @@ function mapFormation(row: FormationResponse): FormationTop {
     color: row.color,
     kind: row.kind,
     is_locked: row.is_locked,
+    water_depth_m: row.water_depth_m ?? 0,
+    eroded_thickness_m: row.eroded_thickness_m ?? 0,
     lithology: row.lithology,
     strat_links: row.strat_links ?? [],
     active_strat_color: row.active_strat_color,

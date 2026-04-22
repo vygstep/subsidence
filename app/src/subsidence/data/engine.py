@@ -70,6 +70,12 @@ def migrate_schema(engine: Engine) -> None:
             conn.execute(text("ALTER TABLE strat_units ADD COLUMN chart_id INTEGER REFERENCES strat_charts(id)"))
             conn.commit()
         formation_cols = {row[1] for row in conn.execute(text("PRAGMA table_info(formation_tops)"))}
+        if 'water_depth_m' not in formation_cols:
+            conn.execute(text("ALTER TABLE formation_tops ADD COLUMN water_depth_m REAL NOT NULL DEFAULT 0.0"))
+            conn.commit()
+        if 'eroded_thickness_m' not in formation_cols:
+            conn.execute(text("ALTER TABLE formation_tops ADD COLUMN eroded_thickness_m REAL NOT NULL DEFAULT 0.0"))
+            conn.commit()
         if 'strat_unit_id' in formation_cols:
             # SQLite < 3.35 cannot DROP COLUMN; leave it as an orphan column (ORM ignores it)
             pass

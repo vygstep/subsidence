@@ -33,6 +33,8 @@ interface SettingsPaneShellProps {
       age_ma?: number
       kind?: string
       color?: string
+      water_depth_m?: number
+      eroded_thickness_m?: number
     },
   ) => void | Promise<void>
   onFormationMove: (formationId: string, depth: number) => void

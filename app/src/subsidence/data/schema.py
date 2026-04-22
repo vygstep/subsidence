@@ -204,6 +204,10 @@ class FormationTopModel(Base, AuditMixin):
     confidence: Mapped[float | None] = mapped_column(Float, nullable=True)
     color: Mapped[str] = mapped_column(String(9), default="#90a4ae")
     is_locked: Mapped[bool] = mapped_column(Boolean, default=False)
+    water_depth_m: Mapped[float] = mapped_column(Float, default=0.0, server_default='0.0')
+    # paleobathymetry + sea level at time of deposition for this interval (m); used in Airy backstripping
+    eroded_thickness_m: Mapped[float] = mapped_column(Float, default=0.0, server_default='0.0')
+    # compacted thickness of section eroded above this boundary (unconformity only, m)
     note: Mapped[str | None] = mapped_column(Text, nullable=True)
 
     well: Mapped[WellModel] = relationship(back_populates="formation_tops")

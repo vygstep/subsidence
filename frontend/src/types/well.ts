@@ -46,6 +46,8 @@ export interface FormationTop {
   color: string
   kind: string
   is_locked: boolean
+  water_depth_m: number
+  eroded_thickness_m: number
   lithology?: LithologyType
   strat_links: FormationStratLink[]
   active_strat_color: string | null

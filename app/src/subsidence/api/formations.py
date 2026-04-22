@@ -28,6 +28,8 @@ class FormationTopCreate(BaseModel):
     lithology: str | None = None
     age_ma: float | None = None
     is_locked: bool = False
+    water_depth_m: float = 0.0
+    eroded_thickness_m: float = 0.0
 
 
 class FormationTopPatch(BaseModel):
@@ -38,6 +40,8 @@ class FormationTopPatch(BaseModel):
     lithology: str | None = None
     age_ma: float | None = None
     is_locked: bool | None = None
+    water_depth_m: float | None = None
+    eroded_thickness_m: float | None = None
 
 
 class FormationStratLinkResponse(BaseModel):
@@ -57,6 +61,8 @@ class FormationTopResponse(BaseModel):
     lithology: str | None
     age_ma: float | None
     is_locked: bool
+    water_depth_m: float
+    eroded_thickness_m: float
     strat_links: list[FormationStratLinkResponse]
     active_strat_color: str | None
     active_strat_unit_name: str | None
@@ -130,6 +136,8 @@ def _to_response(row: FormationTopModel) -> FormationTopResponse:
         lithology=None,
         age_ma=row.age_top_ma,
         is_locked=row.is_locked,
+        water_depth_m=row.water_depth_m,
+        eroded_thickness_m=row.eroded_thickness_m,
         strat_links=links,
         active_strat_color=active_link.strat_unit.color_hex if active_link else None,
         active_strat_unit_name=active_link.strat_unit.name if active_link else None,
@@ -186,6 +194,8 @@ def create_formation(well_id: str, body: FormationTopCreate, request: Request) -
             color=body.color,
             kind=body.kind,
             is_locked=body.is_locked,
+            water_depth_m=body.water_depth_m,
+            eroded_thickness_m=body.eroded_thickness_m,
         )
         session.add(row)
         session.flush()
@@ -218,6 +228,8 @@ def update_formation(well_id: str, formation_id: int, body: FormationTopPatch, r
             'kind': ('kind', body.kind),
             'age_top_ma': ('age_top_ma', body.age_ma),
             'is_locked': ('is_locked', body.is_locked),
+            'water_depth_m': ('water_depth_m', body.water_depth_m),
+            'eroded_thickness_m': ('eroded_thickness_m', body.eroded_thickness_m),
         }
 
         for model_field, (_, value) in patch_map.items():
