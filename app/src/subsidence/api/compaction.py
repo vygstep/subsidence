@@ -105,6 +105,9 @@ def create_compaction_model(payload: CompactionModelCreate, request: Request) ->
         session.flush()
 
         if payload.clone_from_id is not None:
+            source_model = session.get(CompactionModel, payload.clone_from_id)
+            if source_model is None:
+                raise HTTPException(status_code=404, detail=f'Compaction model not found: {payload.clone_from_id}')
             source_params = session.scalars(
                 select(CompactionModelParam)
                 .where(CompactionModelParam.model_id == payload.clone_from_id)
