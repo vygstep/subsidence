@@ -7,9 +7,8 @@ from fastapi import APIRouter, HTTPException, Request
 from pydantic import BaseModel
 from sqlalchemy import delete, func, select
 
-from subsidence.data import ProjectManager
+from subsidence.data import ActivateStratChart, ProjectManager
 from subsidence.data.schema import FormationStratLink, StratChart, StratUnit
-from subsidence.data.strat_link import auto_link_all_formations_to_chart
 
 router = APIRouter(tags=['strat-chart'])
 
@@ -141,12 +140,17 @@ def activate_strat_chart(chart_id: int, request: Request) -> StratChartInfo:
         chart = session.get(StratChart, chart_id)
         if chart is None:
             raise HTTPException(status_code=404, detail=f'Strat chart not found: {chart_id}')
-        session.execute(StratChart.__table__.update().values(is_active=False))
-        chart.is_active = True
-        session.flush()
-        auto_link_all_formations_to_chart(session, chart)
-        session.commit()
-        manager.mark_dirty()
+        if chart.is_active:
+            return _chart_info(session, chart)
+        previous_active = session.scalar(select(StratChart).where(StratChart.is_active.is_(True)))
+        previous_active_id = previous_active.id if previous_active is not None else None
+
+    manager.execute_command(ActivateStratChart(chart_id, previous_active_id))
+
+    with manager.get_session() as session:
+        chart = session.get(StratChart, chart_id)
+        if chart is None:
+            raise HTTPException(status_code=404, detail=f'Strat chart not found: {chart_id}')
         return _chart_info(session, chart)
 
 

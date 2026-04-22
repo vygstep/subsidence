@@ -9,6 +9,7 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from .schema import CurveMetadata, DeviationSurveyModel, FormationStratLink, FormationTopModel, VisualConfig, WellModel
+from .strat_link import auto_link_all_formations_to_chart
 
 
 class Command(ABC):
@@ -328,6 +329,96 @@ class UpdateWell(Command):
             raise ValueError(f'Well not found: {self.well_id}')
         for key, value in values.items():
             setattr(well, key, value)
+
+
+class ActivateStratChart(Command):
+    def __init__(self, chart_id: int, previous_active_chart_id: int | None) -> None:
+        self.chart_id = chart_id
+        self.previous_active_chart_id = previous_active_chart_id
+        self._captured_changes: list[dict[str, Any]] | None = None
+
+    @property
+    def description(self) -> str:
+        return f'Activate strat chart {self.chart_id}'
+
+    def apply(self, session: Session) -> None:
+        from .schema import StratChart
+
+        chart = session.get(StratChart, self.chart_id)
+        if chart is None:
+            raise ValueError(f'Strat chart not found: {self.chart_id}')
+
+        session.query(StratChart).update({StratChart.is_active: False})
+        chart.is_active = True
+
+        if self._captured_changes is None:
+            formations = session.scalars(select(FormationTopModel)).all()
+            before = {
+                formation.id: {
+                    'color': formation.color,
+                    'age_top_ma': formation.age_top_ma,
+                    'had_link': session.scalar(
+                        select(FormationStratLink.id).where(
+                            FormationStratLink.formation_id == formation.id,
+                            FormationStratLink.chart_id == self.chart_id,
+                        )
+                    ) is not None,
+                }
+                for formation in formations
+            }
+
+            auto_link_all_formations_to_chart(session, chart)
+            session.flush()
+
+            self._captured_changes = []
+            for formation in formations:
+                after_has_link = session.scalar(
+                    select(FormationStratLink.id).where(
+                        FormationStratLink.formation_id == formation.id,
+                        FormationStratLink.chart_id == self.chart_id,
+                    )
+                ) is not None
+                previous = before[formation.id]
+                link_created = after_has_link and not previous['had_link']
+                if (
+                    link_created
+                    or formation.color != previous['color']
+                    or formation.age_top_ma != previous['age_top_ma']
+                ):
+                    self._captured_changes.append({
+                        'formation_id': formation.id,
+                        'old_color': previous['color'],
+                        'old_age_top_ma': previous['age_top_ma'],
+                        'link_created': link_created,
+                    })
+            return
+
+        auto_link_all_formations_to_chart(session, chart)
+
+    def revert(self, session: Session) -> None:
+        from .schema import StratChart
+
+        session.query(StratChart).update({StratChart.is_active: False})
+        if self.previous_active_chart_id is not None:
+            previous_chart = session.get(StratChart, self.previous_active_chart_id)
+            if previous_chart is not None:
+                previous_chart.is_active = True
+
+        for change in self._captured_changes or []:
+            formation = session.get(FormationTopModel, change['formation_id'])
+            if formation is None:
+                continue
+            if change['link_created']:
+                link = session.scalar(
+                    select(FormationStratLink).where(
+                        FormationStratLink.formation_id == formation.id,
+                        FormationStratLink.chart_id == self.chart_id,
+                    )
+                )
+                if link is not None:
+                    session.delete(link)
+            formation.color = change['old_color']
+            formation.age_top_ma = change['old_age_top_ma']
 
 
 class UpdateVisualConfig(Command):

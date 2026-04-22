@@ -19,6 +19,7 @@ from .loaders import load_curves_from_parquet, load_deviation_from_parquet, load
 from .models import DepthReference, LogCurve
 from .project_manager import ProjectManager
 from .undo import (
+    ActivateStratChart,
     Command,
     CreateFormation,
     ImportWell,
@@ -43,6 +44,7 @@ __all__ = [
     "LogCurve",
     "ProjectManager",
     "apply_imported_well_metadata",
+    "ActivateStratChart",
     "Command",
     "CreateFormation",
     "create_empty_well",
