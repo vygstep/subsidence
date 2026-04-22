@@ -141,36 +141,6 @@ Requested behavior:
   - precision
   - scale
 
-### V4. Well toolbar toggles
-
-Requested behavior:
-
-- add buttons above the well viewer for:
-  - show/hide track overview
-  - show/hide curve tooltip
-  - hand
-  - edit tops
-
-### V5. `DEPTH` track should be selectable and configurable
-
-Requested behavior:
-
-- `DEPTH` track should be selectable
-- in `Settings` for `DEPTH`, user should be able to control:
-  - depth reference: `MD / TVD / TVDSS`
-  - background color
-  - number of ticks
-  - units: `m / km / ft`
-
-### V6. `FORMATIONS` track should be selectable and configurable
-
-Requested behavior:
-
-- `FORMATIONS` track should be selectable
-- in `Settings` for `FORMATIONS`, user should be able to control:
-  - background color
-  - displayed formation name source / display attribute
-
 ---
 
 ## Recommended execution order
