@@ -58,9 +58,12 @@ function App() {
 
   useEffect(() => {
     void pollStatus()
-    const timer = window.setInterval(() => void pollStatus(), 2000)
+    if (!isProjectOpen) {
+      return
+    }
+    const timer = window.setInterval(() => void pollStatus(), 10_000)
     return () => window.clearInterval(timer)
-  }, [pollStatus])
+  }, [isProjectOpen, pollStatus])
 
   useEffect(() => {
     const onKeyDown = (e: KeyboardEvent) => { if (e.key === 'Escape') clearSelection() }
