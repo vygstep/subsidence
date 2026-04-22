@@ -9,24 +9,24 @@ The architecture from Phases 1–4 (Canvas + SVG layering, Zustand stores, FastA
 unchanged. Phase 5 is additive: no store refactoring, no renderer rewrites, no breaking API
 changes.
 
-**Status**: Not started.
+**Status**: Complete (2026-04-22). Steps 1, 2, 7 were pre-implemented. Step 10 (dark theme) deferred to Phase 6.
 
 ---
 
 ## Progress
 
-| Step | Status | Verification | Commit |
+| Step | Status | Notes | Commit |
 |---|---|---|---|
-| Step 1  | ⏳ | | |
-| Step 2  | ⏳ | | |
-| Step 3  | ⏳ | | |
-| Step 4  | ⏳ | | |
-| Step 5  | ⏳ | | |
-| Step 6  | ⏳ | | |
-| Step 7  | ⏳ | | |
-| Step 8  | ⏳ | | |
-| Step 9  | ⏳ | | |
-| Step 10 | ⏳ | | |
+| Step 1  | ✅ | Pre-existing: `fillRenderer.ts` fully implemented, wired in `DataTrack.tsx` | pre-Phase 5 |
+| Step 2  | ✅ | Pre-existing: full context menu in `DataManagerPane.tsx` (wells, top-picks, strat charts, compaction models) | pre-Phase 5 |
+| Step 3  | ✅ | SubsidenceControls (toggles + water depth), computedStore state, WS pipeline, backstrip offset | `056379e` |
+| Step 4  | ✅ | "Depth (m)" + "Age (Ma)" axis labels, formation name labels at right edge with color dot | `380c0fc` |
+| Step 5  | ✅ | `exportPng.ts`, Export PNG button in SubsidenceControls, filename includes well name | `2e12138` |
+| Step 6  | ✅ | Inline age editing in FormationTopsList; click age cell → input → PATCH + triggerRecalculation | `4fb0b66` |
+| Step 7  | ✅ | Pre-existing: pendingDepthPatches cleared in reset(), computeTimeout in computedStore, pick_folder sync, session safety | pre-Phase 5 |
+| Step 8  | ✅ | Included in Step 3: ws_recalculate uses `asyncio.to_thread(_compute_subsidence, …)` | `056379e` |
+| Step 9  | ✅ | `useKeyboardShortcuts` hook: +/- zoom, arrows scroll, Ctrl+Z/Y undo/redo, Delete/L on formations | `f45afb0` |
+| Step 10 | ⏳ | Deferred to Phase 6 — dark/light theme toggle requires CSS variable audit | — |
 
 ---
 
