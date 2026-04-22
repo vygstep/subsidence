@@ -63,7 +63,7 @@ export interface WellDataStore {
   error: string | null
   reset: () => void
   setColorOverrides: (overrides: Record<string, string>) => void
-  loadWellInventories: () => Promise<void>
+  loadWellInventories: () => Promise<boolean>
   loadWell: (wellId: string) => Promise<void>
   refreshWell: (preferredWellId?: string) => Promise<void>
   addFormation: (formation: FormationCreatePayload) => Promise<void>
@@ -160,12 +160,18 @@ export const useWellDataStore = create<WellDataStore>((set, get) => ({
     set({ colorOverrides: overrides })
   },
   async loadWellInventories() {
-    const response = await fetch('/api/wells/inventory')
-    if (!response.ok) {
-      throw new Error(await readError(response, `Failed to load well inventories (${response.status})`))
+    try {
+      const response = await fetch('/api/wells/inventory')
+      if (!response.ok) {
+        throw new Error(await readError(response, `Failed to load well inventories (${response.status})`))
+      }
+      const payload = (await response.json()) as WellInventory[]
+      set({ wellInventories: payload, error: null })
+      return true
+    } catch (error) {
+      set({ error: error instanceof Error ? error.message : 'Unknown error' })
+      return false
     }
-    const payload = (await response.json()) as WellInventory[]
-    set({ wellInventories: payload })
   },
   async loadWell(wellId: string) {
     clearPendingDepthPatches()

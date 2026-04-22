@@ -138,9 +138,11 @@ function App() {
     const loadCurrentProject = async () => {
       try {
         const projectChanged = lastProjectPathRef.current !== projectPath
-        await loadWellInventories()
+        const inventoriesLoaded = await loadWellInventories()
+        if (!inventoriesLoaded || cancelled) {
+          return
+        }
         const wells = useWellDataStore.getState().wellInventories
-        if (cancelled) return
         lastProjectPathRef.current = projectPath
         if (wells.length === 0) {
           replaceWellViewStates({})
