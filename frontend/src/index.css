@@ -1571,6 +1571,27 @@ body.is-resizing {
   border-color: #3b82f6;
 }
 
+.subsidence-controls__spacer {
+  flex: 1;
+}
+
+.subsidence-controls__btn {
+  padding: 3px 10px;
+  background: #1e3a5f;
+  border: 1px solid #2d5a8e;
+  border-radius: 4px;
+  color: #93c5fd;
+  font-size: 11px;
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.subsidence-controls__btn:hover {
+  background: #1d4ed8;
+  border-color: #3b82f6;
+  color: #fff;
+}
+
 /* Compaction model params table */
 .compaction-table-wrapper {
   overflow-x: auto;
