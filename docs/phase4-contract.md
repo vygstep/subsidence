@@ -52,189 +52,189 @@ Current truth source for completion is the Progress table above plus the post-st
 
 ### Step 1 — Compaction parameters: schema + API
 
-- [ ] 1.1 Add three columns to `LithologyDictEntry` in `app/src/subsidence/data/schema.py`:
+- [x] 1.1 Add three columns to `LithologyDictEntry` in `app/src/subsidence/data/schema.py`:
           `density: Mapped[float]` (kg/m³, grain density),
           `porosity_surface: Mapped[float]` (φ₀, fraction 0–1),
           `compaction_coeff: Mapped[float]` (c, km⁻¹ — stored in km⁻¹, converted to m⁻¹ in engine)
           All `Float`, non-nullable, with application-level server defaults so existing DB rows
           that were seeded without these columns are updated on next `seed_dictionaries()` call
-- [ ] 1.2 Update the lithology seed CSV (checked via `dict_seeder.py`) to include `density`,
+- [x] 1.2 Update the lithology seed CSV (checked via `dict_seeder.py`) to include `density`,
           `porosity_surface`, and `compaction_coeff` for all 9 lithology codes; use standard
           Athy model values (see spec table); these must match the parameter naming used by
           `repos/pybasin/lib/pybasin_lib.py` after unit conversion (pyBasin expects c in m⁻¹)
-- [ ] 1.3 Write `app/src/subsidence/api/compaction.py`:
+- [x] 1.3 Write `app/src/subsidence/api/compaction.py`:
           `GET /api/lithology-params` → `list[LithologyParamItem]`
           `PATCH /api/lithology-params/{lithology_code}` body `{ density?, porosity_surface?, compaction_coeff? }`
-- [ ] 1.4 Register `compaction` router in `app/src/subsidence/api/main.py`
-- [ ] 1.5 Verify: `GET /api/lithology-params` returns all 9 rows with density, φ₀, c; `PATCH`
+- [x] 1.4 Register `compaction` router in `app/src/subsidence/api/main.py`
+- [x] 1.5 Verify: `GET /api/lithology-params` returns all 9 rows with density, φ₀, c; `PATCH`
           updates shale φ₀ to 0.70; server restart → value persists
 
 ### Step 2 — Backstripping engine backend
 
-- [ ] 2.1 Write `app/src/subsidence/data/backstrip.py` wrapping the existing engine in
+- [x] 2.1 Write `app/src/subsidence/data/backstrip.py` wrapping the existing engine in
           `repos/pybasin/lib/pybasin_lib.py`; do **not** rewrite the decompaction math — import
           `integrate_porosity`, `calculate_matrix_thickness`, and `compact` directly
           (they depend only on `numpy`, no external deps); unit-convert c: DB stores km⁻¹,
           pyBasin expects m⁻¹ → `c_m = c_km / 1000.0`
-- [ ] 2.2 `backstrip.py` public surface:
+- [x] 2.2 `backstrip.py` public surface:
           `backstrip(formations, litho_params, water_depth_m=0.0) → list[SubsidenceResult]`
           where `formations` is a list of `FormationInput` dataclasses and `litho_params` is a
           `dict[str, LithologyParam]` read from DB
-- [ ] 2.3 The backstripping loop follows the Stratya2D algorithm pattern
+- [x] 2.3 The backstripping loop follows the Stratya2D algorithm pattern
           (`repos/Stratya2D/backstripping.py`): at each time step, strip younger formations,
           iteratively decompact remaining column from basement upward using `compact()`, then
           apply Airy correction; use per-lithology density from `litho_params` for the isostatic
           correction instead of a fixed ρ_s (ρ_m=3330, ρ_w=1030 matching pyBacktrack `well.py`)
-- [ ] 2.4 Write `app/src/subsidence/api/subsidence.py`:
+- [x] 2.4 Write `app/src/subsidence/api/subsidence.py`:
           `POST /api/wells/{well_id}/subsidence` reads current formations + compaction params from
           DB, calls `backstrip()`, returns `list[SubsidenceResultResponse]`;
           returns `400` if fewer than 2 formations have both ages assigned
-- [ ] 2.5 Register `subsidence` router in `app/src/subsidence/api/main.py` under `/api`
-- [ ] 2.6 Write unit tests in `tests/unit/test_backstrip.py` using a 2-formation shale column:
+- [x] 2.5 Register `subsidence` router in `app/src/subsidence/api/main.py` under `/api`
+- [x] 2.6 Write unit tests in `tests/unit/test_backstrip.py` using a 2-formation shale column:
           verify pyBasin's `compact()` is called (not a re-implementation); verify decompacted
           paleo-thickness > present thickness; verify tectonic subsidence is positive and finite
-- [ ] 2.7 Verify: `POST /api/wells/{id}/subsidence` with a well that has 3 aged formations
+- [x] 2.7 Verify: `POST /api/wells/{id}/subsidence` with a well that has 3 aged formations
           returns 3 `SubsidenceResult` items; each `burial_path` has length ≥ 2 and depths
           increase monotonically toward the present
 
 ### Step 3 — Frontend types + computedStore
 
-- [ ] 3.1 Write `frontend/src/types/subsidence.ts`:
+- [x] 3.1 Write `frontend/src/types/subsidence.ts`:
           `SubsidenceResult`, `SubsidenceInput`, `BurialPoint` (see spec)
-- [ ] 3.2 Write `frontend/src/stores/computedStore.ts`: `subsidenceCurves`, `isComputing`,
+- [x] 3.2 Write `frontend/src/stores/computedStore.ts`: `subsidenceCurves`, `isComputing`,
           `computeError`, `lastComputeTime`, `triggerRecalculation()`, `setResults()`, `clearResults()`
-- [ ] 3.3 `triggerRecalculation()` initial implementation: calls `POST /api/wells/{id}/subsidence`
+- [x] 3.3 `triggerRecalculation()` initial implementation: calls `POST /api/wells/{id}/subsidence`
           via fetch, sets `isComputing` during the request, calls `setResults` on success
-- [ ] 3.4 Export `useComputedStore` from `frontend/src/stores/index.ts`
-- [ ] 3.5 Verify: call `useComputedStore.getState().triggerRecalculation()` from browser console
+- [x] 3.4 Export `useComputedStore` from `frontend/src/stores/index.ts`
+- [x] 3.5 Verify: call `useComputedStore.getState().triggerRecalculation()` from browser console
           with a project that has aged formations → `subsidenceCurves` is populated, `isComputing`
           transitions false → true → false
 
 ### Step 4 — SplitView resizable layout
 
-- [ ] 4.1 Write `frontend/src/components/layout/SplitView.tsx`: horizontal resizable container;
+- [x] 4.1 Write `frontend/src/components/layout/SplitView.tsx`: horizontal resizable container;
           left pane (log view), right pane (subsidence panel); draggable `<div>` divider bar (6 px)
-- [ ] 4.2 Add `splitRatio: number` (default 0.55) and `setSplitRatio(r: number)` to `viewStore.ts`
-- [ ] 4.3 Divider drag updates `viewStore.splitRatio`; clamp to `[0.2, 0.8]`;
+- [x] 4.2 Add `splitRatio: number` (default 0.55) and `setSplitRatio(r: number)` to `viewStore.ts`
+- [x] 4.3 Divider drag updates `viewStore.splitRatio`; clamp to `[0.2, 0.8]`;
           changes are debounced (300 ms) into `projectStore.saveVisualConfig({ splitRatio })`
-- [ ] 4.4 Update `App.tsx` (or `MainLayout`): replace bare `<LogViewPanel>` with `<SplitView>`;
+- [x] 4.4 Update `App.tsx` (or `MainLayout`): replace bare `<LogViewPanel>` with `<SplitView>`;
           right pane renders `<SubsidencePanel>` (stub acceptable in Step 4)
-- [ ] 4.5 `visual_config` PATCH endpoint in backend must accept and return `splitRatio`
-- [ ] 4.6 Export `SplitView` from `frontend/src/components/layout/index.ts`
-- [ ] 4.7 Verify: drag divider left → log view narrows, subsidence pane widens; close + reopen →
+- [x] 4.5 `visual_config` PATCH endpoint in backend must accept and return `splitRatio`
+- [x] 4.6 Export `SplitView` from `frontend/src/components/layout/index.ts`
+- [x] 4.7 Verify: drag divider left → log view narrows, subsidence pane widens; close + reopen →
           split ratio preserved
 
 ### Step 5 — SubsidenceCanvas + GeologicalTimescale
 
-- [ ] 5.1 Write `frontend/src/utils/geologicalTimescale.ts`: typed array of ICS period records
+- [x] 5.1 Write `frontend/src/utils/geologicalTimescale.ts`: typed array of ICS period records
           covering the Phanerozoic (see spec); exported as `GEOLOGIC_PERIODS`
-- [ ] 5.2 Write `frontend/src/components/subsidence/GeologicalTimescale.tsx`: CSS-rendered
+- [x] 5.2 Write `frontend/src/components/subsidence/GeologicalTimescale.tsx`: CSS-rendered
           horizontal bar (40 px tall); each period a colored block with label clipped to block width;
           time axis: oldest left, present right; `timeRange` prop sets min/max Ma
-- [ ] 5.3 Write `frontend/src/renderers/subsidenceRenderer.ts`:
+- [x] 5.3 Write `frontend/src/renderers/subsidenceRenderer.ts`:
           `drawBurialCurves(ctx, curves, timeScale, depthScale, width, height): void`
           `drawFormationFills(ctx, curves, timeScale, depthScale, width, height): void`
           (see spec for axis orientation and fill logic)
-- [ ] 5.4 Write `frontend/src/components/subsidence/SubsidenceCanvas.tsx`: Canvas-rendered burial
+- [x] 5.4 Write `frontend/src/components/subsidence/SubsidenceCanvas.tsx`: Canvas-rendered burial
           history; x-axis = time (Ma, oldest left), y-axis = depth (m, 0 at top); reads
           `computedStore.subsidenceCurves`; uses `useCanvasRenderer`
-- [ ] 5.5 Write `frontend/src/components/subsidence/SubsidenceControls.tsx` (stub): empty `<div>`
+- [x] 5.5 Write `frontend/src/components/subsidence/SubsidenceControls.tsx` (stub): empty `<div>`
           with class `subsidence-controls`; expand in Step 8
-- [ ] 5.6 Write `frontend/src/components/subsidence/SubsidencePanel.tsx`: container with
+- [x] 5.6 Write `frontend/src/components/subsidence/SubsidencePanel.tsx`: container with
           `GeologicalTimescale` at top + `SubsidenceCanvas` filling remaining height;
           `SubsidenceControls` at bottom; shows loading overlay when `isComputing`; shows
           `"No data — formation ages required"` empty state
-- [ ] 5.7 Export all subsidence components from
+- [x] 5.7 Export all subsidence components from
           `frontend/src/components/subsidence/index.ts` (new file)
-- [ ] 5.8 Verify: manually call `computedStore.setResults([...])` with mock data → burial curves
+- [x] 5.8 Verify: manually call `computedStore.setResults([...])` with mock data → burial curves
           appear in `SubsidenceCanvas`; `GeologicalTimescale` shows Jurassic-to-present when
           `timeRange = { min_ma: 0, max_ma: 201 }`
 
 ### Step 6 — Formation drag → debounced REST recalculation
 
-- [ ] 6.1 In `wellDataStore.ts`, after a successful `updateFormationDepth` debounced PATCH,
+- [x] 6.1 In `wellDataStore.ts`, after a successful `updateFormationDepth` debounced PATCH,
           call `useComputedStore.getState().triggerRecalculation()` via dynamic import (same
           pattern as the existing `pollStatus()` call)
-- [ ] 6.2 Also trigger on `addFormation` success and `removeFormation` success
-- [ ] 6.3 `triggerRecalculation()` must be idempotent: if a request is already in flight, cancel
+- [x] 6.2 Also trigger on `addFormation` success and `removeFormation` success
+- [x] 6.3 `triggerRecalculation()` must be idempotent: if a request is already in flight, cancel
           the previous one (`AbortController`) and start a new one
-- [ ] 6.4 Verify: with 3 aged formations, drag a top 100 m → within 1.5 s burial curves update
+- [x] 6.4 Verify: with 3 aged formations, drag a top 100 m → within 1.5 s burial curves update
           in `SubsidenceCanvas`; `StatusBar` shows `"Computing…"` during the request then clears
 
 ### Step 7 — WebSocket recalculation pipeline
 
-- [ ] 7.1 Write `app/src/subsidence/api/subsidence.py`: add
+- [x] 7.1 Write `app/src/subsidence/api/subsidence.py`: add
           `WebSocket /ws/recalculate` endpoint; accepts JSON `{ well_id }`, reads formations +
           compaction params from DB, sends `{ status: "computing", progress: 0.0 }`, runs
           `backstrip()`, sends `{ status: "complete", results: [...] }`
-- [ ] 7.2 Write `frontend/src/hooks/useWebSocket.ts`: generic hook managing one WebSocket
+- [x] 7.2 Write `frontend/src/hooks/useWebSocket.ts`: generic hook managing one WebSocket
           connection with auto-reconnect (exponential backoff, max 30 s); exposes `send(data)`,
           `readyState`, and `onMessage` callback
-- [ ] 7.3 Write `frontend/src/api/subsidenceSocket.ts`:
+- [x] 7.3 Write `frontend/src/api/subsidenceSocket.ts`:
           `sendRecalculation(wellId: string): void`
           Returns results via `computedStore.setResults`; progress updates `isComputing = true`
-- [ ] 7.4 Replace fetch call in `computedStore.triggerRecalculation()` with
+- [x] 7.4 Replace fetch call in `computedStore.triggerRecalculation()` with
           `subsidenceSocket.sendRecalculation(wellId)` (WebSocket path)
-- [ ] 7.5 `SubsidencePanel` loading overlay: show while `isComputing === true`; display
+- [x] 7.5 `SubsidencePanel` loading overlay: show while `isComputing === true`; display
           `computeError` if not null (red inline message, not a toast)
-- [ ] 7.6 Verify: drag a formation top → WebSocket message sent → "Computing…" overlay appears →
+- [x] 7.6 Verify: drag a formation top → WebSocket message sent → "Computing…" overlay appears →
           curves update on `"complete"` message; kill and restart the backend → client reconnects
           automatically and next drag triggers recalculation normally
 
 ### Step 8 — Compaction parameters editor UI
 
-- [ ] 8.1 Extend `frontend/src/stores/wellDataStore.ts` (or a new `projectWideStore`): add
+- [x] 8.1 Extend `frontend/src/stores/wellDataStore.ts` (or a new `projectWideStore`): add
           `lithologyParams: LithologyParam[]`, `loadLithologyParams(): Promise<void>`,
           `updateLithologyParam(code, patch): Promise<void>` — calls `PATCH /api/lithology-params/{code}`
-- [ ] 8.2 Call `loadLithologyParams()` on project open (after `loadWell`)
-- [ ] 8.3 Add `'compaction'` as a selectable object type in the left `Data Manager` tree: static
+- [x] 8.2 Call `loadLithologyParams()` on project open (after `loadWell`)
+- [x] 8.3 Add `'compaction'` as a selectable object type in the left `Data Manager` tree: static
           node labeled `"Compaction params"` under a `"Models"` section
-- [ ] 8.4 Extend `SettingsInspector.tsx` with a `compaction-params` branch: renders a table of
+- [x] 8.4 Extend `SettingsInspector.tsx` with a `compaction-params` branch: renders a table of
           all 9 lithology codes with editable `<input type="number" step="0.01">` for φ₀ and c;
           on blur, call `updateLithologyParam(code, { porosity_surface, compaction_coeff })`
-- [ ] 8.5 After a successful `PATCH`, call `computedStore.triggerRecalculation()` so curves
+- [x] 8.5 After a successful `PATCH`, call `computedStore.triggerRecalculation()` so curves
           update immediately
-- [ ] 8.6 Verify: change shale φ₀ from 0.63 to 0.80 → curves update; refresh page → value 0.80
+- [x] 8.6 Verify: change shale φ₀ from 0.63 to 0.80 → curves update; refresh page → value 0.80
           is retained; change back to 0.63 → curves update again
 
 ### Step 9 — LTTB server-side LOD + curve mnemonic defaults
 
-- [ ] 9.1 Write `app/src/subsidence/data/lttb.py`: pure Python `lttb(times, values, threshold)`
+- [x] 9.1 Write `app/src/subsidence/data/lttb.py`: pure Python `lttb(times, values, threshold)`
           implementing the Largest-Triangle-Three-Buckets algorithm; return indices of retained
           samples
-- [ ] 9.2 Add `GET /api/wells/{well_id}/curves` with query params `depth_min`, `depth_max`,
+- [x] 9.2 Add `GET /api/wells/{well_id}/curves` with query params `depth_min`, `depth_max`,
           `resolution` (max points per curve); clips curve data to depth window then runs LTTB;
           returns same `CurveResponse` shape as the full `GET /api/wells/{id}` curves
-- [ ] 9.3 In `frontend/src/stores/wellDataStore.ts`, add `fetchCurvesLOD(depthMin, depthMax,
+- [x] 9.3 In `frontend/src/stores/wellDataStore.ts`, add `fetchCurvesLOD(depthMin, depthMax,
           resolution)` which calls the new endpoint and merges results into the loaded `curves`
           array without clearing formations or well metadata
-- [ ] 9.4 Add a `useEffect` in `LogViewPanel.tsx` (or `App.tsx`) that fires when `depthPerPixel`
+- [x] 9.4 Add a `useEffect` in `LogViewPanel.tsx` (or `App.tsx`) that fires when `depthPerPixel`
           crosses a coarseness threshold (e.g., `> 1.0 m/px`): call `fetchCurvesLOD` with the
           current visible depth range + `resolution = Math.ceil(viewportHeight / 2)`
-- [ ] 9.5 Extend `SettingsInspector` curve branch: add a `"Defaults"` row that reads the matching
+- [x] 9.5 Extend `SettingsInspector` curve branch: add a `"Defaults"` row that reads the matching
           `CurveDictEntry` (family, canonical unit) from `GET /api/curve-dict?mnemonic={m}` and
           shows a `"Apply defaults"` button that resets color, scaleMin, scaleMax to family defaults
-- [ ] 9.6 Verify: load a well with 30 000 depth samples; zoom to a 200 m window → LOD fetch
+- [x] 9.6 Verify: load a well with 30 000 depth samples; zoom to a 200 m window → LOD fetch
           replaces curve with ≤ `viewportHeight / 2` points; Canvas frame time stays < 2 ms;
           zoom back out → full-resolution data present
 
 ### Step 10 — MD ↔ TVD depth toggle
 
-- [ ] 10.1 Write `frontend/src/utils/depthTransform.ts`: `minCurvatureToTVD(survey: SurveyPoint[])
+- [x] 10.1 Write `frontend/src/utils/depthTransform.ts`: `minCurvatureToTVD(survey: SurveyPoint[])
            → TVDTable` and `mdToTvd(md: number, table: TVDTable) → number` using minimum curvature
            interpolation; `SurveyPoint = { md, inclination_deg, azimuth_deg }`
-- [ ] 10.2 Add `depthType: 'MD' | 'TVD'` (default `'MD'`) and `setDepthType(t)` to `viewStore.ts`
-- [ ] 10.3 Add a `"TVD"` toggle button to `ProjectToolbar.tsx` (second row, always visible when a
+- [x] 10.2 Add `depthType: 'MD' | 'TVD'` (default `'MD'`) and `setDepthType(t)` to `viewStore.ts`
+- [x] 10.3 Add a `"TVD"` toggle button to `ProjectToolbar.tsx` (second row, always visible when a
            well with deviation data is loaded); disabled + tooltip `"No deviation survey"` when none
-- [ ] 10.4 `wellDataStore.ts` must store the computed TVD table after `loadWell()` when deviation
+- [x] 10.4 `wellDataStore.ts` must store the computed TVD table after `loadWell()` when deviation
            data exist; expose `tvdTable: TVDTable | null`
-- [ ] 10.5 `DepthTrack.tsx`: when `depthType === 'TVD'`, convert `scrollDepth`/labels via
+- [x] 10.5 `DepthTrack.tsx`: when `depthType === 'TVD'`, convert `scrollDepth`/labels via
            `mdToTvd`; render tick labels as TVD values
-- [ ] 10.6 `FormationTopLine.tsx` and `FormationColumn.tsx`: when `depthType === 'TVD'`, convert
+- [x] 10.6 `FormationTopLine.tsx` and `FormationColumn.tsx`: when `depthType === 'TVD'`, convert
            `formation.depth_md` to TVD for the y-position calculation only; store always holds MD
-- [ ] 10.7 `StatusBar.tsx` depth readout: show `MD {d} m` or `TVD {d} m` based on `depthType`
-- [ ] 10.8 `SubsidenceCanvas.tsx` depth axis: convert burial path depths to TVD when toggle is on
-- [ ] 10.9 Verify: toggle TVD on for a deviated well (inclination 20°) → depth track shows
+- [x] 10.7 `StatusBar.tsx` depth readout: show `MD {d} m` or `TVD {d} m` based on `depthType`
+- [x] 10.8 `SubsidenceCanvas.tsx` depth axis: convert burial path depths to TVD when toggle is on
+- [x] 10.9 Verify: toggle TVD on for a deviated well (inclination 20°) → depth track shows
            shallower TVD labels; formation lines shift proportionally; toggle back → MD restored;
            undulating toggle does not cause visual drift (precision stable)
 
@@ -1087,3 +1087,4 @@ Step 10 (MD ↔ TVD toggle)                       ← parallel with Steps 8 + 9
   formation line positions, and StatusBar readout; toggling back restores MD without drift
 - `npx tsc --noEmit` — zero errors
 - Backend unit tests for `backstrip()` and `lttb()` pass
+
