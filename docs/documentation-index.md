@@ -19,7 +19,7 @@ The current implementation is built around:
 - SQLite + Parquet project bundles on disk
 - WebSocket recalculation path for subsidence results
 
-Phase 5 is complete. The current engineering focus is maintainability, regression tests, process logging, and documentation.
+Phase 5 and the post-Phase 5 maintenance/refactor cycle are complete. Current future work is tracked in `todo.md`.
 
 ---
 
@@ -27,7 +27,6 @@ Phase 5 is complete. The current engineering focus is maintainability, regressio
 
 - [Architecture](architecture.md): application runtime shape, data flow, and project bundle model.
 - [Codebase Map](codebase-map.md): compact "where to look" map by bug type.
-- [Engineering Maintenance Contract](contracts/engineering-maintenance-contract.md): current maintenance/refactor/testing/logging plan.
 - [Execution Backlog](../todo.md): active checkpoint list.
 
 ---
@@ -59,7 +58,6 @@ Quality:
 
 Active contracts describe work that still matters for future development:
 
-- [Engineering Maintenance Contract](contracts/engineering-maintenance-contract.md)
 - [1D Well Model Architecture](contracts/well_1d_model_architecture.md)
 - [1D Well Model Summary](contracts/well_1d_model_summary.md)
 
@@ -77,6 +75,7 @@ Implemented or superseded contracts are archived in `contracts/implemented/`. Th
 - [Phase 3 Cleanup 2 Contract](contracts/implemented/phase3-cleanup2-contract.md)
 - [Phase 4 Contract](contracts/implemented/phase4-contract.md)
 - [Phase 5 Contract](contracts/implemented/phase5-contract.md)
+- [Engineering Maintenance Contract](contracts/implemented/engineering-maintenance-contract.md)
 
 ---
 
@@ -98,5 +97,5 @@ pytest tests
 
 Baseline from 2026-04-23:
 
-- Frontend: 25 passed.
-- Backend: 21 passed.
+- Frontend: 34 passed.
+- Backend: 30 passed.

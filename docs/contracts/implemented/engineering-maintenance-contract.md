@@ -1,7 +1,8 @@
 # Engineering Maintenance Contract
 
-**Status:** Draft for execution  
+**Status:** Implemented  
 **Created:** 2026-04-23  
+**Completed:** 2026-04-23  
 **Scope:** Maintainability audit, regression testing, process logging, and codebase documentation after Phase 5.
 
 This contract is intentionally not a feature phase. Its goal is to make the existing application easier to debug, refactor, and extend without breaking the core well-log, stratigraphy, and subsidence workflows.
@@ -15,8 +16,8 @@ This contract is intentionally not a feature phase. Its goal is to make the exis
 - The application has a complete FastAPI + React/Zustand architecture.
 - Project lifecycle, well data import, strat charts, well viewer, settings inspector, subsidence panel, export, undo/redo, and checkpoints are implemented.
 - Existing automated tests pass:
-  - Frontend: `25 passed` via `npm run test -- --run`
-  - Backend: `21 passed` via `pytest tests`
+  - Frontend: `34 passed` via `npm run test -- --run`
+  - Backend: `30 passed` via `pytest tests`
 - Phase 5 is marked complete in `docs/contracts/implemented/phase5-contract.md`.
 
 ### 1.2 Main risk

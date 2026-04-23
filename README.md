@@ -16,14 +16,14 @@ The legacy implementation has been preserved in:
 
 ## Current Scope
 
-Phase 5 is complete. Current work focuses on maintainability, regression tests, process logging, and developer documentation before the next UX/feature pass.
+Phase 5 and the post-Phase 5 maintenance/refactor cycle are complete. Current active planning is in `todo.md`.
 
 ## Active Documents
 
 - [Documentation Index](docs/documentation-index.md)
 - [Architecture](docs/architecture.md)
 - [Codebase Map](docs/codebase-map.md)
-- [Engineering Maintenance Contract](docs/contracts/engineering-maintenance-contract.md)
+- [Engineering Maintenance Contract](docs/contracts/implemented/engineering-maintenance-contract.md)
 - [Historical Compass Strategy](docs/contracts/implemented/app_compass.md)
 - [Reference Sources](docs/reference-sources.md)
 - [Execution Backlog](todo.md)

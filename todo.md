@@ -1,4 +1,4 @@
-# SUBSIDENCE TODO
+﻿# SUBSIDENCE TODO
 
 This file contains only active work that still needs to be done.
 
@@ -13,7 +13,6 @@ Rules:
 
 ## Active Contracts
 
-- [Engineering Maintenance Contract](docs/contracts/engineering-maintenance-contract.md)
 - [1D Well Model Architecture](docs/contracts/well_1d_model_architecture.md)
 - [1D Well Model Summary](docs/contracts/well_1d_model_summary.md)
 
@@ -21,12 +20,11 @@ Rules:
 
 ## Status
 
-M0–M6 complete. Test baseline as of 2026-04-23: **backend 30 passed, frontend 34 passed**.
+M0-M7 maintenance cycle complete. Test baseline as of 2026-04-23: **backend 30 passed, frontend 34 passed**.
 
 ---
 
 ## Future Work
 
-- [ ] Execute `M7 Resume UX and feature backlog` from [Engineering Maintenance Contract](docs/contracts/engineering-maintenance-contract.md).
-- [ ] Create and execute `Import Wizard Contract` after M6.
+- [ ] Create and execute `Import Wizard Contract`.
 - [ ] Review and schedule [1D Well Model Architecture](docs/contracts/well_1d_model_architecture.md) and [1D Well Model Summary](docs/contracts/well_1d_model_summary.md).
