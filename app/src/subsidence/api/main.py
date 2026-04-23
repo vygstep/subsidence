@@ -1,9 +1,12 @@
 import os
+from time import perf_counter
+from uuid import uuid4
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from subsidence.data import ProjectManager
+from subsidence.observability import configure_logging, log_event, reset_request_id, set_request_id
 
 from .compaction import router as compaction_router
 from .formations import router as formations_router
@@ -12,6 +15,8 @@ from .strat_chart import router as strat_chart_router
 from .subsidence import router as subsidence_router
 from .wells import router as wells_router
 
+configure_logging()
+
 app = FastAPI(
     title="SUBSIDENCE API",
     description="Backend for well log visualization and subsidence curve calculation",
@@ -19,6 +24,52 @@ app = FastAPI(
 )
 
 app.state.project_manager = ProjectManager()
+
+
+@app.middleware("http")
+async def request_logging_middleware(request, call_next):
+    request_id = request.headers.get('x-request-id') or str(uuid4())
+    token = set_request_id(request_id)
+    start = perf_counter()
+    log_event(
+        'info',
+        'http.request',
+        'start',
+        method=request.method,
+        path=request.url.path,
+    )
+    try:
+        response = await call_next(request)
+    except Exception as exc:
+        log_event(
+            'error',
+            'http.request',
+            'failure',
+            method=request.method,
+            path=request.url.path,
+            duration_ms=round((perf_counter() - start) * 1000, 2),
+            error_type=type(exc).__name__,
+            error_message=str(exc),
+        )
+        raise
+    finally:
+        reset_request_id(token)
+
+    response.headers['x-request-id'] = request_id
+    token = set_request_id(request_id)
+    try:
+        log_event(
+            'info',
+            'http.request',
+            'success',
+            method=request.method,
+            path=request.url.path,
+            status_code=response.status_code,
+            duration_ms=round((perf_counter() - start) * 1000, 2),
+        )
+    finally:
+        reset_request_id(token)
+    return response
 
 cors_origins = [
     origin.strip()

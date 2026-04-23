@@ -9,6 +9,8 @@ from sqlalchemy import delete, func, select
 
 from subsidence.data import ActivateStratChart, ProjectManager
 from subsidence.data.schema import FormationStratLink, StratChart, StratUnit
+from subsidence.data.strat_link import auto_link_all_formations_to_chart
+from subsidence.observability import operation_log
 
 router = APIRouter(tags=['strat-chart'])
 
@@ -22,6 +24,10 @@ def _require_open_project(request: Request) -> ProjectManager:
     if not manager.is_open:
         raise HTTPException(status_code=400, detail='No project is open')
     return manager
+
+
+def _manager_project_path(manager: ProjectManager) -> str | None:
+    return str(manager.project_path) if manager.project_path else None
 
 
 class ImportStratChartRequest(BaseModel):
@@ -136,57 +142,60 @@ def list_strat_charts(request: Request) -> list[StratChartInfo]:
 @router.patch('/strat-charts/{chart_id}/activate', response_model=StratChartInfo)
 def activate_strat_chart(chart_id: int, request: Request) -> StratChartInfo:
     manager = _require_open_project(request)
-    with manager.get_session() as session:
-        chart = session.get(StratChart, chart_id)
-        if chart is None:
-            raise HTTPException(status_code=404, detail=f'Strat chart not found: {chart_id}')
-        if chart.is_active:
+    with operation_log('strat_chart.activate', project_path=_manager_project_path(manager), chart_id=chart_id):
+        with manager.get_session() as session:
+            chart = session.get(StratChart, chart_id)
+            if chart is None:
+                raise HTTPException(status_code=404, detail=f'Strat chart not found: {chart_id}')
+            if chart.is_active:
+                return _chart_info(session, chart)
+            previous_active = session.scalar(select(StratChart).where(StratChart.is_active.is_(True)))
+            previous_active_id = previous_active.id if previous_active is not None else None
+
+        manager.execute_command(ActivateStratChart(chart_id, previous_active_id))
+
+        with manager.get_session() as session:
+            chart = session.get(StratChart, chart_id)
+            if chart is None:
+                raise HTTPException(status_code=404, detail=f'Strat chart not found: {chart_id}')
             return _chart_info(session, chart)
-        previous_active = session.scalar(select(StratChart).where(StratChart.is_active.is_(True)))
-        previous_active_id = previous_active.id if previous_active is not None else None
-
-    manager.execute_command(ActivateStratChart(chart_id, previous_active_id))
-
-    with manager.get_session() as session:
-        chart = session.get(StratChart, chart_id)
-        if chart is None:
-            raise HTTPException(status_code=404, detail=f'Strat chart not found: {chart_id}')
-        return _chart_info(session, chart)
 
 
 @router.delete('/strat-charts/{chart_id}', status_code=204)
 def delete_strat_chart_by_id(chart_id: int, request: Request) -> None:
     manager = _require_open_project(request)
-    with manager.get_session() as session:
-        chart = session.get(StratChart, chart_id)
-        if chart is None:
-            raise HTTPException(status_code=404, detail=f'Strat chart not found: {chart_id}')
-        if _is_builtin_chart(chart):
-            raise HTTPException(status_code=403, detail='Built-in ICS chart cannot be deleted')
-        session.execute(delete(FormationStratLink).where(FormationStratLink.chart_id == chart_id))
-        session.execute(delete(StratUnit).where(StratUnit.chart_id == chart_id))
-        session.execute(delete(StratChart).where(StratChart.id == chart_id))
-        session.commit()
-    manager.save_project()
+    with operation_log('strat_chart.delete', project_path=_manager_project_path(manager), chart_id=chart_id):
+        with manager.get_session() as session:
+            chart = session.get(StratChart, chart_id)
+            if chart is None:
+                raise HTTPException(status_code=404, detail=f'Strat chart not found: {chart_id}')
+            if _is_builtin_chart(chart):
+                raise HTTPException(status_code=403, detail='Built-in ICS chart cannot be deleted')
+            session.execute(delete(FormationStratLink).where(FormationStratLink.chart_id == chart_id))
+            session.execute(delete(StratUnit).where(StratUnit.chart_id == chart_id))
+            session.execute(delete(StratChart).where(StratChart.id == chart_id))
+            session.commit()
+        manager.save_project()
 
 
 @router.post('/strat-charts/import', response_model=ImportStratChartResponse)
 def import_strat_chart(body: ImportStratChartRequest, request: Request) -> ImportStratChartResponse:
     manager = _require_open_project(request)
-    csv_path = Path(body.csv_path)
-    if not csv_path.exists():
-        raise HTTPException(status_code=400, detail=f'File not found: {body.csv_path}')
-    if not csv_path.is_file():
-        raise HTTPException(status_code=400, detail=f'Path is not a file: {body.csv_path}')
+    with operation_log('strat_chart.import', project_path=_manager_project_path(manager), input_path=body.csv_path):
+        csv_path = Path(body.csv_path)
+        if not csv_path.exists():
+            raise HTTPException(status_code=400, detail=f'File not found: {body.csv_path}')
+        if not csv_path.is_file():
+            raise HTTPException(status_code=400, detail=f'Path is not a file: {body.csv_path}')
 
-    with manager.get_session() as session:
-        try:
-            chart, count = _import_ics_csv(session, csv_path)
-            if chart.is_active:
-                auto_link_all_formations_to_chart(session, chart)
-            session.commit()
-        except ValueError as exc:
-            raise HTTPException(status_code=422, detail=str(exc)) from exc
+        with manager.get_session() as session:
+            try:
+                chart, count = _import_ics_csv(session, csv_path)
+                if chart.is_active:
+                    auto_link_all_formations_to_chart(session, chart)
+                session.commit()
+            except ValueError as exc:
+                raise HTTPException(status_code=422, detail=str(exc)) from exc
 
-    manager.save_project()
-    return ImportStratChartResponse(units_imported=count)
+        manager.save_project()
+        return ImportStratChartResponse(units_imported=count)

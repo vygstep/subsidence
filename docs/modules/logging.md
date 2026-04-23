@@ -1,6 +1,6 @@
 # Logging Module
 
-This module defines the planned process logging layer.
+This module describes the current process logging layer.
 
 ---
 
@@ -14,7 +14,11 @@ User-facing error messages are not enough. Maintenance needs operation-level con
 
 ## Backend Logging
 
-Backend logs should be structured and grep-friendly. JSON lines are preferred.
+Backend logging is implemented in `app/src/subsidence/observability.py`.
+
+The backend writes structured JSON lines through the `subsidence` logger. Logging is configured once during FastAPI startup in `app/src/subsidence/api/main.py`.
+
+Set `SUBSIDENCE_LOG_LEVEL` to change verbosity. Default is `INFO`.
 
 Required fields:
 
@@ -23,16 +27,15 @@ Required fields:
 - `request_id`
 - `operation`
 - `phase`
-- `duration_ms`
-- `project_path`
-- `well_id`
-- `well_name`
-- `input_path`
-- `result_summary`
-- `error_type`
-- `error_message`
+- `duration_ms` on success/failure events
+- `project_path` when available
+- `well_id` / `well_name` when available
+- `input_path` for import operations when available
+- `error_type` / `error_message` on failures
 
-Required operations:
+HTTP requests are logged by middleware as `http.request` and receive an `x-request-id` response header. If the client supplies `x-request-id`, the backend preserves it.
+
+Covered operations:
 
 - `project.create`
 - `project.open`
@@ -44,14 +47,34 @@ Required operations:
 - `import.logs_csv`
 - `import.tops`
 - `import.deviation`
-- `strat_chart.load`
+- `strat_chart.import`
+- `strat_chart.activate`
 - `strat_chart.delete`
 - `visual_config.patch`
 - `undo.run`
 - `redo.run`
 - `checkpoint.create`
 - `checkpoint.restore`
+- `checkpoint.delete`
+- `export.las`
+- `export.csv`
+- `subsidence.calculate`
 - `subsidence.recalculate`
+- `subsidence.stored_results`
+
+Example:
+
+```json
+{"timestamp":"2026-04-23T10:00:00+00:00","level":"info","logger":"subsidence","message":"import.las.success","request_id":"...","operation":"import.las","phase":"success","project_path":"D:\\github\\subsidence\\projects\\demo.subsidence","input_path":"D:\\logs\\well.las","well_id":"...","duration_ms":83.42}
+```
+
+## Backend Implementation Files
+
+- `app/src/subsidence/observability.py`: JSON formatter, request ID context, `log_event`, and `operation_log`.
+- `app/src/subsidence/api/main.py`: request ID middleware and HTTP request logs.
+- `app/src/subsidence/api/projects.py`: project lifecycle, imports, undo/redo, checkpoints, visual config, and export logs.
+- `app/src/subsidence/api/strat_chart.py`: strat chart import/activate/delete logs.
+- `app/src/subsidence/api/subsidence.py`: calculation and websocket recalculation logs.
 
 ---
 
@@ -81,6 +104,6 @@ Required behavior:
 
 ---
 
-## First Implementation Step
+## Next Implementation Step
 
-Add backend request ID middleware and operation logging around project lifecycle and imports. These workflows produce the most expensive bugs to diagnose manually.
+Frontend diagnostics are still pending under `M4 Add frontend diagnostics` in `docs/contracts/engineering-maintenance-contract.md`.

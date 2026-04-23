@@ -4,6 +4,7 @@ import asyncio
 import hashlib
 import json
 from pathlib import Path
+from uuid import uuid4
 
 from fastapi import APIRouter, HTTPException, Request, WebSocket, WebSocketDisconnect
 from pydantic import BaseModel
@@ -15,6 +16,7 @@ from subsidence.data.backstrip import (
     backstrip,
 )
 from subsidence.data.schema import CalculationResult, CompactionModel, CompactionModelParam, FormationTopModel, LithologyDictEntry, WellModel
+from subsidence.observability import operation_log, reset_request_id, set_request_id
 
 router = APIRouter(tags=['subsidence'])
 
@@ -44,6 +46,10 @@ def _require_open_project(request: Request):
     if not manager.is_open:
         raise HTTPException(status_code=400, detail='No project is currently open')
     return manager
+
+
+def _manager_project_path(manager) -> str | None:
+    return str(manager.project_path) if manager.project_path else None
 
 
 def _compute_subsidence(manager, well_id: str, water_depth_m: float = 0.0) -> list[SubsidenceResultResponse]:
@@ -192,48 +198,51 @@ def _store_results(manager, well_id: str, results: list[SubsidenceResultResponse
 @router.get('/subsidence/stored-results', response_model=list[WellSubsidenceResultsResponse])
 def get_stored_results(request: Request) -> list[WellSubsidenceResultsResponse]:
     manager = _require_open_project(request)
-    out: list[WellSubsidenceResultsResponse] = []
-    with manager.get_session() as session:
-        rows = session.scalars(
-            select(CalculationResult).where(
-                CalculationResult.kind == 'burial_history',
-                CalculationResult.is_stale.is_(False),
-            )
-        ).all()
-        for row in rows:
-            well = session.get(WellModel, row.well_id)
-            if well is None:
-                continue
-            fpath = Path(manager.project_path) / row.data_uri
-            if not fpath.exists():
-                continue
-            payload = json.loads(fpath.read_text())
-            curves = [SubsidenceResultResponse.model_validate(c) for c in payload]
-            out.append(WellSubsidenceResultsResponse(
-                well_id=row.well_id,
-                well_name=well.name,
-                algorithm=row.algorithm,
-                td_md=well.td_md or 0.0,
-                curves=curves,
-            ))
-    return out
+    with operation_log('subsidence.stored_results', project_path=_manager_project_path(manager)):
+        out: list[WellSubsidenceResultsResponse] = []
+        with manager.get_session() as session:
+            rows = session.scalars(
+                select(CalculationResult).where(
+                    CalculationResult.kind == 'burial_history',
+                    CalculationResult.is_stale.is_(False),
+                )
+            ).all()
+            for row in rows:
+                well = session.get(WellModel, row.well_id)
+                if well is None:
+                    continue
+                fpath = Path(manager.project_path) / row.data_uri
+                if not fpath.exists():
+                    continue
+                payload = json.loads(fpath.read_text())
+                curves = [SubsidenceResultResponse.model_validate(c) for c in payload]
+                out.append(WellSubsidenceResultsResponse(
+                    well_id=row.well_id,
+                    well_name=well.name,
+                    algorithm=row.algorithm,
+                    td_md=well.td_md or 0.0,
+                    curves=curves,
+                ))
+        return out
 
 
 @router.post('/wells/{well_id}/subsidence', response_model=list[SubsidenceResultResponse])
 def calculate_subsidence(well_id: str, request: Request) -> list[SubsidenceResultResponse]:
     manager = _require_open_project(request)
-    results = _compute_subsidence(manager, well_id)
-    if not results:
-        raise HTTPException(
-            status_code=400,
-            detail='Fewer than 2 formations have both ages assigned',
-        )
-    return results
+    with operation_log('subsidence.calculate', project_path=_manager_project_path(manager), well_id=well_id):
+        results = _compute_subsidence(manager, well_id)
+        if not results:
+            raise HTTPException(
+                status_code=400,
+                detail='Fewer than 2 formations have both ages assigned',
+            )
+        return results
 
 
 @router.websocket('/ws/recalculate')
 async def ws_recalculate(websocket: WebSocket) -> None:
     manager = websocket.app.state.project_manager
+    token = set_request_id(str(uuid4()))
     await websocket.accept()
     try:
         while True:
@@ -251,8 +260,9 @@ async def ws_recalculate(websocket: WebSocket) -> None:
             water_depth_m = float(data.get('water_depth_m', 0.0))
             await websocket.send_json({'status': 'computing', 'progress': 0.0})
             try:
-                results = await asyncio.to_thread(_compute_subsidence, manager, well_id, water_depth_m)
-                await asyncio.to_thread(_store_results, manager, well_id, results, water_depth_m)
+                with operation_log('subsidence.recalculate', project_path=_manager_project_path(manager), well_id=well_id, water_depth_m=water_depth_m):
+                    results = await asyncio.to_thread(_compute_subsidence, manager, well_id, water_depth_m)
+                    await asyncio.to_thread(_store_results, manager, well_id, results, water_depth_m)
                 await websocket.send_json({
                     'status': 'complete',
                     'results': [r.model_dump() for r in results],
@@ -261,3 +271,5 @@ async def ws_recalculate(websocket: WebSocket) -> None:
                 await websocket.send_json({'status': 'error', 'message': str(exc)})
     except WebSocketDisconnect:
         pass
+    finally:
+        reset_request_id(token)

@@ -40,6 +40,7 @@ from subsidence.data import (
 )
 from subsidence.data.dict_resolver import resolve_curve_alias
 from subsidence.data.schema import CurveDictEntry, CurveMetadata, FormationTopModel, LithologyDictEntry, ProjectMeta, VisualConfig, WellModel
+from subsidence.observability import operation_log
 
 router = APIRouter(tags=['projects'])
 
@@ -264,6 +265,10 @@ def _manager(request: Request) -> ProjectManager:
     return request.app.state.project_manager
 
 
+def _manager_project_path(manager: ProjectManager) -> str | None:
+    return str(manager.project_path) if manager.project_path else None
+
+
 def _require_open_project(request: Request) -> ProjectManager:
     manager = _manager(request)
     if not manager.is_open:
@@ -353,11 +358,12 @@ def _select_export_well(session, well_id: str | None) -> WellModel:
 @router.post('', response_model=CreateProjectResponse)
 def create_project(payload: CreateProjectRequest, request: Request) -> CreateProjectResponse:
     manager = _manager(request)
-    try:
-        project_path = manager.create_project(payload.name, payload.path, overwrite=payload.overwrite)
-    except FileExistsError as error:
-        raise HTTPException(status_code=409, detail=str(error)) from error
-    return CreateProjectResponse(project_path=str(project_path))
+    with operation_log('project.create', project_name=payload.name, base_path=payload.path, overwrite=payload.overwrite):
+        try:
+            project_path = manager.create_project(payload.name, payload.path, overwrite=payload.overwrite)
+        except FileExistsError as error:
+            raise HTTPException(status_code=409, detail=str(error)) from error
+        return CreateProjectResponse(project_path=str(project_path))
 
 
 @router.get('/recent', response_model=list[RecentProjectItemResponse])
@@ -369,56 +375,59 @@ def list_recent_projects(request: Request) -> list[RecentProjectItemResponse]:
 @router.post('/wells', response_model=CreateWellResponse)
 def create_well(payload: CreateWellRequest, request: Request) -> CreateWellResponse:
     manager = _require_open_project(request)
-    well_name = payload.name.strip()
-    if not well_name:
-        raise HTTPException(status_code=400, detail='Well name is required')
-    x = _require_finite_number(payload.x, 'Project X')
-    y = _require_finite_number(payload.y, 'Project Y')
-    kb = _require_non_negative_number(payload.kb, 'KB')
-    td = _require_non_negative_number(payload.td, 'TD')
-    crs = payload.crs.strip()
-    if not crs:
-        raise HTTPException(status_code=400, detail='CRS cannot be empty')
+    with operation_log('well.create', project_path=_manager_project_path(manager), well_name=payload.name):
+        well_name = payload.name.strip()
+        if not well_name:
+            raise HTTPException(status_code=400, detail='Well name is required')
+        x = _require_finite_number(payload.x, 'Project X')
+        y = _require_finite_number(payload.y, 'Project Y')
+        kb = _require_non_negative_number(payload.kb, 'KB')
+        td = _require_non_negative_number(payload.td, 'TD')
+        crs = payload.crs.strip()
+        if not crs:
+            raise HTTPException(status_code=400, detail='CRS cannot be empty')
 
-    with manager.get_session() as session:
-        row = create_empty_well(
-            session,
-            name=well_name,
-            x=x,
-            y=y,
-            kb=kb,
-            td=td,
-            crs=crs,
-        )
-        session.flush()
-        command = ImportWell.capture(session, manager.project_path, row.id)
-        session.commit()
-        session.refresh(row)
+        with manager.get_session() as session:
+            row = create_empty_well(
+                session,
+                name=well_name,
+                x=x,
+                y=y,
+                kb=kb,
+                td=td,
+                crs=crs,
+            )
+            session.flush()
+            command = ImportWell.capture(session, manager.project_path, row.id)
+            session.commit()
+            session.refresh(row)
 
-    manager.execute_command(command)
-    return CreateWellResponse(well_id=row.id, well_name=row.name)
+        manager.execute_command(command)
+        return CreateWellResponse(well_id=row.id, well_name=row.name)
 
 
 @router.delete('/wells/{well_id}', response_model=DictionaryUpdateResponse)
 def delete_well(well_id: str, request: Request) -> DictionaryUpdateResponse:
     manager = _require_open_project(request)
-    try:
-        with manager.get_session() as session:
-            command = RemoveWell.capture(session, manager.project_path, well_id)
-        manager.execute_command(command)
-        manager.save_project()
-    except ValueError as error:
-        raise HTTPException(status_code=404, detail=str(error)) from error
-    return DictionaryUpdateResponse(status='ok')
+    with operation_log('well.delete', project_path=_manager_project_path(manager), well_id=well_id):
+        try:
+            with manager.get_session() as session:
+                command = RemoveWell.capture(session, manager.project_path, well_id)
+            manager.execute_command(command)
+            manager.save_project()
+        except ValueError as error:
+            raise HTTPException(status_code=404, detail=str(error)) from error
+        return DictionaryUpdateResponse(status='ok')
 
 
 @router.post('/open', response_model=OpenProjectResponse)
 def open_project(payload: OpenProjectRequest, request: Request) -> OpenProjectResponse:
     manager = _manager(request)
-    try:
-        return OpenProjectResponse(**manager.open_project(payload.path))
-    except (RuntimeError, FileNotFoundError, ValueError) as error:
-        raise HTTPException(status_code=400, detail=str(error)) from error
+    with operation_log('project.open', project_path=payload.path):
+        try:
+            return OpenProjectResponse(**manager.open_project(payload.path))
+        except (RuntimeError, FileNotFoundError, ValueError) as error:
+            raise HTTPException(status_code=400, detail=str(error)) from error
 
 
 @router.post('/reveal-path', response_model=DictionaryUpdateResponse)
@@ -489,14 +498,16 @@ def pick_file(payload: PickFileRequest, request: Request) -> PickPathResponse:
 @router.post('/close', response_model=CloseProjectResponse)
 def close_project(request: Request) -> CloseProjectResponse:
     manager = _manager(request)
-    manager.close_project()
-    return CloseProjectResponse(status='closed')
+    with operation_log('project.close', project_path=_manager_project_path(manager)):
+        manager.close_project()
+        return CloseProjectResponse(status='closed')
 
 
 @router.post('/save', response_model=SaveProjectResponse)
 def save_project(request: Request) -> SaveProjectResponse:
     manager = _require_open_project(request)
-    return SaveProjectResponse(project_path=str(manager.save_project()))
+    with operation_log('project.save', project_path=_manager_project_path(manager)):
+        return SaveProjectResponse(project_path=str(manager.save_project()))
 
 
 @router.get('/status', response_model=ProjectStatusResponse)
@@ -507,140 +518,148 @@ def project_status(request: Request) -> ProjectStatusResponse:
 @router.post('/import-las', response_model=ImportLasResponse)
 def import_las(payload: ImportLasRequest, request: Request) -> ImportLasResponse:
     manager = _require_open_project(request)
-    try:
-        with manager.get_session() as session:
-            well = import_las_file(
-                session,
-                manager.project_path,
-                Path(payload.las_path),
-                well_id=payload.well_id,
-                create_new_well=payload.create_new_well,
-            )
-            session.flush()
-            command = ImportWell.capture(session, manager.project_path, well.id)
-            well_id = well.id
-            well_name = well.name
-            curve_count = len(list(session.scalars(select(CurveMetadata).where(CurveMetadata.well_id == well_id))))
-            session.commit()
-        manager.execute_command(command)  # apply() is no-op: well already in DB
-        manager.save_project()
-    except (ValueError, FileNotFoundError) as error:
-        raise HTTPException(status_code=400, detail=str(error)) from error
-    return ImportLasResponse(well_id=well_id, well_name=well_name, curve_count=curve_count)
+    with operation_log('import.las', project_path=_manager_project_path(manager), input_path=payload.las_path, well_id=payload.well_id, create_new_well=payload.create_new_well):
+        try:
+            with manager.get_session() as session:
+                well = import_las_file(
+                    session,
+                    manager.project_path,
+                    Path(payload.las_path),
+                    well_id=payload.well_id,
+                    create_new_well=payload.create_new_well,
+                )
+                session.flush()
+                command = ImportWell.capture(session, manager.project_path, well.id)
+                well_id = well.id
+                well_name = well.name
+                curve_count = len(list(session.scalars(select(CurveMetadata).where(CurveMetadata.well_id == well_id))))
+                session.commit()
+            manager.execute_command(command)  # apply() is no-op: well already in DB
+            manager.save_project()
+        except (ValueError, FileNotFoundError) as error:
+            raise HTTPException(status_code=400, detail=str(error)) from error
+        return ImportLasResponse(well_id=well_id, well_name=well_name, curve_count=curve_count)
 
 
 @router.post('/import-logs-csv', response_model=ImportLasResponse)
 def import_logs_csv_route(payload: ImportLogsCsvRequest, request: Request) -> ImportLasResponse:
     manager = _require_open_project(request)
-    try:
-        with manager.get_session() as session:
-            well = import_logs_csv(
-                session,
-                manager.project_path,
-                Path(payload.csv_path),
-                well_id=payload.well_id,
-                depth_column=payload.depth_column,
-                create_new_well=payload.create_new_well,
-            )
-            session.flush()
-            command = ImportWell.capture(session, manager.project_path, well.id)
-            well_id = well.id
-            well_name = well.name
-            curve_count = len(list(session.scalars(select(CurveMetadata).where(CurveMetadata.well_id == well_id))))
-            session.commit()
-        manager.execute_command(command)  # apply() is no-op: well already in DB
-        manager.save_project()
-    except (ValueError, FileNotFoundError) as error:
-        raise HTTPException(status_code=400, detail=str(error)) from error
-    return ImportLasResponse(well_id=well_id, well_name=well_name, curve_count=curve_count)
+    with operation_log('import.logs_csv', project_path=_manager_project_path(manager), input_path=payload.csv_path, well_id=payload.well_id, depth_column=payload.depth_column, create_new_well=payload.create_new_well):
+        try:
+            with manager.get_session() as session:
+                well = import_logs_csv(
+                    session,
+                    manager.project_path,
+                    Path(payload.csv_path),
+                    well_id=payload.well_id,
+                    depth_column=payload.depth_column,
+                    create_new_well=payload.create_new_well,
+                )
+                session.flush()
+                command = ImportWell.capture(session, manager.project_path, well.id)
+                well_id = well.id
+                well_name = well.name
+                curve_count = len(list(session.scalars(select(CurveMetadata).where(CurveMetadata.well_id == well_id))))
+                session.commit()
+            manager.execute_command(command)  # apply() is no-op: well already in DB
+            manager.save_project()
+        except (ValueError, FileNotFoundError) as error:
+            raise HTTPException(status_code=400, detail=str(error)) from error
+        return ImportLasResponse(well_id=well_id, well_name=well_name, curve_count=curve_count)
 
 
 @router.post('/import-tops', response_model=ImportTopsResponse)
 def import_tops(payload: ImportTopsRequest, request: Request) -> ImportTopsResponse:
     manager = _require_open_project(request)
-    try:
-        with manager.get_session() as session:
-            imported = import_tops_csv(
-                session,
-                payload.well_id,
-                Path(payload.csv_path),
-                payload.depth_ref,
-                create_new_well=payload.create_new_well,
-            )
-            target_well_id = imported[0].well_id if imported else payload.well_id
-            if target_well_id is None:
-                raise HTTPException(status_code=500, detail='Import created no well')
-            linked = link_tops_to_unconformities(session, target_well_id)
-            formation_count = len(list(session.scalars(select(FormationTopModel).where(FormationTopModel.well_id == target_well_id))))
-            session.commit()
-        manager.save_project()
-    except (ValueError, FileNotFoundError, NotImplementedError) as error:
-        raise HTTPException(status_code=400, detail=str(error)) from error
-    return ImportTopsResponse(well_id=target_well_id, formation_count=formation_count, linked_count=len(linked))
+    with operation_log('import.tops', project_path=_manager_project_path(manager), input_path=payload.csv_path, well_id=payload.well_id, depth_ref=payload.depth_ref, create_new_well=payload.create_new_well):
+        try:
+            with manager.get_session() as session:
+                imported = import_tops_csv(
+                    session,
+                    payload.well_id,
+                    Path(payload.csv_path),
+                    payload.depth_ref,
+                    create_new_well=payload.create_new_well,
+                )
+                target_well_id = imported[0].well_id if imported else payload.well_id
+                if target_well_id is None:
+                    raise HTTPException(status_code=500, detail='Import created no well')
+                linked = link_tops_to_unconformities(session, target_well_id)
+                formation_count = len(list(session.scalars(select(FormationTopModel).where(FormationTopModel.well_id == target_well_id))))
+                session.commit()
+            manager.save_project()
+        except (ValueError, FileNotFoundError, NotImplementedError) as error:
+            raise HTTPException(status_code=400, detail=str(error)) from error
+        return ImportTopsResponse(well_id=target_well_id, formation_count=formation_count, linked_count=len(linked))
 
 
 @router.post('/import-unconformities', response_model=ImportUnconformitiesResponse)
 def import_unconformities(payload: ImportUnconformitiesRequest, request: Request) -> ImportUnconformitiesResponse:
     manager = _require_open_project(request)
-    try:
-        with manager.get_session() as session:
-            import_unconformities_csv(session, payload.well_id, Path(payload.csv_path))
-            linked = link_tops_to_unconformities(session, payload.well_id)
-            formation_count = len(list(session.scalars(select(FormationTopModel).where(FormationTopModel.well_id == payload.well_id))))
-            session.commit()
-        manager.save_project()
-    except (ValueError, FileNotFoundError) as error:
-        raise HTTPException(status_code=400, detail=str(error)) from error
-    return ImportUnconformitiesResponse(well_id=payload.well_id, formation_count=formation_count, linked_count=len(linked))
+    with operation_log('import.unconformities', project_path=_manager_project_path(manager), input_path=payload.csv_path, well_id=payload.well_id):
+        try:
+            with manager.get_session() as session:
+                import_unconformities_csv(session, payload.well_id, Path(payload.csv_path))
+                linked = link_tops_to_unconformities(session, payload.well_id)
+                formation_count = len(list(session.scalars(select(FormationTopModel).where(FormationTopModel.well_id == payload.well_id))))
+                session.commit()
+            manager.save_project()
+        except (ValueError, FileNotFoundError) as error:
+            raise HTTPException(status_code=400, detail=str(error)) from error
+        return ImportUnconformitiesResponse(well_id=payload.well_id, formation_count=formation_count, linked_count=len(linked))
 
 
 @router.post('/import-deviation', response_model=ImportDeviationResponse)
 def import_deviation(payload: ImportDeviationRequest, request: Request) -> ImportDeviationResponse:
     manager = _require_open_project(request)
-    try:
-        with manager.get_session() as session:
-            survey = import_deviation_csv(
-                session,
-                manager.project_path,
-                payload.well_id,
-                Path(payload.csv_path),
-                create_new_well=payload.create_new_well,
-            )
-            target_well_id = survey.well_id
-            reference = survey.reference
-            mode = survey.mode
-            data_uri = survey.data_uri
-            session.commit()
-        manager.save_project()
-    except (ValueError, FileNotFoundError) as error:
-        raise HTTPException(status_code=400, detail=str(error)) from error
-    return ImportDeviationResponse(well_id=target_well_id, reference=reference, mode=mode, data_uri=data_uri)
+    with operation_log('import.deviation', project_path=_manager_project_path(manager), input_path=payload.csv_path, well_id=payload.well_id, create_new_well=payload.create_new_well):
+        try:
+            with manager.get_session() as session:
+                survey = import_deviation_csv(
+                    session,
+                    manager.project_path,
+                    payload.well_id,
+                    Path(payload.csv_path),
+                    create_new_well=payload.create_new_well,
+                )
+                target_well_id = survey.well_id
+                reference = survey.reference
+                mode = survey.mode
+                data_uri = survey.data_uri
+                session.commit()
+            manager.save_project()
+        except (ValueError, FileNotFoundError) as error:
+            raise HTTPException(status_code=400, detail=str(error)) from error
+        return ImportDeviationResponse(well_id=target_well_id, reference=reference, mode=mode, data_uri=data_uri)
 
 
 @router.post('/undo', response_model=UndoRedoResponse)
 def undo(request: Request) -> UndoRedoResponse:
     manager = _require_open_project(request)
-    try:
-        command = manager.undo()
-    except RuntimeError as error:
-        raise HTTPException(status_code=400, detail=str(error)) from error
-    return UndoRedoResponse(description=command.description, can_undo=manager.can_undo, can_redo=manager.can_redo, is_dirty=manager.is_dirty)
+    with operation_log('undo.run', project_path=_manager_project_path(manager)):
+        try:
+            command = manager.undo()
+        except RuntimeError as error:
+            raise HTTPException(status_code=400, detail=str(error)) from error
+        return UndoRedoResponse(description=command.description, can_undo=manager.can_undo, can_redo=manager.can_redo, is_dirty=manager.is_dirty)
 
 
 @router.post('/redo', response_model=UndoRedoResponse)
 def redo(request: Request) -> UndoRedoResponse:
     manager = _require_open_project(request)
-    try:
-        command = manager.redo()
-    except RuntimeError as error:
-        raise HTTPException(status_code=400, detail=str(error)) from error
-    return UndoRedoResponse(description=command.description, can_undo=manager.can_undo, can_redo=manager.can_redo, is_dirty=manager.is_dirty)
+    with operation_log('redo.run', project_path=_manager_project_path(manager)):
+        try:
+            command = manager.redo()
+        except RuntimeError as error:
+            raise HTTPException(status_code=400, detail=str(error)) from error
+        return UndoRedoResponse(description=command.description, can_undo=manager.can_undo, can_redo=manager.can_redo, is_dirty=manager.is_dirty)
 
 
 @router.post('/checkpoints', response_model=CheckpointResponse)
 def create_checkpoint(payload: CreateCheckpointRequest, request: Request) -> CheckpointResponse:
     manager = _require_open_project(request)
-    return CheckpointResponse(**manager.create_checkpoint(payload.name, payload.description))
+    with operation_log('checkpoint.create', project_path=_manager_project_path(manager), checkpoint_name=payload.name):
+        return CheckpointResponse(**manager.create_checkpoint(payload.name, payload.description))
 
 
 @router.get('/checkpoints', response_model=list[CheckpointResponse])
@@ -652,20 +671,22 @@ def list_checkpoints(request: Request) -> list[CheckpointResponse]:
 @router.post('/checkpoints/{checkpoint_id}/restore', response_model=CheckpointResponse)
 def restore_checkpoint(checkpoint_id: int, request: Request) -> CheckpointResponse:
     manager = _require_open_project(request)
-    try:
-        return CheckpointResponse(**manager.restore_checkpoint(checkpoint_id))
-    except (ValueError, FileNotFoundError) as error:
-        raise HTTPException(status_code=400, detail=str(error)) from error
+    with operation_log('checkpoint.restore', project_path=_manager_project_path(manager), checkpoint_id=checkpoint_id):
+        try:
+            return CheckpointResponse(**manager.restore_checkpoint(checkpoint_id))
+        except (ValueError, FileNotFoundError) as error:
+            raise HTTPException(status_code=400, detail=str(error)) from error
 
 
 @router.delete('/checkpoints/{checkpoint_id}', response_model=DictionaryUpdateResponse)
 def delete_checkpoint(checkpoint_id: int, request: Request) -> DictionaryUpdateResponse:
     manager = _require_open_project(request)
-    try:
-        manager.delete_checkpoint(checkpoint_id)
-    except ValueError as error:
-        raise HTTPException(status_code=404, detail=str(error)) from error
-    return DictionaryUpdateResponse(status='deleted')
+    with operation_log('checkpoint.delete', project_path=_manager_project_path(manager), checkpoint_id=checkpoint_id):
+        try:
+            manager.delete_checkpoint(checkpoint_id)
+        except ValueError as error:
+            raise HTTPException(status_code=404, detail=str(error)) from error
+        return DictionaryUpdateResponse(status='deleted')
 
 
 @router.get('/dictionary/curves', response_model=list[CurveRuleResponse])
@@ -752,82 +773,85 @@ def get_visual_config_alias(request: Request, scope: str = 'project', scope_id: 
 @router.patch('/visual-config', response_model=VisualConfigResponse)
 def patch_visual_config(payload: VisualConfigPatchRequest, request: Request) -> VisualConfigResponse:
     manager = _require_open_project(request)
-    with manager.get_session() as session:
-        resolved_scope_id = _resolve_scope_id(session, payload.scope, payload.scope_id)
-        existing = session.scalar(select(VisualConfig).where(VisualConfig.scope == payload.scope, VisualConfig.scope_id == resolved_scope_id))
-        old_config = json.loads(existing.config) if existing is not None else {}
-        merged_config = {**old_config, **payload.config}
-        if merged_config == old_config:
-            return VisualConfigResponse(scope=payload.scope, scope_id=resolved_scope_id, config=old_config)
-    manager.execute_command(UpdateVisualConfig(payload.scope, resolved_scope_id, old_config, merged_config))
-    return VisualConfigResponse(scope=payload.scope, scope_id=resolved_scope_id, config=merged_config)
+    with operation_log('visual_config.patch', project_path=_manager_project_path(manager), scope=payload.scope, scope_id=payload.scope_id):
+        with manager.get_session() as session:
+            resolved_scope_id = _resolve_scope_id(session, payload.scope, payload.scope_id)
+            existing = session.scalar(select(VisualConfig).where(VisualConfig.scope == payload.scope, VisualConfig.scope_id == resolved_scope_id))
+            old_config = json.loads(existing.config) if existing is not None else {}
+            merged_config = {**old_config, **payload.config}
+            if merged_config == old_config:
+                return VisualConfigResponse(scope=payload.scope, scope_id=resolved_scope_id, config=old_config)
+        manager.execute_command(UpdateVisualConfig(payload.scope, resolved_scope_id, old_config, merged_config))
+        return VisualConfigResponse(scope=payload.scope, scope_id=resolved_scope_id, config=merged_config)
 
 
 
 @router.post('/export/las')
 def export_las(payload: ExportRequest, request: Request) -> Response:
     manager = _require_open_project(request)
-    with manager.get_session() as session:
-        well = _select_export_well(session, payload.well_id)
-        curve_rows = list(session.scalars(select(CurveMetadata).where(CurveMetadata.well_id == well.id).order_by(CurveMetadata.id.asc())))
-        if not curve_rows:
-            raise HTTPException(status_code=404, detail=f'No curves found for well: {well.id}')
-        frame = pd.read_parquet(manager.project_path / curve_rows[0].data_uri)
-        if 'DEPT' not in frame.columns:
-            raise HTTPException(status_code=500, detail='Curve parquet is missing DEPT column')
-        curve_headers = [(row.mnemonic, row.unit or '') for row in curve_rows if row.mnemonic in frame.columns]
+    with operation_log('export.las', project_path=_manager_project_path(manager), well_id=payload.well_id):
+        with manager.get_session() as session:
+            well = _select_export_well(session, payload.well_id)
+            curve_rows = list(session.scalars(select(CurveMetadata).where(CurveMetadata.well_id == well.id).order_by(CurveMetadata.id.asc())))
+            if not curve_rows:
+                raise HTTPException(status_code=404, detail=f'No curves found for well: {well.id}')
+            frame = pd.read_parquet(manager.project_path / curve_rows[0].data_uri)
+            if 'DEPT' not in frame.columns:
+                raise HTTPException(status_code=500, detail='Curve parquet is missing DEPT column')
+            curve_headers = [(row.mnemonic, row.unit or '') for row in curve_rows if row.mnemonic in frame.columns]
 
-        lines = [
-            '~Version Information',
-            ' VERS.  2.0 : CWLS LOG ASCII STANDARD',
-            ' WRAP.  NO  : One line per depth step',
-            '~Well Information',
-            f' WELL.  {well.name} : Well name',
-            f' UWI.   {well.uwi or well.id} : Unique well identifier',
-            f' KB.M   {well.kb_elev:.3f} : Kelly bushing elevation',
-            ' NULL.  -999.25 : Null value',
-            '~Curve Information',
-            ' DEPT.M : Measured depth',
-        ]
-        for mnemonic, unit in curve_headers:
-            lines.append(f' {mnemonic}.{unit or ""} : Exported curve')
-        lines.append('~ASCII')
+            lines = [
+                '~Version Information',
+                ' VERS.  2.0 : CWLS LOG ASCII STANDARD',
+                ' WRAP.  NO  : One line per depth step',
+                '~Well Information',
+                f' WELL.  {well.name} : Well name',
+                f' UWI.   {well.uwi or well.id} : Unique well identifier',
+                f' KB.M   {well.kb_elev:.3f} : Kelly bushing elevation',
+                ' NULL.  -999.25 : Null value',
+                '~Curve Information',
+                ' DEPT.M : Measured depth',
+            ]
+            for mnemonic, unit in curve_headers:
+                lines.append(f' {mnemonic}.{unit or ""} : Exported curve')
+            lines.append('~ASCII')
 
-        export_columns = ['DEPT', *[mnemonic for mnemonic, _ in curve_headers]]
-        for row_values in frame[export_columns].itertuples(index=False, name=None):
-            formatted = []
-            for value in row_values:
-                if pd.isna(value):
-                    formatted.append('-999.250000')
-                else:
-                    formatted.append(f'{float(value):.6f}')
-            lines.append(' '.join(formatted))
+            export_columns = ['DEPT', *[mnemonic for mnemonic, _ in curve_headers]]
+            for row_values in frame[export_columns].itertuples(index=False, name=None):
+                formatted = []
+                for value in row_values:
+                    if pd.isna(value):
+                        formatted.append('-999.250000')
+                    else:
+                        formatted.append(f'{float(value):.6f}')
+                lines.append(' '.join(formatted))
 
-        body = '\n'.join(lines) + '\n'
-        filename = f'{well.name.replace(" ", "_")}.las'
-        return Response(content=body, media_type='application/octet-stream', headers={'Content-Disposition': f'attachment; filename="{filename}"'})
+            body = '\n'.join(lines) + '\n'
+            filename = f'{well.name.replace(" ", "_")}.las'
+            return Response(content=body, media_type='application/octet-stream', headers={'Content-Disposition': f'attachment; filename="{filename}"'})
 
 
 @router.post('/export/csv')
 def export_csv(payload: ExportRequest, request: Request) -> Response:
     manager = _require_open_project(request)
-    with manager.get_session() as session:
-        well = _select_export_well(session, payload.well_id)
-        curve_rows = list(session.scalars(select(CurveMetadata).where(CurveMetadata.well_id == well.id).order_by(CurveMetadata.id.asc())))
-        if not curve_rows:
-            raise HTTPException(status_code=404, detail=f'No curves found for well: {well.id}')
-        frame = pd.read_parquet(manager.project_path / curve_rows[0].data_uri)
-        if 'DEPT' not in frame.columns:
-            raise HTTPException(status_code=500, detail='Curve parquet is missing DEPT column')
+    with operation_log('export.csv', project_path=_manager_project_path(manager), well_id=payload.well_id):
+        with manager.get_session() as session:
+            well = _select_export_well(session, payload.well_id)
+            curve_rows = list(session.scalars(select(CurveMetadata).where(CurveMetadata.well_id == well.id).order_by(CurveMetadata.id.asc())))
+            if not curve_rows:
+                raise HTTPException(status_code=404, detail=f'No curves found for well: {well.id}')
+            frame = pd.read_parquet(manager.project_path / curve_rows[0].data_uri)
+            if 'DEPT' not in frame.columns:
+                raise HTTPException(status_code=500, detail='Curve parquet is missing DEPT column')
 
-        output = io.StringIO()
-        output.write(f'# WELL,{well.name}\n')
-        output.write(f'# CRS,{well.crs}\n')
-        writer = csv.writer(output)
-        export_columns = ['DEPT', *[row.mnemonic for row in curve_rows if row.mnemonic in frame.columns]]
-        writer.writerow(export_columns)
-        for row_values in frame[export_columns].itertuples(index=False, name=None):
-            writer.writerow(row_values)
+            output = io.StringIO()
+            output.write(f'# WELL,{well.name}\n')
+            output.write(f'# CRS,{well.crs}\n')
+            writer = csv.writer(output)
+            export_columns = ['DEPT', *[row.mnemonic for row in curve_rows if row.mnemonic in frame.columns]]
+            writer.writerow(export_columns)
+            for row_values in frame[export_columns].itertuples(index=False, name=None):
+                writer.writerow(row_values)
 
-        filename = f'{well.name.replace(" ", "_")}.csv'
-        return Response(content=output.getvalue(), media_type='text/csv', headers={'Content-Disposition': f'attachment; filename="{filename}"'})
+            filename = f'{well.name.replace(" ", "_")}.csv'
+            return Response(content=output.getvalue(), media_type='text/csv', headers={'Content-Disposition': f'attachment; filename="{filename}"'})
