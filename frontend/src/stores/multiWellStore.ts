@@ -6,6 +6,7 @@ export interface WellSubsidenceResults {
   wellId: string
   wellName: string
   algorithm: string
+  tdMd: number
   curves: SubsidenceResult[]
 }
 
@@ -13,6 +14,7 @@ interface WellResultResponse {
   well_id: string
   well_name: string
   algorithm: string
+  td_md: number
   curves: SubsidenceResult[]
 }
 
@@ -37,6 +39,7 @@ export const useMultiWellStore = create<MultiWellStore>((set) => ({
           wellId: d.well_id,
           wellName: d.well_name,
           algorithm: d.algorithm,
+          tdMd: d.td_md,
           curves: d.curves,
         })),
       })

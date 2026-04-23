@@ -1685,6 +1685,10 @@ body.is-resizing-row {
   height: 100%;
 }
 
+.subsidence-canvas--crosshair {
+  pointer-events: none;
+}
+
 .geological-timescale {
   background: #f0f5fa;
   border-bottom: 1px solid #c4d0dc;

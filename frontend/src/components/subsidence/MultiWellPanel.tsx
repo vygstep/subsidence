@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo } from 'react'
+import { useCallback, useEffect, useMemo, useRef } from 'react'
 
 import { useCanvasRenderer } from '@/hooks/useCanvasRenderer'
 import { useMultiWellStore } from '@/stores/multiWellStore'
@@ -27,6 +27,10 @@ export function MultiWellPanel() {
   const fetchResults = useMultiWellStore((s) => s.fetchResults)
   const activeWellId = useWellDataStore((s) => s.well?.well_id ?? null)
 
+  const crosshairRef = useRef<HTMLCanvasElement>(null)
+  const maxAgeRef = useRef(100)
+  const maxDepthMRef = useRef(3000)
+
   useEffect(() => {
     void fetchResults()
   }, [fetchResults])
@@ -46,6 +50,7 @@ export function MultiWellPanel() {
   const maxDepthM = useMemo(() => {
     let max = 0
     for (const wr of wellResults) {
+      if (wr.tdMd > max) max = wr.tdMd
       for (const curve of wr.curves) {
         for (const pt of curve.burial_path) {
           if (pt.depth_m > max) max = pt.depth_m
@@ -54,6 +59,88 @@ export function MultiWellPanel() {
     }
     return max > 0 ? max : 3000
   }, [wellResults])
+
+  maxAgeRef.current = maxAge
+  maxDepthMRef.current = maxDepthM
+
+  const drawCrosshair = useCallback((cssX: number | null, cssY: number | null) => {
+    const canvas = crosshairRef.current
+    if (!canvas) return
+    const ctx = canvas.getContext('2d')
+    if (!ctx) return
+
+    const ratio = window.devicePixelRatio || 1
+    const w = canvas.clientWidth || 1
+    const h = canvas.clientHeight || 1
+    const bw = Math.round(w * ratio)
+    const bh = Math.round(h * ratio)
+    if (canvas.width !== bw || canvas.height !== bh) {
+      canvas.width = bw
+      canvas.height = bh
+    }
+    ctx.clearRect(0, 0, canvas.width, canvas.height)
+    if (cssX === null || cssY === null) return
+
+    const currentMaxAge = maxAgeRef.current
+    const currentMaxDepthM = maxDepthMRef.current
+    const plotW = w - PADDING.left - PADDING.right
+    const plotH = h - PADDING.top - PADDING.bottom
+    if (plotW <= 0 || plotH <= 0) return
+    if (cssX < PADDING.left || cssX > PADDING.left + plotW) return
+    if (cssY < PADDING.top || cssY > PADDING.top + plotH) return
+
+    const age = currentMaxAge * (1 - (cssX - PADDING.left) / plotW)
+    const depthM = currentMaxDepthM * (cssY - PADDING.top) / plotH
+
+    ctx.save()
+    ctx.scale(ratio, ratio)
+
+    ctx.strokeStyle = 'rgba(30, 41, 59, 0.45)'
+    ctx.lineWidth = 0.75
+    ctx.setLineDash([3, 3])
+    ctx.beginPath()
+    ctx.moveTo(PADDING.left, cssY)
+    ctx.lineTo(PADDING.left + plotW, cssY)
+    ctx.stroke()
+    ctx.beginPath()
+    ctx.moveTo(cssX, PADDING.top)
+    ctx.lineTo(cssX, PADDING.top + plotH)
+    ctx.stroke()
+    ctx.setLineDash([])
+
+    const depthLabel = depthM < 1000
+      ? `${Math.round(depthM)} m`
+      : `${(depthM / 1000).toFixed(2)} km`
+    ctx.font = 'bold 9px system-ui, sans-serif'
+    const dw = ctx.measureText(depthLabel).width + 6
+    ctx.fillStyle = '#1e293b'
+    ctx.fillRect(PADDING.left - dw - 2, cssY - 8, dw, 16)
+    ctx.fillStyle = '#f8fafc'
+    ctx.textAlign = 'right'
+    ctx.textBaseline = 'middle'
+    ctx.fillText(depthLabel, PADDING.left - 5, cssY)
+
+    const ageLabel = `${age.toFixed(1)} Ma`
+    ctx.font = 'bold 9px system-ui, sans-serif'
+    const aw = ctx.measureText(ageLabel).width + 6
+    ctx.fillStyle = '#1e293b'
+    ctx.fillRect(cssX - aw / 2, PADDING.top + plotH + 2, aw, 14)
+    ctx.fillStyle = '#f8fafc'
+    ctx.textAlign = 'center'
+    ctx.textBaseline = 'top'
+    ctx.fillText(ageLabel, cssX, PADDING.top + plotH + 4)
+
+    ctx.restore()
+  }, [])
+
+  const handleMouseMove = useCallback((e: React.MouseEvent<HTMLDivElement>) => {
+    const rect = e.currentTarget.getBoundingClientRect()
+    drawCrosshair(e.clientX - rect.left, e.clientY - rect.top)
+  }, [drawCrosshair])
+
+  const handleMouseLeave = useCallback(() => {
+    drawCrosshair(null, null)
+  }, [drawCrosshair])
 
   const draw = useCallback((ctx: CanvasRenderingContext2D, width: number, height: number) => {
     ctx.fillStyle = '#ffffff'
@@ -154,8 +241,12 @@ export function MultiWellPanel() {
       const color = WELL_COLORS[i % WELL_COLORS.length]
       const isActive = wr.wellId === activeWellId
 
-      // deepest formation = last in array
-      const curve = wr.curves[wr.curves.length - 1]
+      // pick the formation with the greatest burial depth
+      const curve = wr.curves.reduce((best, c) => {
+        const maxD = c.burial_path.reduce((m, p) => Math.max(m, p.depth_m), 0)
+        const bestD = best.burial_path.reduce((m, p) => Math.max(m, p.depth_m), 0)
+        return maxD > bestD ? c : best
+      }, wr.curves[0])
       const path = [...curve.burial_path].sort((a, b) => b.age_ma - a.age_ma)
 
       ctx.beginPath()
@@ -199,13 +290,12 @@ export function MultiWellPanel() {
 
   const canvasRef = useCanvasRenderer(draw, [draw])
 
-  const handleClick = useCallback((e: React.MouseEvent<HTMLCanvasElement>) => {
+  const handleClick = useCallback((e: React.MouseEvent<HTMLDivElement>) => {
     if (wellResults.length === 0) return
     const rect = e.currentTarget.getBoundingClientRect()
     const cssX = e.clientX - rect.left
     const cssY = e.clientY - rect.top
 
-    // only handle clicks in the legend area (right margin)
     const legendX = rect.width - PADDING.right + 8
     if (cssX < legendX) return
 
@@ -219,8 +309,15 @@ export function MultiWellPanel() {
   }, [wellResults])
 
   return (
-    <div className="multi-well-panel">
-      <canvas ref={canvasRef} className="subsidence-canvas" onClick={handleClick} style={{ cursor: 'pointer' }} />
+    <div
+      className="multi-well-panel"
+      onMouseMove={handleMouseMove}
+      onMouseLeave={handleMouseLeave}
+      onClick={handleClick}
+      style={{ cursor: 'pointer' }}
+    >
+      <canvas ref={canvasRef} className="subsidence-canvas" />
+      <canvas ref={crosshairRef} className="subsidence-canvas subsidence-canvas--crosshair" />
     </div>
   )
 }

@@ -135,6 +135,9 @@ function niceStep(range: number, targetTicks: number): number {
 
 export function SubsidenceCanvas() {
   const containerRef = useRef<HTMLDivElement>(null)
+  const crosshairRef = useRef<HTMLCanvasElement>(null)
+  const maxAgeRef = useRef(100)
+  const maxDepthMRef = useRef(3000)
 
   const subsidenceCurves = useComputedStore((s) => s.subsidenceCurves)
   const showFormationFills = useComputedStore((s) => s.showFormationFills)
@@ -152,8 +155,102 @@ export function SubsidenceCanvas() {
     return max > 0 ? max : 100
   }, [formations])
 
-  // Y axis: well TD in metres; labels in km
-  const maxDepthM = tdMd > 0 ? tdMd : 3000
+  // Y axis: max of well TD and deepest burial depth in results
+  const maxDepthM = useMemo(() => {
+    let max = tdMd > 0 ? tdMd : 0
+    for (const c of subsidenceCurves) {
+      for (const pt of c.burial_path) {
+        if (pt.depth_m > max) max = pt.depth_m
+      }
+    }
+    return max > 0 ? max : 3000
+  }, [tdMd, subsidenceCurves])
+
+  // Keep refs in sync so crosshair handler always has latest values without re-binding
+  maxAgeRef.current = maxAge
+  maxDepthMRef.current = maxDepthM
+
+  const drawCrosshair = useCallback((cssX: number | null, cssY: number | null) => {
+    const canvas = crosshairRef.current
+    if (!canvas) return
+    const ctx = canvas.getContext('2d')
+    if (!ctx) return
+
+    const ratio = window.devicePixelRatio || 1
+    const w = canvas.clientWidth || 1
+    const h = canvas.clientHeight || 1
+    const bw = Math.round(w * ratio)
+    const bh = Math.round(h * ratio)
+    if (canvas.width !== bw || canvas.height !== bh) {
+      canvas.width = bw
+      canvas.height = bh
+    }
+    ctx.clearRect(0, 0, canvas.width, canvas.height)
+    if (cssX === null || cssY === null) return
+
+    const currentMaxAge = maxAgeRef.current
+    const currentMaxDepthM = maxDepthMRef.current
+    const plotW = w - PADDING.left - PADDING.right
+    const plotH = h - PADDING.top - PADDING.bottom
+    if (plotW <= 0 || plotH <= 0) return
+    if (cssX < PADDING.left || cssX > PADDING.left + plotW) return
+    if (cssY < PADDING.top || cssY > PADDING.top + plotH) return
+
+    const age = currentMaxAge * (1 - (cssX - PADDING.left) / plotW)
+    const depthM = currentMaxDepthM * (cssY - PADDING.top) / plotH
+
+    ctx.save()
+    ctx.scale(ratio, ratio)
+
+    // Crosshair lines
+    ctx.strokeStyle = 'rgba(30, 41, 59, 0.45)'
+    ctx.lineWidth = 0.75
+    ctx.setLineDash([3, 3])
+    ctx.beginPath()
+    ctx.moveTo(PADDING.left, cssY)
+    ctx.lineTo(PADDING.left + plotW, cssY)
+    ctx.stroke()
+    ctx.beginPath()
+    ctx.moveTo(cssX, PADDING.top)
+    ctx.lineTo(cssX, PADDING.top + plotH)
+    ctx.stroke()
+    ctx.setLineDash([])
+
+    // Depth readout on Y axis
+    const depthLabel = depthM < 1000
+      ? `${Math.round(depthM)} m`
+      : `${(depthM / 1000).toFixed(2)} km`
+    ctx.font = 'bold 9px system-ui, sans-serif'
+    const dw = ctx.measureText(depthLabel).width + 6
+    ctx.fillStyle = '#1e293b'
+    ctx.fillRect(PADDING.left - dw - 2, cssY - 8, dw, 16)
+    ctx.fillStyle = '#f8fafc'
+    ctx.textAlign = 'right'
+    ctx.textBaseline = 'middle'
+    ctx.fillText(depthLabel, PADDING.left - 5, cssY)
+
+    // Age readout on X axis
+    const ageLabel = `${age.toFixed(1)} Ma`
+    ctx.font = 'bold 9px system-ui, sans-serif'
+    const aw = ctx.measureText(ageLabel).width + 6
+    ctx.fillStyle = '#1e293b'
+    ctx.fillRect(cssX - aw / 2, PADDING.top + plotH + 2, aw, 14)
+    ctx.fillStyle = '#f8fafc'
+    ctx.textAlign = 'center'
+    ctx.textBaseline = 'top'
+    ctx.fillText(ageLabel, cssX, PADDING.top + plotH + 4)
+
+    ctx.restore()
+  }, [])
+
+  const handleMouseMove = useCallback((e: React.MouseEvent<HTMLDivElement>) => {
+    const rect = e.currentTarget.getBoundingClientRect()
+    drawCrosshair(e.clientX - rect.left, e.clientY - rect.top)
+  }, [drawCrosshair])
+
+  const handleMouseLeave = useCallback(() => {
+    drawCrosshair(null, null)
+  }, [drawCrosshair])
 
   const draw = useCallback((ctx: CanvasRenderingContext2D, width: number, height: number) => {
     ctx.fillStyle = '#ffffff'
@@ -163,11 +260,9 @@ export function SubsidenceCanvas() {
     const plotH = height - PADDING.top - PADDING.bottom
     if (plotW <= 0 || plotH <= 0) return
 
-    // Present (0 Ma) is rightmost, oldest age is leftmost
     const timeToX = (age: number) =>
       PADDING.left + ((maxAge - age) / (maxAge || 1)) * plotW
 
-    // 0 at top, well TD at bottom; depths are in metres internally
     const depthToY = (depthM: number) =>
       PADDING.top + (depthM / (maxDepthM || 1)) * plotH
 
@@ -196,8 +291,13 @@ export function SubsidenceCanvas() {
         paddingLeft={PADDING.left}
         paddingRight={PADDING.right}
       />
-      <div className="subsidence-canvas-wrapper">
+      <div
+        className="subsidence-canvas-wrapper"
+        onMouseMove={handleMouseMove}
+        onMouseLeave={handleMouseLeave}
+      >
         <canvas ref={canvasRef} className="subsidence-canvas" />
+        <canvas ref={crosshairRef} className="subsidence-canvas subsidence-canvas--crosshair" />
       </div>
     </div>
   )

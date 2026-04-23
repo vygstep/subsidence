@@ -35,6 +35,7 @@ class WellSubsidenceResultsResponse(BaseModel):
     well_id: str
     well_name: str
     algorithm: str
+    td_md: float
     curves: list[SubsidenceResultResponse]
 
 
@@ -191,6 +192,7 @@ def get_stored_results(request: Request) -> list[WellSubsidenceResultsResponse]:
                 well_id=row.well_id,
                 well_name=well.name,
                 algorithm=row.algorithm,
+                td_md=well.td_md or 0.0,
                 curves=curves,
             ))
     return out
