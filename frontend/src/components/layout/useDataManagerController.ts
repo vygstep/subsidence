@@ -1,26 +1,9 @@
 import { useEffect, useMemo, useState } from 'react'
 
-import { buildTrackOrder, createDefaultWellView, createEmptyTrack, useViewStore, useWellDataStore, useWorkspaceStore } from '@/stores'
-import type { TrackConfig } from '@/types'
-import { buildCurveDefaults } from '@/utils/curvePresets'
-
-async function readError(response: Response, fallback: string): Promise<string> {
-  try {
-    const payload = (await response.json()) as { detail?: string }
-    if (payload.detail) return payload.detail
-  } catch {
-    // ignore non-JSON payloads
-  }
-  return fallback
-}
-
-function nextTrackNumber(tracks: TrackConfig[]): number {
-  const numbers = tracks.map((track) => {
-    const match = /^track-(\d+)$/.exec(track.id)
-    return match ? Number(match[1]) : 0
-  })
-  return Math.max(0, ...numbers) + 1
-}
+import { createDefaultWellView, useViewStore, useWellDataStore, useWorkspaceStore } from '@/stores'
+import { makeActionHandlers } from './dataManagerActions'
+import { makeSelectionHandlers } from './dataManagerSelection'
+import { makeVisibilityHandlers } from './dataManagerVisibility'
 
 export function useDataManagerController() {
   const [wellInspectorDraft, setWellInspectorDraft] = useState({
@@ -145,391 +128,41 @@ export function useDataManagerController() {
     return compactionModels.find((m) => m.id === selectedObject.modelId) ?? null
   }, [selectedObject, compactionModels])
 
-  function loadWellInBackground(wellId: string): void {
-    if (wellId !== well?.well_id) {
-      void loadWell(wellId)
-    }
-  }
+  const selection = makeSelectionHandlers({
+    well,
+    selectedObject,
+    setSelectedObject,
+    setSelectedFormationId,
+    setActiveToolbarMode,
+    loadWell,
+  })
 
-  function handleSelectWell(wellId: string): void {
-    setSelectedObject({ type: 'well', wellId })
-    loadWellInBackground(wellId)
-  }
+  const visibility = makeVisibilityHandlers({
+    well,
+    selectedTrackId,
+    updateWellViewState,
+    loadWell,
+  })
 
-  function handleFocusWellObject(wellId: string): void {
-    setSelectedObject({ type: 'well', wellId })
-  }
-
-  function handleFocusLasGroupObject(wellId: string): void {
-    setSelectedObject({ type: 'las-group', wellId })
-  }
-
-  function handleFocusCurveObject(wellId: string, mnemonic: string): void {
-    setSelectedObject({ type: 'curve', wellId, mnemonic })
-  }
-
-  function handleFocusTopsGroupObject(wellId: string): void {
-    setSelectedObject({ type: 'tops-group', wellId })
-  }
-
-  async function handleSelectLasGroup(wellId: string): Promise<void> {
-    setSelectedObject({ type: 'las-group', wellId })
-    loadWellInBackground(wellId)
-  }
-
-  async function handleSelectCurve(wellId: string, mnemonic: string): Promise<void> {
-    if (selectedObject?.type === 'curve' && selectedObject.wellId === wellId && selectedObject.mnemonic === mnemonic) {
-      setSelectedObject(null)
-    } else {
-      setSelectedObject({ type: 'curve', wellId, mnemonic })
-    }
-    loadWellInBackground(wellId)
-  }
-
-  async function handleSelectTopsGroup(wellId: string): Promise<void> {
-    setSelectedObject({ type: 'tops-group', wellId })
-    loadWellInBackground(wellId)
-  }
-
-  async function handleSetDeviationVisible(wellId: string, nextValue: boolean): Promise<void> {
-    if (wellId !== well?.well_id) await loadWell(wellId)
-    updateWellViewState(wellId, (state) => ({ ...state, deviationVisible: nextValue }))
-  }
-
-  async function handleToggleFormation(wellId: string, formationId: string, nextValue: boolean): Promise<void> {
-    if (wellId !== well?.well_id) await loadWell(wellId)
-    updateWellViewState(wellId, (state) => ({
-      ...state,
-      visibleFormationIds: nextValue
-        ? Array.from(new Set([...state.visibleFormationIds, formationId]))
-        : state.visibleFormationIds.filter((id) => id !== formationId),
-    }))
-  }
-
-  async function handleToggleAllFormations(wellId: string, nextValue: boolean): Promise<void> {
-    if (wellId !== well?.well_id) await loadWell(wellId)
-    const currentFormations = useWellDataStore.getState().formations
-    updateWellViewState(wellId, (state) => ({
-      ...state,
-      visibleFormationIds: nextValue ? currentFormations.map((f) => f.id) : [],
-    }))
-  }
-
-  async function handleSelectFormation(wellId: string, formationId: string): Promise<void> {
-    if (selectedObject?.type === 'top-pick' && selectedObject.wellId === wellId && selectedObject.formationId === formationId) {
-      setSelectedObject(null)
-      setSelectedFormationId(null)
-    } else {
-      setSelectedFormationId(formationId)
-      setSelectedObject({ type: 'top-pick', wellId, formationId })
-      setActiveToolbarMode('tops')
-    }
-    loadWellInBackground(wellId)
-  }
-
-  function handleFocusFormationObject(wellId: string, formationId: string): void {
-    setSelectedFormationId(formationId)
-    setSelectedObject({ type: 'top-pick', wellId, formationId })
-  }
-
-  async function handleToggleCurve(wellId: string, mnemonic: string, nextValue: boolean): Promise<void> {
-    if (wellId !== well?.well_id) await loadWell(wellId)
-    const activeWellId = useWellDataStore.getState().well?.well_id
-    if (!activeWellId) return
-    const curve = useWellDataStore.getState().curves.find((c) => c.mnemonic === mnemonic)
-    if (!curve) return
-
-    updateWellViewState(activeWellId, (state) => {
-      if (!nextValue) {
-        const nextTracks = state.tracks.map((track) => ({
-          ...track,
-          curves: track.curves.filter((c) => c.mnemonic !== mnemonic),
-        }))
-        const hasAnyCurve = nextTracks.some((track) => track.curves.length > 0)
-        const finalTracks = hasAnyCurve ? nextTracks : [createEmptyTrack()]
-        return {
-          ...state,
-          tracks: finalTracks,
-          trackOrder: buildTrackOrder(finalTracks.map((track) => track.id), state.trackOrder),
-        }
-      }
-
-      if (state.tracks.some((track) => track.curves.some((c) => c.mnemonic === mnemonic))) {
-        return state
-      }
-
-      const existingCount = state.tracks.reduce((n, t) => n + t.curves.length, 0)
-      const { curveConfig, scaleType } = buildCurveDefaults(curve, existingCount)
-
-      if (selectedTrackId && state.tracks.some((t) => t.id === selectedTrackId)) {
-        return {
-          ...state,
-          tracks: state.tracks.map((track) =>
-            track.id !== selectedTrackId ? track : { ...track, curves: [...track.curves, curveConfig] },
-          ),
-        }
-      }
-
-      const trackNumber = nextTrackNumber(state.tracks)
-      return {
-        ...state,
-        tracks: [
-          ...state.tracks,
-          {
-            id: `track-${trackNumber}`,
-            title: `Track ${trackNumber}`,
-            width: 200,
-            scaleType,
-            gridDivisions: 3,
-            showGrid: true,
-            curves: [curveConfig],
-          },
-        ],
-        trackOrder: buildTrackOrder(
-          [...state.tracks.map((track) => track.id), `track-${trackNumber}`],
-          state.trackOrder,
-        ),
-      }
-    })
-  }
-
-  async function handleToggleAllCurves(wellId: string, nextValue: boolean): Promise<void> {
-    if (wellId !== well?.well_id) await loadWell(wellId)
-    if (!nextValue) {
-      updateWellViewState(wellId, (state) => {
-        const track = createEmptyTrack()
-        return {
-          ...state,
-          tracks: [track],
-          trackOrder: buildTrackOrder([track.id], state.trackOrder),
-        }
-      })
-      return
-    }
-    useWellDataStore.getState().curves.forEach((curve) => {
-      void handleToggleCurve(wellId, curve.mnemonic, true)
-    })
-  }
-
-  function handleCurveSettingUpdate(mnemonic: string, patch: Partial<TrackConfig['curves'][number]>): void {
-    if (!well?.well_id) return
-    updateWellViewState(well.well_id, (state) => ({
-      ...state,
-      tracks: state.tracks.map((track) => ({
-        ...track,
-        curves: track.curves.map((curve) => (curve.mnemonic === mnemonic ? { ...curve, ...patch } : curve)),
-      })),
-    }))
-  }
-
-  async function handleSaveWellInspector(): Promise<void> {
-    if (!well?.well_id) return
-    const payload = {
-      well_name: wellInspectorDraft.well_name.trim(),
-      x: Number(wellInspectorDraft.x),
-      y: Number(wellInspectorDraft.y),
-      kb_elev: Number(wellInspectorDraft.kb_elev),
-      gl_elev: Number(wellInspectorDraft.gl_elev),
-      td_md: Number(wellInspectorDraft.td_md),
-      crs: wellInspectorDraft.crs.trim(),
-    }
-    const response = await fetch(`/api/wells/${well.well_id}`, {
-      method: 'PATCH',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(payload),
-    })
-    if (!response.ok) {
-      window.alert(await readError(response, `Failed to update well '${well.well_name}' (${response.status})`))
-      return
-    }
-    await refreshWell(well.well_id)
-  }
-
-  async function handleRenameSelectedObject(): Promise<void> {
-    if (!selectedObject) return
-
-    if (selectedObject.type === 'well') {
-      if (!well || well.well_id !== selectedObject.wellId) return
-      const nextName = window.prompt('Rename well', well.well_name)?.trim()
-      if (!nextName || nextName === well.well_name) return
-
-      const response = await fetch(`/api/wells/${well.well_id}`, {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ well_name: nextName }),
-      })
-      if (!response.ok) {
-        window.alert(await readError(response, `Failed to rename well '${well.well_name}' (${response.status})`))
-        return
-      }
-      await refreshWell(well.well_id)
-      return
-    }
-
-    if (selectedObject.type === 'top-pick') {
-      if (!selectedFormation || selectedFormation.id !== selectedObject.formationId) return
-      const nextName = window.prompt('Rename top', selectedFormation.name)?.trim()
-      if (!nextName || nextName === selectedFormation.name) return
-      await updateFormation(selectedFormation.id, { name: nextName })
-      return
-    }
-
-    if (selectedObject.type === 'compaction-model') {
-      if (!selectedCompactionModel || selectedCompactionModel.id !== selectedObject.modelId) return
-      const nextName = window.prompt('Rename model', selectedCompactionModel.name)?.trim()
-      if (!nextName || nextName === selectedCompactionModel.name) return
-      try {
-        await useWellDataStore.getState().renameCompactionModel(selectedCompactionModel.id, nextName)
-      } catch (error) {
-        window.alert(String(error))
-      }
-      return
-    }
-
-    window.alert('Rename is not implemented for the selected object yet.')
-  }
-
-  async function handleRenameWell(wellId: string, currentName: string): Promise<void> {
-    const nextName = window.prompt('Rename well', currentName)?.trim()
-    if (!nextName || nextName === currentName) return
-
-    const response = await fetch(`/api/wells/${wellId}`, {
-      method: 'PATCH',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ well_name: nextName }),
-    })
-    if (!response.ok) {
-      window.alert(await readError(response, `Failed to rename well '${currentName}' (${response.status})`))
-      return
-    }
-    await loadWellInventories()
-    if (well?.well_id === wellId) {
-      await refreshWell(wellId)
-    }
-  }
-
-  async function handleDeleteWell(wellId: string, wellName: string): Promise<void> {
-    if (!window.confirm(`Delete well "${wellName}"?`)) return
-
-    const response = await fetch(`/api/projects/wells/${wellId}`, { method: 'DELETE' })
-    if (!response.ok) {
-      window.alert(await readError(response, `Failed to delete well '${wellName}' (${response.status})`))
-      return
-    }
-
-    dropWellViewState(wellId)
-    setSelectedFormationId(null)
-    setSelectedObject(null)
-    selectTrack(null)
-    await refreshWell()
-  }
-
-  async function handleRenameFormation(wellId: string, formationId: string, currentName: string): Promise<void> {
-    const nextName = window.prompt('Rename top', currentName)?.trim()
-    if (!nextName || nextName === currentName) return
-
-    const response = await fetch(`/api/wells/${wellId}/formations/${formationId}`, {
-      method: 'PATCH',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ name: nextName }),
-    })
-    if (!response.ok) {
-      window.alert(await readError(response, `Failed to rename top '${currentName}' (${response.status})`))
-      return
-    }
-
-    await loadWellInventories()
-    if (well?.well_id === wellId) {
-      await refreshWell(wellId)
-    }
-  }
-
-  async function handleDeleteFormation(wellId: string, formationId: string, name: string): Promise<void> {
-    if (!window.confirm(`Delete top "${name}"?`)) return
-
-    const response = await fetch(`/api/wells/${wellId}/formations/${formationId}`, { method: 'DELETE' })
-    if (!response.ok) {
-      window.alert(await readError(response, `Failed to delete top '${name}' (${response.status})`))
-      return
-    }
-
-    await loadWellInventories()
-    if (well?.well_id === wellId) {
-      await refreshWell(wellId)
-    }
-    if (selectedFormationId === formationId) {
-      setSelectedFormationId(null)
-      setSelectedObject(null)
-    }
-  }
-
-  async function handleDuplicateFormation(
-    wellId: string,
-    formation: { name: string; depth_md: number; active_strat_color: string | null },
-  ): Promise<void> {
-    const response = await fetch(`/api/wells/${wellId}/formations`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        name: `${formation.name} copy`,
-        depth_md: formation.depth_md,
-        color: formation.active_strat_color ?? '#9ca3af',
-      }),
-    })
-    if (!response.ok) {
-      window.alert(await readError(response, `Failed to duplicate top '${formation.name}' (${response.status})`))
-      return
-    }
-
-    await loadWellInventories()
-    if (well?.well_id === wellId) {
-      await refreshWell(wellId)
-    }
-  }
-
-  async function handleDeleteChartById(chartId: number, name: string, isBuiltin: boolean): Promise<void> {
-    if (isBuiltin) {
-      window.alert('Built-in ICS chart cannot be deleted.')
-      return
-    }
-    if (!window.confirm(`Delete strat chart "${name}"?`)) return
-    await deleteChart(chartId)
-    setSelectedObject(null)
-  }
-
-  async function handleDuplicateCompactionModel(modelId: number, name: string): Promise<void> {
-    const created = await createCompactionModel(`${name} copy`, modelId)
-    setSelectedObject({ type: 'compaction-model', modelId: created.id })
-  }
-
-  async function handleDeleteCompactionModelById(
-    modelId: number,
-    name: string,
-    isBuiltin: boolean,
-    isActive: boolean,
-  ): Promise<void> {
-    if (isBuiltin) {
-      window.alert('Built-in compaction model cannot be deleted.')
-      return
-    }
-    if (isActive) {
-      window.alert('Activate another compaction model first.')
-      return
-    }
-    if (!window.confirm(`Delete compaction model "${name}"?`)) return
-    await deleteCompactionModel(modelId)
-    setSelectedObject(null)
-  }
-
-  function handleWellInspectorDraftChange(field: keyof typeof wellInspectorDraft, value: string): void {
-    setWellInspectorDraft((current) => ({ ...current, [field]: value }))
-  }
-
-  function handleCreateCompactionModel(): void {
-    const name = window.prompt('New compaction model name:')?.trim()
-    if (!name) return
-    void createCompactionModel(name)
-  }
+  const actions = makeActionHandlers({
+    well,
+    wellInspectorDraft,
+    setWellInspectorDraft,
+    selectedObject,
+    selectedFormation,
+    selectedCompactionModel,
+    selectedFormationId,
+    setSelectedObject,
+    setSelectedFormationId,
+    dropWellViewState,
+    selectTrack,
+    refreshWell,
+    loadWellInventories,
+    updateFormation: updateFormation as (id: string, patch: Record<string, unknown>) => Promise<void>,
+    deleteChart,
+    createCompactionModel,
+    deleteCompactionModel,
+  })
 
   return {
     activeSidebarTab,
@@ -539,45 +172,45 @@ export function useDataManagerController() {
     curveCount: curves.length,
     deviationVisibilityByWellId,
     formations,
-    handleCurveSettingUpdate,
-    handleFocusCurveObject,
-    handleFocusFormationObject,
-    handleFocusLasGroupObject,
-    handleFocusTopsGroupObject,
-    handleFocusWellObject,
-    handleSaveWellInspector,
-    handleSelectCurve,
-    handleSelectFormation,
-    handleSelectLasGroup,
-    handleSelectTopsGroup,
-    handleSelectWell,
-    handleSetDeviationVisible,
-    handleToggleAllCurves,
-    handleToggleAllFormations,
-    handleToggleCurve,
-    handleToggleFormation,
-    handleWellInspectorDraftChange,
+    handleCurveSettingUpdate: visibility.handleCurveSettingUpdate,
+    handleFocusCurveObject: selection.handleFocusCurveObject,
+    handleFocusFormationObject: selection.handleFocusFormationObject,
+    handleFocusLasGroupObject: selection.handleFocusLasGroupObject,
+    handleFocusTopsGroupObject: selection.handleFocusTopsGroupObject,
+    handleFocusWellObject: selection.handleFocusWellObject,
+    handleSaveWellInspector: actions.handleSaveWellInspector,
+    handleSelectCurve: selection.handleSelectCurve,
+    handleSelectFormation: selection.handleSelectFormation,
+    handleSelectLasGroup: selection.handleSelectLasGroup,
+    handleSelectTopsGroup: selection.handleSelectTopsGroup,
+    handleSelectWell: selection.handleSelectWell,
+    handleSetDeviationVisible: visibility.handleSetDeviationVisible,
+    handleToggleAllCurves: visibility.handleToggleAllCurves,
+    handleToggleAllFormations: visibility.handleToggleAllFormations,
+    handleToggleCurve: visibility.handleToggleCurve,
+    handleToggleFormation: visibility.handleToggleFormation,
+    handleWellInspectorDraftChange: actions.handleWellInspectorDraftChange,
     maxDepth,
     minDepth,
     onActivateChart: (chartId: number) => void activateChart(chartId),
     onActivateCompactionModel: (id: number) => void activateCompactionModel(id),
-    onCreateCompactionModel: handleCreateCompactionModel,
+    onCreateCompactionModel: actions.handleCreateCompactionModel,
     onDeleteChart: (chartId: number) => void deleteChart(chartId),
     onDeleteCompactionModel: (id: number) => void deleteCompactionModel(id).catch((e: unknown) => window.alert(String(e))),
     onDeleteCompactionModelById: (id: number, name: string, isBuiltin: boolean, isActive: boolean) =>
-      void handleDeleteCompactionModelById(id, name, isBuiltin, isActive),
-    onDeleteFormation: (wellId: string, formationId: string, name: string) => void handleDeleteFormation(wellId, formationId, name),
-    onDeleteStratChartById: (chartId: number, name: string, isBuiltin: boolean) => void handleDeleteChartById(chartId, name, isBuiltin),
-    onDeleteWellById: (wellId: string, wellName: string) => void handleDeleteWell(wellId, wellName),
-    onDuplicateCompactionModel: (id: number, name: string) => void handleDuplicateCompactionModel(id, name),
+      void actions.handleDeleteCompactionModelById(id, name, isBuiltin, isActive),
+    onDeleteFormation: (wellId: string, formationId: string, name: string) => void actions.handleDeleteFormation(wellId, formationId, name),
+    onDeleteStratChartById: (chartId: number, name: string, isBuiltin: boolean) => void actions.handleDeleteChartById(chartId, name, isBuiltin),
+    onDeleteWellById: (wellId: string, wellName: string) => void actions.handleDeleteWell(wellId, wellName),
+    onDuplicateCompactionModel: (id: number, name: string) => void actions.handleDuplicateCompactionModel(id, name),
     onDuplicateFormation: (
       wellId: string,
       formation: { name: string; depth_md: number; active_strat_color: string | null },
-    ) => void handleDuplicateFormation(wellId, formation),
+    ) => void actions.handleDuplicateFormation(wellId, formation),
     onRenameFormation: (wellId: string, formationId: string, currentName: string) =>
-      void handleRenameFormation(wellId, formationId, currentName),
-    onRenameSelectedObject: () => void handleRenameSelectedObject(),
-    onRenameWellById: (wellId: string, currentName: string) => void handleRenameWell(wellId, currentName),
+      void actions.handleRenameFormation(wellId, formationId, currentName),
+    onRenameSelectedObject: () => void actions.handleRenameSelectedObject(),
+    onRenameWellById: (wellId: string, currentName: string) => void actions.handleRenameWell(wellId, currentName),
     onSelectChart: (chartId: number) => setSelectedObject({ type: 'strat-chart', chartId }),
     onSelectCompactionModel: (modelId: number) => setSelectedObject({ type: 'compaction-model', modelId }),
     onSelectModelsTab: () => setActiveSidebarTab('models'),
