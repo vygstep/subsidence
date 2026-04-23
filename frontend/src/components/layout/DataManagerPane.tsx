@@ -270,8 +270,10 @@ export function DataManagerPane({ sidebarRef, onInternalSplitterMouseDown }: Dat
           onFocusCurveObject={controller.handleFocusCurveObject}
           onSelectChart={controller.onSelectChart}
           onSelectCompactionModel={controller.onSelectCompactionModel}
+          onSelectCurveDictionaryEntry={controller.onSelectCurveDictionaryEntry}
           onSelectCurve={controller.handleSelectCurve}
           onSelectFormation={controller.handleSelectFormation}
+          onSelectLithologyDictionaryEntry={controller.onSelectLithologyDictionaryEntry}
           onFocusFormationObject={controller.handleFocusFormationObject}
           onFocusLasGroupObject={controller.handleFocusLasGroupObject}
           onFocusTopsGroupObject={controller.handleFocusTopsGroupObject}
@@ -289,7 +291,9 @@ export function DataManagerPane({ sidebarRef, onInternalSplitterMouseDown }: Dat
           onToggleFormation={controller.handleToggleFormation}
           selectedChartId={controller.selectedChartId}
           selectedCompactionModelId={controller.selectedCompactionModelId}
+          selectedCurveDictionaryEntryId={controller.selectedCurveDictionaryEntryId}
           selectedFormationId={controller.selectedFormationId}
+          selectedLithologyDictionaryEntryId={controller.selectedLithologyDictionaryEntryId}
           selectedObject={controller.selectedObject}
           stratCharts={controller.stratCharts}
           visibleCurveMnemonicsByWellId={controller.visibleCurveMnemonicsByWellId}
@@ -322,6 +326,8 @@ export function DataManagerPane({ sidebarRef, onInternalSplitterMouseDown }: Dat
           onFormationMove={controller.setFormationMove}
           selectedChart={controller.selectedChart}
           selectedCompactionModel={controller.selectedCompactionModel}
+          selectedCurveDictionaryEntry={controller.selectedCurveDictionaryEntry}
+          selectedLithologyDictionaryEntry={controller.selectedLithologyDictionaryEntry}
           curveCount={controller.curveCount}
           visibleCurveCount={controller.visibleCurveCount}
           minDepth={controller.minDepth}

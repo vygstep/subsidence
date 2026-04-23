@@ -11,7 +11,11 @@ interface TemplatesTabProps {
   lithologyDictionaryEntries: LithologyDictionaryEntry[]
   models: CompactionModel[]
   selectedModelId: number | null
+  selectedCurveDictionaryEntryId: number | null
+  selectedLithologyDictionaryEntryId: number | null
   onSelectModel: (modelId: number) => void
+  onSelectCurveDictionaryEntry: (entryId: number) => void
+  onSelectLithologyDictionaryEntry: (entryId: number) => void
   onActivateModel: (modelId: number) => void
   onDeleteModelById: (modelId: number, name: string, isBuiltin: boolean, isActive: boolean) => void
   onCreateModel: () => void
@@ -20,7 +24,6 @@ interface TemplatesTabProps {
 
 interface TemplateSectionProps {
   title: string
-  subtitle: string
   count?: number
   defaultOpen?: boolean
   actions?: React.ReactNode
@@ -29,7 +32,6 @@ interface TemplateSectionProps {
 
 function TemplateSection({
   title,
-  subtitle,
   count,
   defaultOpen = false,
   actions,
@@ -46,11 +48,10 @@ function TemplateSection({
         aria-expanded={isOpen}
       >
         <span className={`template-section__chevron ${isOpen ? 'template-section__chevron--open' : ''}`}>
-          ▸
+          {'>'}
         </span>
         <span className="template-section__heading">
           <span className="template-section__title">{title}</span>
-          <span className="template-section__subtitle">{subtitle}</span>
         </span>
       </button>
       <div className="template-section__controls">
@@ -67,7 +68,11 @@ export function TemplatesTab({
   lithologyDictionaryEntries,
   models,
   selectedModelId,
+  selectedCurveDictionaryEntryId,
+  selectedLithologyDictionaryEntryId,
   onSelectModel,
+  onSelectCurveDictionaryEntry,
+  onSelectLithologyDictionaryEntry,
   onActivateModel,
   onDeleteModelById,
   onCreateModel,
@@ -76,8 +81,7 @@ export function TemplatesTab({
   return (
     <div className="sidebar-panel__body">
       <TemplateSection
-        title="Compaction Models"
-        subtitle="Editable project models built on lithology defaults."
+        title="Compaction Presets"
         count={models.length}
         defaultOpen
         actions={(
@@ -90,7 +94,7 @@ export function TemplatesTab({
               onCreateModel()
             }}
           >
-            + New model
+            + New preset
           </button>
         )}
       >
@@ -105,31 +109,38 @@ export function TemplatesTab({
                 onContextMenuModel(event, model)
               }}
             >
-              <label className="strat-chart-item__radio-label">
-                <input
-                  type="radio"
-                  name="active-compaction-model"
-                  checked={model.is_active}
-                  onChange={() => onActivateModel(model.id)}
-                  onClick={(event) => event.stopPropagation()}
-                />
+              <div className="strat-chart-item__content">
                 <span className="strat-chart-item__name">{model.name}</span>
-              </label>
+              </div>
               {model.is_builtin ? (
                 <span className="strat-chart-item__meta">built-in</span>
               ) : null}
+              {model.is_active ? (
+                <span className="strat-chart-item__status">active</span>
+              ) : (
+                <button
+                  type="button"
+                  className="strat-chart-item__activate"
+                  onClick={(event) => {
+                    event.stopPropagation()
+                    onActivateModel(model.id)
+                  }}
+                >
+                  Set active
+                </button>
+              )}
               <button
                 type="button"
                 className="strat-chart-item__delete"
                 title={
-                  model.is_builtin ? 'Built-in model cannot be deleted'
-                  : model.is_active ? 'Activate another model first'
-                  : 'Delete this model'
+                  model.is_builtin ? 'Built-in preset cannot be deleted'
+                  : model.is_active ? 'Activate another preset first'
+                  : 'Delete this preset'
                 }
                 disabled={model.is_builtin || model.is_active}
                 onClick={(event) => {
                   event.stopPropagation()
-                  if (window.confirm(`Delete compaction model "${model.name}"?`)) {
+                  if (window.confirm(`Delete compaction preset "${model.name}"?`)) {
                     onDeleteModelById(model.id, model.name, model.is_builtin, model.is_active)
                   }
                 }}
@@ -143,7 +154,6 @@ export function TemplatesTab({
 
       <TemplateSection
         title="Curve Mnemonics"
-        subtitle="Read-only built-in alias rules used for curve family resolution."
         count={curveDictionaryEntries.length}
       >
         <div className="template-table-wrapper">
@@ -159,7 +169,11 @@ export function TemplatesTab({
             </thead>
             <tbody>
               {curveDictionaryEntries.map((entry) => (
-                <tr key={entry.id}>
+                <tr
+                  key={entry.id}
+                  className={selectedCurveDictionaryEntryId === entry.id ? 'template-table__row--selected' : ''}
+                  onClick={() => onSelectCurveDictionaryEntry(entry.id)}
+                >
                   <td>{entry.pattern}</td>
                   <td>{entry.scope}</td>
                   <td>{entry.family_code ?? '-'}</td>
@@ -174,7 +188,6 @@ export function TemplatesTab({
 
       <TemplateSection
         title="Lithologies"
-        subtitle="Built-in lithology palette and default compaction parameters."
         count={lithologyDictionaryEntries.length}
       >
         <div className="template-table-wrapper">
@@ -191,7 +204,11 @@ export function TemplatesTab({
             </thead>
             <tbody>
               {lithologyDictionaryEntries.map((entry) => (
-                <tr key={entry.id}>
+                <tr
+                  key={entry.id}
+                  className={selectedLithologyDictionaryEntryId === entry.id ? 'template-table__row--selected' : ''}
+                  onClick={() => onSelectLithologyDictionaryEntry(entry.id)}
+                >
                   <td>{entry.lithology_code}</td>
                   <td>{entry.display_name}</td>
                   <td>

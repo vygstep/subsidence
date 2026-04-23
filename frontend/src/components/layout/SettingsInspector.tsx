@@ -1,5 +1,15 @@
 import type { SelectedObject } from '@/stores/workspaceStore'
-import type { CompactionModel, FormationTop, StratChartInfo, TrackConfig, Well } from '@/types'
+import type {
+  CompactionModel,
+  CurveDictionaryEntry,
+  FormationTop,
+  LithologyDictionaryEntry,
+  StratChartInfo,
+  TrackConfig,
+  Well,
+} from '@/types'
+import { CurveDictionarySettings } from './settings/CurveDictionarySettings'
+import { LithologyDictionarySettings } from './settings/LithologyDictionarySettings'
 
 import { CurveSettings } from './settings/CurveSettings'
 import { DepthTrackSettings } from './settings/DepthTrackSettings'
@@ -42,6 +52,8 @@ interface SettingsInspectorProps {
   onFormationMove: (formationId: string, depth: number) => void
   selectedChart: StratChartInfo | null
   selectedCompactionModel: CompactionModel | null
+  selectedCurveDictionaryEntry: CurveDictionaryEntry | null
+  selectedLithologyDictionaryEntry: LithologyDictionaryEntry | null
   curveCount: number
   visibleCurveCount: number
   minDepth: number
@@ -67,6 +79,8 @@ export function SettingsInspector({
   onFormationMove,
   selectedChart,
   selectedCompactionModel,
+  selectedCurveDictionaryEntry,
+  selectedLithologyDictionaryEntry,
   curveCount,
   visibleCurveCount,
   minDepth,
@@ -155,9 +169,23 @@ export function SettingsInspector({
 
   if (selectedObject.type === 'compaction-model') {
     if (!selectedCompactionModel || selectedCompactionModel.id !== selectedObject.modelId) {
-      return <EmptyInspector message="Selected compaction model is not loaded yet." />
+      return <EmptyInspector message="Selected compaction preset is not loaded yet." />
     }
     return <ModelSettings model={selectedCompactionModel} />
+  }
+
+  if (selectedObject.type === 'curve-dictionary-entry') {
+    if (!selectedCurveDictionaryEntry || selectedCurveDictionaryEntry.id !== selectedObject.entryId) {
+      return <EmptyInspector message="Selected curve dictionary rule is not loaded yet." />
+    }
+    return <CurveDictionarySettings entry={selectedCurveDictionaryEntry} />
+  }
+
+  if (selectedObject.type === 'lithology-dictionary-entry') {
+    if (!selectedLithologyDictionaryEntry || selectedLithologyDictionaryEntry.id !== selectedObject.entryId) {
+      return <EmptyInspector message="Selected lithology entry is not loaded yet." />
+    }
+    return <LithologyDictionarySettings entry={selectedLithologyDictionaryEntry} />
   }
 
   return <EmptyInspector message="No editable settings are implemented for the selected object yet." />

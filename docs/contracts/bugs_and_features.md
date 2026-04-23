@@ -39,7 +39,7 @@ Items:
 
 - `DICT-001`: Add Templates tab beside Settings.
 - `DICT-002`: Curve mnemonic and unit resolver.
-- `DICT-003`: Lithology and compaction parameter templates.
+- `DICT-003`: Lithology sets and compaction presets.
 
 Exit criteria:
 
@@ -370,7 +370,7 @@ Required behavior:
   - Curve units.
   - Lithologies.
   - Discrete curve palettes.
-  - Compaction models.
+  - Compaction presets.
 - Built-in templates are read-only.
 - Built-in templates can be duplicated into editable project templates.
 
@@ -378,7 +378,7 @@ Likely code areas:
 
 - `frontend/src/components/layout/DataManagerPane.tsx`
 - `frontend/src/components/layout/SettingsPaneShell.tsx`
-- `frontend/src/components/layout/CompactionModelsTab.tsx`
+- `frontend/src/components/layout/TemplatesTab.tsx`
 - `app/src/subsidence/data/schema.py`
 - `app/src/subsidence/data/dict_seeder.py`
 - `app/src/subsidence/api/compaction.py`
@@ -413,17 +413,33 @@ Acceptance:
 - Curves with alias mnemonics resolve to the correct canonical family.
 - Curves with unknown mnemonic but known unit can still resolve.
 
-### DICT-003: Lithology and compaction parameter templates
+### DICT-003: Lithology sets and compaction presets
 
 Problem:
 
-- Lithology defaults and compaction parameters must be editable at project level while preserving built-ins.
+- Lithology display/coding and compaction behavior are different concerns and should not be stored as one flat table forever.
 
 Required behavior:
 
-- Built-in lithology defaults are immutable.
-- User can duplicate built-in lithology/compaction templates.
-- Project copies can be edited and applied to a model.
+- Introduce the target domain model:
+  - `Lithology Set`
+  - `Lithology Entry`
+  - `Compaction Preset`
+- `Lithology Entry` owns:
+  - code
+  - display name
+  - color
+  - pattern
+  - linked compaction preset
+- `Compaction Preset` owns:
+  - preset name
+  - density
+  - phi0
+  - compaction coefficient `C`
+- Built-in lithology sets and built-in compaction presets are immutable.
+- User can duplicate built-in sets/presets into project-level editable copies.
+- A user can assign any available compaction preset to a lithology entry.
+- The current backend `CompactionModel` implementation is treated as a temporary technical name until the later schema refactor.
 
 Likely code areas:
 
@@ -434,8 +450,9 @@ Likely code areas:
 
 Acceptance:
 
-- Built-in parameters remain protected.
-- Project-specific model parameters can be changed and used by calculations.
+- Built-in presets remain protected.
+- Project-specific presets can be duplicated, renamed, and changed.
+- Lithology entries can eventually point to chosen presets instead of embedding `Density / Phi0 / C` directly.
 
 ---
 
@@ -805,7 +822,7 @@ Import Wizard is now part of this contract as `WIZ-*`.
 
 Ownership split:
 
-- `DICT-*` owns dictionaries, templates, aliases, units, lithologies, palettes, and compaction parameters.
+- `DICT-*` owns dictionaries, templates, aliases, units, lithologies, palettes, lithology sets, and compaction presets.
 - `WIZ-*` owns import preview, parser settings, column mapping, target-well selection, validation, execution, logging, and import tests.
 - `LITH-*` owns discrete/percentage lithology data behavior after import.
 - `UX-*` owns viewer interactions and visual presentation.

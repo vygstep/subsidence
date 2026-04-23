@@ -38,6 +38,8 @@ interface DataManagerTopPaneProps {
   onFocusWellObject: (wellId: string) => void
   onSelectChart: (chartId: number) => void
   onSelectCompactionModel: (id: number) => void
+  onSelectCurveDictionaryEntry: (entryId: number) => void
+  onSelectLithologyDictionaryEntry: (entryId: number) => void
   onSelectCurve: (wellId: string, mnemonic: string) => void | Promise<void>
   onSelectFormation: (wellId: string, formationId: string) => void | Promise<void>
   onSelectLasGroup: (wellId: string) => void | Promise<void>
@@ -53,7 +55,9 @@ interface DataManagerTopPaneProps {
   onToggleFormation: (wellId: string, formationId: string, nextValue: boolean) => void | Promise<void>
   selectedChartId: number | null
   selectedCompactionModelId: number | null
+  selectedCurveDictionaryEntryId: number | null
   selectedFormationId: string | null
+  selectedLithologyDictionaryEntryId: number | null
   selectedObject: SelectedObject | null
   stratCharts: StratChartInfo[]
   visibleCurveMnemonicsByWellId: Record<string, string[]>
@@ -88,6 +92,8 @@ export function DataManagerTopPane({
   onFocusWellObject,
   onSelectChart,
   onSelectCompactionModel,
+  onSelectCurveDictionaryEntry,
+  onSelectLithologyDictionaryEntry,
   onSelectCurve,
   onSelectFormation,
   onSelectLasGroup,
@@ -103,7 +109,9 @@ export function DataManagerTopPane({
   onToggleFormation,
   selectedChartId,
   selectedCompactionModelId,
+  selectedCurveDictionaryEntryId,
   selectedFormationId,
+  selectedLithologyDictionaryEntryId,
   selectedObject,
   stratCharts,
   visibleCurveMnemonicsByWellId,
@@ -182,7 +190,11 @@ export function DataManagerTopPane({
           lithologyDictionaryEntries={lithologyDictionaryEntries}
           models={compactionModels}
           selectedModelId={selectedCompactionModelId}
+          selectedCurveDictionaryEntryId={selectedCurveDictionaryEntryId}
+          selectedLithologyDictionaryEntryId={selectedLithologyDictionaryEntryId}
           onSelectModel={onSelectCompactionModel}
+          onSelectCurveDictionaryEntry={onSelectCurveDictionaryEntry}
+          onSelectLithologyDictionaryEntry={onSelectLithologyDictionaryEntry}
           onActivateModel={onActivateCompactionModel}
           onCreateModel={onCreateCompactionModel}
           onDeleteModelById={onDeleteCompactionModelById}

@@ -438,12 +438,6 @@
   color: #17212b;
 }
 
-.template-section__subtitle {
-  margin-top: 2px;
-  font-size: 0.72rem;
-  color: #64748b;
-}
-
 .template-section__count {
   flex-shrink: 0;
   display: inline-flex;
@@ -496,6 +490,18 @@
 
 .template-table tbody tr:last-child td {
   border-bottom: 0;
+}
+
+.template-table tbody tr {
+  cursor: pointer;
+}
+
+.template-table tbody tr:hover td {
+  background: #f8fbff;
+}
+
+.template-table__row--selected td {
+  background: #e8f0fe;
 }
 
 .template-color-chip {
@@ -625,6 +631,13 @@
   min-width: 0;
 }
 
+.strat-chart-item__content {
+  display: flex;
+  align-items: center;
+  flex: 1;
+  min-width: 0;
+}
+
 .strat-chart-item__name {
   white-space: nowrap;
   overflow: hidden;
@@ -635,6 +648,35 @@
   font-size: 0.74rem;
   color: #64748b;
   white-space: nowrap;
+}
+
+.strat-chart-item__status {
+  display: inline-flex;
+  align-items: center;
+  padding: 2px 8px;
+  border-radius: 999px;
+  background: #dbeafe;
+  color: #1d4ed8;
+  font-size: 0.68rem;
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+.strat-chart-item__activate {
+  border: 1px solid #cbd5e1;
+  background: #ffffff;
+  color: #334155;
+  border-radius: 999px;
+  padding: 3px 8px;
+  font-size: 0.68rem;
+  font-weight: 700;
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.strat-chart-item__activate:hover {
+  background: #eff6ff;
+  border-color: #93c5fd;
 }
 
 .strat-chart-item__delete {

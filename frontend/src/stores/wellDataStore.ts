@@ -469,7 +469,7 @@ export const useWellDataStore = create<WellDataStore>((set, get) => ({
       body: JSON.stringify({ name, clone_from_id: cloneFromId ?? null }),
     })
     if (!response.ok) {
-      throw new Error(await readError(response, `Failed to create compaction model (${response.status})`))
+      throw new Error(await readError(response, `Failed to create compaction preset (${response.status})`))
     }
     const created = (await response.json()) as CompactionModel
     set((state) => ({ compactionModels: [...state.compactionModels, created] }))
@@ -507,7 +507,7 @@ export const useWellDataStore = create<WellDataStore>((set, get) => ({
   async deleteCompactionModel(id) {
     const response = await fetch(`/api/compaction-models/${id}`, { method: 'DELETE' })
     if (!response.ok) {
-      throw new Error(await readError(response, `Failed to delete compaction model (${response.status})`))
+      throw new Error(await readError(response, `Failed to delete compaction preset (${response.status})`))
     }
     set((state) => ({ compactionModels: state.compactionModels.filter((m) => m.id !== id) }))
   },

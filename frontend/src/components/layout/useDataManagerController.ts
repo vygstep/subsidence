@@ -130,6 +130,16 @@ export function useDataManagerController() {
     return compactionModels.find((m) => m.id === selectedObject.modelId) ?? null
   }, [selectedObject, compactionModels])
 
+  const selectedCurveDictionaryEntry = useMemo(() => {
+    if (selectedObject?.type !== 'curve-dictionary-entry') return null
+    return curveDictionaryEntries.find((entry) => entry.id === selectedObject.entryId) ?? null
+  }, [curveDictionaryEntries, selectedObject])
+
+  const selectedLithologyDictionaryEntry = useMemo(() => {
+    if (selectedObject?.type !== 'lithology-dictionary-entry') return null
+    return lithologyDictionaryEntries.find((entry) => entry.id === selectedObject.entryId) ?? null
+  }, [lithologyDictionaryEntries, selectedObject])
+
   const selection = makeSelectionHandlers({
     well,
     selectedObject,
@@ -217,6 +227,8 @@ export function useDataManagerController() {
     onRenameWellById: (wellId: string, currentName: string) => void actions.handleRenameWell(wellId, currentName),
     onSelectChart: (chartId: number) => setSelectedObject({ type: 'strat-chart', chartId }),
     onSelectCompactionModel: (modelId: number) => setSelectedObject({ type: 'compaction-model', modelId }),
+    onSelectCurveDictionaryEntry: (entryId: number) => setSelectedObject({ type: 'curve-dictionary-entry', entryId }),
+    onSelectLithologyDictionaryEntry: (entryId: number) => setSelectedObject({ type: 'lithology-dictionary-entry', entryId }),
     onSelectTemplatesTab: () => setActiveSidebarTab('templates'),
     onSelectStratChartsTab: () => setActiveSidebarTab('strat-charts'),
     onSelectWellsTab: () => setActiveSidebarTab('wells'),
@@ -224,9 +236,13 @@ export function useDataManagerController() {
     selectedChartId: selectedObject?.type === 'strat-chart' ? selectedObject.chartId : null,
     selectedCompactionModel,
     selectedCompactionModelId: selectedObject?.type === 'compaction-model' ? selectedObject.modelId : null,
+    selectedCurveDictionaryEntry,
+    selectedCurveDictionaryEntryId: selectedObject?.type === 'curve-dictionary-entry' ? selectedObject.entryId : null,
     selectedCurveConfig,
     selectedFormation,
     selectedFormationId,
+    selectedLithologyDictionaryEntry,
+    selectedLithologyDictionaryEntryId: selectedObject?.type === 'lithology-dictionary-entry' ? selectedObject.entryId : null,
     selectedObject,
     setFormationMove: (formationId: string, depth: number) => {
       if (Number.isFinite(depth)) void updateFormationDepth(formationId, depth)
