@@ -87,20 +87,41 @@ def _compute_subsidence(manager, well_id: str, water_depth_m: float = 0.0) -> li
 
         td_m = well.td_md if well.td_md is not None else 0.0
         inputs: list[FormationInput] = []
+
+        def _is_undated_unconformity(pick: FormationTopModel) -> bool:
+            """An unconformity with no real hiatus (ages absent or equal) — treat as conformity."""
+            if pick.kind != 'unconformity':
+                return False
+            if pick.age_top_ma is None or pick.age_base_ma is None:
+                return True
+            return pick.age_base_ma <= pick.age_top_ma
+
         for idx, f in enumerate(formations):
             next_f = formations[idx + 1] if idx + 1 < len(formations) else None
             base_m = next_f.depth_md if next_f is not None else max(td_m, f.depth_md + 1.0)
 
-            # Unconformity with both hiatus bounds defined: the interval below it starts
-            # at age_base_ma (older end of gap). Everything else uses age_top_ma directly.
-            if f.kind == 'unconformity' and f.age_top_ma is not None and f.age_base_ma is not None:
+            # Unconformity with a real hiatus (age_base_ma > age_top_ma): the interval below
+            # it started at age_base_ma (older end of the gap).  Undated/zero-gap unconformities
+            # are transparent — treat exactly like a conformity surface.
+            if (f.kind == 'unconformity'
+                    and f.age_top_ma is not None
+                    and f.age_base_ma is not None
+                    and f.age_base_ma > f.age_top_ma):
                 age_top = f.age_base_ma
             else:
                 age_top = f.age_top_ma
 
-            # age_base is always derived from the next pick's age_top_ma:
-            # conformable → next strat age; unconformity contact → its age_top_ma (hiatus top).
-            age_base = next_f.age_top_ma if next_f is not None else None
+            # age_base: derived from the next pick's age.
+            # Undated unconformities are transparent — look through them to the
+            # formation below.  For the deepest formation (no next pick) fall back
+            # to its own age_base_ma so it is not silently dropped.
+            if next_f is None:
+                age_base = f.age_base_ma
+            elif _is_undated_unconformity(next_f):
+                skip_f = formations[idx + 2] if idx + 2 < len(formations) else None
+                age_base = skip_f.age_top_ma if skip_f is not None else f.age_base_ma
+            else:
+                age_base = next_f.age_top_ma
 
             inputs.append(FormationInput(
                 name=f.name,

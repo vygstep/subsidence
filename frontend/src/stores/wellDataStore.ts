@@ -293,6 +293,8 @@ export const useWellDataStore = create<WellDataStore>((set, get) => ({
       error: null,
     }))
     await get().loadWellInventories()
+    const { useComputedStore } = await import('./computedStore')
+    useComputedStore.getState().triggerRecalculation()
   },
   async updateFormationDepth(formationId, depth) {
     const wellId = get().well?.well_id
