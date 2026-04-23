@@ -1,0 +1,261 @@
+/* ── SplitView ─────────────────────────────────────────────────────────────── */
+
+.split-view {
+  display: flex;
+  flex-direction: row;
+  flex: 1 1 0;
+  min-width: 0;
+  min-height: 0;
+  overflow: hidden;
+}
+
+.split-view__pane--left {
+  flex: 1 1 0;
+  min-width: 0;
+  min-height: 0;
+  overflow: hidden;
+  isolation: isolate;
+}
+
+.split-view__pane--right {
+  flex-shrink: 0;
+  height: 100%;
+  min-height: 0;
+  overflow: hidden;
+}
+
+.split-view__divider {
+  width: 2px;
+  flex-shrink: 0;
+  cursor: col-resize;
+  background: #c4d0dc;
+  user-select: none;
+  touch-action: none;
+}
+
+.split-view__divider:hover {
+  background: #7cb8e8;
+}
+
+/* ── SubsidencePanel ────────────────────────────────────────────────────────── */
+
+.subsidence-panel {
+  width: 100%;
+  height: 100%;
+  display: flex;
+  flex-direction: row;
+  background: #f8fafc;
+  color: #334155;
+  min-width: 0;
+  min-height: 0;
+}
+
+.subsidence-panel__right-handle {
+  order: 99;
+  width: 2px;
+  flex-shrink: 0;
+  background: #c4d0dc;
+  cursor: col-resize;
+}
+
+.subsidence-panel__right-handle:hover {
+  background: #7cb8e8;
+}
+
+.subsidence-panel__body {
+  flex: 1 1 0;
+  min-width: 0;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.subsidence-panel__top {
+  flex: 1 1 0;
+  min-width: 0;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  position: relative;
+  overflow: hidden;
+}
+
+.subsidence-panel__h-divider {
+  flex-shrink: 0;
+  height: 4px;
+  background: #c4d0dc;
+  cursor: row-resize;
+}
+
+.subsidence-panel__h-divider:hover {
+  background: #7cb8e8;
+}
+
+.subsidence-panel__bottom {
+  flex-shrink: 0;
+  min-height: 0;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+}
+
+.multi-well-panel {
+  position: relative;
+  flex: 1 1 0;
+  min-height: 0;
+  overflow: hidden;
+}
+
+.subsidence-panel__overlay {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(248, 250, 252, 0.75);
+  color: #3b82f6;
+  font-size: 0.875rem;
+  z-index: 10;
+}
+
+.subsidence-panel__error {
+  padding: 12px 16px;
+  color: #ef4444;
+  font-size: 0.8rem;
+}
+
+.subsidence-panel__empty {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #94a3b8;
+  font-size: 0.875rem;
+  pointer-events: none;
+}
+
+/* ── SubsidenceToolbar ──────────────────────────────────────────────────────── */
+
+.subsidence-toolbar {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  width: 25px;
+  padding: 6px 2px;
+  border-right: 1px solid #d9e2ec;
+  background: #f8fafc;
+  flex-shrink: 0;
+}
+
+.subsidence-toolbar__button {
+  border: 1px solid #d6e0eb;
+  background: #ffffff;
+  color: #314155;
+  border-radius: 5px;
+  width: 20px;
+  height: 56px;
+  padding: 0;
+  font-size: 10px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.subsidence-toolbar__label {
+  display: inline-block;
+  transform: rotate(-90deg);
+  white-space: nowrap;
+  transform-origin: center;
+}
+
+.subsidence-toolbar__button:hover {
+  background: #eff6ff;
+  border-color: #93c5fd;
+}
+
+.subsidence-toolbar__button--active {
+  background: #dbeafe;
+  border-color: #60a5fa;
+  color: #1d4ed8;
+}
+
+.subsidence-toolbar__spacer {
+  flex: 1;
+}
+
+.subsidence-toolbar__depth {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+  margin-bottom: 4px;
+}
+
+.subsidence-toolbar__depth-label {
+  font-size: 9px;
+  color: #94a3b8;
+  user-select: none;
+}
+
+.subsidence-toolbar__depth-input {
+  width: 20px;
+  padding: 2px 1px;
+  border: 1px solid #d6e0eb;
+  border-radius: 3px;
+  background: #ffffff;
+  color: #334155;
+  font-size: 9px;
+  text-align: center;
+  -moz-appearance: textfield;
+}
+
+.subsidence-toolbar__depth-input::-webkit-inner-spin-button,
+.subsidence-toolbar__depth-input::-webkit-outer-spin-button {
+  -webkit-appearance: none;
+}
+
+.subsidence-toolbar__depth-input:focus {
+  outline: none;
+  border-color: #60a5fa;
+}
+
+/* ── SubsidenceCanvas ───────────────────────────────────────────────────────── */
+
+.subsidence-canvas-container {
+  display: flex;
+  flex-direction: column;
+  flex: 1 1 0;
+  min-width: 0;
+  min-height: 0;
+}
+
+.subsidence-canvas-wrapper {
+  flex: 1;
+  min-height: 0;
+  position: relative;
+}
+
+.subsidence-canvas {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+}
+
+.subsidence-canvas--crosshair {
+  pointer-events: none;
+}
+
+.geological-timescale {
+  background: #f0f5fa;
+  border-bottom: 1px solid #c4d0dc;
+  flex-shrink: 0;
+}
+
+/* ── SubsidenceControls (legacy, kept for compat) ───────────────────────────── */
+
+.subsidence-controls { display: none; }
