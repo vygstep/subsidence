@@ -1,5 +1,8 @@
 import { useState } from 'react'
 
+import { useProjectStore } from '@/stores'
+import { recordOperation } from '@/utils/diagnostics'
+
 import { getLastImportRoot, pickFile, rememberImportPath } from './pathMemory'
 
 interface WellOption {
@@ -33,6 +36,7 @@ async function readError(response: Response, fallback: string): Promise<string> 
 }
 
 export function ImportLasDialog({ wells, activeWellId, onClose, onSuccess }: ImportLasDialogProps) {
+  const projectPath = useProjectStore((state) => state.projectPath)
   const [wellId, setWellId] = useState(activeWellId ?? '')
   const [createNewWell, setCreateNewWell] = useState(false)
   const [sourceType, setSourceType] = useState<LogSourceType>('las')
@@ -53,37 +57,43 @@ export function ImportLasDialog({ wells, activeWellId, onClose, onSuccess }: Imp
     setIsSubmitting(true)
     setError(null)
     try {
-      const response = await fetch(sourceType === 'las' ? '/api/projects/import-las' : '/api/projects/import-logs-csv', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(
-          sourceType === 'las'
-            ? {
-                las_path: nextPath,
-                well_id: wellId || null,
-                create_new_well: !wellId && createNewWell,
-              }
-            : {
-                csv_path: nextPath,
-                well_id: wellId || null,
-                depth_column: depthColumn.trim() || null,
-                create_new_well: !wellId && createNewWell,
-              },
-        ),
-      })
-      if (!response.ok) {
-        throw new Error(await readError(
-          response,
-          sourceType === 'las'
-            ? `Failed to import LAS (${response.status})`
-            : `Failed to import CSV logs (${response.status})`,
-        ))
-      }
+      await recordOperation(sourceType === 'las' ? 'import.las' : 'import.logs_csv', async () => {
+        const response = await fetch(sourceType === 'las' ? '/api/projects/import-las' : '/api/projects/import-logs-csv', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(
+            sourceType === 'las'
+              ? {
+                  las_path: nextPath,
+                  well_id: wellId || null,
+                  create_new_well: !wellId && createNewWell,
+                }
+              : {
+                  csv_path: nextPath,
+                  well_id: wellId || null,
+                  depth_column: depthColumn.trim() || null,
+                  create_new_well: !wellId && createNewWell,
+                },
+          ),
+        })
+        if (!response.ok) {
+          throw new Error(await readError(
+            response,
+            sourceType === 'las'
+              ? `Failed to import LAS (${response.status})`
+              : `Failed to import CSV logs (${response.status})`,
+          ))
+        }
 
-      const payload = (await response.json()) as ImportLasResponse
-      rememberImportPath(nextPath)
-      await onSuccess(payload.well_id)
-      onClose()
+        const payload = (await response.json()) as ImportLasResponse
+        rememberImportPath(nextPath)
+        await onSuccess(payload.well_id)
+        onClose()
+      }, {
+        projectPath,
+        activeWellId: wellId || activeWellId || null,
+        details: { inputPath: nextPath, createNewWell, depthColumn: depthColumn.trim() || null },
+      })
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : 'Failed to import logs')
     } finally {

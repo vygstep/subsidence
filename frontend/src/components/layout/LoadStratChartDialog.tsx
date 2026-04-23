@@ -1,5 +1,8 @@
 import { useState } from 'react'
 
+import { useProjectStore } from '@/stores'
+import { recordOperation } from '@/utils/diagnostics'
+
 import { getLastImportRoot, pickFile, rememberImportPath } from './pathMemory'
 
 interface LoadStratChartDialogProps {
@@ -18,6 +21,7 @@ async function readError(response: Response, fallback: string): Promise<string> 
 }
 
 export function LoadStratChartDialog({ onClose, onSuccess }: LoadStratChartDialogProps) {
+  const projectPath = useProjectStore((state) => state.projectPath)
   const [csvPath, setCsvPath] = useState(() => getLastImportRoot())
   const [error, setError] = useState<string | null>(null)
   const [isSubmitting, setIsSubmitting] = useState(false)
@@ -33,18 +37,20 @@ export function LoadStratChartDialog({ onClose, onSuccess }: LoadStratChartDialo
     setIsSubmitting(true)
     setError(null)
     try {
-      const response = await fetch('/api/strat-charts/import', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ csv_path: path }),
-      })
-      if (!response.ok) {
-        throw new Error(await readError(response, `Import failed (${response.status})`))
-      }
-      const payload = (await response.json()) as { units_imported: number }
-      rememberImportPath(path)
-      onSuccess(payload.units_imported)
-      onClose()
+      await recordOperation('strat_chart.import', async () => {
+        const response = await fetch('/api/strat-charts/import', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ csv_path: path }),
+        })
+        if (!response.ok) {
+          throw new Error(await readError(response, `Import failed (${response.status})`))
+        }
+        const payload = (await response.json()) as { units_imported: number }
+        rememberImportPath(path)
+        onSuccess(payload.units_imported)
+        onClose()
+      }, { projectPath, details: { inputPath: path } })
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : 'Import failed')
     } finally {

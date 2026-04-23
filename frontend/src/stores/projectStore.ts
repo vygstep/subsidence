@@ -1,6 +1,7 @@
 import { create } from 'zustand'
 
 import { rememberProjectBundlePath } from '@/components/layout/pathMemory'
+import { recordOperation } from '@/utils/diagnostics'
 
 import { useViewStore, type DepthTrackConfig, type FormationsTrackConfig } from './viewStore'
 import { useWellDataStore } from './wellDataStore'
@@ -264,7 +265,52 @@ export const useProjectStore = create<ProjectStore>((set, get) => ({
     set({ recentProjects: mapRecentProjects(payload) })
   },
   async openProject(path) {
-    if (get().isOpen) {
+    await recordOperation('project.open', async () => {
+      if (get().isOpen) {
+        await postAction('/api/projects/close')
+        set({
+          isOpen: false,
+          projectName: null,
+          projectPath: null,
+          isDirty: false,
+          backendDirty: false,
+          pendingVisualConfigDirty: false,
+          canUndo: false,
+          canRedo: false,
+          visualConfig: {},
+          visualConfigSaveToken: 0,
+        })
+        applyVisualConfigPayload({})
+      }
+      const payload = await openProjectRequest(path)
+      set({
+        isOpen: true,
+        projectName: payload.project_name,
+        projectPath: payload.project_path,
+        isDirty: false,
+        backendDirty: false,
+        pendingVisualConfigDirty: false,
+        canUndo: false,
+        canRedo: false,
+        visualConfig: {},
+        visualConfigSaveToken: 0,
+      })
+      rememberProjectBundlePath(payload.project_path)
+      try {
+        await get().loadRecentProjects()
+      } catch {
+        // Do not fail project open because recent-project history could not refresh.
+      }
+    }, { projectPath: path })
+  },
+  async createProject(name, path, overwrite = false) {
+    await recordOperation('project.create', async () => {
+      const payload = await createProjectRequest(name, path, overwrite)
+      await get().openProject(payload.project_path)
+    }, { projectPath: path, details: { name, overwrite } })
+  },
+  async closeProject() {
+    await recordOperation('project.close', async () => {
       await postAction('/api/projects/close')
       set({
         isOpen: false,
@@ -279,46 +325,7 @@ export const useProjectStore = create<ProjectStore>((set, get) => ({
         visualConfigSaveToken: 0,
       })
       applyVisualConfigPayload({})
-    }
-    const payload = await openProjectRequest(path)
-    set({
-      isOpen: true,
-      projectName: payload.project_name,
-      projectPath: payload.project_path,
-      isDirty: false,
-      backendDirty: false,
-      pendingVisualConfigDirty: false,
-      canUndo: false,
-      canRedo: false,
-      visualConfig: {},
-      visualConfigSaveToken: 0,
-    })
-    rememberProjectBundlePath(payload.project_path)
-    try {
-      await get().loadRecentProjects()
-    } catch {
-      // Do not fail project open because recent-project history could not refresh.
-    }
-  },
-  async createProject(name, path, overwrite = false) {
-    const payload = await createProjectRequest(name, path, overwrite)
-    await get().openProject(payload.project_path)
-  },
-  async closeProject() {
-    await postAction('/api/projects/close')
-    set({
-      isOpen: false,
-      projectName: null,
-      projectPath: null,
-      isDirty: false,
-      backendDirty: false,
-      pendingVisualConfigDirty: false,
-      canUndo: false,
-      canRedo: false,
-      visualConfig: {},
-      visualConfigSaveToken: 0,
-    })
-    applyVisualConfigPayload({})
+    }, { projectPath: get().projectPath })
   },
   async loadVisualConfig() {
     const payload = await fetchVisualConfig()
@@ -359,77 +366,85 @@ export const useProjectStore = create<ProjectStore>((set, get) => ({
     return payload.config ?? next
   },
   async saveProject() {
-    const projectConfig = collectProjectVisualConfig()
-    const wellConfigs = collectWellVisualConfigs()
-    await patchVisualConfig('project', projectConfig as unknown as Record<string, unknown>)
-    await Promise.all(
-      Object.entries(wellConfigs).map(([wellId, config]) => patchVisualConfig('well', config, wellId)),
-    )
-    await postAction('/api/projects/save')
-    const payload = await fetchStatus()
-    set({
-      isOpen: payload.is_open,
-      projectName: payload.project_name,
-      projectPath: payload.project_path,
-      backendDirty: payload.is_dirty,
-      pendingVisualConfigDirty: false,
-      isDirty: payload.is_dirty,
-      canUndo: payload.can_undo,
-      canRedo: payload.can_redo,
-      visualConfig: projectConfig as unknown as Record<string, unknown>,
-      visualConfigSaveToken: get().visualConfigSaveToken + 1,
-    })
+    await recordOperation('project.save', async () => {
+      const projectConfig = collectProjectVisualConfig()
+      const wellConfigs = collectWellVisualConfigs()
+      await patchVisualConfig('project', projectConfig as unknown as Record<string, unknown>)
+      await Promise.all(
+        Object.entries(wellConfigs).map(([wellId, config]) => patchVisualConfig('well', config, wellId)),
+      )
+      await postAction('/api/projects/save')
+      const payload = await fetchStatus()
+      set({
+        isOpen: payload.is_open,
+        projectName: payload.project_name,
+        projectPath: payload.project_path,
+        backendDirty: payload.is_dirty,
+        pendingVisualConfigDirty: false,
+        isDirty: payload.is_dirty,
+        canUndo: payload.can_undo,
+        canRedo: payload.can_redo,
+        visualConfig: projectConfig as unknown as Record<string, unknown>,
+        visualConfigSaveToken: get().visualConfigSaveToken + 1,
+      })
+    }, { projectPath: get().projectPath })
   },
   async createCheckpoint(name, description = '') {
-    const stamp = new Date().toISOString().replace(/[:.]/g, '-')
-    await postJsonAction('/api/projects/checkpoints', {
-      name: name?.trim() || `checkpoint-${stamp}`,
-      description,
-    })
-    const payload = await fetchStatus()
-    set({
-      isOpen: payload.is_open,
-      projectName: payload.project_name,
-      projectPath: payload.project_path,
-      backendDirty: payload.is_dirty,
-      isDirty: payload.is_dirty || get().pendingVisualConfigDirty,
-      canUndo: payload.can_undo,
-      canRedo: payload.can_redo,
-    })
+    await recordOperation('checkpoint.create', async () => {
+      const stamp = new Date().toISOString().replace(/[:.]/g, '-')
+      await postJsonAction('/api/projects/checkpoints', {
+        name: name?.trim() || `checkpoint-${stamp}`,
+        description,
+      })
+      const payload = await fetchStatus()
+      set({
+        isOpen: payload.is_open,
+        projectName: payload.project_name,
+        projectPath: payload.project_path,
+        backendDirty: payload.is_dirty,
+        isDirty: payload.is_dirty || get().pendingVisualConfigDirty,
+        canUndo: payload.can_undo,
+        canRedo: payload.can_redo,
+      })
+    }, { projectPath: get().projectPath, details: { name } })
   },
   async undo() {
-    await postAction('/api/projects/undo')
-    const payload = await fetchStatus()
-    set({
-      isOpen: payload.is_open,
-      projectName: payload.project_name,
-      projectPath: payload.project_path,
-      backendDirty: payload.is_dirty,
-      isDirty: payload.is_dirty || get().pendingVisualConfigDirty,
-      canUndo: payload.can_undo,
-      canRedo: payload.can_redo,
-    })
-    const wellId = useWellDataStore.getState().well?.well_id
-    if (wellId) {
-      await useWellDataStore.getState().loadWell(wellId)
-    }
+    await recordOperation('undo.run', async () => {
+      await postAction('/api/projects/undo')
+      const payload = await fetchStatus()
+      set({
+        isOpen: payload.is_open,
+        projectName: payload.project_name,
+        projectPath: payload.project_path,
+        backendDirty: payload.is_dirty,
+        isDirty: payload.is_dirty || get().pendingVisualConfigDirty,
+        canUndo: payload.can_undo,
+        canRedo: payload.can_redo,
+      })
+      const wellId = useWellDataStore.getState().well?.well_id
+      if (wellId) {
+        await useWellDataStore.getState().loadWell(wellId)
+      }
+    }, { projectPath: get().projectPath, activeWellId: useWellDataStore.getState().well?.well_id })
   },
   async redo() {
-    await postAction('/api/projects/redo')
-    const payload = await fetchStatus()
-    set({
-      isOpen: payload.is_open,
-      projectName: payload.project_name,
-      projectPath: payload.project_path,
-      backendDirty: payload.is_dirty,
-      isDirty: payload.is_dirty || get().pendingVisualConfigDirty,
-      canUndo: payload.can_undo,
-      canRedo: payload.can_redo,
-    })
-    const wellId = useWellDataStore.getState().well?.well_id
-    if (wellId) {
-      await useWellDataStore.getState().loadWell(wellId)
-    }
+    await recordOperation('redo.run', async () => {
+      await postAction('/api/projects/redo')
+      const payload = await fetchStatus()
+      set({
+        isOpen: payload.is_open,
+        projectName: payload.project_name,
+        projectPath: payload.project_path,
+        backendDirty: payload.is_dirty,
+        isDirty: payload.is_dirty || get().pendingVisualConfigDirty,
+        canUndo: payload.can_undo,
+        canRedo: payload.can_redo,
+      })
+      const wellId = useWellDataStore.getState().well?.well_id
+      if (wellId) {
+        await useWellDataStore.getState().loadWell(wellId)
+      }
+    }, { projectPath: get().projectPath, activeWellId: useWellDataStore.getState().well?.well_id })
   },
   markVisualConfigDirty() {
     set((state) => (

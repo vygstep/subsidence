@@ -21,7 +21,6 @@ Rules:
 
 ## Current Work
 
-- [ ] Execute `M4 Add frontend diagnostics` from [Engineering Maintenance Contract](docs/contracts/engineering-maintenance-contract.md).
 - [ ] Execute `M5 Add critical workflow tests` from [Engineering Maintenance Contract](docs/contracts/engineering-maintenance-contract.md).
 - [ ] Execute `M6 Safe refactoring pass` from [Engineering Maintenance Contract](docs/contracts/engineering-maintenance-contract.md).
 - [ ] Execute `M7 Resume UX and feature backlog` from [Engineering Maintenance Contract](docs/contracts/engineering-maintenance-contract.md).

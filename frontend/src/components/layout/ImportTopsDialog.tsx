@@ -1,5 +1,8 @@
 import { useState } from 'react'
 
+import { useProjectStore } from '@/stores'
+import { recordOperation } from '@/utils/diagnostics'
+
 import { getLastImportRoot, pickFile, rememberImportPath } from './pathMemory'
 
 interface WellOption {
@@ -31,6 +34,7 @@ async function readError(response: Response, fallback: string): Promise<string> 
 }
 
 export function ImportTopsDialog({ wells, activeWellId, onClose, onSuccess }: ImportTopsDialogProps) {
+  const projectPath = useProjectStore((state) => state.projectPath)
   const [wellId, setWellId] = useState(activeWellId ?? '')
   const [createNewWell, setCreateNewWell] = useState(false)
   const [csvPath, setCsvPath] = useState(() => getLastImportRoot())
@@ -50,24 +54,30 @@ export function ImportTopsDialog({ wells, activeWellId, onClose, onSuccess }: Im
     setIsSubmitting(true)
     setError(null)
     try {
-      const response = await fetch('/api/projects/import-tops', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          well_id: wellId || null,
-          csv_path: nextPath,
-          depth_ref: depthRef,
-          create_new_well: !wellId && createNewWell,
-        }),
-      })
-      if (!response.ok) {
-        throw new Error(await readError(response, `Failed to import tops (${response.status})`))
-      }
+      await recordOperation('import.tops', async () => {
+        const response = await fetch('/api/projects/import-tops', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            well_id: wellId || null,
+            csv_path: nextPath,
+            depth_ref: depthRef,
+            create_new_well: !wellId && createNewWell,
+          }),
+        })
+        if (!response.ok) {
+          throw new Error(await readError(response, `Failed to import tops (${response.status})`))
+        }
 
-      const payload = (await response.json()) as ImportTopsResponse
-      rememberImportPath(nextPath)
-      await onSuccess(payload.well_id)
-      onClose()
+        const payload = (await response.json()) as ImportTopsResponse
+        rememberImportPath(nextPath)
+        await onSuccess(payload.well_id)
+        onClose()
+      }, {
+        projectPath,
+        activeWellId: wellId || activeWellId || null,
+        details: { inputPath: nextPath, depthRef, createNewWell },
+      })
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : 'Failed to import tops')
     } finally {

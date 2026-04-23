@@ -1,5 +1,8 @@
 import { useState } from 'react'
 
+import { useProjectStore } from '@/stores'
+import { recordOperation } from '@/utils/diagnostics'
+
 import { getLastImportRoot, pickFile, rememberImportPath } from './pathMemory'
 
 interface WellOption {
@@ -31,6 +34,7 @@ async function readError(response: Response, fallback: string): Promise<string> 
 }
 
 export function ImportDeviationDialog({ wells, activeWellId, onClose, onSuccess }: ImportDeviationDialogProps) {
+  const projectPath = useProjectStore((state) => state.projectPath)
   const [wellId, setWellId] = useState(activeWellId ?? '')
   const [createNewWell, setCreateNewWell] = useState(false)
   const [csvPath, setCsvPath] = useState(() => getLastImportRoot())
@@ -49,23 +53,29 @@ export function ImportDeviationDialog({ wells, activeWellId, onClose, onSuccess 
     setIsSubmitting(true)
     setError(null)
     try {
-      const response = await fetch('/api/projects/import-deviation', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          well_id: wellId || null,
-          csv_path: nextPath,
-          create_new_well: !wellId && createNewWell,
-        }),
-      })
-      if (!response.ok) {
-        throw new Error(await readError(response, `Failed to import deviation (${response.status})`))
-      }
+      await recordOperation('import.deviation', async () => {
+        const response = await fetch('/api/projects/import-deviation', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            well_id: wellId || null,
+            csv_path: nextPath,
+            create_new_well: !wellId && createNewWell,
+          }),
+        })
+        if (!response.ok) {
+          throw new Error(await readError(response, `Failed to import deviation (${response.status})`))
+        }
 
-      const payload = (await response.json()) as ImportDeviationResponse
-      rememberImportPath(nextPath)
-      await onSuccess(payload.well_id)
-      onClose()
+        const payload = (await response.json()) as ImportDeviationResponse
+        rememberImportPath(nextPath)
+        await onSuccess(payload.well_id)
+        onClose()
+      }, {
+        projectPath,
+        activeWellId: wellId || activeWellId || null,
+        details: { inputPath: nextPath, createNewWell },
+      })
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : 'Failed to import deviation')
     } finally {

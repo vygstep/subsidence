@@ -80,7 +80,9 @@ Example:
 
 ## Frontend Diagnostics
 
-Frontend should keep a bounded in-memory event buffer.
+Frontend diagnostics are implemented in `frontend/src/utils/diagnostics.ts`.
+
+The frontend keeps a bounded in-memory event buffer with the last 250 events. It records user-triggered workflow start/success/failure events and can copy a JSON diagnostic snapshot from the Project menu.
 
 Required fields:
 
@@ -98,12 +100,27 @@ Required fields:
 Required behavior:
 
 - Record start/success/failure for user-triggered workflows.
-- Expose a diagnostic export/copy action later.
+- Expose a diagnostic export/copy action in the Project menu as `Copy diagnostics`.
 - Do not log large curve arrays.
 - Do not log secrets or unnecessary local filesystem contents beyond paths needed for debugging.
 
 ---
 
+## Frontend Implementation Files
+
+- `frontend/src/utils/diagnostics.ts`: event ring buffer, operation recorder, and snapshot builder.
+- `frontend/src/stores/projectStore.ts`: project lifecycle, save, undo/redo, and checkpoint events.
+- `frontend/src/stores/wellDataStore.ts`: strat chart activate/delete events.
+- `frontend/src/stores/computedStore.ts`: subsidence recalculation events.
+- `frontend/src/components/layout/CreateWellDialog.tsx`: well creation events.
+- `frontend/src/components/layout/ImportLasDialog.tsx`: LAS and logs CSV import events.
+- `frontend/src/components/layout/ImportTopsDialog.tsx`: tops import events.
+- `frontend/src/components/layout/ImportDeviationDialog.tsx`: deviation import events.
+- `frontend/src/components/layout/LoadStratChartDialog.tsx`: strat chart import events.
+- `frontend/src/components/layout/ProjectToolbar.tsx`: `Copy diagnostics` action.
+
+---
+
 ## Next Implementation Step
 
-Frontend diagnostics are still pending under `M4 Add frontend diagnostics` in `docs/contracts/engineering-maintenance-contract.md`.
+Critical workflow tests are pending under `M5 Add critical workflow tests` in `docs/contracts/engineering-maintenance-contract.md`.

@@ -11,6 +11,7 @@ import { NewProjectDialog } from './NewProjectDialog'
 import { ZoomControl } from './ZoomControl'
 import { useProjectStore, useViewStore, useWellDataStore, useWorkspaceStore } from '@/stores'
 import type { FormationTop } from '@/types'
+import { buildDiagnosticSnapshot } from '@/utils/diagnostics'
 
 type DialogKind = 'project-open' | 'project-new' | 'create-well' | 'load-las' | 'load-tops' | 'load-deviation' | 'link-top' | 'load-strat-chart' | 'set-top-type' | null
 type FormationTypeOption = 'strat' | 'unconformity'
@@ -100,6 +101,7 @@ export function ProjectToolbar() {
 
   const isProjectOpen = useProjectStore((state) => state.isOpen)
   const projectName = useProjectStore((state) => state.projectName)
+  const projectPath = useProjectStore((state) => state.projectPath)
   const isDirty = useProjectStore((state) => state.isDirty)
   const canUndo = useProjectStore((state) => state.canUndo)
   const canRedo = useProjectStore((state) => state.canRedo)
@@ -196,6 +198,26 @@ export function ProjectToolbar() {
     setProjectMenuOpen(false)
     await closeProject()
     setActiveDialog('project-open')
+  }
+
+  async function handleCopyDiagnostics(): Promise<void> {
+    const snapshot = buildDiagnosticSnapshot({
+      projectName,
+      projectPath,
+      activeWellId: well?.well_id ?? null,
+      activeWellName: well?.well_name ?? null,
+      selectedFormationId,
+      activeSidebarTab,
+      curveCount: curves.length,
+      formationCount: formations.length,
+    })
+    const body = JSON.stringify(snapshot, null, 2)
+    try {
+      await navigator.clipboard.writeText(body)
+      window.alert('Diagnostics copied to clipboard.')
+    } catch {
+      window.prompt('Copy diagnostics JSON', body)
+    }
   }
 
   async function handleDeleteWell(): Promise<void> {
@@ -384,6 +406,7 @@ export function ProjectToolbar() {
       <button type="button" className="app-menu__item" onClick={() => void handleProjectClose()}>Close project</button>
       <button type="button" className="app-menu__item" onClick={() => { setProjectMenuOpen(false); void saveProject() }}>Save project</button>
       <button type="button" className="app-menu__item" onClick={() => { setProjectMenuOpen(false); void createCheckpoint() }}>Create checkpoint</button>
+      <button type="button" className="app-menu__item" onClick={() => { setProjectMenuOpen(false); void handleCopyDiagnostics() }}>Copy diagnostics</button>
       <hr className="app-menu__separator" />
       <button type="button" className="app-menu__item app-menu__item--check" onClick={() => setLodEnabled(!lodEnabled)}>
         <span className="app-menu__checkmark">{lodEnabled ? '✓' : ''}</span>

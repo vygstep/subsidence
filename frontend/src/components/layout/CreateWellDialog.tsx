@@ -1,5 +1,8 @@
 import { useState } from 'react'
 
+import { useProjectStore } from '@/stores'
+import { recordOperation } from '@/utils/diagnostics'
+
 interface CreateWellDialogProps {
   onClose: () => void
   onSuccess: (wellId: string) => Promise<void> | void
@@ -23,6 +26,7 @@ async function readError(response: Response, fallback: string): Promise<string> 
 }
 
 export function CreateWellDialog({ onClose, onSuccess }: CreateWellDialogProps) {
+  const projectPath = useProjectStore((state) => state.projectPath)
   const [name, setName] = useState('')
   const [x, setX] = useState('0')
   const [y, setY] = useState('0')
@@ -52,25 +56,27 @@ export function CreateWellDialog({ onClose, onSuccess }: CreateWellDialogProps) 
     setIsSubmitting(true)
     setError(null)
     try {
-      const response = await fetch('/api/projects/wells', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          name: nextName,
-          x: parsedX,
-          y: parsedY,
-          kb: parsedKb,
-          td: parsedTd,
-          crs: crs.trim() || 'unset',
-        }),
-      })
-      if (!response.ok) {
-        throw new Error(await readError(response, `Failed to create well (${response.status})`))
-      }
+      await recordOperation('well.create', async () => {
+        const response = await fetch('/api/projects/wells', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            name: nextName,
+            x: parsedX,
+            y: parsedY,
+            kb: parsedKb,
+            td: parsedTd,
+            crs: crs.trim() || 'unset',
+          }),
+        })
+        if (!response.ok) {
+          throw new Error(await readError(response, `Failed to create well (${response.status})`))
+        }
 
-      const payload = (await response.json()) as CreateWellResponse
-      await onSuccess(payload.well_id)
-      onClose()
+        const payload = (await response.json()) as CreateWellResponse
+        await onSuccess(payload.well_id)
+        onClose()
+      }, { projectPath, details: { wellName: nextName } })
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : 'Failed to create well')
     } finally {

@@ -2,6 +2,7 @@ import { create } from 'zustand'
 
 import type { CompactionModel, CurveData, FormationTop, LithologyParam, StratChartInfo, Well, WellInventory } from '@/types'
 import { minCurvatureToTVD, type TVDTable } from '@/utils/depthTransform'
+import { recordOperation } from '@/utils/diagnostics'
 
 interface CurveResponse {
   mnemonic: string
@@ -381,32 +382,36 @@ export const useWellDataStore = create<WellDataStore>((set, get) => ({
     set({ stratCharts: charts })
   },
   async activateChart(chartId) {
-    const response = await fetch(`/api/strat-charts/${chartId}/activate`, { method: 'PATCH' })
-    if (!response.ok) return
-    const updated = (await response.json()) as StratChartInfo
-    set((state) => ({
-      stratCharts: state.stratCharts.map((c) => ({
-        ...c,
-        is_active: c.id === updated.id,
-      })),
-    }))
-    // Refresh formations to pick up new active strat colors
-    const wellId = get().well?.well_id
-    if (wellId) {
-      const formations = await fetchFormations(wellId)
-      set({ formations: sortFormations(formations.map(mapFormation)) })
-    }
+    await recordOperation('strat_chart.activate', async () => {
+      const response = await fetch(`/api/strat-charts/${chartId}/activate`, { method: 'PATCH' })
+      if (!response.ok) return
+      const updated = (await response.json()) as StratChartInfo
+      set((state) => ({
+        stratCharts: state.stratCharts.map((c) => ({
+          ...c,
+          is_active: c.id === updated.id,
+        })),
+      }))
+      // Refresh formations to pick up new active strat colors
+      const wellId = get().well?.well_id
+      if (wellId) {
+        const formations = await fetchFormations(wellId)
+        set({ formations: sortFormations(formations.map(mapFormation)) })
+      }
+    }, { activeWellId: get().well?.well_id, details: { chartId } })
   },
   async deleteChart(chartId) {
-    const response = await fetch(`/api/strat-charts/${chartId}`, { method: 'DELETE' })
-    if (!response.ok) return
-    set((state) => ({ stratCharts: state.stratCharts.filter((c) => c.id !== chartId) }))
-    // Refresh formations
-    const wellId = get().well?.well_id
-    if (wellId) {
-      const formations = await fetchFormations(wellId)
-      set({ formations: sortFormations(formations.map(mapFormation)) })
-    }
+    await recordOperation('strat_chart.delete', async () => {
+      const response = await fetch(`/api/strat-charts/${chartId}`, { method: 'DELETE' })
+      if (!response.ok) return
+      set((state) => ({ stratCharts: state.stratCharts.filter((c) => c.id !== chartId) }))
+      // Refresh formations
+      const wellId = get().well?.well_id
+      if (wellId) {
+        const formations = await fetchFormations(wellId)
+        set({ formations: sortFormations(formations.map(mapFormation)) })
+      }
+    }, { activeWellId: get().well?.well_id, details: { chartId } })
   },
   async refreshWell(preferredWellId) {
     await get().loadWellInventories()

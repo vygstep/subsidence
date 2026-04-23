@@ -20,6 +20,8 @@ export function createMockFormationTop(overrides?: Partial<FormationTop>): Forma
     kind: 'strat',
     is_locked: false,
     age_ma: 78,
+    water_depth_m: 0,
+    eroded_thickness_m: 0,
     lithology: 'limestone',
     strat_links: [],
     active_strat_color: null,

@@ -2,6 +2,7 @@ import { create } from 'zustand'
 
 import { sendRecalculation } from '@/api/subsidenceSocket'
 import type { SubsidenceResult } from '@/types/subsidence'
+import { logDiagnosticEvent } from '@/utils/diagnostics'
 import { useMultiWellStore } from './multiWellStore'
 import { useWellDataStore } from './wellDataStore'
 
@@ -18,6 +19,13 @@ function clearComputeTimeout(): void {
 function scheduleComputeTimeout(): void {
   clearComputeTimeout()
   computeTimeout = window.setTimeout(() => {
+    logDiagnosticEvent({
+      level: 'error',
+      operation: 'subsidence.recalculate',
+      phase: 'failure',
+      activeWellId: useWellDataStore.getState().well?.well_id,
+      error: 'Subsidence recalculation timed out',
+    })
     useComputedStore.setState({
       isComputing: false,
       computeError: 'Subsidence recalculation timed out',
@@ -62,6 +70,13 @@ export const useComputedStore = create<ComputedStore>((set, get) => ({
   triggerRecalculation() {
     const wellId = useWellDataStore.getState().well?.well_id
     if (!wellId) return
+    logDiagnosticEvent({
+      level: 'info',
+      operation: 'subsidence.recalculate',
+      phase: 'start',
+      activeWellId: wellId,
+      details: { waterDepthM: get().waterDepthM },
+    })
     set({ isComputing: true, computeError: null })
     scheduleComputeTimeout()
     sendRecalculation(wellId, get().waterDepthM)
@@ -69,6 +84,13 @@ export const useComputedStore = create<ComputedStore>((set, get) => ({
 
   setResults(results) {
     clearComputeTimeout()
+    logDiagnosticEvent({
+      level: 'info',
+      operation: 'subsidence.recalculate',
+      phase: 'success',
+      activeWellId: useWellDataStore.getState().well?.well_id,
+      details: { resultCount: results.length },
+    })
     set({
       subsidenceCurves: results,
       isComputing: false,
@@ -80,6 +102,13 @@ export const useComputedStore = create<ComputedStore>((set, get) => ({
 
   setComputeError(message) {
     clearComputeTimeout()
+    logDiagnosticEvent({
+      level: 'error',
+      operation: 'subsidence.recalculate',
+      phase: 'failure',
+      activeWellId: useWellDataStore.getState().well?.well_id,
+      error: message,
+    })
     set({
       isComputing: false,
       computeError: message,
