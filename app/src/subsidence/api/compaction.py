@@ -4,7 +4,13 @@ from fastapi import APIRouter, HTTPException, Request
 from pydantic import BaseModel
 from sqlalchemy import select
 
-from subsidence.data.schema import CompactionModel, CompactionModelParam, CurveDictEntry, LithologyDictEntry
+from subsidence.data.schema import (
+    CompactionModel,
+    CompactionModelParam,
+    CompactionPreset,
+    CurveDictEntry,
+    LithologyDictEntry,
+)
 
 router = APIRouter(tags=['compaction'])
 
@@ -28,6 +34,38 @@ class CompactionModelCreate(BaseModel):
 class CompactionModelPatch(BaseModel):
     name: str | None = None
     is_active: bool | None = None
+
+
+class CompactionPresetSummary(BaseModel):
+    id: int
+    name: str
+    origin: str
+    is_builtin: bool
+    source_lithology_code: str | None
+
+
+class CompactionPresetDetail(CompactionPresetSummary):
+    description: str | None
+    density: float
+    porosity_surface: float
+    compaction_coeff: float
+
+
+class CompactionPresetCreate(BaseModel):
+    name: str | None = None
+    clone_from_id: int | None = None
+    description: str | None = None
+    density: float | None = None
+    porosity_surface: float | None = None
+    compaction_coeff: float | None = None
+
+
+class CompactionPresetPatch(BaseModel):
+    name: str | None = None
+    description: str | None = None
+    density: float | None = None
+    porosity_surface: float | None = None
+    compaction_coeff: float | None = None
 
 
 class LithologyParamItem(BaseModel):
@@ -90,6 +128,30 @@ def _to_model_response(row: CompactionModel) -> CompactionModelResponse:
     )
 
 
+def _to_preset_summary(row: CompactionPreset) -> CompactionPresetSummary:
+    return CompactionPresetSummary(
+        id=row.id,
+        name=row.name,
+        origin=row.origin,
+        is_builtin=row.is_builtin,
+        source_lithology_code=row.source_lithology_code,
+    )
+
+
+def _to_preset_detail(row: CompactionPreset) -> CompactionPresetDetail:
+    return CompactionPresetDetail(
+        id=row.id,
+        name=row.name,
+        origin=row.origin,
+        is_builtin=row.is_builtin,
+        source_lithology_code=row.source_lithology_code,
+        description=row.description,
+        density=row.density,
+        porosity_surface=row.porosity_surface,
+        compaction_coeff=row.compaction_coeff,
+    )
+
+
 def _param_to_item(param: CompactionModelParam, litho: LithologyDictEntry) -> LithologyParamItem:
     return LithologyParamItem(
         lithology_code=param.lithology_code,
@@ -128,6 +190,124 @@ def _lithology_dict_to_item(row: LithologyDictEntry) -> LithologyDictionaryItem:
         porosity_surface=row.porosity_surface,
         compaction_coeff=row.compaction_coeff,
     )
+
+
+# ---------------------------------------------------------------------------
+# Compaction preset CRUD
+# ---------------------------------------------------------------------------
+
+@router.get('/compaction-presets', response_model=list[CompactionPresetSummary])
+def list_compaction_presets(request: Request) -> list[CompactionPresetSummary]:
+    manager = _require_open_project(request)
+    with manager.get_session() as session:
+        rows = session.scalars(
+            select(CompactionPreset).order_by(
+                CompactionPreset.is_builtin.desc(),
+                CompactionPreset.name.asc(),
+                CompactionPreset.id.asc(),
+            )
+        ).all()
+        return [_to_preset_summary(row) for row in rows]
+
+
+@router.get('/compaction-presets/{preset_id}', response_model=CompactionPresetDetail)
+def get_compaction_preset(preset_id: int, request: Request) -> CompactionPresetDetail:
+    manager = _require_open_project(request)
+    with manager.get_session() as session:
+        row = session.get(CompactionPreset, preset_id)
+        if row is None:
+            raise HTTPException(status_code=404, detail=f'Compaction preset not found: {preset_id}')
+        return _to_preset_detail(row)
+
+
+@router.post('/compaction-presets', response_model=CompactionPresetDetail, status_code=201)
+def create_compaction_preset(payload: CompactionPresetCreate, request: Request) -> CompactionPresetDetail:
+    manager = _require_open_project(request)
+    with manager.get_session() as session:
+        source: CompactionPreset | None = None
+        if payload.clone_from_id is not None:
+            source = session.get(CompactionPreset, payload.clone_from_id)
+            if source is None:
+                raise HTTPException(status_code=404, detail=f'Compaction preset not found: {payload.clone_from_id}')
+
+        name = (payload.name if payload.name is not None else source.name if source is not None else '').strip()
+        if not name:
+            raise HTTPException(status_code=400, detail='Compaction preset name is required')
+
+        density = payload.density if payload.density is not None else source.density if source is not None else None
+        porosity_surface = (
+            payload.porosity_surface
+            if payload.porosity_surface is not None
+            else source.porosity_surface if source is not None else None
+        )
+        compaction_coeff = (
+            payload.compaction_coeff
+            if payload.compaction_coeff is not None
+            else source.compaction_coeff if source is not None else None
+        )
+        if density is None or porosity_surface is None or compaction_coeff is None:
+            raise HTTPException(status_code=400, detail='density, porosity_surface, and compaction_coeff are required')
+
+        row = CompactionPreset(
+            name=name,
+            origin='user',
+            is_builtin=False,
+            source_lithology_code=source.source_lithology_code if source is not None else None,
+            description=payload.description if payload.description is not None else source.description if source is not None else None,
+            density=density,
+            porosity_surface=porosity_surface,
+            compaction_coeff=compaction_coeff,
+        )
+        session.add(row)
+        session.commit()
+        session.refresh(row)
+        return _to_preset_detail(row)
+
+
+@router.patch('/compaction-presets/{preset_id}', response_model=CompactionPresetDetail)
+def patch_compaction_preset(
+    preset_id: int,
+    payload: CompactionPresetPatch,
+    request: Request,
+) -> CompactionPresetDetail:
+    manager = _require_open_project(request)
+    with manager.get_session() as session:
+        row = session.get(CompactionPreset, preset_id)
+        if row is None:
+            raise HTTPException(status_code=404, detail=f'Compaction preset not found: {preset_id}')
+        if row.is_builtin:
+            raise HTTPException(status_code=403, detail='Built-in compaction preset cannot be edited')
+
+        if payload.name is not None:
+            next_name = payload.name.strip()
+            if not next_name:
+                raise HTTPException(status_code=400, detail='Compaction preset name is required')
+            row.name = next_name
+        if payload.description is not None:
+            row.description = payload.description
+        if payload.density is not None:
+            row.density = payload.density
+        if payload.porosity_surface is not None:
+            row.porosity_surface = payload.porosity_surface
+        if payload.compaction_coeff is not None:
+            row.compaction_coeff = payload.compaction_coeff
+
+        session.commit()
+        session.refresh(row)
+        return _to_preset_detail(row)
+
+
+@router.delete('/compaction-presets/{preset_id}', status_code=204)
+def delete_compaction_preset(preset_id: int, request: Request) -> None:
+    manager = _require_open_project(request)
+    with manager.get_session() as session:
+        row = session.get(CompactionPreset, preset_id)
+        if row is None:
+            raise HTTPException(status_code=404, detail=f'Compaction preset not found: {preset_id}')
+        if row.is_builtin:
+            raise HTTPException(status_code=403, detail='Built-in compaction preset cannot be deleted')
+        session.delete(row)
+        session.commit()
 
 
 # ---------------------------------------------------------------------------

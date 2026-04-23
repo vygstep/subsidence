@@ -242,6 +242,66 @@ def test_builtin_ics_chart_cannot_be_deleted(api_client: TestClient, tmp_path: P
     assert any(chart['id'] == builtin_chart['id'] for chart in response.json())
 
 
+def test_compaction_presets_seed_and_allow_user_duplicates(api_client: TestClient, tmp_path: Path):
+    _create_project(api_client, tmp_path, 'compaction-presets')
+
+    response = api_client.get('/api/compaction-presets')
+    assert response.status_code == 200, response.text
+    presets = response.json()
+    assert presets
+    assert all('id' in item for item in presets)
+    builtin = next(item for item in presets if item['is_builtin'])
+    assert builtin['origin'] == 'builtin'
+    assert builtin['source_lithology_code']
+
+    response = api_client.get(f"/api/compaction-presets/{builtin['id']}")
+    assert response.status_code == 200, response.text
+    builtin_detail = response.json()
+    assert builtin_detail['name'].endswith('(default)')
+
+    response = api_client.patch(f"/api/compaction-presets/{builtin['id']}", json={'name': 'Should fail'})
+    assert response.status_code == 403, response.text
+
+    response = api_client.post('/api/compaction-presets', json={'clone_from_id': builtin['id']})
+    assert response.status_code == 201, response.text
+    user_copy = response.json()
+    assert user_copy['name'] == builtin_detail['name']
+    assert user_copy['origin'] == 'user'
+    assert user_copy['is_builtin'] is False
+
+    response = api_client.post('/api/compaction-presets', json={
+        'name': 'Custom Coal',
+        'density': 1800.0,
+        'porosity_surface': 0.62,
+        'compaction_coeff': 0.41,
+    })
+    assert response.status_code == 201, response.text
+    custom = response.json()
+    assert custom['name'] == 'Custom Coal'
+
+    response = api_client.patch(f"/api/compaction-presets/{custom['id']}", json={
+        'name': 'Custom Coal',
+        'description': 'Editable user preset',
+        'density': 1810.0,
+    })
+    assert response.status_code == 200, response.text
+    assert response.json()['density'] == pytest.approx(1810.0)
+    assert response.json()['description'] == 'Editable user preset'
+
+    response = api_client.delete(f"/api/compaction-presets/{builtin['id']}")
+    assert response.status_code == 403, response.text
+
+    response = api_client.delete(f"/api/compaction-presets/{custom['id']}")
+    assert response.status_code == 204, response.text
+
+    response = api_client.get('/api/compaction-presets')
+    assert response.status_code == 200, response.text
+    remaining_ids = {item['id'] for item in response.json()}
+    assert builtin['id'] in remaining_ids
+    assert user_copy['id'] in remaining_ids
+    assert custom['id'] not in remaining_ids
+
+
 def test_subsidence_rest_and_websocket_recalculation(api_client: TestClient, tmp_path: Path):
     _create_project(api_client, tmp_path, 'subsidence-calc')
     response = api_client.post('/api/projects/wells', json={

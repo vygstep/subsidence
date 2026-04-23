@@ -6,7 +6,15 @@ from pathlib import Path
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
-from .schema import CompactionModel, CompactionModelParam, CurveDictEntry, LithologyDictEntry, StratChart, StratUnit
+from .schema import (
+    CompactionModel,
+    CompactionModelParam,
+    CompactionPreset,
+    CurveDictEntry,
+    LithologyDictEntry,
+    StratChart,
+    StratUnit,
+)
 
 
 def _seed_curve_entries(session: Session, csv_path: Path) -> None:
@@ -161,6 +169,39 @@ def _seed_builtin_compaction_model(session: Session) -> None:
         ))
 
 
+def _seed_builtin_compaction_presets(session: Session) -> None:
+    """Create one built-in compaction preset per lithology dictionary entry."""
+    litho_rows = session.scalars(
+        select(LithologyDictEntry).order_by(LithologyDictEntry.sort_order.asc(), LithologyDictEntry.id.asc())
+    ).all()
+    if not litho_rows:
+        return
+
+    existing = {
+        row.source_lithology_code: row
+        for row in session.scalars(
+            select(CompactionPreset).where(CompactionPreset.is_builtin.is_(True))
+        ).all()
+        if row.source_lithology_code
+    }
+
+    for row in litho_rows:
+        if row.lithology_code in existing:
+            continue
+        session.add(
+            CompactionPreset(
+                name=f"{row.display_name} (default)",
+                origin='builtin',
+                is_builtin=True,
+                source_lithology_code=row.lithology_code,
+                density=row.density,
+                porosity_surface=row.porosity_surface,
+                compaction_coeff=row.compaction_coeff,
+                description=row.description,
+            )
+        )
+
+
 def seed_dictionaries(session: Session, db_path: Path) -> None:
     del db_path
     seed_dir = Path(__file__).parent / 'dictionaries'
@@ -190,3 +231,4 @@ def seed_dictionaries(session: Session, db_path: Path) -> None:
         _normalize_builtin_chart(session, builtin_chart_path)
 
     _seed_builtin_compaction_model(session)
+    _seed_builtin_compaction_presets(session)

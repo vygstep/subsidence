@@ -418,6 +418,7 @@ Acceptance:
 Problem:
 
 - Lithology display/coding and compaction behavior are different concerns and should not be stored as one flat table forever.
+- The current grouped compaction table is only a temporary bootstrap and does not match the intended per-lithology preset workflow.
 
 Required behavior:
 
@@ -432,14 +433,41 @@ Required behavior:
   - pattern
   - linked compaction preset
 - `Compaction Preset` owns:
-  - preset name
+  - internal immutable `id`
+  - display name
+  - origin (`builtin` or `user`)
   - density
   - phi0
   - compaction coefficient `C`
+- In the target UI, `Templates -> Compaction Presets` is a library of individual preset entries, not a single table containing all lithologies inside one preset object.
+- Built-in compaction presets are seeded from the current defaults and shown as one entry per lithology, for example `Coal (default)`.
 - Built-in lithology sets and built-in compaction presets are immutable.
 - User can duplicate built-in sets/presets into project-level editable copies.
+- User-created presets are separate entries, for example a copied `Coal` preset with modified parameters.
+- Duplicate display names are allowed.
+- All linking and persistence must use immutable preset `id`, not preset display name.
+- In settings, linking dialogs, and other disambiguation contexts, the UI should show an extended label:
+  - `<id> <name> [builtin]`
+  - `<id> <name> [user]`
+- In final visualization and result presentation, the UI should show the plain display name only.
 - A user can assign any available compaction preset to a lithology entry.
 - The current backend `CompactionModel` implementation is treated as a temporary technical name until the later schema refactor.
+
+Templates UI behavior:
+
+- Clicking the `Compaction Presets` root in `Templates` opens a settings overview of all presets.
+- The settings overview shows:
+  - all built-in presets in muted/gray style;
+  - all user presets in normal style.
+- Built-in presets are selectable from the list and open in `Settings` as read-only entries.
+- Clicking a built-in preset opens its parameter view in `Settings`.
+- Built-in preset settings include a `Make copy` action at the bottom of the settings pane.
+- `Make copy` creates a new user preset initialized from the selected built-in preset parameters.
+- The `Templates -> Compaction Presets` list includes a compact `New preset` button at the bottom of the list.
+- `New preset` creates an empty user preset and opens it in `Settings`.
+- User preset settings use explicit `Save` and `Cancel` actions.
+- New or edited user presets must validate required fields before save.
+- If any required field is missing, save is blocked and the user sees a clear error such as `Fill all required parameters`.
 
 Likely code areas:
 
@@ -451,7 +479,9 @@ Likely code areas:
 Acceptance:
 
 - Built-in presets remain protected.
-- Project-specific presets can be duplicated, renamed, and changed.
+- Project-specific presets can be created, duplicated, renamed, and changed.
+- Duplicate preset names do not break linking because references use immutable `id`.
+- Settings and linking UI can disambiguate same-name presets by showing the extended label with `id` and origin.
 - Lithology entries can eventually point to chosen presets instead of embedding `Density / Phi0 / C` directly.
 
 ---
