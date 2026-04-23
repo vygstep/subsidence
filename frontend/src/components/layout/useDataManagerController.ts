@@ -21,6 +21,7 @@ export function useDataManagerController() {
   const formations = useWellDataStore((state) => state.formations)
   const stratCharts = useWellDataStore((state) => state.stratCharts)
   const compactionModels = useWellDataStore((state) => state.compactionModels)
+  const compactionPresets = useWellDataStore((state) => state.compactionPresets)
   const curveDictionaryEntries = useWellDataStore((state) => state.curveDictionaryEntries)
   const lithologyDictionaryEntries = useWellDataStore((state) => state.lithologyDictionaryEntries)
   const wellInventories = useWellDataStore((state) => state.wellInventories)
@@ -130,6 +131,11 @@ export function useDataManagerController() {
     return compactionModels.find((m) => m.id === selectedObject.modelId) ?? null
   }, [selectedObject, compactionModels])
 
+  const selectedCompactionPreset = useMemo(() => {
+    if (selectedObject?.type !== 'compaction-preset') return null
+    return compactionPresets.find((preset) => preset.id === selectedObject.presetId) ?? null
+  }, [compactionPresets, selectedObject])
+
   const selectedCurveDictionaryEntry = useMemo(() => {
     if (selectedObject?.type !== 'curve-dictionary-entry') return null
     return curveDictionaryEntries.find((entry) => entry.id === selectedObject.entryId) ?? null
@@ -181,6 +187,7 @@ export function useDataManagerController() {
     activeWellId: well?.well_id ?? null,
     activeWellView,
     compactionModels,
+    compactionPresets,
     curveDictionaryEntries,
     curveCount: curves.length,
     deviationVisibilityByWellId,
@@ -226,6 +233,9 @@ export function useDataManagerController() {
     onRenameSelectedObject: () => void actions.handleRenameSelectedObject(),
     onRenameWellById: (wellId: string, currentName: string) => void actions.handleRenameWell(wellId, currentName),
     onSelectChart: (chartId: number) => setSelectedObject({ type: 'strat-chart', chartId }),
+    onCreateCompactionPresetDraft: () => setSelectedObject({ type: 'compaction-preset-draft' }),
+    onSelectCompactionPreset: (presetId: number) => setSelectedObject({ type: 'compaction-preset', presetId }),
+    onSelectCompactionPresetsRoot: () => setSelectedObject({ type: 'compaction-presets-root' }),
     onSelectCompactionModel: (modelId: number) => setSelectedObject({ type: 'compaction-model', modelId }),
     onSelectCurveDictionaryEntry: (entryId: number) => setSelectedObject({ type: 'curve-dictionary-entry', entryId }),
     onSelectLithologyDictionaryEntry: (entryId: number) => setSelectedObject({ type: 'lithology-dictionary-entry', entryId }),
@@ -236,6 +246,8 @@ export function useDataManagerController() {
     selectedChartId: selectedObject?.type === 'strat-chart' ? selectedObject.chartId : null,
     selectedCompactionModel,
     selectedCompactionModelId: selectedObject?.type === 'compaction-model' ? selectedObject.modelId : null,
+    selectedCompactionPreset,
+    selectedCompactionPresetId: selectedObject?.type === 'compaction-preset' ? selectedObject.presetId : null,
     selectedCurveDictionaryEntry,
     selectedCurveDictionaryEntryId: selectedObject?.type === 'curve-dictionary-entry' ? selectedObject.entryId : null,
     selectedCurveConfig,
@@ -244,6 +256,7 @@ export function useDataManagerController() {
     selectedLithologyDictionaryEntry,
     selectedLithologyDictionaryEntryId: selectedObject?.type === 'lithology-dictionary-entry' ? selectedObject.entryId : null,
     selectedObject,
+    isCompactionPresetsRootSelected: selectedObject?.type === 'compaction-presets-root',
     setFormationMove: (formationId: string, depth: number) => {
       if (Number.isFinite(depth)) void updateFormationDepth(formationId, depth)
     },

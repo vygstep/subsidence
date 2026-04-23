@@ -16,6 +16,9 @@ export type SelectedObject =
   | { type: 'tops-group'; wellId: string }
   | { type: 'top-pick'; wellId: string; formationId: string }
   | { type: 'strat-chart'; chartId: number }
+  | { type: 'compaction-presets-root' }
+  | { type: 'compaction-preset'; presetId: number }
+  | { type: 'compaction-preset-draft' }
   | { type: 'curve-dictionary-entry'; entryId: number }
   | { type: 'lithology-dictionary-entry'; entryId: number }
   | { type: 'compaction-model'; modelId: number }

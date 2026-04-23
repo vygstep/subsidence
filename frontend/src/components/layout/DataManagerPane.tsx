@@ -214,19 +214,11 @@ export function DataManagerPane({ sidebarRef, onInternalSplitterMouseDown }: Dat
         <DataManagerTopPane
           activeSidebarTab={controller.activeSidebarTab}
           activeWellId={controller.activeWellId}
-          compactionModels={controller.compactionModels}
+          compactionPresets={controller.compactionPresets}
           curveDictionaryEntries={controller.curveDictionaryEntries}
           deviationVisibilityByWellId={controller.deviationVisibilityByWellId}
           lithologyDictionaryEntries={controller.lithologyDictionaryEntries}
           onActivateChart={controller.onActivateChart}
-          onActivateCompactionModel={controller.onActivateCompactionModel}
-          onContextMenuCompactionModel={(event, model) => openContextMenu(event, {
-            type: 'compaction-model',
-            modelId: model.id,
-            name: model.name,
-            isBuiltin: model.is_builtin,
-            isActive: model.is_active,
-          })}
           onContextMenuCurve={(event, wellId, curve) => openContextMenu(event, {
             type: 'curve',
             wellId,
@@ -264,12 +256,12 @@ export function DataManagerPane({ sidebarRef, onInternalSplitterMouseDown }: Dat
             wellId: wellInventory.well_id,
             name: wellInventory.well_name,
           })}
-          onCreateCompactionModel={controller.onCreateCompactionModel}
-          onDeleteCompactionModelById={controller.onDeleteCompactionModelById}
           onDeleteStratChartById={controller.onDeleteStratChartById}
           onFocusCurveObject={controller.handleFocusCurveObject}
           onSelectChart={controller.onSelectChart}
-          onSelectCompactionModel={controller.onSelectCompactionModel}
+          onCreateCompactionPresetDraft={controller.onCreateCompactionPresetDraft}
+          onSelectCompactionPreset={controller.onSelectCompactionPreset}
+          onSelectCompactionPresetsRoot={controller.onSelectCompactionPresetsRoot}
           onSelectCurveDictionaryEntry={controller.onSelectCurveDictionaryEntry}
           onSelectCurve={controller.handleSelectCurve}
           onSelectFormation={controller.handleSelectFormation}
@@ -290,7 +282,8 @@ export function DataManagerPane({ sidebarRef, onInternalSplitterMouseDown }: Dat
           onToggleDeviation={controller.handleSetDeviationVisible}
           onToggleFormation={controller.handleToggleFormation}
           selectedChartId={controller.selectedChartId}
-          selectedCompactionModelId={controller.selectedCompactionModelId}
+          selectedCompactionPresetId={controller.selectedCompactionPresetId}
+          isCompactionPresetsRootSelected={controller.isCompactionPresetsRootSelected}
           selectedCurveDictionaryEntryId={controller.selectedCurveDictionaryEntryId}
           selectedFormationId={controller.selectedFormationId}
           selectedLithologyDictionaryEntryId={controller.selectedLithologyDictionaryEntryId}
@@ -326,6 +319,8 @@ export function DataManagerPane({ sidebarRef, onInternalSplitterMouseDown }: Dat
           onFormationMove={controller.setFormationMove}
           selectedChart={controller.selectedChart}
           selectedCompactionModel={controller.selectedCompactionModel}
+          selectedCompactionPreset={controller.selectedCompactionPreset}
+          compactionPresets={controller.compactionPresets}
           selectedCurveDictionaryEntry={controller.selectedCurveDictionaryEntry}
           selectedLithologyDictionaryEntry={controller.selectedLithologyDictionaryEntry}
           curveCount={controller.curveCount}

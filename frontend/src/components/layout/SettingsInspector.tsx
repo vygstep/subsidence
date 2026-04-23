@@ -1,5 +1,6 @@
 import type { SelectedObject } from '@/stores/workspaceStore'
 import type {
+  CompactionPresetSummary,
   CompactionModel,
   CurveDictionaryEntry,
   FormationTop,
@@ -8,6 +9,9 @@ import type {
   TrackConfig,
   Well,
 } from '@/types'
+import { CompactionPresetDraftSettings } from './settings/CompactionPresetDraftSettings'
+import { CompactionPresetSettings } from './settings/CompactionPresetSettings'
+import { CompactionPresetsRootSettings } from './settings/CompactionPresetsRootSettings'
 import { CurveDictionarySettings } from './settings/CurveDictionarySettings'
 import { LithologyDictionarySettings } from './settings/LithologyDictionarySettings'
 
@@ -52,6 +56,8 @@ interface SettingsInspectorProps {
   onFormationMove: (formationId: string, depth: number) => void
   selectedChart: StratChartInfo | null
   selectedCompactionModel: CompactionModel | null
+  selectedCompactionPreset: CompactionPresetSummary | null
+  compactionPresets: CompactionPresetSummary[]
   selectedCurveDictionaryEntry: CurveDictionaryEntry | null
   selectedLithologyDictionaryEntry: LithologyDictionaryEntry | null
   curveCount: number
@@ -79,6 +85,8 @@ export function SettingsInspector({
   onFormationMove,
   selectedChart,
   selectedCompactionModel,
+  selectedCompactionPreset,
+  compactionPresets,
   selectedCurveDictionaryEntry,
   selectedLithologyDictionaryEntry,
   curveCount,
@@ -167,9 +175,24 @@ export function SettingsInspector({
     return <StratChartSettings selectedChart={selectedChart} />
   }
 
+  if (selectedObject.type === 'compaction-presets-root') {
+    return <CompactionPresetsRootSettings presets={compactionPresets} />
+  }
+
+  if (selectedObject.type === 'compaction-preset') {
+    if (!selectedCompactionPreset || selectedCompactionPreset.id !== selectedObject.presetId) {
+      return <EmptyInspector message="Selected compaction preset is not loaded yet." />
+    }
+    return <CompactionPresetSettings preset={selectedCompactionPreset} />
+  }
+
+  if (selectedObject.type === 'compaction-preset-draft') {
+    return <CompactionPresetDraftSettings />
+  }
+
   if (selectedObject.type === 'compaction-model') {
     if (!selectedCompactionModel || selectedCompactionModel.id !== selectedObject.modelId) {
-      return <EmptyInspector message="Selected compaction preset is not loaded yet." />
+      return <EmptyInspector message="Selected legacy compaction model is not loaded yet." />
     }
     return <ModelSettings model={selectedCompactionModel} />
   }

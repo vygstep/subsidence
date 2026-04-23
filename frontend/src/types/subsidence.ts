@@ -26,6 +26,23 @@ export interface CompactionModel {
   is_active: boolean
 }
 
+export type CompactionPresetOrigin = 'builtin' | 'user'
+
+export interface CompactionPresetSummary {
+  id: number
+  name: string
+  origin: CompactionPresetOrigin | string
+  is_builtin: boolean
+  source_lithology_code: string | null
+}
+
+export interface CompactionPresetDetail extends CompactionPresetSummary {
+  description: string | null
+  density: number
+  porosity_surface: number
+  compaction_coeff: number
+}
+
 export interface CurveDictionaryEntry {
   id: number
   scope: string

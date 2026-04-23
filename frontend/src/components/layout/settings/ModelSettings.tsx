@@ -46,11 +46,11 @@ export function ModelSettings({ model }: { model: CompactionModel }) {
   return (
     <div className="template-panel">
       <div className="template-panel__group">
-        <div className="template-panel__label">Compaction Preset</div>
+        <div className="template-panel__label">Legacy Runtime Model</div>
         <div className="template-panel__value">{model.name}</div>
       </div>
       {model.is_builtin ? (
-        <div className="tree-leaf"><span>Kind</span><span>Built-in (read-only)</span></div>
+        <div className="tree-leaf"><span>Kind</span><span>Built-in legacy model</span></div>
       ) : (
         <label className="project-dialog__field">
           <span>Name</span>
@@ -62,7 +62,7 @@ export function ModelSettings({ model }: { model: CompactionModel }) {
         </label>
       )}
       <div className="template-panel__group" style={{ marginTop: 8 }}>
-        <div className="template-panel__label">Compaction Parameters</div>
+        <div className="template-panel__label">Legacy Runtime Parameters</div>
       </div>
       <div className="compaction-table-wrapper">
         <table className="compaction-table">

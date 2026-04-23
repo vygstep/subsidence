@@ -117,7 +117,7 @@ export function makeActionHandlers(deps: ActionDeps) {
 
     if (selectedObject.type === 'compaction-model') {
       if (!selectedCompactionModel || selectedCompactionModel.id !== selectedObject.modelId) return
-      const nextName = window.prompt('Rename compaction preset', selectedCompactionModel.name)?.trim()
+      const nextName = window.prompt('Rename legacy runtime model', selectedCompactionModel.name)?.trim()
       if (!nextName || nextName === selectedCompactionModel.name) return
       try {
         await useWellDataStore.getState().renameCompactionModel(selectedCompactionModel.id, nextName)
@@ -250,14 +250,14 @@ export function makeActionHandlers(deps: ActionDeps) {
     isActive: boolean,
   ): Promise<void> {
     if (isBuiltin) {
-      window.alert('Built-in compaction preset cannot be deleted.')
+      window.alert('Built-in legacy runtime model cannot be deleted.')
       return
     }
     if (isActive) {
-      window.alert('Activate another compaction preset first.')
+      window.alert('Activate another legacy runtime model first.')
       return
     }
-    if (!window.confirm(`Delete compaction preset "${name}"?`)) return
+    if (!window.confirm(`Delete legacy runtime model "${name}"?`)) return
     await deleteCompactionModel(modelId)
     setSelectedObject(null)
   }
@@ -267,7 +267,7 @@ export function makeActionHandlers(deps: ActionDeps) {
   }
 
   function handleCreateCompactionModel(): void {
-    const name = window.prompt('New compaction preset name:')?.trim()
+    const name = window.prompt('New legacy runtime model name:')?.trim()
     if (!name) return
     void createCompactionModel(name)
   }

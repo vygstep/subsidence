@@ -142,3 +142,21 @@ def test_formation_optional_fields(test_db: Session, well_factory):
     retrieved = test_db.query(FormationTopModel).filter_by(id=formation.id).first()
     assert retrieved.age_top_ma is None
     assert retrieved.is_locked is False
+
+
+def test_formation_lithology_field_persists(test_db: Session, well_factory):
+    well_factory(well_id="well-1")
+
+    formation = FormationTopModel(
+        well_id="well-1",
+        name="Lithology carrier",
+        depth_md=1200.0,
+        color="#808080",
+        kind="strat",
+        lithology="coal",
+    )
+    test_db.add(formation)
+    test_db.commit()
+
+    retrieved = test_db.query(FormationTopModel).filter_by(id=formation.id).first()
+    assert retrieved.lithology == "coal"

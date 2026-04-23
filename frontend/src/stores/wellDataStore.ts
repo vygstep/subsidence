@@ -2,6 +2,8 @@ import { create } from 'zustand'
 
 import type {
   CompactionModel,
+  CompactionPresetDetail,
+  CompactionPresetSummary,
   CurveData,
   CurveDictionaryEntry,
   FormationTop,
@@ -73,6 +75,7 @@ export interface WellDataStore {
   colorOverrides: Record<string, string>
   stratCharts: StratChartInfo[]
   compactionModels: CompactionModel[]
+  compactionPresets: CompactionPresetSummary[]
   curveDictionaryEntries: CurveDictionaryEntry[]
   lithologyDictionaryEntries: LithologyDictionaryEntry[]
   tvdTable: TVDTable | null
@@ -92,10 +95,28 @@ export interface WellDataStore {
   deleteChart: (chartId: number) => Promise<void>
   linkFormationToChart: (formationId: string, chartId: number, stratUnitId: number | null) => Promise<void>
   loadCompactionModels: () => Promise<void>
+  loadCompactionPresets: () => Promise<void>
   createCompactionModel: (name: string, cloneFromId?: number) => Promise<CompactionModel>
   activateCompactionModel: (id: number) => Promise<void>
   renameCompactionModel: (id: number, name: string) => Promise<void>
   deleteCompactionModel: (id: number) => Promise<void>
+  fetchCompactionPreset: (presetId: number) => Promise<CompactionPresetDetail | null>
+  createCompactionPreset: (payload: {
+    name?: string
+    cloneFromId?: number
+    description?: string | null
+    density?: number
+    porosity_surface?: number
+    compaction_coeff?: number
+  }) => Promise<CompactionPresetDetail>
+  updateCompactionPreset: (presetId: number, patch: {
+    name?: string
+    description?: string | null
+    density?: number
+    porosity_surface?: number
+    compaction_coeff?: number
+  }) => Promise<CompactionPresetDetail>
+  deleteCompactionPreset: (presetId: number) => Promise<void>
   loadCurveDictionary: () => Promise<void>
   loadLithologyDictionary: () => Promise<void>
   fetchCompactionModelParams: (modelId: number) => Promise<LithologyParam[]>
@@ -166,6 +187,7 @@ const emptyState = {
   colorOverrides: {},
   stratCharts: [],
   compactionModels: [],
+  compactionPresets: [],
   curveDictionaryEntries: [],
   lithologyDictionaryEntries: [],
   tvdTable: null,
@@ -452,6 +474,11 @@ export const useWellDataStore = create<WellDataStore>((set, get) => ({
     if (!response.ok) return
     set({ compactionModels: (await response.json()) as CompactionModel[] })
   },
+  async loadCompactionPresets() {
+    const response = await fetch('/api/compaction-presets')
+    if (!response.ok) return
+    set({ compactionPresets: (await response.json()) as CompactionPresetSummary[] })
+  },
   async loadCurveDictionary() {
     const response = await fetch('/api/curve-dictionary')
     if (!response.ok) return
@@ -510,6 +537,73 @@ export const useWellDataStore = create<WellDataStore>((set, get) => ({
       throw new Error(await readError(response, `Failed to delete compaction preset (${response.status})`))
     }
     set((state) => ({ compactionModels: state.compactionModels.filter((m) => m.id !== id) }))
+  },
+  async fetchCompactionPreset(presetId) {
+    const response = await fetch(`/api/compaction-presets/${presetId}`)
+    if (!response.ok) return null
+    return (await response.json()) as CompactionPresetDetail
+  },
+  async createCompactionPreset(payload) {
+    const response = await fetch('/api/compaction-presets', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        name: payload.name,
+        clone_from_id: payload.cloneFromId ?? null,
+        description: payload.description ?? null,
+        density: payload.density,
+        porosity_surface: payload.porosity_surface,
+        compaction_coeff: payload.compaction_coeff,
+      }),
+    })
+    if (!response.ok) {
+      throw new Error(await readError(response, `Failed to create compaction preset (${response.status})`))
+    }
+    const created = (await response.json()) as CompactionPresetDetail
+    set((state) => ({
+      compactionPresets: [...state.compactionPresets, {
+        id: created.id,
+        name: created.name,
+        origin: created.origin,
+        is_builtin: created.is_builtin,
+        source_lithology_code: created.source_lithology_code,
+      }],
+    }))
+    return created
+  },
+  async updateCompactionPreset(presetId, patch) {
+    const response = await fetch(`/api/compaction-presets/${presetId}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(patch),
+    })
+    if (!response.ok) {
+      throw new Error(await readError(response, `Failed to update compaction preset (${response.status})`))
+    }
+    const updated = (await response.json()) as CompactionPresetDetail
+    set((state) => ({
+      compactionPresets: state.compactionPresets.map((preset) => (
+        preset.id === updated.id
+          ? {
+            id: updated.id,
+            name: updated.name,
+            origin: updated.origin,
+            is_builtin: updated.is_builtin,
+            source_lithology_code: updated.source_lithology_code,
+          }
+          : preset
+      )),
+    }))
+    return updated
+  },
+  async deleteCompactionPreset(presetId) {
+    const response = await fetch(`/api/compaction-presets/${presetId}`, { method: 'DELETE' })
+    if (!response.ok) {
+      throw new Error(await readError(response, `Failed to delete compaction preset (${response.status})`))
+    }
+    set((state) => ({
+      compactionPresets: state.compactionPresets.filter((preset) => preset.id !== presetId),
+    }))
   },
   async fetchCompactionModelParams(modelId) {
     const response = await fetch(`/api/compaction-models/${modelId}/params`)

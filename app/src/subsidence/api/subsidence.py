@@ -15,7 +15,15 @@ from subsidence.data.backstrip import (
     LithologyParam,
     backstrip,
 )
-from subsidence.data.schema import CalculationResult, CompactionModel, CompactionModelParam, FormationTopModel, LithologyDictEntry, WellModel
+from subsidence.data.schema import (
+    CalculationResult,
+    CompactionModel,
+    CompactionModelParam,
+    CompactionPreset,
+    FormationTopModel,
+    LithologyDictEntry,
+    WellModel,
+)
 from subsidence.observability import operation_log, reset_request_id, set_request_id
 
 router = APIRouter(tags=['subsidence'])
@@ -81,15 +89,32 @@ def _compute_subsidence(manager, well_id: str, water_depth_m: float = 0.0) -> li
                 for r in param_rows
             }
         else:
-            litho_rows = session.scalars(select(LithologyDictEntry)).all()
-            litho_params = {
-                r.lithology_code: LithologyParam(
-                    density=r.density,
-                    porosity_surface=r.porosity_surface,
-                    compaction_coeff=r.compaction_coeff,
+            builtin_presets = session.scalars(
+                select(CompactionPreset).where(
+                    CompactionPreset.is_builtin.is_(True),
+                    CompactionPreset.source_lithology_code.is_not(None),
                 )
-                for r in litho_rows
-            }
+            ).all()
+            if builtin_presets:
+                litho_params = {
+                    r.source_lithology_code: LithologyParam(
+                        density=r.density,
+                        porosity_surface=r.porosity_surface,
+                        compaction_coeff=r.compaction_coeff,
+                    )
+                    for r in builtin_presets
+                    if r.source_lithology_code
+                }
+            else:
+                litho_rows = session.scalars(select(LithologyDictEntry)).all()
+                litho_params = {
+                    r.lithology_code: LithologyParam(
+                        density=r.density,
+                        porosity_surface=r.porosity_surface,
+                        compaction_coeff=r.compaction_coeff,
+                    )
+                    for r in litho_rows
+                }
 
         td_m = well.td_md if well.td_md is not None else 0.0
         inputs: list[FormationInput] = []
@@ -132,7 +157,7 @@ def _compute_subsidence(manager, well_id: str, water_depth_m: float = 0.0) -> li
             inputs.append(FormationInput(
                 name=f.name,
                 color=f.color,
-                lithology='',
+                lithology=f.lithology or '',
                 age_top_ma=age_top,
                 age_base_ma=age_base,
                 current_top_m=f.depth_md,

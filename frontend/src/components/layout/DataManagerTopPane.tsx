@@ -3,7 +3,7 @@ import { TemplatesTab } from './TemplatesTab'
 import { WellDataPanel } from './WellDataPanel'
 import type { SelectedObject } from '@/stores/workspaceStore'
 import type {
-  CompactionModel,
+  CompactionPresetSummary,
   CurveDictionaryEntry,
   FormationInventoryItem,
   LithologyDictionaryEntry,
@@ -14,13 +14,11 @@ import type {
 interface DataManagerTopPaneProps {
   activeSidebarTab: 'wells' | 'templates' | 'strat-charts'
   activeWellId: string | null
-  compactionModels: CompactionModel[]
+  compactionPresets: CompactionPresetSummary[]
   curveDictionaryEntries: CurveDictionaryEntry[]
   deviationVisibilityByWellId: Record<string, boolean>
   lithologyDictionaryEntries: LithologyDictionaryEntry[]
   onActivateChart: (chartId: number) => void
-  onActivateCompactionModel: (id: number) => void
-  onContextMenuCompactionModel: (event: React.MouseEvent, model: CompactionModel) => void
   onContextMenuCurve: (event: React.MouseEvent, wellId: string, curve: { mnemonic: string; unit: string }) => void
   onContextMenuDeviation: (event: React.MouseEvent, wellId: string) => void
   onContextMenuFormation: (event: React.MouseEvent, wellId: string, formation: FormationInventoryItem) => void
@@ -28,8 +26,6 @@ interface DataManagerTopPaneProps {
   onContextMenuStratChart: (event: React.MouseEvent, chart: StratChartInfo) => void
   onContextMenuTopsGroup: (event: React.MouseEvent, wellId: string) => void
   onContextMenuWell: (event: React.MouseEvent, well: WellInventory) => void
-  onCreateCompactionModel: () => void
-  onDeleteCompactionModelById: (id: number, name: string, isBuiltin: boolean, isActive: boolean) => void
   onDeleteStratChartById: (chartId: number, name: string, isBuiltin: boolean) => void
   onFocusCurveObject: (wellId: string, mnemonic: string) => void
   onFocusFormationObject: (wellId: string, formationId: string) => void
@@ -37,7 +33,9 @@ interface DataManagerTopPaneProps {
   onFocusTopsGroupObject: (wellId: string) => void
   onFocusWellObject: (wellId: string) => void
   onSelectChart: (chartId: number) => void
-  onSelectCompactionModel: (id: number) => void
+  onCreateCompactionPresetDraft: () => void
+  onSelectCompactionPreset: (id: number) => void
+  onSelectCompactionPresetsRoot: () => void
   onSelectCurveDictionaryEntry: (entryId: number) => void
   onSelectLithologyDictionaryEntry: (entryId: number) => void
   onSelectCurve: (wellId: string, mnemonic: string) => void | Promise<void>
@@ -54,7 +52,8 @@ interface DataManagerTopPaneProps {
   onToggleDeviation: (wellId: string, nextValue: boolean) => void | Promise<void>
   onToggleFormation: (wellId: string, formationId: string, nextValue: boolean) => void | Promise<void>
   selectedChartId: number | null
-  selectedCompactionModelId: number | null
+  selectedCompactionPresetId: number | null
+  isCompactionPresetsRootSelected: boolean
   selectedCurveDictionaryEntryId: number | null
   selectedFormationId: string | null
   selectedLithologyDictionaryEntryId: number | null
@@ -68,13 +67,11 @@ interface DataManagerTopPaneProps {
 export function DataManagerTopPane({
   activeSidebarTab,
   activeWellId,
-  compactionModels,
+  compactionPresets,
   curveDictionaryEntries,
   deviationVisibilityByWellId,
   lithologyDictionaryEntries,
   onActivateChart,
-  onActivateCompactionModel,
-  onContextMenuCompactionModel,
   onContextMenuCurve,
   onContextMenuDeviation,
   onContextMenuFormation,
@@ -82,8 +79,6 @@ export function DataManagerTopPane({
   onContextMenuStratChart,
   onContextMenuTopsGroup,
   onContextMenuWell,
-  onCreateCompactionModel,
-  onDeleteCompactionModelById,
   onDeleteStratChartById,
   onFocusCurveObject,
   onFocusFormationObject,
@@ -91,7 +86,9 @@ export function DataManagerTopPane({
   onFocusTopsGroupObject,
   onFocusWellObject,
   onSelectChart,
-  onSelectCompactionModel,
+  onCreateCompactionPresetDraft,
+  onSelectCompactionPreset,
+  onSelectCompactionPresetsRoot,
   onSelectCurveDictionaryEntry,
   onSelectLithologyDictionaryEntry,
   onSelectCurve,
@@ -108,7 +105,8 @@ export function DataManagerTopPane({
   onToggleDeviation,
   onToggleFormation,
   selectedChartId,
-  selectedCompactionModelId,
+  selectedCompactionPresetId,
+  isCompactionPresetsRootSelected,
   selectedCurveDictionaryEntryId,
   selectedFormationId,
   selectedLithologyDictionaryEntryId,
@@ -188,17 +186,16 @@ export function DataManagerTopPane({
         <TemplatesTab
           curveDictionaryEntries={curveDictionaryEntries}
           lithologyDictionaryEntries={lithologyDictionaryEntries}
-          models={compactionModels}
-          selectedModelId={selectedCompactionModelId}
+          compactionPresets={compactionPresets}
+          isCompactionPresetsRootSelected={isCompactionPresetsRootSelected}
+          selectedCompactionPresetId={selectedCompactionPresetId}
           selectedCurveDictionaryEntryId={selectedCurveDictionaryEntryId}
           selectedLithologyDictionaryEntryId={selectedLithologyDictionaryEntryId}
-          onSelectModel={onSelectCompactionModel}
+          onCreateCompactionPresetDraft={onCreateCompactionPresetDraft}
+          onSelectCompactionPresetsRoot={onSelectCompactionPresetsRoot}
+          onSelectCompactionPreset={onSelectCompactionPreset}
           onSelectCurveDictionaryEntry={onSelectCurveDictionaryEntry}
           onSelectLithologyDictionaryEntry={onSelectLithologyDictionaryEntry}
-          onActivateModel={onActivateCompactionModel}
-          onCreateModel={onCreateCompactionModel}
-          onDeleteModelById={onDeleteCompactionModelById}
-          onContextMenuModel={onContextMenuCompactionModel}
         />
       )}
     </section>

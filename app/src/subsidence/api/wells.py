@@ -290,7 +290,7 @@ def get_well(well_id: str, request: Request) -> WellResponse:
                 kind=row.kind,
                 strat_color=(_active_link(row).strat_unit.color_hex if _active_link(row) else None),
                 is_locked=row.is_locked,
-                lithology=(
+                lithology=row.lithology if row.lithology is not None else (
                     _active_link(row).strat_unit.lithology if _active_link(row) else None
                 ),
                 strat_unit_id=(

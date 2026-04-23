@@ -18,6 +18,7 @@ function App() {
   const resetWell = useWellDataStore((state) => state.reset)
   const loadStratCharts = useWellDataStore((state) => state.loadStratCharts)
   const loadCompactionModels = useWellDataStore((state) => state.loadCompactionModels)
+  const loadCompactionPresets = useWellDataStore((state) => state.loadCompactionPresets)
   const loadCurveDictionary = useWellDataStore((state) => state.loadCurveDictionary)
   const loadLithologyDictionary = useWellDataStore((state) => state.loadLithologyDictionary)
   const colorOverrides = useWellDataStore((state) => state.colorOverrides)
@@ -122,7 +123,8 @@ function App() {
   useEffect(() => {
     if (!isProjectOpen) return
     void loadCompactionModels()
-  }, [isProjectOpen, loadCompactionModels])
+    void loadCompactionPresets()
+  }, [isProjectOpen, loadCompactionModels, loadCompactionPresets])
 
   useEffect(() => {
     if (!isProjectOpen) return

@@ -7,7 +7,7 @@ from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column, relationship
 from sqlalchemy import MetaData
 
 SUBSIDENCE_APP_ID = 0x53554253  # "SUBS" as 4-byte int
-SCHEMA_VERSION = 2
+SCHEMA_VERSION = 3
 
 _NAMING: dict[str, str] = {
     "ix": "ix_%(table_name)s_%(column_0_name)s",
@@ -208,6 +208,7 @@ class FormationTopModel(Base, AuditMixin):
     # paleobathymetry + sea level at time of deposition for this interval (m); used in Airy backstripping
     eroded_thickness_m: Mapped[float] = mapped_column(Float, default=0.0, server_default='0.0')
     # compacted thickness of section eroded above this boundary (unconformity only, m)
+    lithology: Mapped[str | None] = mapped_column(String(32), nullable=True)
     note: Mapped[str | None] = mapped_column(Text, nullable=True)
 
     well: Mapped[WellModel] = relationship(back_populates="formation_tops")

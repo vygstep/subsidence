@@ -1,6 +1,7 @@
 import { SettingsInspector } from './SettingsInspector'
 import type { SelectedObject } from '@/stores/workspaceStore'
 import type {
+  CompactionPresetSummary,
   CompactionModel,
   CurveDictionaryEntry,
   FormationTop,
@@ -48,6 +49,8 @@ interface SettingsPaneShellProps {
   onFormationMove: (formationId: string, depth: number) => void
   selectedChart: StratChartInfo | null
   selectedCompactionModel: CompactionModel | null
+  selectedCompactionPreset: CompactionPresetSummary | null
+  compactionPresets: CompactionPresetSummary[]
   selectedCurveDictionaryEntry: CurveDictionaryEntry | null
   selectedLithologyDictionaryEntry: LithologyDictionaryEntry | null
   curveCount: number

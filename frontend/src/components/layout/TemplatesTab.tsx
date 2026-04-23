@@ -1,7 +1,7 @@
 import { useState } from 'react'
 
 import type {
-  CompactionModel,
+  CompactionPresetSummary,
   CurveDictionaryEntry,
   LithologyDictionaryEntry,
 } from '@/types'
@@ -9,24 +9,24 @@ import type {
 interface TemplatesTabProps {
   curveDictionaryEntries: CurveDictionaryEntry[]
   lithologyDictionaryEntries: LithologyDictionaryEntry[]
-  models: CompactionModel[]
-  selectedModelId: number | null
+  compactionPresets: CompactionPresetSummary[]
+  isCompactionPresetsRootSelected: boolean
+  selectedCompactionPresetId: number | null
   selectedCurveDictionaryEntryId: number | null
   selectedLithologyDictionaryEntryId: number | null
-  onSelectModel: (modelId: number) => void
+  onCreateCompactionPresetDraft: () => void
+  onSelectCompactionPresetsRoot: () => void
+  onSelectCompactionPreset: (presetId: number) => void
   onSelectCurveDictionaryEntry: (entryId: number) => void
   onSelectLithologyDictionaryEntry: (entryId: number) => void
-  onActivateModel: (modelId: number) => void
-  onDeleteModelById: (modelId: number, name: string, isBuiltin: boolean, isActive: boolean) => void
-  onCreateModel: () => void
-  onContextMenuModel: (event: React.MouseEvent, model: CompactionModel) => void
 }
 
 interface TemplateSectionProps {
   title: string
   count?: number
   defaultOpen?: boolean
-  actions?: React.ReactNode
+  isSelected?: boolean
+  onSelect?: () => void
   children: React.ReactNode
 }
 
@@ -34,7 +34,8 @@ function TemplateSection({
   title,
   count,
   defaultOpen = false,
-  actions,
+  isSelected = false,
+  onSelect,
   children,
 }: TemplateSectionProps) {
   const [isOpen, setIsOpen] = useState(defaultOpen)
@@ -43,8 +44,11 @@ function TemplateSection({
     <div className="template-section">
       <button
         type="button"
-        className="template-section__toggle"
-        onClick={() => setIsOpen((open) => !open)}
+        className={`template-section__toggle ${isSelected ? 'template-section__toggle--selected' : ''}`}
+        onClick={() => {
+          setIsOpen((open) => !open)
+          onSelect?.()
+        }}
         aria-expanded={isOpen}
       >
         <span className={`template-section__chevron ${isOpen ? 'template-section__chevron--open' : ''}`}>
@@ -56,7 +60,6 @@ function TemplateSection({
       </button>
       <div className="template-section__controls">
         {count !== undefined ? <span className="template-section__count">{count}</span> : null}
-        {actions}
       </div>
       {isOpen ? children : null}
     </div>
@@ -66,89 +69,49 @@ function TemplateSection({
 export function TemplatesTab({
   curveDictionaryEntries,
   lithologyDictionaryEntries,
-  models,
-  selectedModelId,
+  compactionPresets,
+  isCompactionPresetsRootSelected,
+  selectedCompactionPresetId,
   selectedCurveDictionaryEntryId,
   selectedLithologyDictionaryEntryId,
-  onSelectModel,
+  onCreateCompactionPresetDraft,
+  onSelectCompactionPresetsRoot,
+  onSelectCompactionPreset,
   onSelectCurveDictionaryEntry,
   onSelectLithologyDictionaryEntry,
-  onActivateModel,
-  onDeleteModelById,
-  onCreateModel,
-  onContextMenuModel,
 }: TemplatesTabProps) {
   return (
     <div className="sidebar-panel__body">
       <TemplateSection
         title="Compaction Presets"
-        count={models.length}
+        count={compactionPresets.length}
         defaultOpen
-        actions={(
+        isSelected={isCompactionPresetsRootSelected}
+        onSelect={onSelectCompactionPresetsRoot}
+      >
+        <div className="strat-chart-list template-section__content">
+          {compactionPresets.map((preset) => (
+            <div
+              key={preset.id}
+              className={`strat-chart-item ${preset.is_builtin ? 'strat-chart-item--muted' : ''} ${selectedCompactionPresetId === preset.id ? 'strat-chart-item--selected' : ''}`}
+              onClick={() => onSelectCompactionPreset(preset.id)}
+            >
+              <div className="strat-chart-item__content">
+                <span className="strat-chart-item__name">{preset.name}</span>
+              </div>
+              <span className="strat-chart-item__meta">{preset.is_builtin ? 'built-in' : 'user'}</span>
+            </div>
+          ))}
           <button
             type="button"
-            className="project-dialog__button project-dialog__button--primary"
-            style={{ fontSize: '0.76rem' }}
+            className="template-section__inline-action"
             onClick={(event) => {
               event.stopPropagation()
-              onCreateModel()
+              onCreateCompactionPresetDraft()
             }}
           >
             + New preset
           </button>
-        )}
-      >
-        <div className="strat-chart-list template-section__content">
-          {models.map((model) => (
-            <div
-              key={model.id}
-              className={`strat-chart-item ${model.is_active ? 'strat-chart-item--active' : ''} ${selectedModelId === model.id ? 'strat-chart-item--selected' : ''}`}
-              onClick={() => onSelectModel(model.id)}
-              onContextMenu={(event) => {
-                onSelectModel(model.id)
-                onContextMenuModel(event, model)
-              }}
-            >
-              <div className="strat-chart-item__content">
-                <span className="strat-chart-item__name">{model.name}</span>
-              </div>
-              {model.is_builtin ? (
-                <span className="strat-chart-item__meta">built-in</span>
-              ) : null}
-              {model.is_active ? (
-                <span className="strat-chart-item__status">active</span>
-              ) : (
-                <button
-                  type="button"
-                  className="strat-chart-item__activate"
-                  onClick={(event) => {
-                    event.stopPropagation()
-                    onActivateModel(model.id)
-                  }}
-                >
-                  Set active
-                </button>
-              )}
-              <button
-                type="button"
-                className="strat-chart-item__delete"
-                title={
-                  model.is_builtin ? 'Built-in preset cannot be deleted'
-                  : model.is_active ? 'Activate another preset first'
-                  : 'Delete this preset'
-                }
-                disabled={model.is_builtin || model.is_active}
-                onClick={(event) => {
-                  event.stopPropagation()
-                  if (window.confirm(`Delete compaction preset "${model.name}"?`)) {
-                    onDeleteModelById(model.id, model.name, model.is_builtin, model.is_active)
-                  }
-                }}
-              >
-                x
-              </button>
-            </div>
-          ))}
         </div>
       </TemplateSection>
 

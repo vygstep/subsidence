@@ -76,6 +76,9 @@ def migrate_schema(engine: Engine) -> None:
         if 'eroded_thickness_m' not in formation_cols:
             conn.execute(text("ALTER TABLE formation_tops ADD COLUMN eroded_thickness_m REAL NOT NULL DEFAULT 0.0"))
             conn.commit()
+        if 'lithology' not in formation_cols:
+            conn.execute(text("ALTER TABLE formation_tops ADD COLUMN lithology TEXT"))
+            conn.commit()
         if 'strat_unit_id' in formation_cols:
             # SQLite < 3.35 cannot DROP COLUMN; leave it as an orphan column (ORM ignores it)
             pass

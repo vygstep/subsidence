@@ -356,6 +356,12 @@
   gap: 10px;
 }
 
+.template-panel--muted {
+  padding: 10px;
+  border-radius: 10px;
+  background: #f3f4f6;
+}
+
 .template-panel__group {
   display: flex;
   align-items: center;
@@ -403,6 +409,13 @@
   padding: 0;
   text-align: left;
   cursor: pointer;
+}
+
+.template-section__toggle--selected {
+  background: #e8f0fe;
+  border-radius: 8px;
+  padding: 4px 6px;
+  margin: -4px -6px;
 }
 
 .template-section__heading {
@@ -455,6 +468,24 @@
 .template-section__content {
   grid-column: 1 / -1;
   padding: 0;
+}
+
+.template-section__inline-action {
+  align-self: flex-start;
+  margin-top: 4px;
+  border: 1px solid #cbd5e1;
+  background: #ffffff;
+  color: #334155;
+  border-radius: 999px;
+  padding: 3px 8px;
+  font-size: 0.68rem;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.template-section__inline-action:hover {
+  background: #eff6ff;
+  border-color: #93c5fd;
 }
 
 .template-table-wrapper {
@@ -528,6 +559,11 @@
   background: #f8fbff;
 }
 
+.template-track-card--muted {
+  background: #f3f4f6;
+  border-color: #d1d5db;
+}
+
 .template-track-card__header {
   display: flex;
   align-items: flex-start;
@@ -594,6 +630,10 @@
   color: #b45309;
 }
 
+.template-track-card--muted .template-track-card__status {
+  color: #6b7280;
+}
+
 .strat-chart-list {
   display: flex;
   flex-direction: column;
@@ -619,6 +659,11 @@
 .strat-chart-item--selected {
   outline: 2px solid #2563eb;
   outline-offset: -1px;
+}
+
+.strat-chart-item--muted {
+  background: #f3f4f6;
+  border-color: #d1d5db;
 }
 
 .strat-chart-item__radio-label {
@@ -696,6 +741,13 @@
   background: rgba(239, 68, 68, 0.1);
 }
 
+.template-settings__actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+  margin-top: 4px;
+}
+
 .compaction-table-wrapper {
   overflow-x: auto;
   margin-top: 4px;
@@ -748,4 +800,17 @@
 
 .compaction-table__input:focus {
   border-bottom-color: #3b82f6;
+}
+
+.compaction-table--presets th:nth-child(2),
+.compaction-table--presets td:nth-child(2) {
+  text-align: left;
+}
+
+.compaction-table__row--muted td {
+  color: #64748b;
+}
+
+.compaction-table__input--name {
+  text-align: left;
 }
