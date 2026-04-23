@@ -21,7 +21,6 @@ Rules:
 
 ## Current Work
 
-- [ ] Execute `M1 Complete codebase map` from [Engineering Maintenance Contract](docs/contracts/engineering-maintenance-contract.md).
 - [ ] Execute `M2 Build regression test matrix` from [Engineering Maintenance Contract](docs/contracts/engineering-maintenance-contract.md).
 - [ ] Execute `M3 Add backend process logging` from [Engineering Maintenance Contract](docs/contracts/engineering-maintenance-contract.md).
 - [ ] Execute `M4 Add frontend diagnostics` from [Engineering Maintenance Contract](docs/contracts/engineering-maintenance-contract.md).

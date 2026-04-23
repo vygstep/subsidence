@@ -8,9 +8,13 @@ This module covers subsidence/burial-history rendering and recalculation.
 
 Files:
 
+- `frontend/src/api/subsidenceSocket.ts`
 - `frontend/src/components/subsidence/MultiWellPanel.tsx`
+- `frontend/src/components/subsidence/SubsidencePanel.tsx`
 - `frontend/src/components/subsidence/SubsidenceCanvas.tsx`
 - `frontend/src/components/subsidence/SubsidenceControls.tsx`
+- `frontend/src/components/subsidence/SubsidenceToolbar.tsx`
+- `frontend/src/components/subsidence/GeologicalTimescale.tsx`
 - `frontend/src/utils/exportPng.ts`
 - `frontend/src/stores/computedStore.ts`
 
@@ -21,6 +25,8 @@ Responsibilities:
 - Trigger recalculation.
 - Expose display toggles and water depth.
 - Export panel PNG.
+- Maintain WebSocket connection and pending recalculation queue.
+- Render stored multi-well results separately from active-well recalculation.
 
 ---
 
@@ -42,10 +48,11 @@ Responsibilities:
 ## Data Flow
 
 1. Formation edits or controls trigger recalculation in `computedStore`.
-2. Frontend sends WebSocket payload to backend.
-3. Backend calculates in a non-blocking path.
-4. Frontend receives results.
-5. `SubsidenceCanvas` redraws.
+2. `computedStore` calls `frontend/src/api/subsidenceSocket.ts`.
+3. Frontend sends WebSocket payload to backend.
+4. Backend calculates in a non-blocking path.
+5. Frontend receives results.
+6. `SubsidenceCanvas` redraws.
 
 ---
 
@@ -58,6 +65,8 @@ Start here for:
 - Recalculation does not trigger after top edits.
 - Water depth does not affect curves.
 - Export PNG is empty or clipped.
+- Stored result panel and active recalculation panel show different states.
+- WebSocket reconnect queues stale recalculation payloads.
 
 Historical bug notes:
 

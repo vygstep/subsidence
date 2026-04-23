@@ -15,6 +15,7 @@ Responsibilities:
 - Compose main UI regions.
 - Coordinate high-level effects after project or active well changes.
 - Wire toolbar, Data Manager, viewer, settings pane, and status bar.
+- Wire keyboard shortcuts and high-level project/well hydration effects.
 
 Rule:
 
@@ -47,6 +48,7 @@ Common bug areas:
 - Active well is not preselected as target.
 - Dialog input and action payload diverge.
 - File picker root is not remembered.
+- Path picker writes visible input but submit uses stale internal state.
 
 ---
 
@@ -72,6 +74,7 @@ Responsibilities:
 Risk:
 
 - `useDataManagerController.ts` combines many interaction responsibilities.
+- Right-click context behavior should stay cheap; slow context menus usually indicate over-coupled selection/action code.
 
 Planned split:
 
@@ -81,6 +84,8 @@ Planned split:
 - Tops object actions.
 - Strat chart actions.
 - Visualization toggle actions.
+- Rename/duplicate/delete actions.
+- Active object settings routing.
 
 ---
 
@@ -103,6 +108,7 @@ Responsibilities:
 Risk:
 
 - `SettingsInspector.tsx` has too many object-specific branches.
+- It also triggers persistence for some settings. Extract UI-only branches separately from save/patch logic.
 
 Planned split:
 
@@ -111,3 +117,12 @@ Planned split:
 - `TopsSettingsInspector`
 - `StratChartSettingsInspector`
 - `CompactionModelInspector`
+
+Safety tests before split:
+
+- selected well opens well settings
+- selected curve opens curve settings
+- selected LAS folder opens LAS settings
+- selected top opens top settings
+- selected strat chart opens chart stats/settings
+- metadata edits persist and reload

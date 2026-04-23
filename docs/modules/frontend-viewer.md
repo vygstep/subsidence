@@ -14,8 +14,12 @@ Files:
 - `frontend/src/components/logview/FormationColumn.tsx`
 - `frontend/src/components/logview/TrackHeaderRow.tsx`
 - `frontend/src/components/logview/TrackHeader.tsx`
-- `frontend/src/components/logview/FormationTopLine.tsx`
 - `frontend/src/components/logview/WellOverviewMinimap.tsx`
+- `frontend/src/components/interaction/InteractionOverlay.tsx`
+- `frontend/src/components/interaction/FormationTopLine.tsx`
+- `frontend/src/components/interaction/DepthCursor.tsx`
+- `frontend/src/components/interaction/CurveTooltip.tsx`
+- `frontend/src/utils/curvePresets.ts`
 
 Responsibilities:
 
@@ -24,6 +28,7 @@ Responsibilities:
 - Render formations and tops.
 - Handle track headers, selection, and drag/reorder behavior.
 - Synchronize scroll and visible depth.
+- Apply mnemonic-based curve defaults.
 
 ---
 
@@ -54,6 +59,7 @@ Responsibilities:
 Rule:
 
 - Renderer changes should prefer pure unit tests.
+- Do not extract clipping/interpolation from `DataTrack.tsx` without preserving existing depth-clipping unit coverage.
 
 ---
 
@@ -75,6 +81,15 @@ Planned split after behavior is stable:
 - Log viewer.
 - Subsidence panel.
 - Settings/status.
+
+---
+
+## Viewer Refactor Risks
+
+- `DataTrack.tsx` combines clipping, interpolation, fill preparation, and canvas drawing orchestration.
+- `TrackHeaderRow.tsx` is the track selection/reorder surface.
+- `FormationTopLine.tsx` in `components/interaction` owns editable top interactions.
+- `curvePresets.ts` must stay aligned with backend curve dictionaries when defaults change.
 
 ---
 

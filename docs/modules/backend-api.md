@@ -21,6 +21,7 @@ Future maintenance:
 
 - Add request ID middleware here.
 - Add application-level logging setup here.
+- Keep router registration explicit so endpoint ownership stays discoverable.
 
 ---
 
@@ -44,12 +45,23 @@ Responsibilities:
 Known risk:
 
 - This router is too large and mixes unrelated responsibilities.
+- It also owns native path picking endpoints, which are platform/blocking integrations.
 
 Refactor direction:
 
 - Keep public paths stable.
 - Extract service functions first.
 - Split route groups only after tests cover project lifecycle and imports.
+
+Do not split before tests cover:
+
+- create/open/save/close/reopen
+- recent projects
+- all import endpoints
+- visual config save/load
+- checkpoints
+- undo/redo
+- export
 
 ---
 
@@ -70,6 +82,10 @@ Responsibilities:
 Refactor direction:
 
 - Extract response builders for inventory, well detail, curve payloads, and deviation payloads.
+
+High-risk helper:
+
+- `_load_curve_maps` bridges SQLite curve metadata and Parquet payloads. Changes here can make imported curves disappear.
 
 ---
 
@@ -92,6 +108,7 @@ Common bug areas:
 - Active chart mismatch.
 - Built-in chart deletion.
 - Tops linked to one chart but rendered against another.
+- Formation strat links not refreshed after active chart changes.
 
 ---
 
@@ -114,3 +131,4 @@ Common bug areas:
 - Blank subsidence panel.
 - Stale recalculation after formation edits.
 - Slow or blocked recalculation path.
+- Stored multi-well results not matching active well recalculation.
