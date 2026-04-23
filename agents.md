@@ -3,9 +3,18 @@
 ## Workflow
 
 1. **Brainstorm & Discuss** — обсуждаем идеи, уточняем требования
-2. **Record Contract** — записываем согласованный план в todo.md
+2. **Record Contract** — записываем согласованный план в активный контракт under `docs/contracts/`
 3. **Execute** — реализуем, отчитываемся о результатах
 4. **Confirm & Proceed** — каждый шаг подтверждаем перед следующим
+
+## Planning Files
+
+- `todo.md` contains only active work that still needs to be done.
+- Every `todo.md` item must link to an active contract in `docs/contracts/`.
+- Completed items are removed from `todo.md`; do not keep checked-off historical clutter there.
+- Completed or superseded contracts are moved to `docs/contracts/implemented/`.
+- Current architecture/navigation docs live directly under `docs/` and `docs/modules/`.
+- `docs/contracts/implemented/` is legacy implementation history, not the active development plan.
 
 ## Rules
 

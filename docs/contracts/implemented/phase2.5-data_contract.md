@@ -1,4 +1,4 @@
-# Phase 2.5: Data Persistence Layer — Implementation Contract
+﻿# Phase 2.5: Data Persistence Layer — Implementation Contract
 
 **Goal**: Implement a project-based data persistence layer so that well data, formation tops,
 deviation surveys, visual config, and calculation results survive between sessions. This phase

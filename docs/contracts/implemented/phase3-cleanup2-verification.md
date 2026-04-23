@@ -1,12 +1,12 @@
-# Phase 3 Cleanup 2 Verification
+﻿# Phase 3 Cleanup 2 Verification
 
 This file records the verification snapshot for the second Phase 3 stabilization pass.
 
 It complements:
 
 - `docs/phase3-verification.md`
-- `docs/phase3-cleanup-contract.md`
-- `docs/phase3-cleanup2-contract.md`
+- `docs/contracts/implemented/phase3-cleanup-contract.md`
+- `docs/contracts/implemented/phase3-cleanup2-contract.md`
 
 It is not a planning document.
 
@@ -18,8 +18,8 @@ It is not a planning document.
 
 Verified:
 
-- `docs/phase3-contract.md` no longer contains mojibake
-- `docs/phase3-contract.md` now explicitly points to cleanup and verification documents
+- `docs/contracts/implemented/phase3-contract.md` no longer contains mojibake
+- `docs/contracts/implemented/phase3-contract.md` now explicitly points to cleanup and verification documents
 - top-level progress wording no longer pretends to be the only truthful Phase 3 ledger
 
 ### 2. Persistence boundary

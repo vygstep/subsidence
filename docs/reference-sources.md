@@ -1,48 +1,77 @@
-﻿# Reference Sources
+# Reference Sources
 
-This document defines the active knowledge sources that may be reused during implementation.
+This document lists reusable knowledge sources for future implementation and maintenance.
 
-## `repos/`
+---
 
-`repos/` is the external scientific and algorithmic reference source.
+## External Scientific References
 
-Primary purposes:
+Directory:
 
-- subsidence engine reference
-- burial history logic
+- `repos/`
+
+Use for:
+
+- burial history algorithms
 - decompaction and backstripping formulas
+- subsidence and thermal modeling references
 - scientific workflow patterns
-- reference implementations for domain algorithms
 
-Use `repos/` to answer:
+Primary rule:
 
-- how the scientific engine should work
-- how formulas and numerical workflows should be structured
-- which algorithmic patterns are worth adopting
+- Prefer `repos/` when checking equations, numerical workflow, or scientific assumptions.
 
-## `subsidence_archive/`
+---
 
-`subsidence_archive/` is the internal implementation reference source.
+## Internal Legacy Reference
 
-Primary purposes:
+Directory:
 
-- data engine reference
-- loaders and parsers reuse
-- API and package layout ideas
-- reusable local code fragments
-- previous project documentation and implementation context
+- `subsidence_archive/`
 
-Use `subsidence_archive/` to answer:
+Use for:
 
-- what has already been built locally
-- which implementation parts can be copied or adapted
-- which internal patterns are still useful in the new version
+- previous local implementation patterns
+- old loaders/parsers
+- data-layer ideas
+- legacy UI behavior that may still describe desired product behavior
 
-## Reuse Rule
+Primary rule:
 
-Reuse from both sources is allowed.
+- Prefer `subsidence_archive/` when checking what was already built locally or when recovering useful implementation details.
 
-- prefer `repos/` for scientific logic and formulas
-- prefer `subsidence_archive/` for local implementation patterns and data-layer reuse
+---
 
-All reused material should be adapted to the active Compass and Phase 1 scope.
+## Implemented Contract Archive
+
+Directory:
+
+- `docs/contracts/implemented/`
+
+Use for:
+
+- understanding why existing code was implemented
+- reviewing old phase decisions
+- tracing feature origin and acceptance criteria
+
+Primary rule:
+
+- Treat implemented contracts as historical context, not active planning.
+
+---
+
+## Active Contracts
+
+Directory:
+
+- `docs/contracts/`
+
+Use for:
+
+- current implementation plans
+- future work that still needs execution
+- contract-linked todo items
+
+Primary rule:
+
+- Active development work should be represented by an active contract and a linked `todo.md` item.

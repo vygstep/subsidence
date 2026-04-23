@@ -1,4 +1,4 @@
-# Phase 3 Verification
+﻿# Phase 3 Verification
 
 This file records the verification outcomes after the cleanup pass.
 

@@ -1,4 +1,4 @@
-# Phase 3: Interactivity — Formation Tops, Cursors, and Property Panels
+﻿# Phase 3: Interactivity — Formation Tops, Cursors, and Property Panels
 
 **Goal**: Wire the persistence layer built in Phase 2.5 to the visible UI. Users can open and
 create projects through dialogs, drag formation top lines, inspect curve values at the cursor
@@ -10,8 +10,8 @@ React panels communicating through Zustand stores and the Phase 2.5 REST API.
 
 **Current source of truth**:
 
-- `docs/phase3-cleanup-contract.md`
-- `docs/phase3-cleanup2-contract.md`
+- `docs/contracts/implemented/phase3-cleanup-contract.md`
+- `docs/contracts/implemented/phase3-cleanup2-contract.md`
 - `docs/phase3-verification.md`
 
 This file remains useful as the original Phase 3 roadmap and detailed step specification, but it is

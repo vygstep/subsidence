@@ -1,4 +1,4 @@
-# Phase 5: Curve Fills, Subsidence Controls, Export, and Quality
+﻿# Phase 5: Curve Fills, Subsidence Controls, Export, and Quality
 
 **Goal**: Close the gaps left after Phase 4. Add crossover curve fills (the core petrophysical
 overlay absent from the viewer), give the subsidence panel real controls (water depth history,

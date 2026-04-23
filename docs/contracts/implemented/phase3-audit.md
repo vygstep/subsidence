@@ -1,4 +1,4 @@
-# Phase 3 Audit
+﻿# Phase 3 Audit
 
 **Purpose**: record the actual implementation state of Phase 3 at the start of cleanup.
 
@@ -227,7 +227,7 @@ Weak points:
 
 ## Contract drift audit
 
-The current `docs/phase3-contract.md` is no longer a truthful implementation ledger.
+The current `docs/contracts/implemented/phase3-contract.md` is no longer a truthful implementation ledger.
 
 Problems:
 

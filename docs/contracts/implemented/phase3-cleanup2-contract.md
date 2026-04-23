@@ -1,4 +1,4 @@
-# Phase 3 Cleanup 2 Contract
+﻿# Phase 3 Cleanup 2 Contract
 
 **Purpose**: close the remaining Phase 3 architecture, consistency, and verification gaps
 after the first cleanup pass, so Phase 4 can start on a stable UI and persistence base.
@@ -21,7 +21,7 @@ after the first cleanup pass, so Phase 4 can start on a stable UI and persistenc
 
 However, the implementation is still not fully hardened:
 
-- `docs/phase3-contract.md` is no longer a truthful implementation ledger
+- `docs/contracts/implemented/phase3-contract.md` is no longer a truthful implementation ledger
 - `App.tsx` is smaller than before but still carries orchestration-heavy logic
 - `DataManagerPane.tsx` is the next oversized frontend bottleneck
 - `Load logs` still means LAS-only instead of LAS + CSV
@@ -38,10 +38,10 @@ This contract defines the second and final stabilization pass for Phase 3.
 
 The following statements are treated as factual starting conditions:
 
-1. `docs/phase3-cleanup-contract.md` is currently the most truthful Phase 3 contract.
+1. `docs/contracts/implemented/phase3-cleanup-contract.md` is currently the most truthful Phase 3 contract.
 2. `docs/phase3-verification.md` is the most truthful verification snapshot.
 3. `docs/phase3-audit.md` is historical and must not be treated as the current source of truth.
-4. `docs/phase3-contract.md` is still useful as a roadmap reference, but it is stale as a progress ledger and also contains encoding corruption.
+4. `docs/contracts/implemented/phase3-contract.md` is still useful as a roadmap reference, but it is stale as a progress ledger and also contains encoding corruption.
 5. The remaining risk is no longer a single blocking bug; it is the accumulation of architectural and semantic drift.
 
 ---
@@ -85,7 +85,7 @@ This cleanup pass is not intended to:
 
 ### A1. Phase 3 contract normalization
 
-`docs/phase3-contract.md` must be reduced to one of these roles:
+`docs/contracts/implemented/phase3-contract.md` must be reduced to one of these roles:
 
 - a truthful progress ledger aligned with current code,
 or
@@ -95,7 +95,7 @@ It must not remain ambiguous.
 
 ### A2. Encoding repair
 
-The mojibake visible in `docs/phase3-contract.md` must be removed.
+The mojibake visible in `docs/contracts/implemented/phase3-contract.md` must be removed.
 
 Examples currently present:
 
@@ -106,7 +106,7 @@ The document must become clean UTF-8 text again.
 
 ### A3. Progress-table truthfulness
 
-Every step in `docs/phase3-contract.md` must be placed into one category:
+Every step in `docs/contracts/implemented/phase3-contract.md` must be placed into one category:
 
 - `done`
 - `partial`
@@ -117,10 +117,10 @@ No step may remain “green” if the code and verification docs do not support 
 
 ### A4. Verification linkage
 
-`docs/phase3-contract.md` must point explicitly to:
+`docs/contracts/implemented/phase3-contract.md` must point explicitly to:
 
-- `docs/phase3-cleanup-contract.md`
-- `docs/phase3-cleanup2-contract.md`
+- `docs/contracts/implemented/phase3-cleanup-contract.md`
+- `docs/contracts/implemented/phase3-cleanup2-contract.md`
 - `docs/phase3-verification.md`
 
 so there is a single clear chain:
@@ -258,7 +258,7 @@ Invisible hybrid behavior is not allowed.
 - LAS
 - CSV
 
-This is already flagged as not done in `docs/phase3-contract.md`.
+This is already flagged as not done in `docs/contracts/implemented/phase3-contract.md`.
 
 ### D2. CSV log-import contract
 

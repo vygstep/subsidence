@@ -9,7 +9,7 @@ Status: **Initial Phase Complete** (5 tests, ~8 more planned)
 ## What Was Created
 
 ### 📋 Documentation
-- **`docs/testing-contract.md`** — Executable specification of all critical workflows
+- **`docs/contracts/implemented/testing-contract.md`** — Executable specification of all critical workflows
   - 5 frontend workflows (Formation drag, well switching, project open, CRUD, rendering)
   - 4 backend workflows (depth update, CRUD, switching, config persistence)
   - Complete invariant checks and edge cases for each

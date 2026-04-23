@@ -1,4 +1,4 @@
-# Bugs and Improvements Backlog
+﻿# Bugs and Improvements Backlog
 
 This file is a normalized working backlog for post-cleanup Phase 3 fixes and UX improvements.
 

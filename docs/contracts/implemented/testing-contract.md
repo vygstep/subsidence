@@ -1,4 +1,4 @@
-# Testing Contract — SUBSIDENCE Critical Workflows
+﻿# Testing Contract — SUBSIDENCE Critical Workflows
 
 **Purpose:** Document testable workflows covering all critical paths. Tests serve as executable specification of expected behavior.
 

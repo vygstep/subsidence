@@ -1,4 +1,4 @@
-# Phase 3 Cleanup Contract
+﻿# Phase 3 Cleanup Contract
 
 **Purpose**: stabilize the current Phase 3 implementation before adding more interaction features.
 This cleanup contract records the agreed rules for save behavior, hydration, built-in
@@ -261,7 +261,7 @@ Before more feature work continues, the project must produce a truthful audit of
 
 This audit must update:
 
-- `docs/phase3-contract.md`
+- `docs/contracts/implemented/phase3-contract.md`
 - optionally `todo.md` if checkpoint sequencing changed
 
 No future implementation should continue against stale progress tables.
@@ -679,8 +679,8 @@ Cleanup is not complete until the following flows pass:
 
 ### Cleanup Step 6 - Verification pass ✅ (docs)
 
-- `docs/phase3-contract.md` progress table updated to truthful status
-- `docs/phase3-cleanup-contract.md` status updated
+- `docs/contracts/implemented/phase3-contract.md` progress table updated to truthful status
+- `docs/contracts/implemented/phase3-cleanup-contract.md` status updated
 - manual verification matrix execution required before deeper Compass work
 
 ---

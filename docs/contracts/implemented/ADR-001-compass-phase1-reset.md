@@ -8,7 +8,7 @@ Date: 2026-04-16
 
 The project is being reset onto a new product and architecture direction.
 The target architecture is defined in `docs/app_compass.md`.
-The active implementation scope is defined in `docs/phase1-contract.md`.
+The active implementation scope is defined in `docs/contracts/implemented/phase1-contract.md`.
 
 The previous project version is preserved as a reference snapshot under `subsidence_archive/legacy_reset_2026-04-16/`.
 

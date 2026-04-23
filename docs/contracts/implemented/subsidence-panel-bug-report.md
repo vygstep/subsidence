@@ -1,4 +1,4 @@
-# Subsidence Panel Bug Report
+﻿# Subsidence Panel Bug Report
 
 This document records the current known issues in the right-side subsidence panel.
 

@@ -1,4 +1,4 @@
-# Phase 1: Foundation - Implementation Contract
+﻿# Phase 1: Foundation - Implementation Contract
 
 **Goal**: Render static well log curves from a LAS file in the browser with synchronized scrolling across all tracks. No calculations yet.
 

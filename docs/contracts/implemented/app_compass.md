@@ -1,4 +1,4 @@
-# Techlog-inspired well log visualization: architecture and implementation contract
+﻿# Techlog-inspired well log visualization: architecture and implementation contract
 
 **A Python subsidence calculator deserves a professional-grade web frontend.** This document specifies a modular, interactive well log visualization architecture modeled on Schlumberger Techlog's UI, designed to render petrophysical logs alongside subsidence/burial-history curves with full interactivity — draggable formation tops, click-to-select curves, and real-time recalculation. The architecture draws on patterns proven in Equinor's videx-wellog (the most sophisticated open-source well log renderer), combines a **hybrid Canvas + SVG rendering strategy** for performance and interactivity, and uses React 18, Zustand, and a FastAPI backend. Everything below is structured as an actionable implementation contract suitable for step-by-step execution in Claude Code.
 

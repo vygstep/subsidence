@@ -1,11 +1,14 @@
 ﻿# SUBSIDENCE
 
-SUBSIDENCE is being reset around the Compass architecture.
+SUBSIDENCE is a local web application for well-log visualization, stratigraphic data management, and 1D subsidence/burial-history workflows.
 
-The active direction is:
+The current implementation uses:
 
-- `docs/app_compass.md` as the strategic architecture target
-- `docs/phase1-contract.md` as the execution contract for the current phase
+- FastAPI backend in `app/`
+- React + TypeScript frontend in `frontend/`
+- SQLite + Parquet project bundles on disk
+- Canvas/SVG hybrid rendering for well-log visualization
+- WebSocket recalculation for subsidence results
 
 The legacy implementation has been preserved in:
 
@@ -13,28 +16,16 @@ The legacy implementation has been preserved in:
 
 ## Current Scope
 
-Current work is limited to Phase 1 foundation:
-
-- create a new React + TypeScript frontend in `frontend/`
-- extend the Python backend in `app/`
-- render static well log curves from a LAS file in the browser
-- establish the project structure and current-truth documents
-
-Out of scope for the current phase:
-
-- burial history calculations
-- tectonic subsidence calculations
-- formation dragging
-- WebSocket recalculation
-- migration of legacy Dash UI into the active codepath
+Phase 5 is complete. Current work focuses on maintainability, regression tests, process logging, and developer documentation before the next UX/feature pass.
 
 ## Active Documents
 
-- [Compass Strategy](docs/app_compass.md)
-- [Phase 1 Contract](docs/phase1-contract.md)
-- [Current Truth](docs/current-truth.md)
+- [Documentation Index](docs/documentation-index.md)
+- [Architecture](docs/architecture.md)
+- [Codebase Map](docs/codebase-map.md)
+- [Engineering Maintenance Contract](docs/contracts/engineering-maintenance-contract.md)
+- [Historical Compass Strategy](docs/contracts/implemented/app_compass.md)
 - [Reference Sources](docs/reference-sources.md)
-- [Decision ADR](docs/decisions/ADR-001-compass-phase1-reset.md)
 - [Execution Backlog](todo.md)
 
 ## Environment Rule
