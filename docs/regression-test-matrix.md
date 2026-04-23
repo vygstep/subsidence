@@ -12,19 +12,21 @@ This matrix turns critical user workflows into executable test work items. It is
 
 Current automated tests:
 
-- Backend: `21 passed` via `cd app && pytest tests`
-- Frontend: `25 passed` via `cd frontend && npm run test -- --run`
+- Backend: `27 passed` via `cd app && pytest tests`
+- Frontend: `28 passed` via `cd frontend && npm run test -- --run`
 
 Existing backend tests:
 
 - `app/tests/unit/test_backstrip.py`
 - `app/tests/integration/test_formation_crud.py`
 - `app/tests/integration/test_formation_depth_persistence.py`
+- `app/tests/integration/test_project_api_workflows.py`
 
 Existing frontend tests:
 
 - `frontend/src/__tests__/unit/depthClipping.test.ts`
 - `frontend/src/__tests__/integration/FormationDepthDrag.integration.test.ts`
+- `frontend/src/__tests__/integration/ImportDialogTargetWell.integration.test.tsx`
 - `frontend/src/__tests__/integration/WellSwitching.integration.test.ts`
 
 ---
@@ -79,17 +81,17 @@ These protect `projects.py`, `importers.py`, `project_manager.py`, `engine.py`, 
 | ID | Workflow | Current coverage | Planned test file | Layer | Status |
 |---|---|---|---|---|---|
 | BE-P0-001 | Health endpoint returns OK | missing | `app/tests/api/test_health.py` | Backend API | planned |
-| BE-P0-002 | Create project in temp directory | missing | `app/tests/api/test_project_lifecycle.py` | Backend API | planned |
-| BE-P0-003 | Open existing project | missing | `app/tests/api/test_project_lifecycle.py` | Backend API | planned |
-| BE-P0-004 | Save project and reopen without data loss | missing | `app/tests/api/test_project_lifecycle.py` | Backend API | planned |
-| BE-P0-005 | Close project clears open state | missing | `app/tests/api/test_project_lifecycle.py` | Backend API | planned |
-| BE-P0-006 | Recent projects updated after create/open | missing | `app/tests/api/test_project_lifecycle.py` | Backend API | planned |
-| BE-P0-007 | Create well through API | missing | `app/tests/api/test_well_lifecycle.py` | Backend API | planned |
-| BE-P0-008 | Delete well removes related project data | missing | `app/tests/api/test_well_lifecycle.py` | Backend API | planned |
-| BE-P0-009 | Visual config save/load project scope | missing | `app/tests/api/test_visual_config.py` | Backend API | planned |
-| BE-P0-010 | Visual config save/load well scope | missing | `app/tests/api/test_visual_config.py` | Backend API | planned |
-| BE-P0-011 | Checkpoint create/list/restore/delete | missing | `app/tests/api/test_checkpoints.py` | Backend API | planned |
-| BE-P0-012 | Undo/redo API changes project state | missing | `app/tests/api/test_undo_redo.py` | Backend API | planned |
+| BE-P0-002 | Create project in temp directory | missing | `app/tests/integration/test_project_api_workflows.py` | Backend API | implemented |
+| BE-P0-003 | Open existing project | missing | `app/tests/integration/test_project_api_workflows.py` | Backend API | implemented |
+| BE-P0-004 | Save project and reopen without data loss | missing | `app/tests/integration/test_project_api_workflows.py` | Backend API | implemented |
+| BE-P0-005 | Close project clears open state | missing | `app/tests/integration/test_project_api_workflows.py` | Backend API | implemented |
+| BE-P0-006 | Recent projects updated after create/open | missing | `app/tests/integration/test_project_api_workflows.py` | Backend API | implemented |
+| BE-P0-007 | Create well through API | missing | `app/tests/integration/test_project_api_workflows.py` | Backend API | implemented |
+| BE-P0-008 | Delete well removes related project data | missing | `app/tests/integration/test_project_api_workflows.py` | Backend API | implemented |
+| BE-P0-009 | Visual config save/load project scope | missing | `app/tests/integration/test_project_api_workflows.py` | Backend API | implemented |
+| BE-P0-010 | Visual config save/load well scope | missing | `app/tests/integration/test_project_api_workflows.py` | Backend API | implemented |
+| BE-P0-011 | Checkpoint create/list/restore/delete | missing | `app/tests/integration/test_project_api_workflows.py` | Backend API | implemented |
+| BE-P0-012 | Undo/redo API changes project state | missing | `app/tests/integration/test_project_api_workflows.py` | Backend API | implemented |
 
 ### P0: Must Exist Before Importer Refactor
 
@@ -99,14 +101,14 @@ These protect `data/importers.py`, `data/loaders.py`, curve payload paths, well 
 |---|---|---|---|---|---|
 | BE-P0-101 | Import LAS into explicit existing well | missing | `app/tests/api/test_import_las.py` | Backend API | planned |
 | BE-P0-102 | Import LAS auto-creates well when no target exists | missing | `app/tests/api/test_import_las.py` | Backend API | planned |
-| BE-P0-103 | Import logs CSV comma delimiter | missing | `app/tests/api/test_import_logs_csv.py` | Backend API | planned |
-| BE-P0-104 | Import logs CSV tab delimiter | missing | `app/tests/api/test_import_logs_csv.py` | Backend API | planned |
+| BE-P0-103 | Import logs CSV comma delimiter | missing | `app/tests/integration/test_project_api_workflows.py` | Backend API | implemented |
+| BE-P0-104 | Import logs CSV tab delimiter | missing | `app/tests/integration/test_project_api_workflows.py` | Backend API | implemented |
 | BE-P0-105 | Logs CSV without well name imports into active/target well | missing | `app/tests/api/test_import_logs_csv.py` | Backend API | planned |
 | BE-P0-106 | Duplicate well name is reused unless explicit create-new policy | missing | `app/tests/api/test_import_target_well.py` | Backend API | planned |
-| BE-P0-107 | Import tops into explicit well | missing | `app/tests/api/test_import_tops.py` | Backend API | planned |
+| BE-P0-107 | Import tops into explicit well | missing | `app/tests/integration/test_project_api_workflows.py` | Backend API | implemented |
 | BE-P0-108 | Import tops links/colors against active strat chart | missing | `app/tests/api/test_import_tops.py` | Backend API | planned |
-| BE-P0-109 | Import deviation into explicit well | missing | `app/tests/api/test_import_deviation.py` | Backend API | planned |
-| BE-P0-110 | Save/reopen after LAS/logs/tops/deviation imports | missing | `app/tests/api/test_import_reopen.py` | Backend API | planned |
+| BE-P0-109 | Import deviation into explicit well | missing | `app/tests/integration/test_project_api_workflows.py` | Backend API | implemented |
+| BE-P0-110 | Save/reopen after LAS/logs/tops/deviation imports | missing | `app/tests/integration/test_project_api_workflows.py` | Backend API | partial: logs save/reopen implemented |
 
 ### P1: Stratigraphy and Formations
 
@@ -115,9 +117,9 @@ These protect `data/importers.py`, `data/loaders.py`, curve payload paths, well 
 | BE-P1-001 | Formation CRUD through API endpoints | backend data-layer only | `app/tests/api/test_formations_api.py` | Backend API | planned |
 | BE-P1-002 | Formation depth update through API | backend data-layer only | `app/tests/api/test_formations_api.py` | Backend API | planned |
 | BE-P1-003 | Formation strat-link create/update through API | missing | `app/tests/api/test_formation_strat_link.py` | Backend API | planned |
-| BE-P1-004 | Load strat chart CSV | missing | `app/tests/api/test_strat_charts.py` | Backend API | planned |
-| BE-P1-005 | Activate strat chart changes active chart only | missing | `app/tests/api/test_strat_charts.py` | Backend API | planned |
-| BE-P1-006 | Delete current non-built-in strat chart only | missing | `app/tests/api/test_strat_charts.py` | Backend API | planned |
+| BE-P1-004 | Load strat chart CSV | missing | `app/tests/integration/test_project_api_workflows.py` | Backend API | implemented |
+| BE-P1-005 | Activate strat chart changes active chart only | missing | `app/tests/integration/test_project_api_workflows.py` | Backend API | implemented |
+| BE-P1-006 | Delete current non-built-in strat chart only | missing | `app/tests/integration/test_project_api_workflows.py` | Backend API | implemented |
 | BE-P1-007 | Built-in ICS chart cannot be deleted | missing | `app/tests/api/test_strat_charts.py` | Backend API | planned |
 
 ### P1: Frontend Project and Data Manager
@@ -128,7 +130,7 @@ These protect `projectStore.ts`, `workspaceStore.ts`, `wellDataStore.ts`, `DataM
 |---|---|---|---|---|---|
 | FE-P1-001 | Project open hydrates visual config before well view state | missing | `frontend/src/__tests__/integration/ProjectOpen.integration.test.ts` | Frontend store | planned |
 | FE-P1-002 | Per-well visual config persists track order and curve config | missing | `frontend/src/__tests__/integration/VisualConfig.integration.test.ts` | Frontend store | planned |
-| FE-P1-003 | Active target well preselected in import dialogs | missing | `frontend/src/__tests__/integration/ImportDialogTargetWell.integration.test.tsx` | Frontend component | planned |
+| FE-P1-003 | Active target well preselected in import dialogs | missing | `frontend/src/__tests__/integration/ImportDialogTargetWell.integration.test.tsx` | Frontend component | implemented |
 | FE-P1-004 | Data Manager shows all wells, not only active well | manual only | `frontend/src/__tests__/integration/DataManagerTree.integration.test.tsx` | Frontend component | planned |
 | FE-P1-005 | Data Manager selection routes to correct settings object | missing | `frontend/src/__tests__/integration/SettingsRouting.integration.test.tsx` | Frontend component | planned |
 | FE-P1-006 | Context menu duplicate/delete/rename appears for supported objects | missing | `frontend/src/__tests__/integration/DataManagerContextMenu.integration.test.tsx` | Frontend component | planned |
@@ -198,4 +200,3 @@ After this matrix is committed:
 - `todo.md` should point to M3 unless test implementation is intentionally pulled forward.
 - M5 should use this matrix as the execution list.
 - When a planned test is implemented, update its row from `planned` to `implemented`.
-

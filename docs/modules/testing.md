@@ -24,8 +24,8 @@ pytest tests
 
 Baseline from 2026-04-23:
 
-- Frontend: 25 passed.
-- Backend: 21 passed.
+- Frontend: 28 passed.
+- Backend: 27 passed.
 
 ---
 
@@ -33,12 +33,18 @@ Baseline from 2026-04-23:
 
 Frontend:
 
+- Active target well preselection in import dialogs.
 - Formation drag optimistic update and debounce.
 - Well switching.
 - Depth clipping.
 
 Backend:
 
+- Project create/open/save/close/reopen and recent projects through API.
+- Logs CSV comma/tab import through API.
+- Tops, deviation, and strat chart API workflows.
+- Visual config project/well scope persistence.
+- Undo/redo, delete well, and checkpoint create/restore/delete through API.
 - Formation CRUD at data layer.
 - Formation depth persistence.
 - Backstrip unit behavior.
@@ -49,20 +55,8 @@ Backend:
 
 Missing high-priority workflows:
 
-- Create/open/save/close/reopen project.
-- Recent projects.
 - LAS import.
-- Logs CSV import with comma delimiter.
-- Logs CSV import with tab delimiter.
-- Tops import.
-- Deviation import.
-- Active target well import behavior.
-- Delete well.
-- Strat chart load/delete/current behavior.
 - Built-in ICS chart immutability.
-- Visual config save/load per well.
-- Undo/redo through API.
-- Checkpoint create/restore/delete.
 - Data Manager selection and settings routing.
 - Context menus.
 - Track reorder/config persistence.
