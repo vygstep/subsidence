@@ -2,6 +2,8 @@
 
 This module tracks current test coverage and the required regression direction.
 
+Detailed workflow-level planning lives in `docs/regression-test-matrix.md`.
+
 ---
 
 ## Current Commands
@@ -66,6 +68,8 @@ Missing high-priority workflows:
 - Track reorder/config persistence.
 - Subsidence WebSocket recalculation.
 - PNG/export behavior.
+
+See `docs/regression-test-matrix.md` for planned test IDs, files, layers, and execution order.
 
 ---
 

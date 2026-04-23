@@ -50,6 +50,7 @@ Frontend:
 Quality:
 
 - [Testing](modules/testing.md): current tests, missing coverage, and regression matrix ownership.
+- [Regression Test Matrix](regression-test-matrix.md): workflow-level test worklist.
 - [Logging](modules/logging.md): planned backend/frontend process logging contract.
 
 ---
