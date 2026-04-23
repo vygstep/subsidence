@@ -12,8 +12,8 @@ This matrix turns critical user workflows into executable test work items. It is
 
 Current automated tests:
 
-- Backend: `27 passed` via `cd app && pytest tests`
-- Frontend: `28 passed` via `cd frontend && npm run test -- --run`
+- Backend: `30 passed` via `cd app && pytest tests`
+- Frontend: `34 passed` via `cd frontend && npm run test -- --run`
 
 Existing backend tests:
 
@@ -25,8 +25,11 @@ Existing backend tests:
 Existing frontend tests:
 
 - `frontend/src/__tests__/unit/depthClipping.test.ts`
+- `frontend/src/__tests__/integration/DataManagerTree.integration.test.tsx`
 - `frontend/src/__tests__/integration/FormationDepthDrag.integration.test.ts`
 - `frontend/src/__tests__/integration/ImportDialogTargetWell.integration.test.tsx`
+- `frontend/src/__tests__/integration/ProjectToolbarMenu.integration.test.tsx`
+- `frontend/src/__tests__/integration/VisualConfigHydration.integration.test.ts`
 - `frontend/src/__tests__/integration/WellSwitching.integration.test.ts`
 
 ---
@@ -100,7 +103,7 @@ These protect `data/importers.py`, `data/loaders.py`, curve payload paths, well 
 | ID | Workflow | Current coverage | Planned test file | Layer | Status |
 |---|---|---|---|---|---|
 | BE-P0-101 | Import LAS into explicit existing well | missing | `app/tests/api/test_import_las.py` | Backend API | planned |
-| BE-P0-102 | Import LAS auto-creates well when no target exists | missing | `app/tests/api/test_import_las.py` | Backend API | planned |
+| BE-P0-102 | Import LAS auto-creates well when no target exists | missing | `app/tests/integration/test_project_api_workflows.py` | Backend API | implemented |
 | BE-P0-103 | Import logs CSV comma delimiter | missing | `app/tests/integration/test_project_api_workflows.py` | Backend API | implemented |
 | BE-P0-104 | Import logs CSV tab delimiter | missing | `app/tests/integration/test_project_api_workflows.py` | Backend API | implemented |
 | BE-P0-105 | Logs CSV without well name imports into active/target well | missing | `app/tests/api/test_import_logs_csv.py` | Backend API | planned |
@@ -108,7 +111,7 @@ These protect `data/importers.py`, `data/loaders.py`, curve payload paths, well 
 | BE-P0-107 | Import tops into explicit well | missing | `app/tests/integration/test_project_api_workflows.py` | Backend API | implemented |
 | BE-P0-108 | Import tops links/colors against active strat chart | missing | `app/tests/api/test_import_tops.py` | Backend API | planned |
 | BE-P0-109 | Import deviation into explicit well | missing | `app/tests/integration/test_project_api_workflows.py` | Backend API | implemented |
-| BE-P0-110 | Save/reopen after LAS/logs/tops/deviation imports | missing | `app/tests/integration/test_project_api_workflows.py` | Backend API | partial: logs save/reopen implemented |
+| BE-P0-110 | Save/reopen after LAS/logs/tops/deviation imports | missing | `app/tests/integration/test_project_api_workflows.py` | Backend API | partial: LAS/logs save/reopen implemented |
 
 ### P1: Stratigraphy and Formations
 
@@ -120,7 +123,7 @@ These protect `data/importers.py`, `data/loaders.py`, curve payload paths, well 
 | BE-P1-004 | Load strat chart CSV | missing | `app/tests/integration/test_project_api_workflows.py` | Backend API | implemented |
 | BE-P1-005 | Activate strat chart changes active chart only | missing | `app/tests/integration/test_project_api_workflows.py` | Backend API | implemented |
 | BE-P1-006 | Delete current non-built-in strat chart only | missing | `app/tests/integration/test_project_api_workflows.py` | Backend API | implemented |
-| BE-P1-007 | Built-in ICS chart cannot be deleted | missing | `app/tests/api/test_strat_charts.py` | Backend API | planned |
+| BE-P1-007 | Built-in ICS chart cannot be deleted | missing | `app/tests/integration/test_project_api_workflows.py` | Backend API | implemented |
 
 ### P1: Frontend Project and Data Manager
 
@@ -131,8 +134,8 @@ These protect `projectStore.ts`, `workspaceStore.ts`, `wellDataStore.ts`, `DataM
 | FE-P1-001 | Project open hydrates visual config before well view state | missing | `frontend/src/__tests__/integration/ProjectOpen.integration.test.ts` | Frontend store | planned |
 | FE-P1-002 | Per-well visual config persists track order and curve config | missing | `frontend/src/__tests__/integration/VisualConfig.integration.test.ts` | Frontend store | planned |
 | FE-P1-003 | Active target well preselected in import dialogs | missing | `frontend/src/__tests__/integration/ImportDialogTargetWell.integration.test.tsx` | Frontend component | implemented |
-| FE-P1-004 | Data Manager shows all wells, not only active well | manual only | `frontend/src/__tests__/integration/DataManagerTree.integration.test.tsx` | Frontend component | planned |
-| FE-P1-005 | Data Manager selection routes to correct settings object | missing | `frontend/src/__tests__/integration/SettingsRouting.integration.test.tsx` | Frontend component | planned |
+| FE-P1-004 | Data Manager shows all wells, not only active well | manual only | `frontend/src/__tests__/integration/DataManagerTree.integration.test.tsx` | Frontend component | implemented |
+| FE-P1-005 | Data Manager selection routes to correct settings object | missing | `frontend/src/__tests__/integration/DataManagerTree.integration.test.tsx` | Frontend component | partial: well/curve/top selection implemented |
 | FE-P1-006 | Context menu duplicate/delete/rename appears for supported objects | missing | `frontend/src/__tests__/integration/DataManagerContextMenu.integration.test.tsx` | Frontend component | planned |
 | FE-P1-007 | LAS folder checkbox toggles all curves | missing | `frontend/src/__tests__/integration/DataManagerVisibility.integration.test.tsx` | Frontend component | planned |
 | FE-P1-008 | TOPS tri-state checkbox empty/partial/all behavior | manual only | `frontend/src/__tests__/integration/DataManagerVisibility.integration.test.tsx` | Frontend component | planned |
@@ -154,9 +157,9 @@ These protect `projectStore.ts`, `workspaceStore.ts`, `wellDataStore.ts`, `DataM
 | ID | Workflow | Current coverage | Planned test file | Layer | Status |
 |---|---|---|---|---|---|
 | BE-P2-001 | Backstrip pure calculation | existing | `app/tests/unit/test_backstrip.py` | Backend unit | keep |
-| BE-P2-002 | Subsidence REST calculation stores result | missing | `app/tests/api/test_subsidence.py` | Backend API | planned |
-| BE-P2-003 | Stored subsidence results load for multi-well panel | missing | `app/tests/api/test_subsidence.py` | Backend API | planned |
-| BE-P2-004 | WebSocket recalculation returns success/error payloads | missing | `app/tests/api/test_subsidence_ws.py` | Backend API/WS | planned |
+| BE-P2-002 | Subsidence REST calculation stores result | missing | `app/tests/integration/test_project_api_workflows.py` | Backend API | partial: REST calculation covered, WS stores result |
+| BE-P2-003 | Stored subsidence results load for multi-well panel | missing | `app/tests/integration/test_project_api_workflows.py` | Backend API | implemented |
+| BE-P2-004 | WebSocket recalculation returns success/error payloads | missing | `app/tests/integration/test_project_api_workflows.py` | Backend API/WS | implemented |
 | FE-P2-001 | `computedStore` sends recalculation and handles timeout/error | missing | `frontend/src/__tests__/integration/SubsidenceRecalculation.integration.test.ts` | Frontend store | planned |
 | FE-P2-002 | Export PNG calls download path with non-empty canvas target | missing | `frontend/src/__tests__/unit/exportPng.test.ts` | Frontend unit | planned |
 

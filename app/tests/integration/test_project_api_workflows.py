@@ -31,6 +31,31 @@ def _create_project(client: TestClient, tmp_path: Path, name: str = 'workflow') 
     return project_path
 
 
+def _write_minimal_las(path: Path, well_name: str = 'LAS Well') -> Path:
+    path.write_text(
+        '~Version Information\n'
+        ' VERS. 2.0 : CWLS LOG ASCII STANDARD\n'
+        ' WRAP. NO  : One line per depth step\n'
+        '~Well Information\n'
+        ' STRT.M 100.0 : Start depth\n'
+        ' STOP.M 300.0 : Stop depth\n'
+        ' STEP.M 100.0 : Step\n'
+        ' NULL. -999.25 : Null value\n'
+        f' WELL. {well_name} : Well name\n'
+        ' KB.M 15.0 : Kelly bushing\n'
+        '~Curve Information\n'
+        ' DEPT.M : Depth\n'
+        ' GR.API : Gamma ray\n'
+        ' RHOB.G/C3 : Bulk density\n'
+        '~ASCII\n'
+        '100.0 80.0 2.35\n'
+        '200.0 85.0 2.40\n'
+        '300.0 90.0 2.45\n',
+        encoding='utf-8',
+    )
+    return path
+
+
 def test_project_lifecycle_save_close_reopen_preserves_wells(api_client: TestClient, tmp_path: Path):
     project_path = _create_project(api_client, tmp_path, 'lifecycle')
 
@@ -110,6 +135,32 @@ def test_logs_csv_import_supports_comma_and_tab_delimiters(api_client: TestClien
     assert [curve['mnemonic'] for curve in wells[0]['curves']] == ['GR', 'RT', 'CALI']
 
 
+def test_las_import_auto_creates_well_and_survives_reopen(api_client: TestClient, tmp_path: Path):
+    project_path = _create_project(api_client, tmp_path, 'las-import')
+    las_path = _write_minimal_las(tmp_path / 'minimal.las')
+
+    response = api_client.post('/api/projects/import-las', json={'las_path': str(las_path)})
+    assert response.status_code == 200, response.text
+    payload = response.json()
+    well_id = payload['well_id']
+    assert payload['well_name'] == 'LAS Well'
+    assert payload['curve_count'] == 2
+
+    response = api_client.post('/api/projects/save')
+    assert response.status_code == 200, response.text
+    response = api_client.post('/api/projects/close')
+    assert response.status_code == 200, response.text
+    response = api_client.post('/api/projects/open', json={'path': str(project_path)})
+    assert response.status_code == 200, response.text
+
+    response = api_client.get('/api/wells/inventory')
+    assert response.status_code == 200, response.text
+    wells = response.json()
+    assert [well['well_id'] for well in wells] == [well_id]
+    assert wells[0]['well_name'] == 'LAS Well'
+    assert [curve['mnemonic'] for curve in wells[0]['curves']] == ['GR', 'RHOB']
+
+
 def test_tops_deviation_and_strat_chart_workflows(api_client: TestClient, tmp_path: Path):
     _create_project(api_client, tmp_path, 'geology')
     response = api_client.post('/api/projects/wells', json={
@@ -174,6 +225,62 @@ def test_tops_deviation_and_strat_chart_workflows(api_client: TestClient, tmp_pa
     well = response.json()[0]
     assert len(well['formations']) == 2
     assert well['deviation']['mode'] == 'INCL_AZIM'
+
+
+def test_builtin_ics_chart_cannot_be_deleted(api_client: TestClient, tmp_path: Path):
+    _create_project(api_client, tmp_path, 'builtin-chart')
+
+    response = api_client.get('/api/strat-charts')
+    assert response.status_code == 200, response.text
+    builtin_chart = next(chart for chart in response.json() if chart['is_builtin'])
+
+    response = api_client.delete(f"/api/strat-charts/{builtin_chart['id']}")
+    assert response.status_code == 403, response.text
+
+    response = api_client.get('/api/strat-charts')
+    assert response.status_code == 200, response.text
+    assert any(chart['id'] == builtin_chart['id'] for chart in response.json())
+
+
+def test_subsidence_rest_and_websocket_recalculation(api_client: TestClient, tmp_path: Path):
+    _create_project(api_client, tmp_path, 'subsidence-calc')
+    response = api_client.post('/api/projects/wells', json={
+        'name': 'Subsidence Well',
+        'x': 0.0,
+        'y': 0.0,
+        'kb': 10.0,
+        'td': 900.0,
+        'crs': 'local',
+    })
+    assert response.status_code == 200, response.text
+    well_id = response.json()['well_id']
+
+    for payload in [
+        {'name': 'Top A', 'depth_md': 100.0, 'age_ma': 10.0, 'color': '#aaaaaa'},
+        {'name': 'Top B', 'depth_md': 400.0, 'age_ma': 30.0, 'color': '#bbbbbb'},
+        {'name': 'Top C', 'depth_md': 700.0, 'age_ma': 60.0, 'color': '#cccccc'},
+    ]:
+        response = api_client.post(f'/api/wells/{well_id}/formations', json=payload)
+        assert response.status_code == 201, response.text
+
+    response = api_client.post(f'/api/wells/{well_id}/subsidence')
+    assert response.status_code == 200, response.text
+    rest_results = response.json()
+    assert rest_results
+    assert rest_results[0]['burial_path']
+
+    with api_client.websocket_connect('/api/ws/recalculate') as websocket:
+        websocket.send_json({'well_id': well_id, 'water_depth_m': 0.0})
+        computing = websocket.receive_json()
+        assert computing['status'] == 'computing'
+        complete = websocket.receive_json()
+        assert complete['status'] == 'complete'
+        assert complete['results']
+
+    response = api_client.get('/api/subsidence/stored-results')
+    assert response.status_code == 200, response.text
+    stored = response.json()
+    assert [item['well_id'] for item in stored] == [well_id]
 
 
 def test_visual_config_persists_project_and_well_scopes(api_client: TestClient, tmp_path: Path):

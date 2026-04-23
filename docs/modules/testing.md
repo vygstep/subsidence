@@ -24,8 +24,8 @@ pytest tests
 
 Baseline from 2026-04-23:
 
-- Frontend: 28 passed.
-- Backend: 27 passed.
+- Frontend: 34 passed.
+- Backend: 30 passed.
 
 ---
 
@@ -34,15 +34,21 @@ Baseline from 2026-04-23:
 Frontend:
 
 - Active target well preselection in import dialogs.
+- Data Manager all-wells tree, group expansion, and well/curve/top selection callbacks.
 - Formation drag optimistic update and debounce.
+- Project menu actions and undo/redo wiring.
+- Project visual config hydration into view and curve stores.
 - Well switching.
 - Depth clipping.
 
 Backend:
 
 - Project create/open/save/close/reopen and recent projects through API.
+- LAS import auto-create and save/reopen through API.
 - Logs CSV comma/tab import through API.
 - Tops, deviation, and strat chart API workflows.
+- Built-in ICS chart delete protection.
+- Subsidence REST calculation, WebSocket recalculation, and stored result loading.
 - Visual config project/well scope persistence.
 - Undo/redo, delete well, and checkpoint create/restore/delete through API.
 - Formation CRUD at data layer.
@@ -55,12 +61,10 @@ Backend:
 
 Missing high-priority workflows:
 
-- LAS import.
-- Built-in ICS chart immutability.
-- Data Manager selection and settings routing.
+- LAS import into explicit existing well.
+- Full Data Manager settings inspector routing for every object type.
 - Context menus.
 - Track reorder/config persistence.
-- Subsidence WebSocket recalculation.
 - PNG/export behavior.
 
 See `docs/regression-test-matrix.md` for planned test IDs, files, layers, and execution order.
