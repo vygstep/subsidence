@@ -13,6 +13,7 @@ Rules:
 
 ## Active Contracts
 
+- [Bugs and Feature Backlog](docs/contracts/bugs_and_features.md)
 - [1D Well Model Architecture](docs/contracts/well_1d_model_architecture.md)
 - [1D Well Model Summary](docs/contracts/well_1d_model_summary.md)
 
@@ -26,5 +27,4 @@ M0-M7 maintenance cycle complete. Test baseline as of 2026-04-23: **backend 30 p
 
 ## Future Work
 
-- [ ] Create and execute `Import Wizard Contract`.
 - [ ] Review and schedule [1D Well Model Architecture](docs/contracts/well_1d_model_architecture.md) and [1D Well Model Summary](docs/contracts/well_1d_model_summary.md).
