@@ -66,40 +66,21 @@ Registered route families:
 
 ### Project API
 
-File:
+Files:
 
-- `app/src/subsidence/api/projects.py`
+- `app/src/subsidence/api/projects.py` — lifecycle, path helpers, shared models
+- `app/src/subsidence/api/projects_imports.py` — import endpoints (LAS, logs CSV, tops, unconformities, deviation)
+- `app/src/subsidence/api/projects_config.py` — undo/redo, checkpoints, dictionaries, visual config
+- `app/src/subsidence/api/projects_export.py` — LAS/CSV export
 
-Responsibilities:
+All four routers share the `/api/projects` prefix and are registered in `main.py`. Public API paths are unchanged.
 
-- Project create/open/save/close/status/recent.
-- Native path picking/reveal helpers.
-- Import endpoints for LAS, logs CSV, tops, unconformities, and deviation.
-- Undo/redo and checkpoints.
-- Dictionary endpoints.
-- Visual config endpoints.
-- LAS/CSV export endpoints.
-
-Main endpoint groups:
-
-- Project lifecycle: create, open, save, close, status, recent.
-- Native path helpers: reveal path, pick folder, pick file.
-- Well management: create well, delete well.
-- Imports: LAS, logs CSV, tops, unconformities, deviation.
-- Undo/redo and checkpoints.
-- Dictionaries: curve rules and lithology defaults.
-- Visual config persistence.
-- Export: LAS and CSV.
+`projects.py` also owns all Pydantic models and helpers used across the split files.
 
 Risk:
 
-- This file is large and mixes API validation, platform dialogs, project lifecycle, import orchestration, dictionaries, visual config, and export.
-- Native path picking uses platform dialogs from this router; treat it as blocking platform integration when adding logging or async behavior.
-
-Refactor direction:
-
-- Keep API paths stable.
-- Extract service helpers for project lifecycle, import orchestration, visual config, dictionaries, and export.
+- Native path picking endpoints in `projects.py` use platform-blocking dialogs. Do not make them async.
+- Shared models are imported by the other three files; renaming models in `projects.py` requires updating those imports.
 
 ### Well API
 
@@ -260,53 +241,21 @@ Rule:
 
 ### Importers
 
-File:
+Files:
 
-- `app/src/subsidence/data/importers.py`
-- `app/src/subsidence/data/loaders.py`
+- `app/src/subsidence/data/importers/__init__.py` — re-exports all public symbols
+- `app/src/subsidence/data/importers/common.py` — shared helpers, well resolution, payload writing
+- `app/src/subsidence/data/importers/las.py` — LAS import
+- `app/src/subsidence/data/importers/logs_csv.py` — logs CSV import
+- `app/src/subsidence/data/importers/tops.py` — tops and unconformities import
+- `app/src/subsidence/data/importers/deviation.py` — deviation import
+- `app/src/subsidence/data/loaders.py` — read curve and deviation payloads from Parquet
 
-Responsibilities:
-
-- Create empty wells.
-- Resolve or create wells from incoming data.
-- Read LAS.
-- Read logs CSV.
-- Read tops and unconformities CSV.
-- Read deviation CSV.
-- Write curve payload Parquet files.
-- Apply imported metadata and link stratigraphy.
-
-`loaders.py` responsibilities:
-
-- Read LAS curves for quick/static loading.
-- Read curve payloads from Parquet.
-- Read deviation payloads from Parquet.
+Public function signatures are unchanged. All callers import from `data.importers` (the package).
 
 Risk:
 
-- This is the largest backend file and the most important correctness hotspot.
-
-Refactor direction:
-
-- Split into:
-  - `importers/common.py`
-  - `importers/well_resolution.py`
-  - `importers/las.py`
-  - `importers/logs_csv.py`
-  - `importers/tops.py`
-  - `importers/deviation.py`
-
-Do this only after API tests exist for import workflows.
-
-Do not refactor before tests:
-
-- LAS import into existing well.
-- LAS import auto-creates well.
-- Logs CSV import with comma delimiter.
-- Logs CSV import with tab delimiter.
-- Tops import and active chart linking.
-- Deviation import.
-- Save/reopen after every import type.
+- This is the most important backend correctness hotspot. Behavior bugs here affect all import workflows.
 
 ### Undo and checkpoints
 
@@ -430,7 +379,10 @@ Files:
 - `frontend/src/components/layout/WellDataPanel.tsx`
 - `frontend/src/components/layout/StratChartTab.tsx`
 - `frontend/src/components/layout/CompactionModelsTab.tsx`
-- `frontend/src/components/layout/useDataManagerController.ts`
+- `frontend/src/components/layout/useDataManagerController.ts` — thin coordinator hook
+- `frontend/src/components/layout/dataManagerSelection.ts` — object selection handlers
+- `frontend/src/components/layout/dataManagerVisibility.ts` — toggle/visibility handlers
+- `frontend/src/components/layout/dataManagerActions.ts` — context menu action handlers
 - `frontend/src/components/layout/pathMemory.ts`
 
 Responsibilities:
@@ -441,35 +393,32 @@ Responsibilities:
 - Object actions: duplicate, delete, rename, link, add/remove visualization items.
 - Last project/import root memory.
 
+`useDataManagerController.ts` calls `makeSelectionHandlers`, `makeVisibilityHandlers`, and `makeActionHandlers` each render and returns a unified public shape.
+
 Risk:
 
-- `useDataManagerController.ts` is a dense interaction controller. It should be split after tests are added.
 - `WellDataPanel.tsx` renders both tree structure and visibility controls. UI bugs can be state bugs or rendering bugs.
 
 ### Settings pane
 
 Files:
 
-- `frontend/src/components/layout/SettingsInspector.tsx`
+- `frontend/src/components/layout/SettingsInspector.tsx` — dispatcher by selected object type
 - `frontend/src/components/layout/SettingsPaneShell.tsx`
+- `frontend/src/components/layout/settings/WellSettings.tsx`
+- `frontend/src/components/layout/settings/DepthTrackSettings.tsx`
+- `frontend/src/components/layout/settings/FormationsTrackSettings.tsx`
+- `frontend/src/components/layout/settings/LasSettings.tsx`
+- `frontend/src/components/layout/settings/CurveSettings.tsx`
+- `frontend/src/components/layout/settings/TopsSettings.tsx`
+- `frontend/src/components/layout/settings/TopPickSettings.tsx`
+- `frontend/src/components/layout/settings/StratChartSettings.tsx`
+- `frontend/src/components/layout/settings/ModelSettings.tsx`
 
 Responsibilities:
 
 - Show editor for the selected object.
-- Edit well metadata, LAS/curve settings, tops settings, strat chart stats, compaction model settings.
-
-Risk:
-
-- `SettingsInspector.tsx` contains many inspector types in one file.
-
-Refactor direction:
-
-- Split into inspectors by object type:
-  - `WellSettingsInspector`
-  - `CurveSettingsInspector`
-  - `TopsSettingsInspector`
-  - `StratChartSettingsInspector`
-  - `CompactionModelInspector`
+- `SettingsInspector.tsx` dispatches to the matching settings component based on `selectedObject.type`.
 
 ### Toolbar and dialogs
 
@@ -565,27 +514,15 @@ Known historical risk:
 
 ### Styling
 
-File:
+Files:
 
-- `frontend/src/index.css`
-
-Responsibilities:
-
-- Global application styles and component styles.
-
-Risk:
-
-- This file is too large. Layout fixes can cascade into unrelated components.
-
-Refactor direction:
-
-- Split after behavior is stable:
-  - layout shell
-  - toolbar/dialogs
-  - data manager
-  - log viewer
-  - subsidence panel
-  - settings/status
+- `frontend/src/index.css` — `@import` index only
+- `frontend/src/styles/base.css` — reset rules, `:root`, `html/body`
+- `frontend/src/styles/app-layout.css` — app shell, topbar, status bar, sidebar, workspace layout
+- `frontend/src/styles/data-manager.css` — sidebar panels, trees, top leaves, template panels, compaction table
+- `frontend/src/styles/log-view.css` — depth track, data track, formation column, track headers, log view panel
+- `frontend/src/styles/dialogs.css` — project dialog
+- `frontend/src/styles/subsidence-panel.css` — split view, subsidence panel, toolbar, canvas, timescale
 
 ---
 
@@ -662,13 +599,13 @@ Implementation files:
 | Project cannot open/save/reopen | `projectStore.ts`, `api/projects.py`, `data/project_manager.py` |
 | Recent projects wrong | `projectStore.ts`, `data/project_manager.py`, `api/projects.py` |
 | Native file/folder picker wrong | `FileOpenDialog.tsx`, import dialogs, `pathMemory.ts`, `api/projects.py` |
-| LAS/log CSV imports into wrong well | import dialog, `projectStore.ts`, `data/importers.py`, `api/projects.py` |
-| Logs CSV delimiter problem | `data/importers.py`, `ImportLasDialog.tsx`, `api/projects.py` |
-| Tops colors/links wrong | `data/importers.py`, `data/strat_link.py`, `api/formations.py`, `StratChartTab.tsx` |
+| LAS/log CSV imports into wrong well | import dialog, `projectStore.ts`, `importers/common.py`, `api/projects_imports.py` |
+| Logs CSV delimiter problem | `importers/logs_csv.py`, `ImportLasDialog.tsx`, `api/projects_imports.py` |
+| Tops colors/links wrong | `importers/tops.py`, `data/strat_link.py`, `api/formations.py`, `StratChartTab.tsx` |
 | Data Manager tree wrong | `WellDataPanel.tsx`, `DataManagerPane.tsx`, `useDataManagerController.ts` |
 | Data Manager context menu slow/wrong | `useDataManagerController.ts`, `DataManagerPane.tsx`, `WellDataPanel.tsx` |
-| Settings pane wrong object | `viewStore.ts`, `SettingsInspector.tsx`, Data Manager selection code |
-| Well settings not saved | `SettingsInspector.tsx`, `wellDataStore.ts`, `api/wells.py` |
+| Settings pane wrong object | `viewStore.ts`, `SettingsInspector.tsx`, `dataManagerSelection.ts` |
+| Well settings not saved | `settings/WellSettings.tsx`, `wellDataStore.ts`, `api/wells.py` |
 | Track display wrong | `workspaceStore.ts`, `LogViewPanel.tsx`, `TrackHeaderRow.tsx`, `DataTrack.tsx` |
 | Track order wrong after reopen | `workspaceStore.ts`, `projectStore.ts`, `TrackHeaderRow.tsx`, `api/projects.py` visual config |
 | Curve rendering wrong | `DataTrack.tsx`, `renderers/*`, `hooks/useCanvasRenderer.ts` |
@@ -679,7 +616,7 @@ Implementation files:
 | Undo/redo wrong | `projectStore.ts`, `api/projects.py`, `data/undo.py` |
 | Subsidence panel blank/wrong | `computedStore.ts`, `api/subsidenceSocket.ts`, `MultiWellPanel.tsx`, `SubsidenceCanvas.tsx`, `api/subsidence.py` |
 | Export wrong | `utils/exportPng.ts`, `api/projects.py`, `SubsidenceControls.tsx` |
-| Layout scroll/resizer bug | `index.css`, `SplitView.tsx`, `DataManagerPane.tsx`, `MultiWellPanel.tsx` |
+| Layout scroll/resizer bug | `styles/app-layout.css`, `styles/subsidence-panel.css`, `SplitView.tsx`, `DataManagerPane.tsx`, `MultiWellPanel.tsx` |
 
 ---
 
@@ -689,13 +626,11 @@ These files are allowed to change, but not casually. Add tests/logging first whe
 
 | File | Why risky | Safety net needed |
 |---|---|---|
-| `app/src/subsidence/data/importers.py` | all import paths and well auto-resolution | API import/save/reopen tests |
-| `app/src/subsidence/api/projects.py` | project lifecycle, import endpoints, native dialogs, visual config, export | project lifecycle + import API tests |
+| `app/src/subsidence/data/importers/` | all import paths and well auto-resolution | API import/save/reopen tests |
+| `app/src/subsidence/api/projects*.py` | project lifecycle, native dialogs; shared models imported by split files | project lifecycle + import API tests |
 | `frontend/src/components/layout/useDataManagerController.ts` | many object actions and selection behavior | Data Manager component/store tests |
-| `frontend/src/components/layout/SettingsInspector.tsx` | many object-specific editors | settings routing and save tests |
 | `frontend/src/stores/projectStore.ts` | project lifecycle and visual config serialization | save/reopen/hydration tests |
 | `frontend/src/stores/wellDataStore.ts` | active well data, optimistic top updates | well switching + formation CRUD tests |
-| `frontend/src/index.css` | global layout and scroll behavior | visual/manual smoke until CSS tests exist |
 | `frontend/src/components/subsidence/*` | two rendering paths and WebSocket-fed data | recalculation + stored-results tests |
 
 ---
@@ -716,7 +651,7 @@ cd app
 pytest tests
 ```
 
-Current baseline from 2026-04-23:
+Current baseline from 2026-04-23 (after M6 refactor):
 
-- Frontend: 25 passed.
-- Backend: 21 passed.
+- Frontend: 34 passed.
+- Backend: 30 passed.

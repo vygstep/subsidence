@@ -56,41 +56,26 @@ Migration owner:
 
 ## Importers
 
-File:
+Files:
 
-- `app/src/subsidence/data/importers.py`
-- `app/src/subsidence/data/loaders.py`
+- `app/src/subsidence/data/importers/__init__.py` — re-exports all public symbols
+- `app/src/subsidence/data/importers/common.py` — shared helpers and well resolution
+- `app/src/subsidence/data/importers/las.py` — LAS import
+- `app/src/subsidence/data/importers/logs_csv.py` — logs CSV import
+- `app/src/subsidence/data/importers/tops.py` — tops and unconformities import
+- `app/src/subsidence/data/importers/deviation.py` — deviation survey import
+- `app/src/subsidence/data/loaders.py` — read curve/deviation payloads from Parquet
 
-Responsibilities:
+All callers import from `data.importers` (package); public function signatures are unchanged.
 
-- Create empty wells.
-- Resolve or create wells during import.
-- Read LAS files.
-- Read logs CSV files.
-- Read tops and unconformities CSV files.
-- Read deviation CSV files.
-- Write curve payload Parquet files.
-- Apply imported metadata.
-- Link tops to stratigraphic units.
+`common.py` owns:
+
+- CSV reading helpers, numeric parsing, well identity resolution.
+- `create_empty_well`, `apply_imported_well_metadata`.
+- Curve payload writing.
+- ICS utility functions.
 
 `loaders.py` owns reading curve and deviation payload files back from disk. Import tests must verify not only SQLite rows but also payload reopen.
-
-Risk:
-
-- This is the largest backend correctness hotspot.
-
-Planned split:
-
-- `importers/common.py`
-- `importers/well_resolution.py`
-- `importers/las.py`
-- `importers/logs_csv.py`
-- `importers/tops.py`
-- `importers/deviation.py`
-
-Prerequisite:
-
-- Add API integration tests for all import workflows before splitting.
 
 Important import behaviors:
 

@@ -27,41 +27,41 @@ Future maintenance:
 
 ## Project Router
 
-File:
+Files:
 
-- `app/src/subsidence/api/projects.py`
+- `app/src/subsidence/api/projects.py` — project lifecycle
+- `app/src/subsidence/api/projects_imports.py` — import endpoints
+- `app/src/subsidence/api/projects_config.py` — undo/redo, checkpoints, dictionaries, visual config
+- `app/src/subsidence/api/projects_export.py` — LAS/CSV export endpoints
 
-Responsibilities:
+All four routers are registered in `main.py` under the same `/api/projects` prefix. Public API paths are unchanged.
+
+`projects.py` responsibilities:
 
 - Project create/open/save/close/status/recent.
 - Native path picking and reveal helpers.
-- Import endpoints for LAS, logs CSV, tops, unconformities, and deviation.
+- Well management endpoints.
+- Shared helpers and Pydantic models imported by the other three files.
+
+`projects_imports.py` responsibilities:
+
+- Import LAS, logs CSV, tops, unconformities, deviation.
+
+`projects_config.py` responsibilities:
+
 - Undo/redo.
 - Checkpoints.
-- Dictionary endpoints.
-- Visual config endpoints.
-- LAS/CSV export endpoints.
+- Dictionary endpoints (curve rules, lithology defaults).
+- Visual config save/load.
 
-Known risk:
+`projects_export.py` responsibilities:
 
-- This router is too large and mixes unrelated responsibilities.
-- It also owns native path picking endpoints, which are platform/blocking integrations.
+- LAS and CSV export.
 
-Refactor direction:
+Note:
 
-- Keep public paths stable.
-- Extract service functions first.
-- Split route groups only after tests cover project lifecycle and imports.
-
-Do not split before tests cover:
-
-- create/open/save/close/reopen
-- recent projects
-- all import endpoints
-- visual config save/load
-- checkpoints
-- undo/redo
-- export
+- Native path picking endpoints remain in `projects.py`; they are platform-blocking and must not be made async.
+- Shared Pydantic models and helpers live in `projects.py` and are imported by the split files.
 
 ---
 
