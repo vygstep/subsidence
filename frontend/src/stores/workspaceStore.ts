@@ -5,7 +5,7 @@ import type { TrackConfig } from '@/types'
 export const DEPTH_TRACK_ID = 'depth'
 export const FORMATION_TRACK_ID = 'formations'
 
-export type SidebarTab = 'wells' | 'models' | 'strat-charts'
+export type SidebarTab = 'wells' | 'templates' | 'strat-charts'
 export type ToolbarMode = 'project' | 'strat-chart' | 'wells' | 'tops'
 export type SelectedObject =
   | { type: 'well'; wellId: string }

@@ -215,7 +215,9 @@ export function DataManagerPane({ sidebarRef, onInternalSplitterMouseDown }: Dat
           activeSidebarTab={controller.activeSidebarTab}
           activeWellId={controller.activeWellId}
           compactionModels={controller.compactionModels}
+          curveDictionaryEntries={controller.curveDictionaryEntries}
           deviationVisibilityByWellId={controller.deviationVisibilityByWellId}
+          lithologyDictionaryEntries={controller.lithologyDictionaryEntries}
           onActivateChart={controller.onActivateChart}
           onActivateCompactionModel={controller.onActivateCompactionModel}
           onContextMenuCompactionModel={(event, model) => openContextMenu(event, {
@@ -275,7 +277,7 @@ export function DataManagerPane({ sidebarRef, onInternalSplitterMouseDown }: Dat
           onFocusTopsGroupObject={controller.handleFocusTopsGroupObject}
           onFocusWellObject={controller.handleFocusWellObject}
           onSelectLasGroup={controller.handleSelectLasGroup}
-          onSelectModelsTab={controller.onSelectModelsTab}
+          onSelectTemplatesTab={controller.onSelectTemplatesTab}
           onSelectStratChartsTab={controller.onSelectStratChartsTab}
           onSelectTopsGroup={controller.handleSelectTopsGroup}
           onSelectWell={controller.handleSelectWell}

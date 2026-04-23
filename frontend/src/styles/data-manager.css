@@ -379,6 +379,135 @@
   color: #17212b;
 }
 
+.template-section {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 8px 12px;
+  padding-bottom: 12px;
+  margin-bottom: 12px;
+  border-bottom: 1px solid #e2e8f0;
+}
+
+.template-section:last-child {
+  border-bottom: 0;
+  margin-bottom: 0;
+  padding-bottom: 0;
+}
+
+.template-section__toggle {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  border: 0;
+  background: transparent;
+  padding: 0;
+  text-align: left;
+  cursor: pointer;
+}
+
+.template-section__heading {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.template-section__chevron {
+  flex-shrink: 0;
+  width: 14px;
+  color: #64748b;
+  font-size: 0.78rem;
+  line-height: 1.4;
+  transform: rotate(0deg);
+  transition: transform 120ms ease;
+}
+
+.template-section__chevron--open {
+  transform: rotate(90deg);
+}
+
+.template-section__controls {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.template-section__title {
+  font-size: 0.82rem;
+  font-weight: 700;
+  color: #17212b;
+}
+
+.template-section__subtitle {
+  margin-top: 2px;
+  font-size: 0.72rem;
+  color: #64748b;
+}
+
+.template-section__count {
+  flex-shrink: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 24px;
+  padding: 2px 8px;
+  border-radius: 999px;
+  background: #eff6ff;
+  color: #1d4ed8;
+  font-size: 0.72rem;
+  font-weight: 700;
+}
+
+.template-section__content {
+  grid-column: 1 / -1;
+  padding: 0;
+}
+
+.template-table-wrapper {
+  overflow: auto;
+  border: 1px solid #d6e0eb;
+  border-radius: 10px;
+}
+
+.template-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.72rem;
+  color: #334155;
+  background: #ffffff;
+}
+
+.template-table th,
+.template-table td {
+  padding: 6px 8px;
+  text-align: left;
+  border-bottom: 1px solid #e2e8f0;
+  white-space: nowrap;
+}
+
+.template-table th {
+  background: #f8fbff;
+  color: #526476;
+  font-size: 0.68rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.template-table tbody tr:last-child td {
+  border-bottom: 0;
+}
+
+.template-color-chip {
+  display: inline-block;
+  width: 10px;
+  height: 10px;
+  margin-right: 6px;
+  border-radius: 2px;
+  border: 1px solid rgba(15, 23, 42, 0.15);
+  vertical-align: middle;
+}
+
 .template-panel__tracks {
   display: flex;
   flex-direction: column;

@@ -1,14 +1,23 @@
-import { CompactionModelsTab } from './CompactionModelsTab'
 import { StratChartTab } from './StratChartTab'
+import { TemplatesTab } from './TemplatesTab'
 import { WellDataPanel } from './WellDataPanel'
 import type { SelectedObject } from '@/stores/workspaceStore'
-import type { CompactionModel, FormationInventoryItem, StratChartInfo, WellInventory } from '@/types'
+import type {
+  CompactionModel,
+  CurveDictionaryEntry,
+  FormationInventoryItem,
+  LithologyDictionaryEntry,
+  StratChartInfo,
+  WellInventory,
+} from '@/types'
 
 interface DataManagerTopPaneProps {
-  activeSidebarTab: 'wells' | 'models' | 'strat-charts'
+  activeSidebarTab: 'wells' | 'templates' | 'strat-charts'
   activeWellId: string | null
   compactionModels: CompactionModel[]
+  curveDictionaryEntries: CurveDictionaryEntry[]
   deviationVisibilityByWellId: Record<string, boolean>
+  lithologyDictionaryEntries: LithologyDictionaryEntry[]
   onActivateChart: (chartId: number) => void
   onActivateCompactionModel: (id: number) => void
   onContextMenuCompactionModel: (event: React.MouseEvent, model: CompactionModel) => void
@@ -32,7 +41,7 @@ interface DataManagerTopPaneProps {
   onSelectCurve: (wellId: string, mnemonic: string) => void | Promise<void>
   onSelectFormation: (wellId: string, formationId: string) => void | Promise<void>
   onSelectLasGroup: (wellId: string) => void | Promise<void>
-  onSelectModelsTab: () => void
+  onSelectTemplatesTab: () => void
   onSelectStratChartsTab: () => void
   onSelectTopsGroup: (wellId: string) => void | Promise<void>
   onSelectWell: (wellId: string) => void
@@ -56,7 +65,9 @@ export function DataManagerTopPane({
   activeSidebarTab,
   activeWellId,
   compactionModels,
+  curveDictionaryEntries,
   deviationVisibilityByWellId,
+  lithologyDictionaryEntries,
   onActivateChart,
   onActivateCompactionModel,
   onContextMenuCompactionModel,
@@ -80,7 +91,7 @@ export function DataManagerTopPane({
   onSelectCurve,
   onSelectFormation,
   onSelectLasGroup,
-  onSelectModelsTab,
+  onSelectTemplatesTab,
   onSelectStratChartsTab,
   onSelectTopsGroup,
   onSelectWell,
@@ -118,10 +129,10 @@ export function DataManagerTopPane({
         </button>
         <button
           type="button"
-          className={`sidebar-tab ${activeSidebarTab === 'models' ? 'sidebar-tab--active' : ''}`}
-          onClick={onSelectModelsTab}
+          className={`sidebar-tab ${activeSidebarTab === 'templates' ? 'sidebar-tab--active' : ''}`}
+          onClick={onSelectTemplatesTab}
         >
-          Models
+          Templates
         </button>
       </header>
 
@@ -166,14 +177,16 @@ export function DataManagerTopPane({
           onContextMenuWell={onContextMenuWell}
         />
       ) : (
-        <CompactionModelsTab
+        <TemplatesTab
+          curveDictionaryEntries={curveDictionaryEntries}
+          lithologyDictionaryEntries={lithologyDictionaryEntries}
           models={compactionModels}
           selectedModelId={selectedCompactionModelId}
-          onSelect={onSelectCompactionModel}
-          onActivate={onActivateCompactionModel}
-          onCreate={onCreateCompactionModel}
-          onDeleteById={onDeleteCompactionModelById}
-          onContextMenu={onContextMenuCompactionModel}
+          onSelectModel={onSelectCompactionModel}
+          onActivateModel={onActivateCompactionModel}
+          onCreateModel={onCreateCompactionModel}
+          onDeleteModelById={onDeleteCompactionModelById}
+          onContextMenuModel={onContextMenuCompactionModel}
         />
       )}
     </section>

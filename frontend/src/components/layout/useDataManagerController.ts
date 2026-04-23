@@ -21,6 +21,8 @@ export function useDataManagerController() {
   const formations = useWellDataStore((state) => state.formations)
   const stratCharts = useWellDataStore((state) => state.stratCharts)
   const compactionModels = useWellDataStore((state) => state.compactionModels)
+  const curveDictionaryEntries = useWellDataStore((state) => state.curveDictionaryEntries)
+  const lithologyDictionaryEntries = useWellDataStore((state) => state.lithologyDictionaryEntries)
   const wellInventories = useWellDataStore((state) => state.wellInventories)
   const loadWell = useWellDataStore((state) => state.loadWell)
   const updateFormation = useWellDataStore((state) => state.updateFormation)
@@ -169,9 +171,11 @@ export function useDataManagerController() {
     activeWellId: well?.well_id ?? null,
     activeWellView,
     compactionModels,
+    curveDictionaryEntries,
     curveCount: curves.length,
     deviationVisibilityByWellId,
     formations,
+    lithologyDictionaryEntries,
     handleCurveSettingUpdate: visibility.handleCurveSettingUpdate,
     handleFocusCurveObject: selection.handleFocusCurveObject,
     handleFocusFormationObject: selection.handleFocusFormationObject,
@@ -213,7 +217,7 @@ export function useDataManagerController() {
     onRenameWellById: (wellId: string, currentName: string) => void actions.handleRenameWell(wellId, currentName),
     onSelectChart: (chartId: number) => setSelectedObject({ type: 'strat-chart', chartId }),
     onSelectCompactionModel: (modelId: number) => setSelectedObject({ type: 'compaction-model', modelId }),
-    onSelectModelsTab: () => setActiveSidebarTab('models'),
+    onSelectTemplatesTab: () => setActiveSidebarTab('templates'),
     onSelectStratChartsTab: () => setActiveSidebarTab('strat-charts'),
     onSelectWellsTab: () => setActiveSidebarTab('wells'),
     selectedChart,

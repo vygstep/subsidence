@@ -4,7 +4,7 @@ from fastapi import APIRouter, HTTPException, Request
 from pydantic import BaseModel
 from sqlalchemy import select
 
-from subsidence.data.schema import CompactionModel, CompactionModelParam, LithologyDictEntry
+from subsidence.data.schema import CompactionModel, CompactionModelParam, CurveDictEntry, LithologyDictEntry
 
 router = APIRouter(tags=['compaction'])
 
@@ -45,6 +45,31 @@ class LithologyParamPatch(BaseModel):
     compaction_coeff: float | None = None
 
 
+class CurveDictionaryItem(BaseModel):
+    id: int
+    scope: str
+    pattern: str
+    is_regex: bool
+    priority: int
+    family_code: str | None
+    canonical_mnemonic: str | None
+    canonical_unit: str | None
+    is_active: bool
+
+
+class LithologyDictionaryItem(BaseModel):
+    id: int
+    lithology_code: str
+    display_name: str
+    color_hex: str
+    pattern_id: str | None
+    description: str | None
+    sort_order: int
+    density: float
+    porosity_surface: float
+    compaction_coeff: float
+
+
 # ---------------------------------------------------------------------------
 # Helpers
 # ---------------------------------------------------------------------------
@@ -74,6 +99,63 @@ def _param_to_item(param: CompactionModelParam, litho: LithologyDictEntry) -> Li
         porosity_surface=param.porosity_surface,
         compaction_coeff=param.compaction_coeff,
     )
+
+
+def _curve_dict_to_item(row: CurveDictEntry) -> CurveDictionaryItem:
+    return CurveDictionaryItem(
+        id=row.id,
+        scope=row.scope,
+        pattern=row.pattern,
+        is_regex=row.is_regex,
+        priority=row.priority,
+        family_code=row.family_code,
+        canonical_mnemonic=row.canonical_mnemonic,
+        canonical_unit=row.canonical_unit,
+        is_active=row.is_active,
+    )
+
+
+def _lithology_dict_to_item(row: LithologyDictEntry) -> LithologyDictionaryItem:
+    return LithologyDictionaryItem(
+        id=row.id,
+        lithology_code=row.lithology_code,
+        display_name=row.display_name,
+        color_hex=row.color_hex,
+        pattern_id=row.pattern_id,
+        description=row.description,
+        sort_order=row.sort_order,
+        density=row.density,
+        porosity_surface=row.porosity_surface,
+        compaction_coeff=row.compaction_coeff,
+    )
+
+
+# ---------------------------------------------------------------------------
+# Compaction model CRUD
+# ---------------------------------------------------------------------------
+
+@router.get('/curve-dictionary', response_model=list[CurveDictionaryItem])
+def list_curve_dictionary(request: Request) -> list[CurveDictionaryItem]:
+    manager = _require_open_project(request)
+    with manager.get_session() as session:
+        rows = session.scalars(
+            select(CurveDictEntry).order_by(
+                CurveDictEntry.scope.asc(),
+                CurveDictEntry.priority.desc(),
+                CurveDictEntry.pattern.asc(),
+            )
+        ).all()
+        return [_curve_dict_to_item(row) for row in rows]
+
+
+@router.get('/lithology-dictionary', response_model=list[LithologyDictionaryItem])
+def list_lithology_dictionary(request: Request) -> list[LithologyDictionaryItem]:
+    manager = _require_open_project(request)
+    with manager.get_session() as session:
+        rows = session.scalars(
+            select(LithologyDictEntry).order_by(LithologyDictEntry.sort_order.asc(), LithologyDictEntry.id.asc())
+        ).all()
+        return [_lithology_dict_to_item(row) for row in rows]
 
 
 # ---------------------------------------------------------------------------

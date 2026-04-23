@@ -1,6 +1,16 @@
 import { create } from 'zustand'
 
-import type { CompactionModel, CurveData, FormationTop, LithologyParam, StratChartInfo, Well, WellInventory } from '@/types'
+import type {
+  CompactionModel,
+  CurveData,
+  CurveDictionaryEntry,
+  FormationTop,
+  LithologyDictionaryEntry,
+  LithologyParam,
+  StratChartInfo,
+  Well,
+  WellInventory,
+} from '@/types'
 import { minCurvatureToTVD, type TVDTable } from '@/utils/depthTransform'
 import { recordOperation } from '@/utils/diagnostics'
 
@@ -63,6 +73,8 @@ export interface WellDataStore {
   colorOverrides: Record<string, string>
   stratCharts: StratChartInfo[]
   compactionModels: CompactionModel[]
+  curveDictionaryEntries: CurveDictionaryEntry[]
+  lithologyDictionaryEntries: LithologyDictionaryEntry[]
   tvdTable: TVDTable | null
   isLoading: boolean
   error: string | null
@@ -84,6 +96,8 @@ export interface WellDataStore {
   activateCompactionModel: (id: number) => Promise<void>
   renameCompactionModel: (id: number, name: string) => Promise<void>
   deleteCompactionModel: (id: number) => Promise<void>
+  loadCurveDictionary: () => Promise<void>
+  loadLithologyDictionary: () => Promise<void>
   fetchCompactionModelParams: (modelId: number) => Promise<LithologyParam[]>
   updateCompactionModelParam: (modelId: number, lithologyCode: string, patch: Partial<Pick<LithologyParam, 'density' | 'porosity_surface' | 'compaction_coeff'>>) => Promise<LithologyParam>
   fetchCurvesLOD: (depthMin: number, depthMax: number, resolution: number) => Promise<void>
@@ -152,6 +166,8 @@ const emptyState = {
   colorOverrides: {},
   stratCharts: [],
   compactionModels: [],
+  curveDictionaryEntries: [],
+  lithologyDictionaryEntries: [],
   tvdTable: null,
   isLoading: false,
   error: null,
@@ -435,6 +451,16 @@ export const useWellDataStore = create<WellDataStore>((set, get) => ({
     const response = await fetch('/api/compaction-models')
     if (!response.ok) return
     set({ compactionModels: (await response.json()) as CompactionModel[] })
+  },
+  async loadCurveDictionary() {
+    const response = await fetch('/api/curve-dictionary')
+    if (!response.ok) return
+    set({ curveDictionaryEntries: (await response.json()) as CurveDictionaryEntry[] })
+  },
+  async loadLithologyDictionary() {
+    const response = await fetch('/api/lithology-dictionary')
+    if (!response.ok) return
+    set({ lithologyDictionaryEntries: (await response.json()) as LithologyDictionaryEntry[] })
   },
   async createCompactionModel(name, cloneFromId) {
     const response = await fetch('/api/compaction-models', {
