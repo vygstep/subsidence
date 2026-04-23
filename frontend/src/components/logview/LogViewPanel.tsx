@@ -40,6 +40,7 @@ export function LogViewPanel({ tracks, trackOrder, curves, formations, minDepth,
   const overviewVisible = useViewStore((state) => state.overviewVisible)
   const curveTooltipVisible = useViewStore((state) => state.curveTooltipVisible)
   const interactionMode = useViewStore((state) => state.interactionMode)
+  const lodEnabled = useViewStore((state) => state.lodEnabled)
 
   const depthWidth = trackWidths[DEPTH_TRACK_ID] ?? DEFAULT_DEPTH_WIDTH
   const formationWidth = trackWidths[FORMATION_TRACK_ID] ?? DEFAULT_FORMATION_WIDTH
@@ -74,13 +75,13 @@ export function LogViewPanel({ tracks, trackOrder, curves, formations, minDepth,
 
   // LOD: when zoomed out past 1 m/px, fetch downsampled curves for the visible window
   useEffect(() => {
-    if (depthPerPixel <= 1.0) return
+    if (!lodEnabled || depthPerPixel <= 1.0) return
     const resolution = Math.ceil(trackHeight / 2)
     const timer = window.setTimeout(() => {
       void fetchCurvesLOD(visibleDepthRange.min, visibleDepthRange.max, resolution)
     }, 200)
     return () => window.clearTimeout(timer)
-  }, [depthPerPixel, visibleDepthRange.min, visibleDepthRange.max, trackHeight, fetchCurvesLOD])
+  }, [lodEnabled, depthPerPixel, visibleDepthRange.min, visibleDepthRange.max, trackHeight, fetchCurvesLOD])
 
   useEffect(() => {
     const element = containerRef.current

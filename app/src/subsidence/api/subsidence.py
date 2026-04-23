@@ -1,7 +1,9 @@
 from __future__ import annotations
 
 import asyncio
+import hashlib
 import json
+from pathlib import Path
 
 from fastapi import APIRouter, HTTPException, Request, WebSocket, WebSocketDisconnect
 from pydantic import BaseModel
@@ -12,7 +14,7 @@ from subsidence.data.backstrip import (
     LithologyParam,
     backstrip,
 )
-from subsidence.data.schema import CompactionModel, CompactionModelParam, FormationTopModel, LithologyDictEntry, WellModel
+from subsidence.data.schema import CalculationResult, CompactionModel, CompactionModelParam, FormationTopModel, LithologyDictEntry, WellModel
 
 router = APIRouter(tags=['subsidence'])
 
@@ -27,6 +29,13 @@ class SubsidenceResultResponse(BaseModel):
     color: str
     lithology: str
     burial_path: list[BurialPointResponse]
+
+
+class WellSubsidenceResultsResponse(BaseModel):
+    well_id: str
+    well_name: str
+    algorithm: str
+    curves: list[SubsidenceResultResponse]
 
 
 def _require_open_project(request: Request):
@@ -118,6 +127,75 @@ def _compute_subsidence(manager, well_id: str, water_depth_m: float = 0.0) -> li
     ]
 
 
+def _store_results(manager, well_id: str, results: list[SubsidenceResultResponse], water_depth_m: float) -> None:
+    if not manager.project_path:
+        return
+    results_dir = Path(manager.project_path) / 'results'
+    results_dir.mkdir(exist_ok=True)
+
+    fname = f'{well_id}_burial_history.json'
+    data_uri = f'results/{fname}'
+    fpath = Path(manager.project_path) / data_uri
+    fpath.write_text(json.dumps([r.model_dump() for r in results]))
+
+    inputs_hash = hashlib.sha256(
+        json.dumps({'well_id': well_id, 'water_depth_m': water_depth_m}).encode()
+    ).hexdigest()[:32]
+
+    with manager.get_session() as session:
+        existing = session.scalar(
+            select(CalculationResult).where(
+                CalculationResult.well_id == well_id,
+                CalculationResult.kind == 'burial_history',
+            )
+        )
+        if existing is not None:
+            existing.data_uri = data_uri
+            existing.inputs_hash = inputs_hash
+            existing.is_stale = False
+            existing.params_json = json.dumps({'water_depth_m': water_depth_m})
+        else:
+            session.add(CalculationResult(
+                well_id=well_id,
+                kind='burial_history',
+                algorithm='airy_backstrip',
+                params_json=json.dumps({'water_depth_m': water_depth_m}),
+                inputs_hash=inputs_hash,
+                data_uri=data_uri,
+                is_stale=False,
+            ))
+        session.commit()
+
+
+@router.get('/subsidence/stored-results', response_model=list[WellSubsidenceResultsResponse])
+def get_stored_results(request: Request) -> list[WellSubsidenceResultsResponse]:
+    manager = _require_open_project(request)
+    out: list[WellSubsidenceResultsResponse] = []
+    with manager.get_session() as session:
+        rows = session.scalars(
+            select(CalculationResult).where(
+                CalculationResult.kind == 'burial_history',
+                CalculationResult.is_stale.is_(False),
+            )
+        ).all()
+        for row in rows:
+            well = session.get(WellModel, row.well_id)
+            if well is None:
+                continue
+            fpath = Path(manager.project_path) / row.data_uri
+            if not fpath.exists():
+                continue
+            payload = json.loads(fpath.read_text())
+            curves = [SubsidenceResultResponse.model_validate(c) for c in payload]
+            out.append(WellSubsidenceResultsResponse(
+                well_id=row.well_id,
+                well_name=well.name,
+                algorithm=row.algorithm,
+                curves=curves,
+            ))
+    return out
+
+
 @router.post('/wells/{well_id}/subsidence', response_model=list[SubsidenceResultResponse])
 def calculate_subsidence(well_id: str, request: Request) -> list[SubsidenceResultResponse]:
     manager = _require_open_project(request)
@@ -151,6 +229,7 @@ async def ws_recalculate(websocket: WebSocket) -> None:
             await websocket.send_json({'status': 'computing', 'progress': 0.0})
             try:
                 results = await asyncio.to_thread(_compute_subsidence, manager, well_id, water_depth_m)
+                await asyncio.to_thread(_store_results, manager, well_id, results, water_depth_m)
                 await websocket.send_json({
                     'status': 'complete',
                     'results': [r.model_dump() for r in results],

@@ -45,6 +45,7 @@ export interface ViewStore {
   trackWidths: Record<string, number>
   viewportHeight: number
   subsidenceWidth: number
+  subsidenceBottomHeight: number
   depthType: 'MD' | 'TVD'
   setScroll: (depth: number) => void
   setScale: (dpp: number) => void
@@ -61,7 +62,10 @@ export interface ViewStore {
   setViewportHeight: (height: number) => void
   setTrackWidth: (id: string, width: number) => void
   setSubsidenceWidth: (width: number) => void
+  setSubsidenceBottomHeight: (height: number) => void
   setDepthType: (t: 'MD' | 'TVD') => void
+  lodEnabled: boolean
+  setLodEnabled: (v: boolean) => void
   applyActiveWellTrackWidths: (trackWidths: Record<string, number>) => void
   applyVisualConfig: (config: VisualConfigPayload) => void
   resetVisualConfig: () => void
@@ -81,6 +85,9 @@ const initialViewportHeight = 800
 const initialSubsidenceWidth = 420
 const MIN_SUBSIDENCE_WIDTH = 150
 const MAX_SUBSIDENCE_WIDTH = 900
+const initialSubsidenceBottomHeight = 200
+const MIN_SUBSIDENCE_BOTTOM = 80
+const MAX_SUBSIDENCE_BOTTOM = 500
 const minimumTrackWidth = 80
 const initialDepthTrackConfig: DepthTrackConfig = {
   backgroundColor: '#ffffff',
@@ -118,7 +125,9 @@ export const useViewStore = create<ViewStore>((set) => ({
   trackWidths: {},
   viewportHeight: initialViewportHeight,
   subsidenceWidth: initialSubsidenceWidth,
+  subsidenceBottomHeight: initialSubsidenceBottomHeight,
   depthType: 'MD',
+  lodEnabled: true,
   setScroll(depth) {
     set((state) => ({
       scrollDepth: depth,
@@ -189,8 +198,14 @@ export const useViewStore = create<ViewStore>((set) => ({
   setSubsidenceWidth(width) {
     set({ subsidenceWidth: Math.max(MIN_SUBSIDENCE_WIDTH, Math.min(MAX_SUBSIDENCE_WIDTH, width)) })
   },
+  setSubsidenceBottomHeight(height) {
+    set({ subsidenceBottomHeight: Math.max(MIN_SUBSIDENCE_BOTTOM, Math.min(MAX_SUBSIDENCE_BOTTOM, height)) })
+  },
   setDepthType(t) {
     set({ depthType: t })
+  },
+  setLodEnabled(v) {
+    set({ lodEnabled: v })
   },
   applyActiveWellTrackWidths(trackWidths) {
     set((state) => {

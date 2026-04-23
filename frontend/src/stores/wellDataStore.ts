@@ -233,6 +233,8 @@ export const useWellDataStore = create<WellDataStore>((set, get) => ({
       }
 
       await get().loadWellInventories()
+      const { useComputedStore } = await import('./computedStore')
+      useComputedStore.getState().triggerRecalculation()
     } catch (error) {
       const inventories = get().wellInventories
       set({

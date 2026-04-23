@@ -1,4 +1,5 @@
 export * from './GeologicalTimescale'
+export * from './MultiWellPanel'
 export * from './SubsidenceCanvas'
 export * from './SubsidenceControls'
 export * from './SubsidencePanel'

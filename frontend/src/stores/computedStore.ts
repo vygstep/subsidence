@@ -2,6 +2,7 @@ import { create } from 'zustand'
 
 import { sendRecalculation } from '@/api/subsidenceSocket'
 import type { SubsidenceResult } from '@/types/subsidence'
+import { useMultiWellStore } from './multiWellStore'
 import { useWellDataStore } from './wellDataStore'
 
 const COMPUTE_TIMEOUT_MS = 30_000
@@ -74,6 +75,7 @@ export const useComputedStore = create<ComputedStore>((set, get) => ({
       computeError: null,
       lastComputeTime: Date.now(),
     })
+    useMultiWellStore.getState().fetchResults()
   },
 
   setComputeError(message) {

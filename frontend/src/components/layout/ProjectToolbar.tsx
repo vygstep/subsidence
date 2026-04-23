@@ -116,6 +116,8 @@ export function ProjectToolbar() {
   const dropWellViewState = useWorkspaceStore((state) => state.dropWellViewState)
 
   const selectTrack = useViewStore((state) => state.selectTrack)
+  const lodEnabled = useViewStore((state) => state.lodEnabled)
+  const setLodEnabled = useViewStore((state) => state.setLodEnabled)
 
   const wellOptions = useMemo(
     () => wellInventories.map((item) => ({ well_id: item.well_id, well_name: item.well_name })),
@@ -382,6 +384,11 @@ export function ProjectToolbar() {
       <button type="button" className="app-menu__item" onClick={() => void handleProjectClose()}>Close project</button>
       <button type="button" className="app-menu__item" onClick={() => { setProjectMenuOpen(false); void saveProject() }}>Save project</button>
       <button type="button" className="app-menu__item" onClick={() => { setProjectMenuOpen(false); void createCheckpoint() }}>Create checkpoint</button>
+      <hr className="app-menu__separator" />
+      <button type="button" className="app-menu__item app-menu__item--check" onClick={() => setLodEnabled(!lodEnabled)}>
+        <span className="app-menu__checkmark">{lodEnabled ? '✓' : ''}</span>
+        LOD
+      </button>
     </>
   )
 
