@@ -217,7 +217,7 @@ export function DataManagerPane({ sidebarRef, onInternalSplitterMouseDown }: Dat
           compactionPresets={controller.compactionPresets}
           curveDictionaryEntries={controller.curveDictionaryEntries}
           deviationVisibilityByWellId={controller.deviationVisibilityByWellId}
-          lithologyDictionaryEntries={controller.lithologyDictionaryEntries}
+          lithologySets={controller.lithologySets}
           onActivateChart={controller.onActivateChart}
           onContextMenuCurve={(event, wellId, curve) => openContextMenu(event, {
             type: 'curve',
@@ -263,9 +263,10 @@ export function DataManagerPane({ sidebarRef, onInternalSplitterMouseDown }: Dat
           onSelectCompactionPreset={controller.onSelectCompactionPreset}
           onSelectCompactionPresetsRoot={controller.onSelectCompactionPresetsRoot}
           onSelectCurveDictionaryEntry={controller.onSelectCurveDictionaryEntry}
+          onSelectLithologiesRoot={controller.onSelectLithologiesRoot}
+          onSelectLithologySet={controller.onSelectLithologySet}
           onSelectCurve={controller.handleSelectCurve}
           onSelectFormation={controller.handleSelectFormation}
-          onSelectLithologyDictionaryEntry={controller.onSelectLithologyDictionaryEntry}
           onFocusFormationObject={controller.handleFocusFormationObject}
           onFocusLasGroupObject={controller.handleFocusLasGroupObject}
           onFocusTopsGroupObject={controller.handleFocusTopsGroupObject}
@@ -284,9 +285,10 @@ export function DataManagerPane({ sidebarRef, onInternalSplitterMouseDown }: Dat
           selectedChartId={controller.selectedChartId}
           selectedCompactionPresetId={controller.selectedCompactionPresetId}
           isCompactionPresetsRootSelected={controller.isCompactionPresetsRootSelected}
+          isLithologiesRootSelected={controller.isLithologiesRootSelected}
           selectedCurveDictionaryEntryId={controller.selectedCurveDictionaryEntryId}
           selectedFormationId={controller.selectedFormationId}
-          selectedLithologyDictionaryEntryId={controller.selectedLithologyDictionaryEntryId}
+          selectedLithologySetId={controller.selectedLithologySetId}
           selectedObject={controller.selectedObject}
           stratCharts={controller.stratCharts}
           visibleCurveMnemonicsByWellId={controller.visibleCurveMnemonicsByWellId}
@@ -321,6 +323,8 @@ export function DataManagerPane({ sidebarRef, onInternalSplitterMouseDown }: Dat
           selectedCompactionModel={controller.selectedCompactionModel}
           selectedCompactionPreset={controller.selectedCompactionPreset}
           compactionPresets={controller.compactionPresets}
+          lithologySets={controller.lithologySets}
+          selectedLithologySet={controller.selectedLithologySet}
           selectedCurveDictionaryEntry={controller.selectedCurveDictionaryEntry}
           selectedLithologyDictionaryEntry={controller.selectedLithologyDictionaryEntry}
           curveCount={controller.curveCount}

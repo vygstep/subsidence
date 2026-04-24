@@ -6,6 +6,7 @@ import pytest
 from fastapi.testclient import TestClient
 
 from subsidence.api.main import app
+from subsidence.data.schema import LithologySet, LithologySetEntry
 
 
 @pytest.fixture
@@ -300,6 +301,42 @@ def test_compaction_presets_seed_and_allow_user_duplicates(api_client: TestClien
     assert builtin['id'] in remaining_ids
     assert user_copy['id'] in remaining_ids
     assert custom['id'] not in remaining_ids
+
+
+def test_default_lithology_set_is_seeded(api_client: TestClient, tmp_path: Path):
+    _create_project(api_client, tmp_path, 'lithology-sets')
+
+    response = api_client.get('/api/lithology-sets')
+    assert response.status_code == 200, response.text
+    sets = response.json()
+    assert sets
+    default_set = next(item for item in sets if item['is_builtin'])
+    assert default_set['name'] == 'Default Lithologies'
+    assert default_set['entry_count'] > 0
+
+    response = api_client.get(f"/api/lithology-sets/{default_set['id']}")
+    assert response.status_code == 200, response.text
+    detail = response.json()
+    assert detail['name'] == 'Default Lithologies'
+    assert detail['entries']
+    first_entry = detail['entries'][0]
+    assert 'compaction_preset_label' in first_entry
+    assert 'density' in first_entry
+
+
+def test_lithology_sets_self_heal_for_open_project(api_client: TestClient, tmp_path: Path):
+    _create_project(api_client, tmp_path, 'lithology-self-heal')
+
+    manager = api_client.app.state.project_manager
+    with manager.get_session() as session:
+        session.execute(LithologySetEntry.__table__.delete())
+        session.execute(LithologySet.__table__.delete())
+        session.commit()
+
+    response = api_client.get('/api/lithology-sets')
+    assert response.status_code == 200, response.text
+    sets = response.json()
+    assert any(item['name'] == 'Default Lithologies' for item in sets)
 
 
 def test_subsidence_rest_and_websocket_recalculation(api_client: TestClient, tmp_path: Path):

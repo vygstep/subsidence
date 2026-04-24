@@ -419,13 +419,20 @@ Problem:
 
 - Lithology display/coding and compaction behavior are different concerns and should not be stored as one flat table forever.
 - The current grouped compaction table is only a temporary bootstrap and does not match the intended per-lithology preset workflow.
+- The current single flat lithology dictionary is also only a temporary bootstrap and does not support multiple lithology-set variants inside one project.
 
 Required behavior:
 
 - Introduce the target domain model:
+  - `Lithologies` root object
   - `Lithology Set`
   - `Lithology Entry`
   - `Compaction Preset`
+- `Lithologies` contains multiple lithology sets.
+- One built-in set must always exist:
+  - `Default Lithologies`
+- Existing built-in lithologies become the seeded `Default Lithologies` set instead of remaining a permanent flat dictionary.
+- Additional user lithology sets can be created later per project.
 - `Lithology Entry` owns:
   - code
   - display name
@@ -452,6 +459,10 @@ Required behavior:
 - In final visualization and result presentation, the UI should show the plain display name only.
 - A user can assign any available compaction preset to a lithology entry.
 - The current backend `CompactionModel` implementation is treated as a temporary technical name until the later schema refactor.
+- Code type must remain flexible:
+  - integer-like codes are allowed
+  - text codes are allowed
+  - storage and linking must not force numeric conversion
 
 Templates UI behavior:
 
@@ -468,11 +479,37 @@ Templates UI behavior:
 - User preset settings use explicit `Save` and `Cancel` actions.
 - New or edited user presets must validate required fields before save.
 - If any required field is missing, save is blocked and the user sees a clear error such as `Fill all required parameters`.
+- The left `Templates` pane should remain a navigation tree, not a wide editor surface.
+- `Templates -> Lithologies` must become a tree of sets:
+  - `Lithologies`
+    - `Default Lithologies`
+    - user lithology sets
+- Clicking `Lithologies` root opens a lithology-set overview in `Settings`.
+- Clicking a specific lithology set opens its data table in `Settings`.
+- The lithology-set table must live in `Settings`, not in the left `Templates` pane.
+- The lithology-set table columns are:
+  - `Code`
+  - `Name`
+  - `Color`
+  - `Pattern`
+  - `Compaction preset`
+  - `Density`
+  - `Phi0`
+  - `C`
+- `Default Lithologies` is read-only.
+- Future user lithology sets are editable.
+- `Compaction preset` is the short table label for the linked preset column.
+- `Density`, `Phi0`, and `C` are informational columns derived from the linked preset.
+- If a lithology entry has no linked preset, the informational columns must show:
+  - `Density = -`
+  - `Phi0 = -`
+  - `C = -`
 
 Likely code areas:
 
 - `app/src/subsidence/data/schema.py`
 - `app/src/subsidence/api/compaction.py`
+- `app/src/subsidence/api/lithology*.py` or equivalent new lithology-set API
 - `frontend/src/components/layout/settings/ModelSettings.tsx`
 - New Templates UI.
 
@@ -482,7 +519,19 @@ Acceptance:
 - Project-specific presets can be created, duplicated, renamed, and changed.
 - Duplicate preset names do not break linking because references use immutable `id`.
 - Settings and linking UI can disambiguate same-name presets by showing the extended label with `id` and origin.
-- Lithology entries can eventually point to chosen presets instead of embedding `Density / Phi0 / C` directly.
+- `Default Lithologies` exists as a read-only built-in lithology set.
+- The `Settings` pane, not the left tree, becomes the main editing surface for lithology-set tables.
+- Lithology entries point to chosen presets instead of embedding `Density / Phi0 / C` directly.
+
+Implementation order for DICT-003:
+
+1. Add backend `Lithology Set` / `Lithology Entry` schema and seed the built-in `Default Lithologies` set from the current flat dictionary.
+2. Add read-only API to list lithology sets and fetch one set with rows and linked preset-derived columns.
+3. Replace the flat `Templates -> Lithologies` table with a navigation tree of lithology sets.
+4. Show lithology-set tables in `Settings`.
+5. Add user lithology-set CRUD.
+6. Add preset-link editing inside non-default lithology sets.
+7. Remove remaining dependency on the legacy flat lithology dictionary UI once all consumers are migrated.
 
 ---
 

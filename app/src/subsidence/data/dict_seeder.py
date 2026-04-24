@@ -12,6 +12,8 @@ from .schema import (
     CompactionPreset,
     CurveDictEntry,
     LithologyDictEntry,
+    LithologySet,
+    LithologySetEntry,
     StratChart,
     StratUnit,
 )
@@ -202,6 +204,61 @@ def _seed_builtin_compaction_presets(session: Session) -> None:
         )
 
 
+def _seed_builtin_lithology_set(session: Session) -> None:
+    """Create the built-in Default Lithologies set from the legacy flat dictionary."""
+    default_set = session.scalar(
+        select(LithologySet).where(LithologySet.is_builtin.is_(True)).order_by(LithologySet.id.asc())
+    )
+    if default_set is None:
+        default_set = LithologySet(name='Default Lithologies', is_builtin=True)
+        session.add(default_set)
+        session.flush()
+    elif default_set.name != 'Default Lithologies':
+        default_set.name = 'Default Lithologies'
+
+    existing_by_code = {
+        row.lithology_code: row
+        for row in session.scalars(
+            select(LithologySetEntry).where(LithologySetEntry.set_id == default_set.id)
+        ).all()
+    }
+    preset_by_code = {
+        row.source_lithology_code: row.id
+        for row in session.scalars(
+            select(CompactionPreset).where(
+                CompactionPreset.is_builtin.is_(True),
+                CompactionPreset.source_lithology_code.is_not(None),
+            )
+        ).all()
+        if row.source_lithology_code
+    }
+
+    dict_rows = session.scalars(
+        select(LithologyDictEntry).order_by(LithologyDictEntry.sort_order.asc(), LithologyDictEntry.id.asc())
+    ).all()
+    for row in dict_rows:
+        preset_id = preset_by_code.get(row.lithology_code)
+        existing = existing_by_code.get(row.lithology_code)
+        if existing is None:
+            session.add(
+                LithologySetEntry(
+                    set_id=default_set.id,
+                    lithology_code=row.lithology_code,
+                    display_name=row.display_name,
+                    color_hex=row.color_hex,
+                    pattern_id=row.pattern_id,
+                    sort_order=row.sort_order,
+                    compaction_preset_id=preset_id,
+                )
+            )
+            continue
+        existing.display_name = row.display_name
+        existing.color_hex = row.color_hex
+        existing.pattern_id = row.pattern_id
+        existing.sort_order = row.sort_order
+        existing.compaction_preset_id = preset_id
+
+
 def seed_dictionaries(session: Session, db_path: Path) -> None:
     del db_path
     seed_dir = Path(__file__).parent / 'dictionaries'
@@ -232,3 +289,4 @@ def seed_dictionaries(session: Session, db_path: Path) -> None:
 
     _seed_builtin_compaction_model(session)
     _seed_builtin_compaction_presets(session)
+    _seed_builtin_lithology_set(session)

@@ -4,12 +4,15 @@ from fastapi import APIRouter, HTTPException, Request
 from pydantic import BaseModel
 from sqlalchemy import select
 
+from subsidence.data.engine import create_all_tables
 from subsidence.data.schema import (
     CompactionModel,
     CompactionModelParam,
     CompactionPreset,
     CurveDictEntry,
     LithologyDictEntry,
+    LithologySet,
+    LithologySetEntry,
 )
 
 router = APIRouter(tags=['compaction'])
@@ -108,6 +111,31 @@ class LithologyDictionaryItem(BaseModel):
     compaction_coeff: float
 
 
+class LithologySetSummary(BaseModel):
+    id: int
+    name: str
+    is_builtin: bool
+    entry_count: int
+
+
+class LithologySetEntryItem(BaseModel):
+    id: int
+    lithology_code: str
+    display_name: str
+    color_hex: str
+    pattern_id: str | None
+    sort_order: int
+    compaction_preset_id: int | None
+    compaction_preset_label: str | None
+    density: float | None
+    porosity_surface: float | None
+    compaction_coeff: float | None
+
+
+class LithologySetDetail(LithologySetSummary):
+    entries: list[LithologySetEntryItem]
+
+
 # ---------------------------------------------------------------------------
 # Helpers
 # ---------------------------------------------------------------------------
@@ -117,6 +145,16 @@ def _require_open_project(request: Request):
     if not manager.is_open:
         raise HTTPException(status_code=400, detail='No project is currently open')
     return manager
+
+
+def _ensure_lithology_sets(manager) -> None:
+    project_path = manager.project_path
+    if project_path is None:
+        return
+    with manager.get_session() as session:
+        create_all_tables(session.get_bind())
+        manager._seed_dictionaries(session, project_path)
+        session.commit()
 
 
 def _to_model_response(row: CompactionModel) -> CompactionModelResponse:
@@ -189,6 +227,36 @@ def _lithology_dict_to_item(row: LithologyDictEntry) -> LithologyDictionaryItem:
         density=row.density,
         porosity_surface=row.porosity_surface,
         compaction_coeff=row.compaction_coeff,
+    )
+
+
+def _lithology_set_summary_to_item(row: LithologySet) -> LithologySetSummary:
+    return LithologySetSummary(
+        id=row.id,
+        name=row.name,
+        is_builtin=row.is_builtin,
+        entry_count=len(row.entries),
+    )
+
+
+def _lithology_set_entry_to_item(row: LithologySetEntry) -> LithologySetEntryItem:
+    preset = row.compaction_preset
+    return LithologySetEntryItem(
+        id=row.id,
+        lithology_code=row.lithology_code,
+        display_name=row.display_name,
+        color_hex=row.color_hex,
+        pattern_id=row.pattern_id,
+        sort_order=row.sort_order,
+        compaction_preset_id=row.compaction_preset_id,
+        compaction_preset_label=(
+            f"{preset.id} {preset.name} [{preset.origin}]"
+            if preset is not None
+            else None
+        ),
+        density=preset.density if preset is not None else None,
+        porosity_surface=preset.porosity_surface if preset is not None else None,
+        compaction_coeff=preset.compaction_coeff if preset is not None else None,
     )
 
 
@@ -336,6 +404,39 @@ def list_lithology_dictionary(request: Request) -> list[LithologyDictionaryItem]
             select(LithologyDictEntry).order_by(LithologyDictEntry.sort_order.asc(), LithologyDictEntry.id.asc())
         ).all()
         return [_lithology_dict_to_item(row) for row in rows]
+
+
+@router.get('/lithology-sets', response_model=list[LithologySetSummary])
+def list_lithology_sets(request: Request) -> list[LithologySetSummary]:
+    manager = _require_open_project(request)
+    _ensure_lithology_sets(manager)
+    with manager.get_session() as session:
+        rows = session.scalars(
+            select(LithologySet).order_by(
+                LithologySet.is_builtin.desc(),
+                LithologySet.name.asc(),
+                LithologySet.id.asc(),
+            )
+        ).all()
+        return [_lithology_set_summary_to_item(row) for row in rows]
+
+
+@router.get('/lithology-sets/{set_id}', response_model=LithologySetDetail)
+def get_lithology_set(set_id: int, request: Request) -> LithologySetDetail:
+    manager = _require_open_project(request)
+    _ensure_lithology_sets(manager)
+    with manager.get_session() as session:
+        row = session.get(LithologySet, set_id)
+        if row is None:
+            raise HTTPException(status_code=404, detail=f'Lithology set not found: {set_id}')
+        entries = sorted(row.entries, key=lambda item: (item.sort_order, item.id))
+        return LithologySetDetail(
+            id=row.id,
+            name=row.name,
+            is_builtin=row.is_builtin,
+            entry_count=len(entries),
+            entries=[_lithology_set_entry_to_item(entry) for entry in entries],
+        )
 
 
 # ---------------------------------------------------------------------------

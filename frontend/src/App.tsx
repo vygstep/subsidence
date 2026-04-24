@@ -21,6 +21,7 @@ function App() {
   const loadCompactionPresets = useWellDataStore((state) => state.loadCompactionPresets)
   const loadCurveDictionary = useWellDataStore((state) => state.loadCurveDictionary)
   const loadLithologyDictionary = useWellDataStore((state) => state.loadLithologyDictionary)
+  const loadLithologySets = useWellDataStore((state) => state.loadLithologySets)
   const colorOverrides = useWellDataStore((state) => state.colorOverrides)
   const well = useWellDataStore((state) => state.well)
 
@@ -130,7 +131,8 @@ function App() {
     if (!isProjectOpen) return
     void loadCurveDictionary()
     void loadLithologyDictionary()
-  }, [isProjectOpen, loadCurveDictionary, loadLithologyDictionary])
+    void loadLithologySets()
+  }, [isProjectOpen, loadCurveDictionary, loadLithologyDictionary, loadLithologySets])
 
   useEffect(() => {
     if (!isProjectOpen) {

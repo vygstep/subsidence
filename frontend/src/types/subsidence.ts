@@ -67,3 +67,28 @@ export interface LithologyDictionaryEntry {
   porosity_surface: number
   compaction_coeff: number
 }
+
+export interface LithologySetSummary {
+  id: number
+  name: string
+  is_builtin: boolean
+  entry_count: number
+}
+
+export interface LithologySetEntry {
+  id: number
+  lithology_code: string
+  display_name: string
+  color_hex: string
+  pattern_id: string | null
+  sort_order: number
+  compaction_preset_id: number | null
+  compaction_preset_label: string | null
+  density: number | null
+  porosity_surface: number | null
+  compaction_coeff: number | null
+}
+
+export interface LithologySetDetail extends LithologySetSummary {
+  entries: LithologySetEntry[]
+}

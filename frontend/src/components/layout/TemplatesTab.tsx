@@ -3,22 +3,24 @@ import { useState } from 'react'
 import type {
   CompactionPresetSummary,
   CurveDictionaryEntry,
-  LithologyDictionaryEntry,
+  LithologySetSummary,
 } from '@/types'
 
 interface TemplatesTabProps {
   curveDictionaryEntries: CurveDictionaryEntry[]
-  lithologyDictionaryEntries: LithologyDictionaryEntry[]
+  lithologySets: LithologySetSummary[]
   compactionPresets: CompactionPresetSummary[]
   isCompactionPresetsRootSelected: boolean
+  isLithologiesRootSelected: boolean
   selectedCompactionPresetId: number | null
   selectedCurveDictionaryEntryId: number | null
-  selectedLithologyDictionaryEntryId: number | null
+  selectedLithologySetId: number | null
   onCreateCompactionPresetDraft: () => void
   onSelectCompactionPresetsRoot: () => void
   onSelectCompactionPreset: (presetId: number) => void
   onSelectCurveDictionaryEntry: (entryId: number) => void
-  onSelectLithologyDictionaryEntry: (entryId: number) => void
+  onSelectLithologiesRoot: () => void
+  onSelectLithologySet: (setId: number) => void
 }
 
 interface TemplateSectionProps {
@@ -68,17 +70,19 @@ function TemplateSection({
 
 export function TemplatesTab({
   curveDictionaryEntries,
-  lithologyDictionaryEntries,
+  lithologySets,
   compactionPresets,
   isCompactionPresetsRootSelected,
+  isLithologiesRootSelected,
   selectedCompactionPresetId,
   selectedCurveDictionaryEntryId,
-  selectedLithologyDictionaryEntryId,
+  selectedLithologySetId,
   onCreateCompactionPresetDraft,
   onSelectCompactionPresetsRoot,
   onSelectCompactionPreset,
   onSelectCurveDictionaryEntry,
-  onSelectLithologyDictionaryEntry,
+  onSelectLithologiesRoot,
+  onSelectLithologySet,
 }: TemplatesTabProps) {
   return (
     <div className="sidebar-panel__body">
@@ -151,40 +155,23 @@ export function TemplatesTab({
 
       <TemplateSection
         title="Lithologies"
-        count={lithologyDictionaryEntries.length}
+        count={lithologySets.length}
+        isSelected={isLithologiesRootSelected}
+        onSelect={onSelectLithologiesRoot}
       >
-        <div className="template-table-wrapper">
-          <table className="template-table">
-            <thead>
-              <tr>
-                <th>Code</th>
-                <th>Name</th>
-                <th>Color</th>
-                <th>Density</th>
-                <th>Phi0</th>
-                <th>C</th>
-              </tr>
-            </thead>
-            <tbody>
-              {lithologyDictionaryEntries.map((entry) => (
-                <tr
-                  key={entry.id}
-                  className={selectedLithologyDictionaryEntryId === entry.id ? 'template-table__row--selected' : ''}
-                  onClick={() => onSelectLithologyDictionaryEntry(entry.id)}
-                >
-                  <td>{entry.lithology_code}</td>
-                  <td>{entry.display_name}</td>
-                  <td>
-                    <span className="template-color-chip" style={{ backgroundColor: entry.color_hex }} />
-                    {entry.color_hex}
-                  </td>
-                  <td>{entry.density.toFixed(0)}</td>
-                  <td>{entry.porosity_surface.toFixed(2)}</td>
-                  <td>{entry.compaction_coeff.toFixed(3)}</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
+        <div className="strat-chart-list template-section__content">
+          {lithologySets.map((set) => (
+            <div
+              key={set.id}
+              className={`strat-chart-item ${set.is_builtin ? 'strat-chart-item--muted' : ''} ${selectedLithologySetId === set.id ? 'strat-chart-item--selected' : ''}`}
+              onClick={() => onSelectLithologySet(set.id)}
+            >
+              <div className="strat-chart-item__content">
+                <span className="strat-chart-item__name">{set.name}</span>
+              </div>
+              <span className="strat-chart-item__meta">{set.entry_count}</span>
+            </div>
+          ))}
         </div>
       </TemplateSection>
     </div>

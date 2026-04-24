@@ -19,6 +19,8 @@ export type SelectedObject =
   | { type: 'compaction-presets-root' }
   | { type: 'compaction-preset'; presetId: number }
   | { type: 'compaction-preset-draft' }
+  | { type: 'lithologies-root' }
+  | { type: 'lithology-set'; setId: number }
   | { type: 'curve-dictionary-entry'; entryId: number }
   | { type: 'lithology-dictionary-entry'; entryId: number }
   | { type: 'compaction-model'; modelId: number }

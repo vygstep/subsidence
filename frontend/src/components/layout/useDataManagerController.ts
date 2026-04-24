@@ -24,6 +24,7 @@ export function useDataManagerController() {
   const compactionPresets = useWellDataStore((state) => state.compactionPresets)
   const curveDictionaryEntries = useWellDataStore((state) => state.curveDictionaryEntries)
   const lithologyDictionaryEntries = useWellDataStore((state) => state.lithologyDictionaryEntries)
+  const lithologySets = useWellDataStore((state) => state.lithologySets)
   const wellInventories = useWellDataStore((state) => state.wellInventories)
   const loadWell = useWellDataStore((state) => state.loadWell)
   const updateFormation = useWellDataStore((state) => state.updateFormation)
@@ -141,6 +142,11 @@ export function useDataManagerController() {
     return curveDictionaryEntries.find((entry) => entry.id === selectedObject.entryId) ?? null
   }, [curveDictionaryEntries, selectedObject])
 
+  const selectedLithologySet = useMemo(() => {
+    if (selectedObject?.type !== 'lithology-set') return null
+    return lithologySets.find((entry) => entry.id === selectedObject.setId) ?? null
+  }, [lithologySets, selectedObject])
+
   const selectedLithologyDictionaryEntry = useMemo(() => {
     if (selectedObject?.type !== 'lithology-dictionary-entry') return null
     return lithologyDictionaryEntries.find((entry) => entry.id === selectedObject.entryId) ?? null
@@ -193,6 +199,7 @@ export function useDataManagerController() {
     deviationVisibilityByWellId,
     formations,
     lithologyDictionaryEntries,
+    lithologySets,
     handleCurveSettingUpdate: visibility.handleCurveSettingUpdate,
     handleFocusCurveObject: selection.handleFocusCurveObject,
     handleFocusFormationObject: selection.handleFocusFormationObject,
@@ -238,6 +245,8 @@ export function useDataManagerController() {
     onSelectCompactionPresetsRoot: () => setSelectedObject({ type: 'compaction-presets-root' }),
     onSelectCompactionModel: (modelId: number) => setSelectedObject({ type: 'compaction-model', modelId }),
     onSelectCurveDictionaryEntry: (entryId: number) => setSelectedObject({ type: 'curve-dictionary-entry', entryId }),
+    onSelectLithologiesRoot: () => setSelectedObject({ type: 'lithologies-root' }),
+    onSelectLithologySet: (setId: number) => setSelectedObject({ type: 'lithology-set', setId }),
     onSelectLithologyDictionaryEntry: (entryId: number) => setSelectedObject({ type: 'lithology-dictionary-entry', entryId }),
     onSelectTemplatesTab: () => setActiveSidebarTab('templates'),
     onSelectStratChartsTab: () => setActiveSidebarTab('strat-charts'),
@@ -253,10 +262,13 @@ export function useDataManagerController() {
     selectedCurveConfig,
     selectedFormation,
     selectedFormationId,
+    selectedLithologySet,
+    selectedLithologySetId: selectedObject?.type === 'lithology-set' ? selectedObject.setId : null,
     selectedLithologyDictionaryEntry,
     selectedLithologyDictionaryEntryId: selectedObject?.type === 'lithology-dictionary-entry' ? selectedObject.entryId : null,
     selectedObject,
     isCompactionPresetsRootSelected: selectedObject?.type === 'compaction-presets-root',
+    isLithologiesRootSelected: selectedObject?.type === 'lithologies-root',
     setFormationMove: (formationId: string, depth: number) => {
       if (Number.isFinite(depth)) void updateFormationDepth(formationId, depth)
     },

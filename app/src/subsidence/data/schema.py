@@ -7,7 +7,7 @@ from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column, relationship
 from sqlalchemy import MetaData
 
 SUBSIDENCE_APP_ID = 0x53554253  # "SUBS" as 4-byte int
-SCHEMA_VERSION = 3
+SCHEMA_VERSION = 4
 
 _NAMING: dict[str, str] = {
     "ix": "ix_%(table_name)s_%(column_0_name)s",
@@ -264,7 +264,44 @@ class LithologyDictEntry(Base):
 
 
 # ---------------------------------------------------------------------------
-# 10. compaction_presets
+# 10. lithology_sets + lithology_set_entries
+# ---------------------------------------------------------------------------
+
+class LithologySet(Base, AuditMixin):
+    __tablename__ = "lithology_sets"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    name: Mapped[str] = mapped_column(String(256))
+    is_builtin: Mapped[bool] = mapped_column(Boolean, default=False)
+
+    entries: Mapped[list["LithologySetEntry"]] = relationship(
+        back_populates="set", cascade="all, delete-orphan"
+    )
+
+
+class LithologySetEntry(Base, AuditMixin):
+    __tablename__ = "lithology_set_entries"
+    __table_args__ = (UniqueConstraint("set_id", "lithology_code"),)
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    set_id: Mapped[int] = mapped_column(
+        Integer, ForeignKey("lithology_sets.id", ondelete="CASCADE"), nullable=False
+    )
+    lithology_code: Mapped[str] = mapped_column(String(64))
+    display_name: Mapped[str] = mapped_column(String(128))
+    color_hex: Mapped[str] = mapped_column(String(9))
+    pattern_id: Mapped[str | None] = mapped_column(String(32), nullable=True)
+    sort_order: Mapped[int] = mapped_column(Integer, default=0)
+    compaction_preset_id: Mapped[int | None] = mapped_column(
+        Integer, ForeignKey("compaction_presets.id"), nullable=True
+    )
+
+    set: Mapped["LithologySet"] = relationship(back_populates="entries")
+    compaction_preset: Mapped["CompactionPreset | None"] = relationship()
+
+
+# ---------------------------------------------------------------------------
+# 11. compaction_presets
 # ---------------------------------------------------------------------------
 
 class CompactionPreset(Base, AuditMixin):
@@ -282,7 +319,7 @@ class CompactionPreset(Base, AuditMixin):
 
 
 # ---------------------------------------------------------------------------
-# 11. compaction_models + compaction_model_params
+# 12. compaction_models + compaction_model_params
 # ---------------------------------------------------------------------------
 
 class CompactionModel(Base):
@@ -316,7 +353,7 @@ class CompactionModelParam(Base):
 
 
 # ---------------------------------------------------------------------------
-# 12. calculation_results
+# 13. calculation_results
 # ---------------------------------------------------------------------------
 
 class CalculationResult(Base, AuditMixin):
@@ -335,7 +372,7 @@ class CalculationResult(Base, AuditMixin):
 
 
 # ---------------------------------------------------------------------------
-# 13. visual_config
+# 14. visual_config
 # ---------------------------------------------------------------------------
 
 class VisualConfig(Base, AuditMixin):
@@ -349,7 +386,7 @@ class VisualConfig(Base, AuditMixin):
 
 
 # ---------------------------------------------------------------------------
-# 14. checkpoints
+# 15. checkpoints
 # ---------------------------------------------------------------------------
 
 class CheckpointModel(Base):

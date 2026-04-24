@@ -5,6 +5,7 @@ import type {
   CurveDictionaryEntry,
   FormationTop,
   LithologyDictionaryEntry,
+  LithologySetSummary,
   StratChartInfo,
   TrackConfig,
   Well,
@@ -14,6 +15,8 @@ import { CompactionPresetSettings } from './settings/CompactionPresetSettings'
 import { CompactionPresetsRootSettings } from './settings/CompactionPresetsRootSettings'
 import { CurveDictionarySettings } from './settings/CurveDictionarySettings'
 import { LithologyDictionarySettings } from './settings/LithologyDictionarySettings'
+import { LithologySetSettings } from './settings/LithologySetSettings'
+import { LithologySetsRootSettings } from './settings/LithologySetsRootSettings'
 
 import { CurveSettings } from './settings/CurveSettings'
 import { DepthTrackSettings } from './settings/DepthTrackSettings'
@@ -58,6 +61,8 @@ interface SettingsInspectorProps {
   selectedCompactionModel: CompactionModel | null
   selectedCompactionPreset: CompactionPresetSummary | null
   compactionPresets: CompactionPresetSummary[]
+  lithologySets: LithologySetSummary[]
+  selectedLithologySet: LithologySetSummary | null
   selectedCurveDictionaryEntry: CurveDictionaryEntry | null
   selectedLithologyDictionaryEntry: LithologyDictionaryEntry | null
   curveCount: number
@@ -87,6 +92,8 @@ export function SettingsInspector({
   selectedCompactionModel,
   selectedCompactionPreset,
   compactionPresets,
+  lithologySets,
+  selectedLithologySet,
   selectedCurveDictionaryEntry,
   selectedLithologyDictionaryEntry,
   curveCount,
@@ -188,6 +195,17 @@ export function SettingsInspector({
 
   if (selectedObject.type === 'compaction-preset-draft') {
     return <CompactionPresetDraftSettings />
+  }
+
+  if (selectedObject.type === 'lithologies-root') {
+    return <LithologySetsRootSettings sets={lithologySets} />
+  }
+
+  if (selectedObject.type === 'lithology-set') {
+    if (!selectedLithologySet || selectedLithologySet.id !== selectedObject.setId) {
+      return <EmptyInspector message="Selected lithology set is not loaded yet." />
+    }
+    return <LithologySetSettings lithologySet={selectedLithologySet} />
   }
 
   if (selectedObject.type === 'compaction-model') {

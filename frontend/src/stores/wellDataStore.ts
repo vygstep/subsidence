@@ -8,6 +8,8 @@ import type {
   CurveDictionaryEntry,
   FormationTop,
   LithologyDictionaryEntry,
+  LithologySetDetail,
+  LithologySetSummary,
   LithologyParam,
   StratChartInfo,
   Well,
@@ -78,6 +80,7 @@ export interface WellDataStore {
   compactionPresets: CompactionPresetSummary[]
   curveDictionaryEntries: CurveDictionaryEntry[]
   lithologyDictionaryEntries: LithologyDictionaryEntry[]
+  lithologySets: LithologySetSummary[]
   tvdTable: TVDTable | null
   isLoading: boolean
   error: string | null
@@ -119,6 +122,8 @@ export interface WellDataStore {
   deleteCompactionPreset: (presetId: number) => Promise<void>
   loadCurveDictionary: () => Promise<void>
   loadLithologyDictionary: () => Promise<void>
+  loadLithologySets: () => Promise<void>
+  fetchLithologySet: (setId: number) => Promise<LithologySetDetail | null>
   fetchCompactionModelParams: (modelId: number) => Promise<LithologyParam[]>
   updateCompactionModelParam: (modelId: number, lithologyCode: string, patch: Partial<Pick<LithologyParam, 'density' | 'porosity_surface' | 'compaction_coeff'>>) => Promise<LithologyParam>
   fetchCurvesLOD: (depthMin: number, depthMax: number, resolution: number) => Promise<void>
@@ -190,6 +195,7 @@ const emptyState = {
   compactionPresets: [],
   curveDictionaryEntries: [],
   lithologyDictionaryEntries: [],
+  lithologySets: [],
   tvdTable: null,
   isLoading: false,
   error: null,
@@ -489,6 +495,11 @@ export const useWellDataStore = create<WellDataStore>((set, get) => ({
     if (!response.ok) return
     set({ lithologyDictionaryEntries: (await response.json()) as LithologyDictionaryEntry[] })
   },
+  async loadLithologySets() {
+    const response = await fetch('/api/lithology-sets')
+    if (!response.ok) return
+    set({ lithologySets: (await response.json()) as LithologySetSummary[] })
+  },
   async createCompactionModel(name, cloneFromId) {
     const response = await fetch('/api/compaction-models', {
       method: 'POST',
@@ -604,6 +615,11 @@ export const useWellDataStore = create<WellDataStore>((set, get) => ({
     set((state) => ({
       compactionPresets: state.compactionPresets.filter((preset) => preset.id !== presetId),
     }))
+  },
+  async fetchLithologySet(setId) {
+    const response = await fetch(`/api/lithology-sets/${setId}`)
+    if (!response.ok) return null
+    return (await response.json()) as LithologySetDetail
   },
   async fetchCompactionModelParams(modelId) {
     const response = await fetch(`/api/compaction-models/${modelId}/params`)

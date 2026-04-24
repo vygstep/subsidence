@@ -6,6 +6,7 @@ import type {
   CurveDictionaryEntry,
   FormationTop,
   LithologyDictionaryEntry,
+  LithologySetSummary,
   StratChartInfo,
   TrackConfig,
   Well,
@@ -51,6 +52,8 @@ interface SettingsPaneShellProps {
   selectedCompactionModel: CompactionModel | null
   selectedCompactionPreset: CompactionPresetSummary | null
   compactionPresets: CompactionPresetSummary[]
+  lithologySets: LithologySetSummary[]
+  selectedLithologySet: LithologySetSummary | null
   selectedCurveDictionaryEntry: CurveDictionaryEntry | null
   selectedLithologyDictionaryEntry: LithologyDictionaryEntry | null
   curveCount: number

@@ -6,7 +6,7 @@ import type {
   CompactionPresetSummary,
   CurveDictionaryEntry,
   FormationInventoryItem,
-  LithologyDictionaryEntry,
+  LithologySetSummary,
   StratChartInfo,
   WellInventory,
 } from '@/types'
@@ -17,7 +17,7 @@ interface DataManagerTopPaneProps {
   compactionPresets: CompactionPresetSummary[]
   curveDictionaryEntries: CurveDictionaryEntry[]
   deviationVisibilityByWellId: Record<string, boolean>
-  lithologyDictionaryEntries: LithologyDictionaryEntry[]
+  lithologySets: LithologySetSummary[]
   onActivateChart: (chartId: number) => void
   onContextMenuCurve: (event: React.MouseEvent, wellId: string, curve: { mnemonic: string; unit: string }) => void
   onContextMenuDeviation: (event: React.MouseEvent, wellId: string) => void
@@ -37,7 +37,8 @@ interface DataManagerTopPaneProps {
   onSelectCompactionPreset: (id: number) => void
   onSelectCompactionPresetsRoot: () => void
   onSelectCurveDictionaryEntry: (entryId: number) => void
-  onSelectLithologyDictionaryEntry: (entryId: number) => void
+  onSelectLithologiesRoot: () => void
+  onSelectLithologySet: (setId: number) => void
   onSelectCurve: (wellId: string, mnemonic: string) => void | Promise<void>
   onSelectFormation: (wellId: string, formationId: string) => void | Promise<void>
   onSelectLasGroup: (wellId: string) => void | Promise<void>
@@ -54,9 +55,10 @@ interface DataManagerTopPaneProps {
   selectedChartId: number | null
   selectedCompactionPresetId: number | null
   isCompactionPresetsRootSelected: boolean
+  isLithologiesRootSelected: boolean
   selectedCurveDictionaryEntryId: number | null
   selectedFormationId: string | null
-  selectedLithologyDictionaryEntryId: number | null
+  selectedLithologySetId: number | null
   selectedObject: SelectedObject | null
   stratCharts: StratChartInfo[]
   visibleCurveMnemonicsByWellId: Record<string, string[]>
@@ -70,7 +72,7 @@ export function DataManagerTopPane({
   compactionPresets,
   curveDictionaryEntries,
   deviationVisibilityByWellId,
-  lithologyDictionaryEntries,
+  lithologySets,
   onActivateChart,
   onContextMenuCurve,
   onContextMenuDeviation,
@@ -90,7 +92,8 @@ export function DataManagerTopPane({
   onSelectCompactionPreset,
   onSelectCompactionPresetsRoot,
   onSelectCurveDictionaryEntry,
-  onSelectLithologyDictionaryEntry,
+  onSelectLithologiesRoot,
+  onSelectLithologySet,
   onSelectCurve,
   onSelectFormation,
   onSelectLasGroup,
@@ -107,9 +110,10 @@ export function DataManagerTopPane({
   selectedChartId,
   selectedCompactionPresetId,
   isCompactionPresetsRootSelected,
+  isLithologiesRootSelected,
   selectedCurveDictionaryEntryId,
   selectedFormationId,
-  selectedLithologyDictionaryEntryId,
+  selectedLithologySetId,
   selectedObject,
   stratCharts,
   visibleCurveMnemonicsByWellId,
@@ -185,17 +189,19 @@ export function DataManagerTopPane({
       ) : (
         <TemplatesTab
           curveDictionaryEntries={curveDictionaryEntries}
-          lithologyDictionaryEntries={lithologyDictionaryEntries}
+          lithologySets={lithologySets}
           compactionPresets={compactionPresets}
           isCompactionPresetsRootSelected={isCompactionPresetsRootSelected}
+          isLithologiesRootSelected={isLithologiesRootSelected}
           selectedCompactionPresetId={selectedCompactionPresetId}
           selectedCurveDictionaryEntryId={selectedCurveDictionaryEntryId}
-          selectedLithologyDictionaryEntryId={selectedLithologyDictionaryEntryId}
+          selectedLithologySetId={selectedLithologySetId}
           onCreateCompactionPresetDraft={onCreateCompactionPresetDraft}
           onSelectCompactionPresetsRoot={onSelectCompactionPresetsRoot}
           onSelectCompactionPreset={onSelectCompactionPreset}
           onSelectCurveDictionaryEntry={onSelectCurveDictionaryEntry}
-          onSelectLithologyDictionaryEntry={onSelectLithologyDictionaryEntry}
+          onSelectLithologiesRoot={onSelectLithologiesRoot}
+          onSelectLithologySet={onSelectLithologySet}
         />
       )}
     </section>
