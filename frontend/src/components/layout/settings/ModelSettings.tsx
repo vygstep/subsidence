@@ -64,8 +64,8 @@ export function ModelSettings({ model }: { model: CompactionModel }) {
       <div className="template-panel__group" style={{ marginTop: 8 }}>
         <div className="template-panel__label">Legacy Runtime Parameters</div>
       </div>
-      <div className="compaction-table-wrapper">
-        <table className="compaction-table">
+      <div className="dm-table-wrapper">
+        <table className="dm-table dm-table--numeric">
           <thead>
             <tr>
               <th>Lithology</th>
@@ -88,7 +88,7 @@ export function ModelSettings({ model }: { model: CompactionModel }) {
                   <>
                     <td>
                       <input
-                        className="compaction-table__input"
+                        className="dm-table__input dm-table__input--num"
                         defaultValue={p.density.toFixed(0)}
                         key={`${p.lithology_code}-density-${p.density}`}
                         onBlur={(e) => void handleParamBlur(p.lithology_code, 'density', e.target.value)}
@@ -96,7 +96,7 @@ export function ModelSettings({ model }: { model: CompactionModel }) {
                     </td>
                     <td>
                       <input
-                        className="compaction-table__input"
+                        className="dm-table__input dm-table__input--num"
                         defaultValue={p.porosity_surface.toFixed(3)}
                         key={`${p.lithology_code}-phi-${p.porosity_surface}`}
                         onBlur={(e) => void handleParamBlur(p.lithology_code, 'porosity_surface', e.target.value)}
@@ -104,7 +104,7 @@ export function ModelSettings({ model }: { model: CompactionModel }) {
                     </td>
                     <td>
                       <input
-                        className="compaction-table__input"
+                        className="dm-table__input dm-table__input--num"
                         defaultValue={p.compaction_coeff.toFixed(3)}
                         key={`${p.lithology_code}-c-${p.compaction_coeff}`}
                         onBlur={(e) => void handleParamBlur(p.lithology_code, 'compaction_coeff', e.target.value)}

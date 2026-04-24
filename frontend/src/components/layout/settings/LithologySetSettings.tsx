@@ -148,8 +148,8 @@ export function LithologySetSettings({ lithologySet }: { lithologySet: Lithology
         <div className="template-panel__label">Lithology Set</div>
         <div className="template-panel__value">{resolved.name}</div>
       </div>
-      <div className="template-table-wrapper">
-        <table className="template-table">
+      <div className="dm-table-wrapper">
+        <table className="dm-table">
           <thead>
             <tr>
               <th>Code</th>
@@ -171,7 +171,7 @@ export function LithologySetSettings({ lithologySet }: { lithologySet: Lithology
                     entry.lithology_code
                   ) : (
                     <input
-                      className="template-table__input"
+                      className="dm-table__input"
                       defaultValue={entry.lithology_code}
                       key={`${entry.id}-code-${entry.lithology_code}`}
                       onBlur={(event) => void handleEntryBlur(entry.id, 'lithology_code', event.target.value)}
@@ -183,7 +183,7 @@ export function LithologySetSettings({ lithologySet }: { lithologySet: Lithology
                     entry.display_name
                   ) : (
                     <input
-                      className="template-table__input"
+                      className="dm-table__input"
                       defaultValue={entry.display_name}
                       key={`${entry.id}-name-${entry.display_name}`}
                       onBlur={(event) => void handleEntryBlur(entry.id, 'display_name', event.target.value)}
@@ -198,7 +198,7 @@ export function LithologySetSettings({ lithologySet }: { lithologySet: Lithology
                     </>
                   ) : (
                     <input
-                      className="template-table__input"
+                      className="dm-table__input"
                       defaultValue={entry.color_hex}
                       key={`${entry.id}-color-${entry.color_hex}`}
                       onBlur={(event) => void handleEntryBlur(entry.id, 'color_hex', event.target.value)}
@@ -210,7 +210,7 @@ export function LithologySetSettings({ lithologySet }: { lithologySet: Lithology
                     entry.pattern_id ?? 'Solid fill'
                   ) : (
                     <input
-                      className="template-table__input"
+                      className="dm-table__input"
                       defaultValue={entry.pattern_id ?? ''}
                       key={`${entry.id}-pattern-${entry.pattern_id ?? ''}`}
                       onBlur={(event) => void handleEntryBlur(entry.id, 'pattern_id', event.target.value)}
@@ -222,7 +222,7 @@ export function LithologySetSettings({ lithologySet }: { lithologySet: Lithology
                     entry.compaction_preset_label ?? '-'
                   ) : (
                     <select
-                      className="template-table__select"
+                      className="dm-table__select"
                       value={entry.compaction_preset_id ?? ''}
                       onChange={(event) => void handlePresetChange(entry.id, event.target.value)}
                     >

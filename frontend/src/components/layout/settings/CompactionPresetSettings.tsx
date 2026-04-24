@@ -135,8 +135,8 @@ export function CompactionPresetSettings({ preset }: { preset: CompactionPresetS
         <div className="template-panel__label">Compaction Preset</div>
         <div className="template-panel__value">{`${resolved.id} ${resolved.name} [${resolved.origin}]`}</div>
       </div>
-      <div className="compaction-table-wrapper">
-        <table className="compaction-table compaction-table--presets">
+      <div className="dm-table-wrapper">
+        <table className="dm-table dm-table--numeric">
           <thead>
             <tr>
               <th>ID</th>
@@ -147,14 +147,14 @@ export function CompactionPresetSettings({ preset }: { preset: CompactionPresetS
             </tr>
           </thead>
           <tbody>
-            <tr className={resolved.is_builtin ? 'compaction-table__row--muted' : ''}>
+            <tr className={resolved.is_builtin ? 'dm-table__row--builtin' : ''}>
               <td>{resolved.id}</td>
               <td>
                 {resolved.is_builtin ? (
                   currentDraft.name
                 ) : (
                   <input
-                    className="compaction-table__input compaction-table__input--name"
+                    className="dm-table__input"
                     value={currentDraft.name}
                     onChange={(event) => updateDraftField('name', event.target.value)}
                   />
@@ -165,7 +165,7 @@ export function CompactionPresetSettings({ preset }: { preset: CompactionPresetS
                   currentDraft.density
                 ) : (
                   <input
-                    className="compaction-table__input"
+                    className="dm-table__input dm-table__input--num"
                     value={currentDraft.density}
                     onChange={(event) => updateDraftField('density', event.target.value)}
                   />
@@ -176,7 +176,7 @@ export function CompactionPresetSettings({ preset }: { preset: CompactionPresetS
                   currentDraft.porosity_surface
                 ) : (
                   <input
-                    className="compaction-table__input"
+                    className="dm-table__input dm-table__input--num"
                     value={currentDraft.porosity_surface}
                     onChange={(event) => updateDraftField('porosity_surface', event.target.value)}
                   />
@@ -187,7 +187,7 @@ export function CompactionPresetSettings({ preset }: { preset: CompactionPresetS
                   currentDraft.compaction_coeff
                 ) : (
                   <input
-                    className="compaction-table__input"
+                    className="dm-table__input dm-table__input--num"
                     value={currentDraft.compaction_coeff}
                     onChange={(event) => updateDraftField('compaction_coeff', event.target.value)}
                   />

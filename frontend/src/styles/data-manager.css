@@ -651,15 +651,15 @@
   border-color: var(--dm-accent-border);
 }
 
-/* ─── template table ─────────────────────────────────────────────────────── */
+/* ─── dm-table ───────────────────────────────────────────────────────────── */
 
-.template-table-wrapper {
+.dm-table-wrapper {
   overflow: auto;
   border: 1px solid var(--dm-border);
   border-radius: var(--dm-radius-lg);
 }
 
-.template-table {
+.dm-table {
   width: 100%;
   border-collapse: collapse;
   font-size: var(--dm-font-sm);
@@ -667,40 +667,61 @@
   background: var(--dm-bg);
 }
 
-.template-table th,
-.template-table td {
+.dm-table th,
+.dm-table td {
   padding: var(--dm-cell-py) var(--dm-cell-px);
   text-align: left;
   border-bottom: 1px solid var(--dm-border-light);
   white-space: nowrap;
 }
 
-.template-table th {
+.dm-table th {
   background: var(--dm-bg-panel);
   color: var(--dm-fg-3);
   font-size: var(--dm-font-xs);
   font-weight: var(--dm-fw-bold);
   text-transform: uppercase;
   letter-spacing: 0.04em;
+  position: sticky;
+  top: 0;
 }
 
-.template-table tbody tr:last-child td {
+.dm-table tbody tr:last-child td {
   border-bottom: 0;
 }
 
-.template-table tbody tr {
-  cursor: pointer;
+.dm-table tbody tr:hover td {
+  background: var(--dm-bg-hover);
 }
 
-.template-table tbody tr:hover td {
-  background: var(--dm-bg-panel);
-}
-
-.template-table__row--selected td {
+.dm-table__row--selected td {
   background: var(--dm-bg-selected);
 }
 
-.template-table__input {
+.dm-table__row--builtin td {
+  color: var(--dm-fg-muted);
+}
+
+/* numeric columns — apply to th and td directly */
+.dm-table .dm-table__cell--num {
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+
+/* numeric table: all columns right-aligned except the first */
+.dm-table--numeric th:not(:first-child),
+.dm-table--numeric td:not(:first-child) {
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+
+.dm-table--numeric td:first-child {
+  max-width: 100px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.dm-table__input {
   width: 100%;
   background: transparent;
   border: none;
@@ -711,11 +732,15 @@
   outline: none;
 }
 
-.template-table__input:focus {
+.dm-table__input:focus {
   border-bottom-color: var(--dm-accent-light);
 }
 
-.template-table__select {
+.dm-table__input--num {
+  text-align: right;
+}
+
+.dm-table__select {
   width: 100%;
   min-width: 0;
   background: transparent;
@@ -725,23 +750,17 @@
   font-size: inherit;
   padding: 0;
   outline: none;
+  cursor: pointer;
 }
 
-.template-table__select:focus {
+.dm-table__select:focus {
   border-bottom-color: var(--dm-accent-light);
 }
 
-.template-row__delete {
-  border: none;
-  background: transparent;
-  color: var(--dm-danger);
-  font-size: var(--dm-font-sm);
-  cursor: pointer;
-  padding: 0;
-}
-
-.template-row__delete:hover {
-  text-decoration: underline;
+.dm-table__empty-row td {
+  color: var(--dm-fg-muted);
+  font-style: italic;
+  text-align: center;
 }
 
 .template-color-chip {
@@ -956,74 +975,6 @@
   margin-top: 4px;
 }
 
-/* ─── compaction table ───────────────────────────────────────────────────── */
-
-.compaction-table-wrapper {
-  overflow-x: auto;
-  margin-top: 4px;
-}
-
-.compaction-table {
-  width: 100%;
-  border-collapse: collapse;
-  font-size: 0.75rem;
-  color: #cbd5e1;
-}
-
-.compaction-table th,
-.compaction-table td {
-  padding: 3px 6px;
-  text-align: right;
-  border-bottom: 1px solid #1e293b;
-}
-
-.compaction-table th:first-child,
-.compaction-table td:first-child {
-  text-align: left;
-  max-width: 80px;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.compaction-table th {
-  color: var(--dm-fg-muted);
-  font-weight: var(--dm-fw-normal);
-  border-bottom: 1px solid #334155;
-}
-
-.compaction-table tr:hover td {
-  background: #1e293b;
-}
-
-.compaction-table__input {
-  width: 100%;
-  background: transparent;
-  border: none;
-  border-bottom: 1px solid transparent;
-  color: inherit;
-  font-size: inherit;
-  text-align: right;
-  padding: 0;
-  outline: none;
-}
-
-.compaction-table__input:focus {
-  border-bottom-color: var(--dm-accent-light);
-}
-
-.compaction-table--presets th:nth-child(2),
-.compaction-table--presets td:nth-child(2) {
-  text-align: left;
-}
-
-.compaction-table__row--muted td {
-  color: var(--dm-fg-muted);
-}
-
-.compaction-table__input--name {
-  text-align: left;
-}
 
 /* ─── formations list (settings panel) ───────────────────────────────────── */
 

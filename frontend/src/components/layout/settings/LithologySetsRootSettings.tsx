@@ -22,8 +22,8 @@ export function LithologySetsRootSettings({ sets }: { sets: LithologySetSummary[
         <div className="template-panel__label">Lithologies</div>
         <div className="template-panel__value">{sets.length}</div>
       </div>
-      <div className="template-table-wrapper">
-        <table className="template-table">
+      <div className="dm-table-wrapper">
+        <table className="dm-table">
           <thead>
             <tr>
               <th>Name</th>

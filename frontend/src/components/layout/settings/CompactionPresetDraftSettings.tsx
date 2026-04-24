@@ -72,8 +72,8 @@ export function CompactionPresetDraftSettings() {
         <div className="template-panel__label">Compaction Preset</div>
         <div className="template-panel__value">New preset</div>
       </div>
-      <div className="compaction-table-wrapper">
-        <table className="compaction-table compaction-table--presets">
+      <div className="dm-table-wrapper">
+        <table className="dm-table dm-table--numeric">
           <thead>
             <tr>
               <th>ID</th>
@@ -88,28 +88,28 @@ export function CompactionPresetDraftSettings() {
               <td>New</td>
               <td>
                 <input
-                  className="compaction-table__input compaction-table__input--name"
+                  className="dm-table__input"
                   value={draft.name}
                   onChange={(event) => updateField('name', event.target.value)}
                 />
               </td>
               <td>
                 <input
-                  className="compaction-table__input"
+                  className="dm-table__input dm-table__input--num"
                   value={draft.density}
                   onChange={(event) => updateField('density', event.target.value)}
                 />
               </td>
               <td>
                 <input
-                  className="compaction-table__input"
+                  className="dm-table__input dm-table__input--num"
                   value={draft.porosity_surface}
                   onChange={(event) => updateField('porosity_surface', event.target.value)}
                 />
               </td>
               <td>
                 <input
-                  className="compaction-table__input"
+                  className="dm-table__input dm-table__input--num"
                   value={draft.compaction_coeff}
                   onChange={(event) => updateField('compaction_coeff', event.target.value)}
                 />

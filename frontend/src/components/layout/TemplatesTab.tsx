@@ -114,8 +114,8 @@ export function TemplatesTab({
           </div>
           {isExpanded('template:curve-mnemonics') ? (
             <div className="tree-node__children">
-              <div className="template-table-wrapper">
-                <table className="template-table">
+              <div className="dm-table-wrapper">
+                <table className="dm-table">
                   <thead>
                     <tr>
                       <th>Pattern</th>
@@ -129,7 +129,7 @@ export function TemplatesTab({
                     {curveDictionaryEntries.map((entry) => (
                       <tr
                         key={entry.id}
-                        className={selectedCurveDictionaryEntryId === entry.id ? 'template-table__row--selected' : ''}
+                        className={selectedCurveDictionaryEntryId === entry.id ? 'dm-table__row--selected' : ''}
                         onClick={() => onSelectCurveDictionaryEntry(entry.id)}
                       >
                         <td>{entry.pattern}</td>

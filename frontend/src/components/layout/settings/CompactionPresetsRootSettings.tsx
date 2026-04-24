@@ -115,8 +115,8 @@ export function CompactionPresetsRootSettings({ presets }: { presets: Compaction
         <div className="template-panel__label">Compaction Presets</div>
         <div className="template-panel__value">{presets.length}</div>
       </div>
-      <div className="compaction-table-wrapper">
-        <table className="compaction-table compaction-table--presets">
+      <div className="dm-table-wrapper">
+        <table className="dm-table dm-table--numeric">
           <thead>
             <tr>
               <th>ID</th>
@@ -130,14 +130,14 @@ export function CompactionPresetsRootSettings({ presets }: { presets: Compaction
             {details.map((preset) => {
               const draft = drafts[preset.id] ?? buildDraft(preset)
               return (
-                <tr key={preset.id} className={preset.is_builtin ? 'compaction-table__row--muted' : ''}>
+                <tr key={preset.id} className={preset.is_builtin ? 'dm-table__row--builtin' : ''}>
                   <td>{preset.id}</td>
                   <td title={`${preset.id} ${preset.name} [${preset.origin}]`}>
                     {preset.is_builtin ? (
                       draft.name
                     ) : (
                       <input
-                        className="compaction-table__input compaction-table__input--name"
+                        className="dm-table__input"
                         value={draft.name}
                         onChange={(event) => updateDraft(preset.id, 'name', event.target.value)}
                         onBlur={() => void handleBlur(preset.id)}
@@ -149,7 +149,7 @@ export function CompactionPresetsRootSettings({ presets }: { presets: Compaction
                       draft.density
                     ) : (
                       <input
-                        className="compaction-table__input"
+                        className="dm-table__input dm-table__input--num"
                         value={draft.density}
                         onChange={(event) => updateDraft(preset.id, 'density', event.target.value)}
                         onBlur={() => void handleBlur(preset.id)}
@@ -161,7 +161,7 @@ export function CompactionPresetsRootSettings({ presets }: { presets: Compaction
                       draft.porosity_surface
                     ) : (
                       <input
-                        className="compaction-table__input"
+                        className="dm-table__input dm-table__input--num"
                         value={draft.porosity_surface}
                         onChange={(event) => updateDraft(preset.id, 'porosity_surface', event.target.value)}
                         onBlur={() => void handleBlur(preset.id)}
@@ -173,7 +173,7 @@ export function CompactionPresetsRootSettings({ presets }: { presets: Compaction
                       draft.compaction_coeff
                     ) : (
                       <input
-                        className="compaction-table__input"
+                        className="dm-table__input dm-table__input--num"
                         value={draft.compaction_coeff}
                         onChange={(event) => updateDraft(preset.id, 'compaction_coeff', event.target.value)}
                         onBlur={() => void handleBlur(preset.id)}
