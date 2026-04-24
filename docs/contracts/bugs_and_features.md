@@ -37,15 +37,15 @@ Goal:
 
 Items:
 
-- `DICT-001`: Add Templates tab beside Settings.
-- `DICT-002`: Curve mnemonic and unit resolver.
-- `DICT-003`: Lithology sets and compaction presets.
+- `DICT-001`: Add Templates tab beside Settings. ✓
+- `DICT-002`: Curve mnemonic and unit resolver. ← **next**
+- `DICT-003`: Lithology sets and compaction presets. ✓
 
 Exit criteria:
 
-- Built-in dictionaries are visible and read-only.
-- Project dictionaries/templates can be duplicated or extended where required.
-- Curve classification can use mnemonic first and unit fallback second.
+- Built-in dictionaries are visible and read-only. ✓
+- Project dictionaries/templates can be duplicated or extended where required. ✓
+- Curve classification can use mnemonic first and unit fallback second. ← blocked on DICT-002
 
 ### Phase B: Import Wizard
 
@@ -356,38 +356,6 @@ Acceptance:
 
 ## 3. Templates and Dictionaries Foundation
 
-### DICT-001: Add Templates tab beside Settings
-
-Problem:
-
-- Dictionary-like project data is scattered between models, seed files, and settings.
-
-Required behavior:
-
-- Add a `Templates` tab next to `Settings`.
-- Templates contains project dictionaries and template tables:
-  - Curve mnemonics.
-  - Curve units.
-  - Lithologies.
-  - Discrete curve palettes.
-  - Compaction presets.
-- Built-in templates are read-only.
-- Built-in templates can be duplicated into editable project templates.
-
-Likely code areas:
-
-- `frontend/src/components/layout/DataManagerPane.tsx`
-- `frontend/src/components/layout/SettingsPaneShell.tsx`
-- `frontend/src/components/layout/TemplatesTab.tsx`
-- `app/src/subsidence/data/schema.py`
-- `app/src/subsidence/data/dict_seeder.py`
-- `app/src/subsidence/api/compaction.py`
-
-Acceptance:
-
-- Templates UI exposes dictionary/template data without mixing it with selected-object settings.
-- Built-in rows cannot be edited directly.
-
 ### DICT-002: Curve mnemonic and unit resolver
 
 Problem:
@@ -476,141 +444,6 @@ Implementation order for DICT-002:
 6. Add entry CRUD and validation for user mnemonic rules.
 7. Update `dict_resolver.py` to evaluate all user mnemonic sets first and built-in default second.
 8. Add unit-dictionary fallback after mnemonic-set resolution is in place.
-
-### DICT-003: Lithology sets and compaction presets
-
-Problem:
-
-- Lithology display/coding and compaction behavior are different concerns and should not be stored as one flat table forever.
-- The current grouped compaction table is only a temporary bootstrap and does not match the intended per-lithology preset workflow.
-- The current single flat lithology dictionary is also only a temporary bootstrap and does not support multiple lithology-set variants inside one project.
-
-Required behavior:
-
-- Introduce the target domain model:
-  - `Lithologies` root object
-  - `Lithology Set`
-  - `Lithology Entry`
-  - `Compaction Preset`
-- `Lithologies` contains multiple lithology sets.
-- One built-in set must always exist:
-  - `Default Lithologies`
-- Existing built-in lithologies become the seeded `Default Lithologies` set instead of remaining a permanent flat dictionary.
-- Additional user lithology sets can be created later per project.
-- `Lithology Entry` owns:
-  - code
-  - display name
-  - color
-  - pattern
-  - linked compaction preset
-- `Compaction Preset` owns:
-  - internal immutable `id`
-  - display name
-  - origin (`builtin` or `user`)
-  - density
-  - phi0
-  - compaction coefficient `C`
-- In the target UI, `Templates -> Compaction Presets` is a library of individual preset entries, not a single table containing all lithologies inside one preset object.
-- Built-in compaction presets are seeded from the current defaults and shown as one entry per lithology, for example `Coal`.
-- Built-in lithology sets and built-in compaction presets are immutable.
-- User can duplicate built-in sets/presets into project-level editable copies.
-- User-created presets are separate entries, for example a copied `Coal` preset with modified parameters.
-- Duplicate display names are allowed.
-- All linking and persistence must use immutable preset `id`, not preset display name.
-- In settings, linking dialogs, and other disambiguation contexts, the UI should show an extended label:
-  - `<id> <name> [builtin]`
-  - `<id> <name> [user]`
-- In final visualization and result presentation, the UI should show the plain display name only.
-- A user can assign any available compaction preset to a lithology entry.
-- The current backend `CompactionModel` implementation is treated as a temporary technical name until the later schema refactor.
-- Code type must remain flexible:
-  - integer-like codes are allowed
-  - text codes are allowed
-  - storage and linking must not force numeric conversion
-
-Templates UI behavior:
-
-- Clicking the `Compaction Presets` root in `Templates` opens a settings overview of all presets.
-- The settings overview shows:
-  - all built-in presets in muted/gray style;
-  - all user presets in normal style.
-- Built-in presets are selectable from the list and open in `Settings` as read-only entries.
-- Clicking a built-in preset opens its parameter view in `Settings`.
-- Built-in preset settings include a `Make copy` action at the bottom of the settings pane.
-- `Make copy` creates a new user preset initialized from the selected built-in preset parameters.
-- The `Templates -> Compaction Presets` list includes a compact `New preset` button at the bottom of the list.
-- `New preset` creates an empty user preset and opens it in `Settings`.
-- User preset settings use explicit `Save` and `Cancel` actions.
-- New or edited user presets must validate required fields before save.
-- If any required field is missing, save is blocked and the user sees a clear error such as `Fill all required parameters`.
-- The left `Templates` pane should remain a navigation tree, not a wide editor surface.
-- `Templates -> Lithologies` must become a tree of sets:
-  - `Lithologies`
-    - `Default Lithologies`
-    - user lithology sets
-- Clicking `Lithologies` root opens a lithology-set overview in `Settings`.
-- Clicking a specific lithology set opens its data table in `Settings`.
-- The lithology-set table must live in `Settings`, not in the left `Templates` pane.
-- The lithology-set table columns are:
-  - `Code`
-  - `Name`
-  - `Color`
-  - `Pattern`
-  - `Compaction preset`
-  - `Density`
-  - `Phi0`
-  - `C`
-- `Default Lithologies` is read-only.
-- Future user lithology sets are editable.
-- `Compaction preset` is the short table label for the linked preset column.
-- `Density`, `Phi0`, and `C` are informational columns derived from the linked preset.
-- If a lithology entry has no linked preset, the informational columns must show:
-  - `Density = -`
-  - `Phi0 = -`
-  - `C = -`
-- Lithology sets are not used by well models directly.
-- A well model must use a lithology log curve or lithology-derived track.
-- That curve/track must point to a `lithology_set_id`.
-- Runtime decoding flow:
-  - model selects a lithology curve for a well;
-  - curve values are decoded through the linked lithology set;
-  - each lithology entry resolves to its linked compaction preset;
-  - compaction parameters are taken from that preset.
-- Future delete protection must follow this chain:
-  - deleting a lithology entry or lithology set must be blocked if it is used by a lithology curve that is referenced by a well model.
-- Future delete-block messages should identify:
-  - well name
-  - model name
-  - curve name
-
-Likely code areas:
-
-- `app/src/subsidence/data/schema.py`
-- `app/src/subsidence/api/compaction.py`
-- `app/src/subsidence/api/lithology*.py` or equivalent new lithology-set API
-- `frontend/src/components/layout/settings/ModelSettings.tsx`
-- New Templates UI.
-
-Acceptance:
-
-- Built-in presets remain protected.
-- Project-specific presets can be created, duplicated, renamed, and changed.
-- Duplicate preset names do not break linking because references use immutable `id`.
-- Settings and linking UI can disambiguate same-name presets by showing the extended label with `id` and origin.
-- `Default Lithologies` exists as a read-only built-in lithology set.
-- The `Settings` pane, not the left tree, becomes the main editing surface for lithology-set tables.
-- Lithology entries point to chosen presets instead of embedding `Density / Phi0 / C` directly.
-- The future runtime uses `lithology curve -> lithology set -> compaction preset`, not a direct `model -> lithology set` shortcut.
-
-Implementation order for DICT-003:
-
-1. Add backend `Lithology Set` / `Lithology Entry` schema and seed the built-in `Default Lithologies` set from the current flat dictionary.
-2. Add read-only API to list lithology sets and fetch one set with rows and linked preset-derived columns.
-3. Replace the flat `Templates -> Lithologies` table with a navigation tree of lithology sets.
-4. Show lithology-set tables in `Settings`.
-5. Add user lithology-set CRUD.
-6. Add preset-link editing inside non-default lithology sets.
-7. Remove remaining dependency on the legacy flat lithology dictionary UI once all consumers are migrated.
 
 ---
 
@@ -990,3 +823,15 @@ Dependency rule:
 
 - Import Wizard can read dictionary/template data, but it must not duplicate dictionary definitions.
 - Lithology import behavior must not be implemented before dictionary/template and wizard foundations are stable.
+
+---
+
+## Implemented
+
+### DICT-001: Add Templates tab beside Settings ✓
+
+Templates tab added next to Settings in the Data Manager. Contains Compaction Presets, Curve Mnemonics (flat read-only table), and Lithologies tree. Built-in entries are read-only; user entries can be created/edited. Commits: `8e44815`, `01817d9`.
+
+### DICT-003: Lithology sets and compaction presets ✓
+
+Backend: `LithologySet` / `LithologyEntry` schema, `CompactionPreset` with `id`/`origin`/`is_builtin`, seeded `Default Lithologies` and built-in presets from existing flat dictionary. API: CRUD for presets and lithology sets. Frontend: `CompactionPresetsRootSettings`, `CompactionPresetSettings`, `CompactionPresetDraftSettings`, `LithologySetSettings`, `LithologySetsRootSettings`. Built-in rows are muted/read-only; user rows are editable inline; `Make copy` and `New preset` actions work. Commits: `d5a6b82`, `5005cee`, `0b5c191`.
