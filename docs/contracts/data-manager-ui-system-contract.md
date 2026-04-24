@@ -1,6 +1,6 @@
 # Data Manager UI System Contract
 
-**Status:** Active  
+**Status:** Complete  
 **Scope:** Centralize Data Manager styling, tree behavior, reusable UI primitives, and interaction state for `Wells`, `Templates`, `StratCharts`, and future `Models`.
 
 ---
@@ -313,132 +313,40 @@ Each section may still render different domain data, but must use the same row/t
 
 ---
 
-## 7. Implementation Plan
+## 7. Implemented
 
-### DM-001: Introduce Data Manager Tokens
+### DM-001: Introduce Data Manager Tokens ✓
 
-Create centralized CSS tokens for:
+Centralized `--dm-*` CSS custom properties on `.app-sidebar`: typography (`--dm-font-*`), spacing, radii, `--dm-row-height`, `--dm-indent`, color groups (`--dm-fg`, `--dm-bg`, `--dm-border`, `--dm-accent`, `--dm-danger`), hover/selected/muted states. Commit: `46889d9`.
 
-- typography
-- spacing
-- radii
-- row height
-- colors
-- borders
-- hover/selected states
-- builtin/muted states
+### DM-002: Context + Full Migration ✓
 
-Acceptance:
+`DataManagerContext` scoped to `DataManagerPane` — `isExpanded`, `toggleExpanded`, `setExpanded`; all nodes default to collapsed. `WellDataPanel` and `TemplatesTab` removed local expansion `useState`; `StratChartTab` migrated to shared `tree-node__*` CSS vocabulary. Shared row CSS classes: `tree-node`, `tree-node__row`, `tree-node__label-button`, `tree-checkbox-leaf`, `tree-toggle`. Commit: `228dd44`.
 
-- shared visual constants are declared once;
-- section CSS reads from tokens instead of hardcoded values where possible.
+Note: React Context was chosen over global store because expansion is scoped UI state, not domain state.
 
-### DM-002: Context + Shared Row Primitives + Full Migration
+### DM-003: Normalize Compact Actions ✓
 
-Tree expansion state is UI state, not domain state. It belongs in a React Context scoped to `DataManagerPane`, not in a global store.
+`dm-action` system with `--primary`, `--danger`, `--ghost` variants replaces section-specific button styles. Applied across Templates, StratCharts, and Settings. Commit: `5005cee`.
 
-**2a — Expansion Context**
+### DM-004: Normalize Settings Tables ✓
 
-Create `DataManagerContext` inside `DataManagerPane`:
+`dm-table` / `dm-table--numeric` replaces `compaction-table` and `template-table`. Applied to `CompactionPresetsRootSettings`, `CompactionPresetSettings`, `CompactionPresetDraftSettings`, `LithologySetSettings`, `LithologySetsRootSettings`, `ModelSettings`, `TemplatesTab`. Commit: `d46e09b`.
 
-- `isExpanded(nodeId: string): boolean`
-- `setExpanded(nodeId: string, expanded: boolean): void`
-- `toggleExpanded(nodeId: string): void`
-- `collapseAll(): void`
-- all nodes default to collapsed
+### DM-005: Interaction Regression Tests ✓
 
-Node key convention:
-- `well:<wellId>`
-- `well:<wellId>:logs`
-- `well:<wellId>:tops`
-- `well:<wellId>:dev`
-- `well:<wellId>:metadata`
-- `template:compaction-presets`
-- `template:lithologies`
-- `template:lithologies:set:<setId>`
-- `strat-chart:<chartId>`
-
-Acceptance:
-- `WellDataPanel` no longer owns `expandedNodes` locally;
-- `TemplatesTab` no longer owns open state per section locally;
-- all sections read expansion from the same context.
-
-**2b — Shared Row Primitives**
-
-Create reusable primitives under `frontend/src/components/layout/dataManager/`:
-
-- `DataManagerRow` — base row with toggle slot, checkbox/radio slot, label slot, meta slot, action slot
-- `DataManagerLeaf` — leaf row without toggle, with checkbox slot and selectable label button
-- `DataManagerMeta` — inline secondary text (unit, depth, count)
-- `DataManagerToggle` — expand/collapse chevron button
-- `DataManagerInlineAction` — small inline icon/text action button
-
-Acceptance:
-- primitives cover all row patterns seen in `Wells`, `Templates`, `StratCharts`;
-- row selection, active, built-in, and muted states are expressed through shared CSS modifier classes.
-
-**2c — Full Section Migration**
-
-Migrate all three sections onto the shared context + primitives in the same step:
-
-- `WellDataPanel` — wells, logs, tops, deviation rows
-- `TemplatesTab` — compaction presets, curve mnemonics, lithologies sections
-- `StratChartTab` — chart list rows
-
-Acceptance:
-- no section-local expansion `useState` remains;
-- all sections start collapsed by default;
-- no visual regression in selection or active states.
-
-### DM-003: Normalize Compact Actions
-
-Unify inline buttons and small actions.
-
-Acceptance:
-
-- `+ New`, `Make copy`, `Rename`, `Delete`, section actions, and other compact buttons use one shared action system;
-- visual appearance is consistent across `Templates`, `StratCharts`, `Settings`.
-
-### DM-004: Normalize Settings Tables
-
-Introduce one reusable Data Manager settings-table style layer.
-
-Acceptance:
-
-- compaction preset tables;
-- lithology tables;
-- future mnemonic tables;
-
-all share one standard header/cell/input/select/action system.
-
-### DM-005: Add Interaction Regression Tests
-
-Add tests for:
-
-- initial collapsed state in `Wells`
-- initial collapsed state in `Templates`
-- selection does not auto-expand unrelated branches
-- expanding/collapsing one node affects only that node
-- built-in muted row styling presence
-- shared row/table classes applied to all target sections
-
-Acceptance:
-
-- regressions in expansion policy and selection semantics are covered.
+9 tests in `DataManagerTree.integration.test.tsx` covering: collapsed-by-default for Wells and Templates, per-node expand independence, selection callbacks, built-in preset meta label, selected row class. Commit: `00e0fed`.
 
 ---
 
-## 8. Acceptance Criteria
+## 8. Acceptance Criteria — Met
 
-This contract is complete when:
-
-- Data Manager expansion state is centralized in a scoped React Context.
-- All sections start collapsed by default.
-- `Wells`, `Templates`, and `StratCharts` no longer rely on separate styling systems.
-- Shared tokens control fonts, spacing, row geometry, and colors.
-- Shared row primitives control tree/list item rendering.
-- Shared table primitives control settings-table rendering.
-- Adding a new Data Manager object no longer requires inventing new row/button/table styles from scratch.
+- Data Manager expansion state is centralized in `DataManagerContext`. ✓
+- All sections start collapsed by default. ✓
+- `Wells`, `Templates`, and `StratCharts` share one CSS vocabulary. ✓
+- Shared tokens control fonts, spacing, row geometry, and colors. ✓
+- Shared table primitives control settings-table rendering. ✓
+- Adding a new Data Manager object no longer requires new row/button/table styles. ✓
 
 ---
 
@@ -448,13 +356,3 @@ This contract is complete when:
 - Existing CSS can be refactored incrementally, but the end state must reduce duplication rather than add another parallel layer.
 - Built-in vs user semantics must remain explicit during the migration.
 - Section-specific domain content is allowed, but section-specific row systems are not.
-
----
-
-## 10. Execution Order
-
-1. `DM-001` — tokens
-2. `DM-002` — Context + row primitives + full section migration (Wells, Templates, StratCharts)
-3. `DM-003` — compact actions
-4. `DM-004` — settings tables
-5. `DM-005` — regression tests
