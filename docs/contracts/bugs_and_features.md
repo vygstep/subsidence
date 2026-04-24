@@ -447,7 +447,7 @@ Required behavior:
   - phi0
   - compaction coefficient `C`
 - In the target UI, `Templates -> Compaction Presets` is a library of individual preset entries, not a single table containing all lithologies inside one preset object.
-- Built-in compaction presets are seeded from the current defaults and shown as one entry per lithology, for example `Coal (default)`.
+- Built-in compaction presets are seeded from the current defaults and shown as one entry per lithology, for example `Coal`.
 - Built-in lithology sets and built-in compaction presets are immutable.
 - User can duplicate built-in sets/presets into project-level editable copies.
 - User-created presets are separate entries, for example a copied `Coal` preset with modified parameters.
@@ -504,6 +504,20 @@ Templates UI behavior:
   - `Density = -`
   - `Phi0 = -`
   - `C = -`
+- Lithology sets are not used by well models directly.
+- A well model must use a lithology log curve or lithology-derived track.
+- That curve/track must point to a `lithology_set_id`.
+- Runtime decoding flow:
+  - model selects a lithology curve for a well;
+  - curve values are decoded through the linked lithology set;
+  - each lithology entry resolves to its linked compaction preset;
+  - compaction parameters are taken from that preset.
+- Future delete protection must follow this chain:
+  - deleting a lithology entry or lithology set must be blocked if it is used by a lithology curve that is referenced by a well model.
+- Future delete-block messages should identify:
+  - well name
+  - model name
+  - curve name
 
 Likely code areas:
 
@@ -522,6 +536,7 @@ Acceptance:
 - `Default Lithologies` exists as a read-only built-in lithology set.
 - The `Settings` pane, not the left tree, becomes the main editing surface for lithology-set tables.
 - Lithology entries point to chosen presets instead of embedding `Density / Phi0 / C` directly.
+- The future runtime uses `lithology curve -> lithology set -> compaction preset`, not a direct `model -> lithology set` shortcut.
 
 Implementation order for DICT-003:
 

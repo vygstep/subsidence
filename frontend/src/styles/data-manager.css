@@ -535,6 +535,50 @@
   background: #e8f0fe;
 }
 
+.template-table__input {
+  width: 100%;
+  background: transparent;
+  border: none;
+  border-bottom: 1px solid transparent;
+  color: inherit;
+  font-size: inherit;
+  padding: 0;
+  outline: none;
+}
+
+.template-table__input:focus {
+  border-bottom-color: #3b82f6;
+}
+
+.template-table__select {
+  width: 100%;
+  min-width: 0;
+  background: transparent;
+  border: none;
+  border-bottom: 1px solid transparent;
+  color: inherit;
+  font-size: inherit;
+  padding: 0;
+  outline: none;
+}
+
+.template-table__select:focus {
+  border-bottom-color: #3b82f6;
+}
+
+.template-row__delete {
+  border: none;
+  background: transparent;
+  color: #b91c1c;
+  font-size: 0.72rem;
+  cursor: pointer;
+  padding: 0;
+}
+
+.template-row__delete:hover {
+  text-decoration: underline;
+}
+
 .template-color-chip {
   display: inline-block;
   width: 10px;

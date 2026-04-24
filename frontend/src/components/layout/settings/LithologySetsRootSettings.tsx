@@ -1,6 +1,21 @@
+import { useWellDataStore, useWorkspaceStore } from '@/stores'
 import type { LithologySetSummary } from '@/types'
 
 export function LithologySetsRootSettings({ sets }: { sets: LithologySetSummary[] }) {
+  const createLithologySet = useWellDataStore((state) => state.createLithologySet)
+  const setSelectedObject = useWorkspaceStore((state) => state.setSelectedObject)
+
+  async function handleCreateSet() {
+    const name = window.prompt('New lithology set name:', 'New Lithology Set')?.trim()
+    if (!name) return
+    try {
+      const created = await createLithologySet(name)
+      setSelectedObject({ type: 'lithology-set', setId: created.id })
+    } catch (error) {
+      window.alert(String(error))
+    }
+  }
+
   return (
     <div className="template-panel">
       <div className="template-panel__group">
@@ -27,9 +42,15 @@ export function LithologySetsRootSettings({ sets }: { sets: LithologySetSummary[
           </tbody>
         </table>
       </div>
-      <p className="sidebar-panel__empty">
-        Select a lithology set in Templates to inspect its table.
-      </p>
+      <div className="template-settings__actions">
+        <button
+          type="button"
+          className="project-dialog__button project-dialog__button--primary"
+          onClick={() => void handleCreateSet()}
+        >
+          + New set
+        </button>
+      </div>
     </div>
   )
 }

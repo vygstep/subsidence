@@ -258,7 +258,8 @@ def test_compaction_presets_seed_and_allow_user_duplicates(api_client: TestClien
     response = api_client.get(f"/api/compaction-presets/{builtin['id']}")
     assert response.status_code == 200, response.text
     builtin_detail = response.json()
-    assert builtin_detail['name'].endswith('(default)')
+    assert builtin_detail['name']
+    assert '(default)' not in builtin_detail['name']
 
     response = api_client.patch(f"/api/compaction-presets/{builtin['id']}", json={'name': 'Should fail'})
     assert response.status_code == 403, response.text
@@ -337,6 +338,70 @@ def test_lithology_sets_self_heal_for_open_project(api_client: TestClient, tmp_p
     assert response.status_code == 200, response.text
     sets = response.json()
     assert any(item['name'] == 'Default Lithologies' for item in sets)
+
+
+def test_lithology_set_user_crud(api_client: TestClient, tmp_path: Path):
+    _create_project(api_client, tmp_path, 'lithology-set-crud')
+
+    response = api_client.get('/api/lithology-sets')
+    assert response.status_code == 200, response.text
+    default_set = next(item for item in response.json() if item['is_builtin'])
+
+    response = api_client.post('/api/lithology-sets', json={'name': 'Project Lithologies'})
+    assert response.status_code == 201, response.text
+    created = response.json()
+    assert created['name'] == 'Project Lithologies'
+    assert created['is_builtin'] is False
+
+    response = api_client.patch(f"/api/lithology-sets/{default_set['id']}", json={'name': 'Nope'})
+    assert response.status_code == 403, response.text
+
+    response = api_client.post(f"/api/lithology-sets/{default_set['id']}/copy")
+    assert response.status_code == 201, response.text
+    copied = response.json()
+    assert copied['is_builtin'] is False
+    assert copied['entry_count'] == default_set['entry_count']
+
+    response = api_client.patch(f"/api/lithology-sets/{created['id']}", json={'name': 'Edited Lithologies'})
+    assert response.status_code == 200, response.text
+    assert response.json()['name'] == 'Edited Lithologies'
+
+    response = api_client.post(f"/api/lithology-sets/{created['id']}/entries", json={})
+    assert response.status_code == 201, response.text
+    entry = response.json()
+    assert entry['lithology_code'].startswith('LITH_')
+    assert entry['display_name'] == entry['lithology_code']
+    assert entry['density'] is None
+
+    response = api_client.patch(
+        f"/api/lithology-sets/{created['id']}/entries/{entry['id']}",
+        json={
+            'lithology_code': 'CLAYX',
+            'display_name': 'Clay X',
+            'color_hex': '#123456',
+            'pattern_id': 'clay',
+        },
+    )
+    assert response.status_code == 200, response.text
+    edited_entry = response.json()
+    assert edited_entry['lithology_code'] == 'CLAYX'
+    assert edited_entry['display_name'] == 'Clay X'
+    assert edited_entry['color_hex'] == '#123456'
+    assert edited_entry['pattern_id'] == 'clay'
+
+    response = api_client.get(f"/api/lithology-sets/{created['id']}")
+    assert response.status_code == 200, response.text
+    assert any(row['id'] == entry['id'] for row in response.json()['entries'])
+
+    response = api_client.delete(f"/api/lithology-sets/{created['id']}")
+    assert response.status_code == 204, response.text
+
+    response = api_client.get('/api/lithology-sets')
+    assert response.status_code == 200, response.text
+    remaining_ids = {item['id'] for item in response.json()}
+    assert default_set['id'] in remaining_ids
+    assert copied['id'] in remaining_ids
+    assert created['id'] not in remaining_ids
 
 
 def test_subsidence_rest_and_websocket_recalculation(api_client: TestClient, tmp_path: Path):

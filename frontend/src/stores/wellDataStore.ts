@@ -124,6 +124,23 @@ export interface WellDataStore {
   loadLithologyDictionary: () => Promise<void>
   loadLithologySets: () => Promise<void>
   fetchLithologySet: (setId: number) => Promise<LithologySetDetail | null>
+  createLithologySet: (name: string) => Promise<LithologySetSummary>
+  copyLithologySet: (setId: number) => Promise<LithologySetSummary>
+  updateLithologySet: (setId: number, patch: { name?: string }) => Promise<LithologySetSummary>
+  deleteLithologySet: (setId: number) => Promise<void>
+  createLithologySetEntry: (setId: number) => Promise<LithologySetDetail['entries'][number]>
+  updateLithologySetEntry: (
+    setId: number,
+    entryId: number,
+    patch: {
+      lithology_code?: string
+      display_name?: string
+      color_hex?: string
+      pattern_id?: string | null
+      compaction_preset_id?: number | null
+    },
+  ) => Promise<LithologySetDetail['entries'][number]>
+  deleteLithologySetEntry: (setId: number, entryId: number) => Promise<void>
   fetchCompactionModelParams: (modelId: number) => Promise<LithologyParam[]>
   updateCompactionModelParam: (modelId: number, lithologyCode: string, patch: Partial<Pick<LithologyParam, 'density' | 'porosity_surface' | 'compaction_coeff'>>) => Promise<LithologyParam>
   fetchCurvesLOD: (depthMin: number, depthMax: number, resolution: number) => Promise<void>
@@ -500,6 +517,79 @@ export const useWellDataStore = create<WellDataStore>((set, get) => ({
     if (!response.ok) return
     set({ lithologySets: (await response.json()) as LithologySetSummary[] })
   },
+  async createLithologySet(name) {
+    const response = await fetch('/api/lithology-sets', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ name }),
+    })
+    if (!response.ok) {
+      throw new Error(await readError(response, `Failed to create lithology set (${response.status})`))
+    }
+    const created = (await response.json()) as LithologySetSummary
+    set((state) => ({ lithologySets: [...state.lithologySets, created] }))
+    return created
+  },
+  async copyLithologySet(setId) {
+    const response = await fetch(`/api/lithology-sets/${setId}/copy`, { method: 'POST' })
+    if (response.ok) {
+      const created = (await response.json()) as LithologySetSummary
+      set((state) => ({ lithologySets: [...state.lithologySets, created] }))
+      return created
+    }
+
+    if (response.status === 404 || response.status === 405) {
+      const source = await get().fetchLithologySet(setId)
+      if (!source) {
+        throw new Error('Source lithology set was not found')
+      }
+      const created = await get().createLithologySet(`${source.name} Copy`)
+      for (const entry of source.entries) {
+        const added = await fetch(`/api/lithology-sets/${created.id}/entries`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            lithology_code: entry.lithology_code,
+            display_name: entry.display_name,
+            color_hex: entry.color_hex,
+            pattern_id: entry.pattern_id,
+            compaction_preset_id: entry.compaction_preset_id,
+          }),
+        })
+        if (!added.ok) {
+          throw new Error(await readError(added, `Failed to copy lithology row (${added.status})`))
+        }
+      }
+      await get().loadLithologySets()
+      return created
+    }
+
+    throw new Error(await readError(response, `Failed to copy lithology set (${response.status})`))
+  },
+  async updateLithologySet(setId, patch) {
+    const response = await fetch(`/api/lithology-sets/${setId}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(patch),
+    })
+    if (!response.ok) {
+      throw new Error(await readError(response, `Failed to update lithology set (${response.status})`))
+    }
+    const updated = (await response.json()) as LithologySetSummary
+    set((state) => ({
+      lithologySets: state.lithologySets.map((row) => (row.id === updated.id ? updated : row)),
+    }))
+    return updated
+  },
+  async deleteLithologySet(setId) {
+    const response = await fetch(`/api/lithology-sets/${setId}`, { method: 'DELETE' })
+    if (!response.ok) {
+      throw new Error(await readError(response, `Failed to delete lithology set (${response.status})`))
+    }
+    set((state) => ({
+      lithologySets: state.lithologySets.filter((row) => row.id !== setId),
+    }))
+  },
   async createCompactionModel(name, cloneFromId) {
     const response = await fetch('/api/compaction-models', {
       method: 'POST',
@@ -620,6 +710,51 @@ export const useWellDataStore = create<WellDataStore>((set, get) => ({
     const response = await fetch(`/api/lithology-sets/${setId}`)
     if (!response.ok) return null
     return (await response.json()) as LithologySetDetail
+  },
+  async createLithologySetEntry(setId) {
+    const response = await fetch(`/api/lithology-sets/${setId}/entries`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({}),
+    })
+    if (!response.ok) {
+      throw new Error(await readError(response, `Failed to add lithology row (${response.status})`))
+    }
+    const created = (await response.json()) as LithologySetDetail['entries'][number]
+    set((state) => ({
+      lithologySets: state.lithologySets.map((row) => (
+        row.id === setId
+          ? { ...row, entry_count: row.entry_count + 1 }
+          : row
+      )),
+    }))
+    return created
+  },
+  async updateLithologySetEntry(setId, entryId, patch) {
+    const response = await fetch(`/api/lithology-sets/${setId}/entries/${entryId}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(patch),
+    })
+    if (!response.ok) {
+      throw new Error(await readError(response, `Failed to update lithology row (${response.status})`))
+    }
+    return (await response.json()) as LithologySetDetail['entries'][number]
+  },
+  async deleteLithologySetEntry(setId, entryId) {
+    const response = await fetch(`/api/lithology-sets/${setId}/entries/${entryId}`, {
+      method: 'DELETE',
+    })
+    if (!response.ok) {
+      throw new Error(await readError(response, `Failed to delete lithology row (${response.status})`))
+    }
+    set((state) => ({
+      lithologySets: state.lithologySets.map((row) => (
+        row.id === setId
+          ? { ...row, entry_count: Math.max(0, row.entry_count - 1) }
+          : row
+      )),
+    }))
   },
   async fetchCompactionModelParams(modelId) {
     const response = await fetch(`/api/compaction-models/${modelId}/params`)

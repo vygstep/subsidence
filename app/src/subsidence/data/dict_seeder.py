@@ -189,10 +189,11 @@ def _seed_builtin_compaction_presets(session: Session) -> None:
 
     for row in litho_rows:
         if row.lithology_code in existing:
+            existing[row.lithology_code].name = row.display_name
             continue
         session.add(
             CompactionPreset(
-                name=f"{row.display_name} (default)",
+                name=row.display_name,
                 origin='builtin',
                 is_builtin=True,
                 source_lithology_code=row.lithology_code,

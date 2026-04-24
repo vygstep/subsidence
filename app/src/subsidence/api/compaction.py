@@ -136,6 +136,30 @@ class LithologySetDetail(LithologySetSummary):
     entries: list[LithologySetEntryItem]
 
 
+class LithologySetCreate(BaseModel):
+    name: str
+
+
+class LithologySetPatch(BaseModel):
+    name: str | None = None
+
+
+class LithologySetEntryCreate(BaseModel):
+    lithology_code: str | None = None
+    display_name: str | None = None
+    color_hex: str | None = None
+    pattern_id: str | None = None
+    compaction_preset_id: int | None = None
+
+
+class LithologySetEntryPatch(BaseModel):
+    lithology_code: str | None = None
+    display_name: str | None = None
+    color_hex: str | None = None
+    pattern_id: str | None = None
+    compaction_preset_id: int | None = None
+
+
 # ---------------------------------------------------------------------------
 # Helpers
 # ---------------------------------------------------------------------------
@@ -155,6 +179,77 @@ def _ensure_lithology_sets(manager) -> None:
         create_all_tables(session.get_bind())
         manager._seed_dictionaries(session, project_path)
         session.commit()
+
+
+def _require_lithology_set(session, set_id: int) -> LithologySet:
+    row = session.get(LithologySet, set_id)
+    if row is None:
+        raise HTTPException(status_code=404, detail=f'Lithology set not found: {set_id}')
+    return row
+
+
+def _require_user_lithology_set(session, set_id: int) -> LithologySet:
+    row = _require_lithology_set(session, set_id)
+    if row.is_builtin:
+        raise HTTPException(status_code=403, detail='Built-in lithology set cannot be edited')
+    return row
+
+
+def _normalize_lithology_set_name(value: str | None) -> str:
+    name = (value or '').strip()
+    if not name:
+        raise HTTPException(status_code=400, detail='Lithology set name is required')
+    return name
+
+
+def _normalize_entry_code(value: str | None) -> str:
+    code = (value or '').strip()
+    if not code:
+        raise HTTPException(status_code=400, detail='Lithology code is required')
+    return code
+
+
+def _normalize_entry_name(value: str | None) -> str:
+    name = (value or '').strip()
+    if not name:
+        raise HTTPException(status_code=400, detail='Lithology name is required')
+    return name
+
+
+def _ensure_unique_lithology_code(session, set_id: int, code: str, exclude_entry_id: int | None = None) -> None:
+    existing = session.scalars(
+        select(LithologySetEntry).where(
+            LithologySetEntry.set_id == set_id,
+            LithologySetEntry.lithology_code == code,
+        )
+    ).all()
+    for row in existing:
+        if exclude_entry_id is None or row.id != exclude_entry_id:
+            raise HTTPException(status_code=409, detail=f'Lithology code already exists in this set: {code!r}')
+
+
+def _resolve_compaction_preset_id(session, preset_id: int | None) -> int | None:
+    if preset_id is None:
+        return None
+    row = session.get(CompactionPreset, preset_id)
+    if row is None:
+        raise HTTPException(status_code=404, detail=f'Compaction preset not found: {preset_id}')
+    return row.id
+
+
+def _next_generated_lithology_code(session, set_id: int) -> str:
+    existing_codes = {
+        row.lithology_code
+        for row in session.scalars(
+            select(LithologySetEntry).where(LithologySetEntry.set_id == set_id)
+        ).all()
+    }
+    index = 1
+    while True:
+        candidate = f'LITH_{index}'
+        if candidate not in existing_codes:
+            return candidate
+        index += 1
 
 
 def _to_model_response(row: CompactionModel) -> CompactionModelResponse:
@@ -426,9 +521,7 @@ def get_lithology_set(set_id: int, request: Request) -> LithologySetDetail:
     manager = _require_open_project(request)
     _ensure_lithology_sets(manager)
     with manager.get_session() as session:
-        row = session.get(LithologySet, set_id)
-        if row is None:
-            raise HTTPException(status_code=404, detail=f'Lithology set not found: {set_id}')
+        row = _require_lithology_set(session, set_id)
         entries = sorted(row.entries, key=lambda item: (item.sort_order, item.id))
         return LithologySetDetail(
             id=row.id,
@@ -437,6 +530,147 @@ def get_lithology_set(set_id: int, request: Request) -> LithologySetDetail:
             entry_count=len(entries),
             entries=[_lithology_set_entry_to_item(entry) for entry in entries],
         )
+
+
+@router.post('/lithology-sets', response_model=LithologySetSummary, status_code=201)
+def create_lithology_set(payload: LithologySetCreate, request: Request) -> LithologySetSummary:
+    manager = _require_open_project(request)
+    _ensure_lithology_sets(manager)
+    with manager.get_session() as session:
+        row = LithologySet(name=_normalize_lithology_set_name(payload.name), is_builtin=False)
+        session.add(row)
+        session.commit()
+        session.refresh(row)
+        return _lithology_set_summary_to_item(row)
+
+
+@router.post('/lithology-sets/{set_id}/copy', response_model=LithologySetSummary, status_code=201)
+def copy_lithology_set(set_id: int, request: Request) -> LithologySetSummary:
+    manager = _require_open_project(request)
+    _ensure_lithology_sets(manager)
+    with manager.get_session() as session:
+        source = _require_lithology_set(session, set_id)
+        copied = LithologySet(name=f'{source.name} Copy', is_builtin=False)
+        session.add(copied)
+        session.flush()
+
+        source_entries = session.scalars(
+            select(LithologySetEntry)
+            .where(LithologySetEntry.set_id == source.id)
+            .order_by(LithologySetEntry.sort_order.asc(), LithologySetEntry.id.asc())
+        ).all()
+        for entry in source_entries:
+            session.add(
+                LithologySetEntry(
+                    set_id=copied.id,
+                    lithology_code=entry.lithology_code,
+                    display_name=entry.display_name,
+                    color_hex=entry.color_hex,
+                    pattern_id=entry.pattern_id,
+                    sort_order=entry.sort_order,
+                    compaction_preset_id=entry.compaction_preset_id,
+                )
+            )
+
+        session.commit()
+        session.refresh(copied)
+        return _lithology_set_summary_to_item(copied)
+
+
+@router.patch('/lithology-sets/{set_id}', response_model=LithologySetSummary)
+def patch_lithology_set(set_id: int, payload: LithologySetPatch, request: Request) -> LithologySetSummary:
+    manager = _require_open_project(request)
+    _ensure_lithology_sets(manager)
+    with manager.get_session() as session:
+        row = _require_user_lithology_set(session, set_id)
+        if payload.name is not None:
+            row.name = _normalize_lithology_set_name(payload.name)
+        session.commit()
+        session.refresh(row)
+        return _lithology_set_summary_to_item(row)
+
+
+@router.delete('/lithology-sets/{set_id}', status_code=204)
+def delete_lithology_set(set_id: int, request: Request) -> None:
+    manager = _require_open_project(request)
+    _ensure_lithology_sets(manager)
+    with manager.get_session() as session:
+        row = _require_user_lithology_set(session, set_id)
+        session.delete(row)
+        session.commit()
+
+
+@router.post('/lithology-sets/{set_id}/entries', response_model=LithologySetEntryItem, status_code=201)
+def create_lithology_set_entry(set_id: int, payload: LithologySetEntryCreate, request: Request) -> LithologySetEntryItem:
+    manager = _require_open_project(request)
+    _ensure_lithology_sets(manager)
+    with manager.get_session() as session:
+        lithology_set = _require_user_lithology_set(session, set_id)
+        code = _normalize_entry_code(payload.lithology_code) if payload.lithology_code is not None else _next_generated_lithology_code(session, set_id)
+        _ensure_unique_lithology_code(session, set_id, code)
+        display_name = _normalize_entry_name(payload.display_name) if payload.display_name is not None else code
+        sort_order = (max((entry.sort_order for entry in lithology_set.entries), default=-1) + 1)
+
+        row = LithologySetEntry(
+            set_id=set_id,
+            lithology_code=code,
+            display_name=display_name,
+            color_hex=(payload.color_hex or '#9ca3af').strip() or '#9ca3af',
+            pattern_id=(payload.pattern_id or '').strip() or None,
+            sort_order=sort_order,
+            compaction_preset_id=_resolve_compaction_preset_id(session, payload.compaction_preset_id),
+        )
+        session.add(row)
+        session.commit()
+        session.refresh(row)
+        return _lithology_set_entry_to_item(row)
+
+
+@router.patch('/lithology-sets/{set_id}/entries/{entry_id}', response_model=LithologySetEntryItem)
+def patch_lithology_set_entry(
+    set_id: int,
+    entry_id: int,
+    payload: LithologySetEntryPatch,
+    request: Request,
+) -> LithologySetEntryItem:
+    manager = _require_open_project(request)
+    _ensure_lithology_sets(manager)
+    with manager.get_session() as session:
+        _require_user_lithology_set(session, set_id)
+        row = session.get(LithologySetEntry, entry_id)
+        if row is None or row.set_id != set_id:
+            raise HTTPException(status_code=404, detail=f'Lithology entry not found: {entry_id}')
+
+        if payload.lithology_code is not None:
+            next_code = _normalize_entry_code(payload.lithology_code)
+            _ensure_unique_lithology_code(session, set_id, next_code, exclude_entry_id=row.id)
+            row.lithology_code = next_code
+        if payload.display_name is not None:
+            row.display_name = _normalize_entry_name(payload.display_name)
+        if payload.color_hex is not None:
+            next_color = payload.color_hex.strip() or '#9ca3af'
+            row.color_hex = next_color
+        if payload.pattern_id is not None:
+            row.pattern_id = payload.pattern_id.strip() or None
+        if 'compaction_preset_id' in payload.model_fields_set:
+            row.compaction_preset_id = _resolve_compaction_preset_id(session, payload.compaction_preset_id)
+
+        session.commit()
+        session.refresh(row)
+        return _lithology_set_entry_to_item(row)
+
+
+@router.delete('/lithology-sets/{set_id}/entries/{entry_id}', status_code=204)
+def delete_lithology_set_entry(set_id: int, entry_id: int, request: Request) -> None:
+    manager = _require_open_project(request)
+    _ensure_lithology_sets(manager)
+    with manager.get_session() as session:
+        _require_user_lithology_set(session, set_id)
+        row = session.get(LithologySetEntry, entry_id)
+        if row is None or row.set_id != set_id:
+            raise HTTPException(status_code=404, detail=f'Lithology entry not found: {entry_id}')
+        session.delete(row)
+        session.commit()
 
 
 # ---------------------------------------------------------------------------
