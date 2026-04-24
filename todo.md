@@ -14,6 +14,7 @@ Rules:
 ## Active Contracts
 
 - [Bugs and Feature Backlog](docs/contracts/bugs_and_features.md)
+- [Data Manager UI System Contract](docs/contracts/data-manager-ui-system-contract.md)
 - [1D Well Model Architecture](docs/contracts/well_1d_model_architecture.md)
 - [1D Well Model Summary](docs/contracts/well_1d_model_summary.md)
 
