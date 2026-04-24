@@ -11,6 +11,8 @@ from .schema import (
     CompactionModelParam,
     CompactionPreset,
     CurveDictEntry,
+    CurveMnemonicEntry,
+    CurveMnemonicSet,
     LithologyDictEntry,
     LithologySet,
     LithologySetEntry,
@@ -260,6 +262,50 @@ def _seed_builtin_lithology_set(session: Session) -> None:
         existing.compaction_preset_id = preset_id
 
 
+def _seed_builtin_mnemonic_set(session: Session, csv_path: Path) -> None:
+    """Create the built-in Default Mnemonics set from the flat curve_families.csv."""
+    default_set = session.scalar(
+        select(CurveMnemonicSet).where(CurveMnemonicSet.is_builtin.is_(True)).order_by(CurveMnemonicSet.id.asc())
+    )
+    if default_set is None:
+        default_set = CurveMnemonicSet(name='Default Mnemonics', is_builtin=True, sort_order=0)
+        session.add(default_set)
+        session.flush()
+    elif default_set.name != 'Default Mnemonics':
+        default_set.name = 'Default Mnemonics'
+
+    existing_by_pattern = {
+        row.pattern: row
+        for row in session.scalars(
+            select(CurveMnemonicEntry).where(CurveMnemonicEntry.set_id == default_set.id)
+        ).all()
+    }
+
+    with csv_path.open('r', encoding='utf-8', newline='') as handle:
+        for row in csv.DictReader(handle):
+            pattern = row['pattern']
+            existing = existing_by_pattern.get(pattern)
+            if existing is None:
+                session.add(
+                    CurveMnemonicEntry(
+                        set_id=default_set.id,
+                        pattern=pattern,
+                        is_regex=bool(int(row['is_regex'])),
+                        priority=int(row['priority']),
+                        family_code=row['family_code'] or None,
+                        canonical_mnemonic=row['canonical_mnemonic'] or None,
+                        canonical_unit=row['canonical_unit'] or None,
+                        is_active=True,
+                    )
+                )
+                continue
+            existing.is_regex = bool(int(row['is_regex']))
+            existing.priority = int(row['priority'])
+            existing.family_code = row['family_code'] or None
+            existing.canonical_mnemonic = row['canonical_mnemonic'] or None
+            existing.canonical_unit = row['canonical_unit'] or None
+
+
 def seed_dictionaries(session: Session, db_path: Path) -> None:
     del db_path
     seed_dir = Path(__file__).parent / 'dictionaries'
@@ -291,3 +337,4 @@ def seed_dictionaries(session: Session, db_path: Path) -> None:
     _seed_builtin_compaction_model(session)
     _seed_builtin_compaction_presets(session)
     _seed_builtin_lithology_set(session)
+    _seed_builtin_mnemonic_set(session, seed_dir / 'curve_families.csv')

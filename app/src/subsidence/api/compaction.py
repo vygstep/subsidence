@@ -10,6 +10,8 @@ from subsidence.data.schema import (
     CompactionModelParam,
     CompactionPreset,
     CurveDictEntry,
+    CurveMnemonicEntry,
+    CurveMnemonicSet,
     LithologyDictEntry,
     LithologySet,
     LithologySetEntry,
@@ -96,6 +98,28 @@ class CurveDictionaryItem(BaseModel):
     canonical_mnemonic: str | None
     canonical_unit: str | None
     is_active: bool
+
+
+class CurveMnemonicSetSummary(BaseModel):
+    id: int
+    name: str
+    is_builtin: bool
+    entry_count: int
+
+
+class CurveMnemonicEntryItem(BaseModel):
+    id: int
+    pattern: str
+    is_regex: bool
+    priority: int
+    family_code: str | None
+    canonical_mnemonic: str | None
+    canonical_unit: str | None
+    is_active: bool
+
+
+class CurveMnemonicSetDetail(CurveMnemonicSetSummary):
+    entries: list[CurveMnemonicEntryItem]
 
 
 class LithologyDictionaryItem(BaseModel):
@@ -489,6 +513,68 @@ def list_curve_dictionary(request: Request) -> list[CurveDictionaryItem]:
             )
         ).all()
         return [_curve_dict_to_item(row) for row in rows]
+
+
+@router.get('/mnemonic-sets', response_model=list[CurveMnemonicSetSummary])
+def list_mnemonic_sets(request: Request) -> list[CurveMnemonicSetSummary]:
+    manager = _require_open_project(request)
+    with manager.get_session() as session:
+        rows = session.scalars(
+            select(CurveMnemonicSet).order_by(
+                CurveMnemonicSet.is_builtin.asc(),
+                CurveMnemonicSet.sort_order.asc(),
+                CurveMnemonicSet.id.asc(),
+            )
+        ).all()
+        from sqlalchemy import func as sa_func
+        entry_counts: dict[int, int] = dict(
+            session.execute(
+                select(CurveMnemonicEntry.set_id, sa_func.count(CurveMnemonicEntry.id))
+                .group_by(CurveMnemonicEntry.set_id)
+            ).all()
+        )
+        return [
+            CurveMnemonicSetSummary(
+                id=row.id,
+                name=row.name,
+                is_builtin=row.is_builtin,
+                entry_count=entry_counts.get(row.id, 0),
+            )
+            for row in rows
+        ]
+
+
+@router.get('/mnemonic-sets/{set_id}', response_model=CurveMnemonicSetDetail)
+def get_mnemonic_set(set_id: int, request: Request) -> CurveMnemonicSetDetail:
+    manager = _require_open_project(request)
+    with manager.get_session() as session:
+        row = session.get(CurveMnemonicSet, set_id)
+        if row is None:
+            raise HTTPException(status_code=404, detail=f'Mnemonic set {set_id} not found')
+        entries = session.scalars(
+            select(CurveMnemonicEntry)
+            .where(CurveMnemonicEntry.set_id == set_id)
+            .order_by(CurveMnemonicEntry.priority.desc(), CurveMnemonicEntry.id.asc())
+        ).all()
+        return CurveMnemonicSetDetail(
+            id=row.id,
+            name=row.name,
+            is_builtin=row.is_builtin,
+            entry_count=len(entries),
+            entries=[
+                CurveMnemonicEntryItem(
+                    id=e.id,
+                    pattern=e.pattern,
+                    is_regex=e.is_regex,
+                    priority=e.priority,
+                    family_code=e.family_code,
+                    canonical_mnemonic=e.canonical_mnemonic,
+                    canonical_unit=e.canonical_unit,
+                    is_active=e.is_active,
+                )
+                for e in entries
+            ],
+        )
 
 
 @router.get('/lithology-dictionary', response_model=list[LithologyDictionaryItem])

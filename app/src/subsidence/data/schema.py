@@ -7,7 +7,7 @@ from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column, relationship
 from sqlalchemy import MetaData
 
 SUBSIDENCE_APP_ID = 0x53554253  # "SUBS" as 4-byte int
-SCHEMA_VERSION = 4
+SCHEMA_VERSION = 5
 
 _NAMING: dict[str, str] = {
     "ix": "ix_%(table_name)s_%(column_0_name)s",
@@ -236,6 +236,41 @@ class CurveDictEntry(Base, AuditMixin):
     canonical_mnemonic: Mapped[str | None] = mapped_column(String(64), nullable=True)
     canonical_unit: Mapped[str | None] = mapped_column(String(32), nullable=True)
     is_active: Mapped[bool] = mapped_column(Boolean, default=True)
+
+
+# ---------------------------------------------------------------------------
+# 8b. curve_mnemonic_sets + curve_mnemonic_entries
+# ---------------------------------------------------------------------------
+
+class CurveMnemonicSet(Base, AuditMixin):
+    __tablename__ = "curve_mnemonic_sets"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    name: Mapped[str] = mapped_column(String(256))
+    is_builtin: Mapped[bool] = mapped_column(Boolean, default=False)
+    sort_order: Mapped[int] = mapped_column(Integer, default=0)
+
+    entries: Mapped[list["CurveMnemonicEntry"]] = relationship(
+        back_populates="mnemonic_set", cascade="all, delete-orphan"
+    )
+
+
+class CurveMnemonicEntry(Base, AuditMixin):
+    __tablename__ = "curve_mnemonic_entries"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    set_id: Mapped[int] = mapped_column(
+        Integer, ForeignKey("curve_mnemonic_sets.id", ondelete="CASCADE"), nullable=False
+    )
+    pattern: Mapped[str] = mapped_column(String(128))
+    is_regex: Mapped[bool] = mapped_column(Boolean, default=False)
+    priority: Mapped[int] = mapped_column(Integer, default=0)
+    family_code: Mapped[str | None] = mapped_column(String(64), nullable=True)
+    canonical_mnemonic: Mapped[str | None] = mapped_column(String(64), nullable=True)
+    canonical_unit: Mapped[str | None] = mapped_column(String(32), nullable=True)
+    is_active: Mapped[bool] = mapped_column(Boolean, default=True)
+
+    mnemonic_set: Mapped["CurveMnemonicSet"] = relationship(back_populates="entries")
 
 
 # ---------------------------------------------------------------------------

@@ -6,7 +6,7 @@ import pytest
 from fastapi.testclient import TestClient
 
 from subsidence.api.main import app
-from subsidence.data.schema import LithologySet, LithologySetEntry
+from subsidence.data.schema import CurveMnemonicEntry, CurveMnemonicSet, LithologySet, LithologySetEntry
 
 
 @pytest.fixture
@@ -562,3 +562,49 @@ def test_checkpoint_create_restore_delete(api_client: TestClient, tmp_path: Path
     response = api_client.get('/api/projects/checkpoints')
     assert response.status_code == 200, response.text
     assert all(item['id'] != before_restore_checkpoint_id for item in response.json())
+
+
+def test_mnemonic_sets_seeded_on_project_create(api_client: TestClient, tmp_path: Path) -> None:
+    _create_project(api_client, tmp_path)
+
+    response = api_client.get('/api/mnemonic-sets')
+    assert response.status_code == 200, response.text
+    sets = response.json()
+
+    builtin = [s for s in sets if s['is_builtin']]
+    assert len(builtin) == 1
+    assert builtin[0]['name'] == 'Default Mnemonics'
+    assert builtin[0]['entry_count'] > 0
+
+    set_id = builtin[0]['id']
+    response = api_client.get(f'/api/mnemonic-sets/{set_id}')
+    assert response.status_code == 200, response.text
+    detail = response.json()
+    assert detail['id'] == set_id
+    assert len(detail['entries']) == builtin[0]['entry_count']
+
+    entry = detail['entries'][0]
+    assert 'pattern' in entry
+    assert 'family_code' in entry
+    assert 'is_active' in entry
+
+
+def test_mnemonic_set_seed_is_idempotent(api_client: TestClient, tmp_path: Path) -> None:
+    project_path = _create_project(api_client, tmp_path)
+
+    api_client.post('/api/projects/close')
+    api_client.post('/api/projects/open', json={'path': str(project_path)})
+
+    response = api_client.get('/api/mnemonic-sets')
+    sets = response.json()
+    builtin = [s for s in sets if s['is_builtin']]
+    assert len(builtin) == 1
+
+    manager = app.state.project_manager
+    with manager.get_session() as session:
+        from sqlalchemy import select as sa_select
+        set_count = len(session.scalars(sa_select(CurveMnemonicSet).where(CurveMnemonicSet.is_builtin.is_(True))).all())
+        assert set_count == 1
+        entry_count_first = builtin[0]['entry_count']
+        actual_count = len(session.scalars(sa_select(CurveMnemonicEntry)).all())
+        assert actual_count == entry_count_first
