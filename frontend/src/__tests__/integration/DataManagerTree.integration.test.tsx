@@ -1,8 +1,10 @@
 import { fireEvent, render, screen } from '@testing-library/react'
 import { describe, expect, it, vi } from 'vitest'
 
+import { DataManagerProvider } from '@/components/layout/dataManager/DataManagerContext'
+import { TemplatesTab } from '@/components/layout/TemplatesTab'
 import { WellDataPanel } from '@/components/layout/WellDataPanel'
-import type { WellInventory } from '@/types'
+import type { CompactionPresetSummary, CurveDictionaryEntry, LithologySetSummary, WellInventory } from '@/types'
 
 function createWellInventory(overrides: Partial<WellInventory>): WellInventory {
   return {
@@ -68,8 +70,137 @@ function renderPanel(overrides: Partial<React.ComponentProps<typeof WellDataPane
     onContextMenuWell: vi.fn(),
     ...overrides,
   }
-  return { props, ...render(<WellDataPanel {...props} />) }
+  return {
+    props,
+    ...render(
+      <DataManagerProvider>
+        <WellDataPanel {...props} />
+      </DataManagerProvider>,
+    ),
+  }
 }
+
+const builtinPreset: CompactionPresetSummary = {
+  id: 1, name: 'Shale', origin: 'builtin', is_builtin: true, source_lithology_code: 'sh',
+}
+const userPreset: CompactionPresetSummary = {
+  id: 2, name: 'Custom', origin: 'user', is_builtin: false, source_lithology_code: null,
+}
+const curveEntry: CurveDictionaryEntry = {
+  id: 1, scope: 'global', pattern: 'GR', is_regex: false, priority: 1,
+  family_code: 'gamma_ray', canonical_mnemonic: 'GR', canonical_unit: 'API', is_active: true,
+}
+const lithologySet: LithologySetSummary = {
+  id: 1, name: 'Default', is_builtin: true, entry_count: 5,
+}
+
+function renderTemplatesTab(overrides: Partial<React.ComponentProps<typeof TemplatesTab>> = {}) {
+  const props: React.ComponentProps<typeof TemplatesTab> = {
+    compactionPresets: [builtinPreset, userPreset],
+    curveDictionaryEntries: [curveEntry],
+    lithologySets: [lithologySet],
+    isCompactionPresetsRootSelected: false,
+    isLithologiesRootSelected: false,
+    selectedCompactionPresetId: null,
+    selectedCurveDictionaryEntryId: null,
+    selectedLithologySetId: null,
+    onCreateCompactionPresetDraft: vi.fn(),
+    onSelectCompactionPresetsRoot: vi.fn(),
+    onSelectCompactionPreset: vi.fn(),
+    onSelectCurveDictionaryEntry: vi.fn(),
+    onSelectLithologiesRoot: vi.fn(),
+    onSelectLithologySet: vi.fn(),
+    ...overrides,
+  }
+  return {
+    props,
+    ...render(
+      <DataManagerProvider>
+        <TemplatesTab {...props} />
+      </DataManagerProvider>,
+    ),
+  }
+}
+
+describe('Data Manager templates tree', () => {
+  it('keeps all template sections collapsed by default', () => {
+    renderTemplatesTab()
+
+    expect(screen.queryByText('Custom')).toBeNull()
+    expect(screen.queryByText('GR')).toBeNull()
+    expect(screen.queryByText('Default')).toBeNull()
+  })
+
+  it('expands compaction presets and fires selection callback', () => {
+    const { props } = renderTemplatesTab()
+
+    const expandButtons = screen.getAllByLabelText('Expand')
+    fireEvent.click(expandButtons[0])
+
+    expect(screen.getByText('Custom')).toBeTruthy()
+    expect(screen.getByText('Shale')).toBeTruthy()
+
+    fireEvent.click(screen.getByText('Custom'))
+    expect(props.onSelectCompactionPreset).toHaveBeenCalledWith(2)
+  })
+
+  it('expands lithologies and fires selection callback', () => {
+    const { props } = renderTemplatesTab()
+
+    const expandButtons = screen.getAllByLabelText('Expand')
+    fireEvent.click(expandButtons[2])
+
+    expect(screen.getByText('Default')).toBeTruthy()
+    fireEvent.click(screen.getByText('Default'))
+    expect(props.onSelectLithologySet).toHaveBeenCalledWith(1)
+  })
+
+  it('expanding one section does not expand siblings', () => {
+    renderTemplatesTab()
+
+    fireEvent.click(screen.getAllByLabelText('Expand')[0])
+    expect(screen.getByText('Custom')).toBeTruthy()
+    expect(screen.queryByText('Default')).toBeNull()
+  })
+
+  it('builtin preset shows built-in meta label', () => {
+    renderTemplatesTab()
+
+    fireEvent.click(screen.getAllByLabelText('Expand')[0])
+    expect(screen.getByText('built-in')).toBeTruthy()
+    expect(screen.getByText('user')).toBeTruthy()
+  })
+
+  it('selected preset row carries tree-node__item-selected class', () => {
+    const { rerender } = renderTemplatesTab()
+
+    fireEvent.click(screen.getAllByLabelText('Expand')[0])
+    expect(screen.getByText('Custom').closest('.tree-node__item-selected')).toBeNull()
+
+    rerender(
+      <DataManagerProvider>
+        <TemplatesTab
+          compactionPresets={[builtinPreset, userPreset]}
+          curveDictionaryEntries={[curveEntry]}
+          lithologySets={[lithologySet]}
+          isCompactionPresetsRootSelected={false}
+          isLithologiesRootSelected={false}
+          selectedCompactionPresetId={2}
+          selectedCurveDictionaryEntryId={null}
+          selectedLithologySetId={null}
+          onCreateCompactionPresetDraft={vi.fn()}
+          onSelectCompactionPresetsRoot={vi.fn()}
+          onSelectCompactionPreset={vi.fn()}
+          onSelectCurveDictionaryEntry={vi.fn()}
+          onSelectLithologiesRoot={vi.fn()}
+          onSelectLithologySet={vi.fn()}
+        />
+      </DataManagerProvider>,
+    )
+
+    expect(screen.getByText('Custom').closest('.tree-node__item-selected')).toBeTruthy()
+  })
+})
 
 describe('Data Manager well tree', () => {
   it('shows all wells and keeps nodes collapsed by default', () => {
