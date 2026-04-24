@@ -1,5 +1,6 @@
-import { useEffect, useLayoutEffect, useRef, useState } from 'react'
+import { useLayoutEffect, useRef } from 'react'
 
+import { useDataManager } from './dataManager/DataManagerContext'
 import type { FormationInventoryItem, WellInventory } from '@/types'
 
 interface WellDataPanelProps {
@@ -151,21 +152,14 @@ export function WellDataPanel({
   onContextMenuTopsGroup,
   onContextMenuWell,
 }: WellDataPanelProps) {
-  const [expandedNodes, setExpandedNodes] = useState<Record<string, boolean>>({})
-
-  useEffect(() => {
-    setExpandedNodes({})
-  }, [wells.map((item) => item.well_id).join('|')])
+  const { isExpanded, toggleExpanded } = useDataManager()
 
   function isOpen(nodeId: string): boolean {
-    return expandedNodes[nodeId] ?? false
+    return isExpanded(nodeId)
   }
 
   function toggleNode(nodeId: string): void {
-    setExpandedNodes((current) => ({
-      ...current,
-      [nodeId]: !(current[nodeId] ?? false),
-    }))
+    toggleExpanded(nodeId)
   }
 
   if (wells.length === 0) {

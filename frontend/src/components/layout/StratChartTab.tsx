@@ -20,33 +20,37 @@ export function StratChartTab({ charts, onActivate, onDeleteById, onContextMenu,
 
   return (
     <div className="sidebar-panel__body">
-      <div className="strat-chart-list">
+      <div className="tree-list">
         {charts.map((chart) => (
           <div
             key={chart.id}
-            className={`strat-chart-item ${chart.is_active ? 'strat-chart-item--active' : ''} ${selectedChartId === chart.id ? 'strat-chart-item--selected' : ''}`}
-            onClick={() => onSelect(chart.id)}
+            className={`tree-node__row ${chart.is_active ? 'tree-node__row--active' : ''} ${selectedChartId === chart.id ? 'tree-node__row--selected' : ''}`}
             onContextMenu={(event) => {
               onSelect(chart.id)
               onContextMenu(event, chart)
             }}
           >
-            <label className="strat-chart-item__radio-label">
-              <input
-                type="radio"
-                name="active-strat-chart"
-                checked={chart.is_active}
-                onChange={() => onActivate(chart.id)}
-                onClick={(event) => event.stopPropagation()}
-              />
-              <span className="strat-chart-item__name">{chart.name}</span>
-            </label>
-            <span className="strat-chart-item__meta">{chart.unit_count} units</span>
+            <input
+              type="radio"
+              name="active-strat-chart"
+              checked={chart.is_active}
+              onChange={() => onActivate(chart.id)}
+              onClick={(event) => event.stopPropagation()}
+            />
             <button
               type="button"
-              className="strat-chart-item__delete"
+              className="tree-node__label-button"
+              onClick={() => onSelect(chart.id)}
+            >
+              {chart.name}
+            </button>
+            <span className="tree-node__item-meta">{chart.unit_count} units</span>
+            <button
+              type="button"
+              className="tree-node__item-button"
               title={chart.is_builtin ? 'Built-in ICS chart cannot be deleted' : 'Delete this chart'}
               disabled={chart.is_builtin}
+              style={{ marginLeft: 'auto', opacity: chart.is_builtin ? 0.3 : 0.6, color: 'var(--dm-danger-light)' }}
               onClick={(event) => {
                 event.stopPropagation()
                 if (window.confirm(`Delete strat chart "${chart.name}"?`)) {

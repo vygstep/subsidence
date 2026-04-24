@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react'
 
+import { DataManagerProvider } from './dataManager/DataManagerContext'
 import { DataManagerTopPane } from './DataManagerTopPane'
 import { SettingsPaneShell } from './SettingsPaneShell'
 import { useDataManagerController } from './useDataManagerController'
@@ -202,6 +203,7 @@ export function DataManagerPane({ sidebarRef, onInternalSplitterMouseDown }: Dat
   })()
 
   return (
+    <DataManagerProvider>
     <aside
       ref={sidebarRef as React.RefObject<HTMLElement>}
       className="app-sidebar"
@@ -354,5 +356,6 @@ export function DataManagerPane({ sidebarRef, onInternalSplitterMouseDown }: Dat
         </div>
       ) : null}
     </aside>
+    </DataManagerProvider>
   )
 }

@@ -1,5 +1,4 @@
-import { useState } from 'react'
-
+import { useDataManager } from './dataManager/DataManagerContext'
 import type {
   CompactionPresetSummary,
   CurveDictionaryEntry,
@@ -23,49 +22,8 @@ interface TemplatesTabProps {
   onSelectLithologySet: (setId: number) => void
 }
 
-interface TemplateSectionProps {
-  title: string
-  count?: number
-  defaultOpen?: boolean
-  isSelected?: boolean
-  onSelect?: () => void
-  children: React.ReactNode
-}
-
-function TemplateSection({
-  title,
-  count,
-  defaultOpen = false,
-  isSelected = false,
-  onSelect,
-  children,
-}: TemplateSectionProps) {
-  const [isOpen, setIsOpen] = useState(defaultOpen)
-
-  return (
-    <div className="template-section">
-      <button
-        type="button"
-        className={`template-section__toggle ${isSelected ? 'template-section__toggle--selected' : ''}`}
-        onClick={() => {
-          setIsOpen((open) => !open)
-          onSelect?.()
-        }}
-        aria-expanded={isOpen}
-      >
-        <span className={`template-section__chevron ${isOpen ? 'template-section__chevron--open' : ''}`}>
-          {'>'}
-        </span>
-        <span className="template-section__heading">
-          <span className="template-section__title">{title}</span>
-        </span>
-      </button>
-      <div className="template-section__controls">
-        {count !== undefined ? <span className="template-section__count">{count}</span> : null}
-      </div>
-      {isOpen ? children : null}
-    </div>
-  )
+function CountBadge({ count }: { count: number }) {
+  return <span className="template-section__count">{count}</span>
 }
 
 export function TemplatesTab({
@@ -84,96 +42,149 @@ export function TemplatesTab({
   onSelectLithologiesRoot,
   onSelectLithologySet,
 }: TemplatesTabProps) {
+  const { isExpanded, toggleExpanded } = useDataManager()
+
   return (
     <div className="sidebar-panel__body">
-      <TemplateSection
-        title="Compaction Presets"
-        count={compactionPresets.length}
-        defaultOpen
-        isSelected={isCompactionPresetsRootSelected}
-        onSelect={onSelectCompactionPresetsRoot}
-      >
-        <div className="strat-chart-list template-section__content">
-          {compactionPresets.map((preset) => (
-            <div
-              key={preset.id}
-              className={`strat-chart-item ${preset.is_builtin ? 'strat-chart-item--muted' : ''} ${selectedCompactionPresetId === preset.id ? 'strat-chart-item--selected' : ''}`}
-              onClick={() => onSelectCompactionPreset(preset.id)}
-            >
-              <div className="strat-chart-item__content">
-                <span className="strat-chart-item__name">{preset.name}</span>
-              </div>
-              <span className="strat-chart-item__meta">{preset.is_builtin ? 'built-in' : 'user'}</span>
-            </div>
-          ))}
-          <button
-            type="button"
-            className="template-section__inline-action"
-            onClick={(event) => {
-              event.stopPropagation()
-              onCreateCompactionPresetDraft()
-            }}
-          >
-            + New preset
-          </button>
-        </div>
-      </TemplateSection>
+      <div className="tree-list">
 
-      <TemplateSection
-        title="Curve Mnemonics"
-        count={curveDictionaryEntries.length}
-      >
-        <div className="template-table-wrapper">
-          <table className="template-table">
-            <thead>
-              <tr>
-                <th>Pattern</th>
-                <th>Scope</th>
-                <th>Family</th>
-                <th>Canonical</th>
-                <th>Unit</th>
-              </tr>
-            </thead>
-            <tbody>
-              {curveDictionaryEntries.map((entry) => (
-                <tr
-                  key={entry.id}
-                  className={selectedCurveDictionaryEntryId === entry.id ? 'template-table__row--selected' : ''}
-                  onClick={() => onSelectCurveDictionaryEntry(entry.id)}
+        {/* Compaction Presets */}
+        <div className="tree-node">
+          <div className={`tree-node__row ${isCompactionPresetsRootSelected ? 'tree-node__row--selected' : ''}`}>
+            <button
+              type="button"
+              className={`tree-toggle ${isExpanded('template:compaction-presets') ? 'tree-toggle--open' : ''}`}
+              onClick={() => toggleExpanded('template:compaction-presets')}
+              aria-label={isExpanded('template:compaction-presets') ? 'Collapse' : 'Expand'}
+            >
+              ▸
+            </button>
+            <button
+              type="button"
+              className="tree-node__section-label"
+              onClick={onSelectCompactionPresetsRoot}
+            >
+              Compaction Presets
+            </button>
+            <CountBadge count={compactionPresets.length} />
+          </div>
+          {isExpanded('template:compaction-presets') ? (
+            <div className="tree-node__children">
+              {compactionPresets.map((preset) => (
+                <div
+                  key={preset.id}
+                  className={selectedCompactionPresetId === preset.id ? 'tree-node__item-selected' : ''}
+                  onClick={() => onSelectCompactionPreset(preset.id)}
                 >
-                  <td>{entry.pattern}</td>
-                  <td>{entry.scope}</td>
-                  <td>{entry.family_code ?? '-'}</td>
-                  <td>{entry.canonical_mnemonic ?? '-'}</td>
-                  <td>{entry.canonical_unit ?? '-'}</td>
-                </tr>
+                  <div className="tree-checkbox-leaf">
+                    <span className="tree-checkbox-leaf__label">{preset.name}</span>
+                    <span className="tree-checkbox-leaf__meta">{preset.is_builtin ? 'built-in' : 'user'}</span>
+                  </div>
+                </div>
               ))}
-            </tbody>
-          </table>
-        </div>
-      </TemplateSection>
-
-      <TemplateSection
-        title="Lithologies"
-        count={lithologySets.length}
-        isSelected={isLithologiesRootSelected}
-        onSelect={onSelectLithologiesRoot}
-      >
-        <div className="strat-chart-list template-section__content">
-          {lithologySets.map((set) => (
-            <div
-              key={set.id}
-              className={`strat-chart-item ${set.is_builtin ? 'strat-chart-item--muted' : ''} ${selectedLithologySetId === set.id ? 'strat-chart-item--selected' : ''}`}
-              onClick={() => onSelectLithologySet(set.id)}
-            >
-              <div className="strat-chart-item__content">
-                <span className="strat-chart-item__name">{set.name}</span>
-              </div>
-              <span className="strat-chart-item__meta">{set.entry_count}</span>
+              <button
+                type="button"
+                className="template-section__inline-action"
+                onClick={(event) => {
+                  event.stopPropagation()
+                  onCreateCompactionPresetDraft()
+                }}
+              >
+                + New preset
+              </button>
             </div>
-          ))}
+          ) : null}
         </div>
-      </TemplateSection>
+
+        {/* Curve Mnemonics */}
+        <div className="tree-node">
+          <div className="tree-node__row">
+            <button
+              type="button"
+              className={`tree-toggle ${isExpanded('template:curve-mnemonics') ? 'tree-toggle--open' : ''}`}
+              onClick={() => toggleExpanded('template:curve-mnemonics')}
+              aria-label={isExpanded('template:curve-mnemonics') ? 'Collapse' : 'Expand'}
+            >
+              ▸
+            </button>
+            <button type="button" className="tree-node__section-label">
+              Curve Mnemonics
+            </button>
+            <CountBadge count={curveDictionaryEntries.length} />
+          </div>
+          {isExpanded('template:curve-mnemonics') ? (
+            <div className="tree-node__children">
+              <div className="template-table-wrapper">
+                <table className="template-table">
+                  <thead>
+                    <tr>
+                      <th>Pattern</th>
+                      <th>Scope</th>
+                      <th>Family</th>
+                      <th>Canonical</th>
+                      <th>Unit</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {curveDictionaryEntries.map((entry) => (
+                      <tr
+                        key={entry.id}
+                        className={selectedCurveDictionaryEntryId === entry.id ? 'template-table__row--selected' : ''}
+                        onClick={() => onSelectCurveDictionaryEntry(entry.id)}
+                      >
+                        <td>{entry.pattern}</td>
+                        <td>{entry.scope}</td>
+                        <td>{entry.family_code ?? '-'}</td>
+                        <td>{entry.canonical_mnemonic ?? '-'}</td>
+                        <td>{entry.canonical_unit ?? '-'}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          ) : null}
+        </div>
+
+        {/* Lithologies */}
+        <div className="tree-node">
+          <div className={`tree-node__row ${isLithologiesRootSelected ? 'tree-node__row--selected' : ''}`}>
+            <button
+              type="button"
+              className={`tree-toggle ${isExpanded('template:lithologies') ? 'tree-toggle--open' : ''}`}
+              onClick={() => toggleExpanded('template:lithologies')}
+              aria-label={isExpanded('template:lithologies') ? 'Collapse' : 'Expand'}
+            >
+              ▸
+            </button>
+            <button
+              type="button"
+              className="tree-node__section-label"
+              onClick={onSelectLithologiesRoot}
+            >
+              Lithologies
+            </button>
+            <CountBadge count={lithologySets.length} />
+          </div>
+          {isExpanded('template:lithologies') ? (
+            <div className="tree-node__children">
+              {lithologySets.map((set) => (
+                <div
+                  key={set.id}
+                  className={selectedLithologySetId === set.id ? 'tree-node__item-selected' : ''}
+                  onClick={() => onSelectLithologySet(set.id)}
+                >
+                  <div className="tree-checkbox-leaf">
+                    <span className="tree-checkbox-leaf__label">{set.name}</span>
+                    <span className="tree-checkbox-leaf__meta">{set.entry_count}</span>
+                  </div>
+                </div>
+              ))}
+            </div>
+          ) : null}
+        </div>
+
+      </div>
     </div>
   )
 }
