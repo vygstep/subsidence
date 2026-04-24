@@ -84,7 +84,7 @@ export function TemplatesTab({
               ))}
               <button
                 type="button"
-                className="template-section__inline-action"
+                className="dm-action dm-action--primary"
                 onClick={(event) => {
                   event.stopPropagation()
                   onCreateCompactionPresetDraft()

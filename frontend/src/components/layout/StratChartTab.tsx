@@ -47,10 +47,10 @@ export function StratChartTab({ charts, onActivate, onDeleteById, onContextMenu,
             <span className="tree-node__item-meta">{chart.unit_count} units</span>
             <button
               type="button"
-              className="tree-node__item-button"
+              className="dm-action dm-action--ghost dm-action--danger"
               title={chart.is_builtin ? 'Built-in ICS chart cannot be deleted' : 'Delete this chart'}
               disabled={chart.is_builtin}
-              style={{ marginLeft: 'auto', opacity: chart.is_builtin ? 0.3 : 0.6, color: 'var(--dm-danger-light)' }}
+              style={{ marginLeft: 'auto' }}
               onClick={(event) => {
                 event.stopPropagation()
                 if (window.confirm(`Delete strat chart "${chart.name}"?`)) {

@@ -246,15 +246,20 @@
   font-weight: 700;
   cursor: pointer;
   background: rgba(148, 163, 184, 0.16);
-  color: #17212b;
+  color: var(--dm-fg, #17212b);
 }
 
 .project-dialog__button--primary {
-  background: #2563eb;
+  background: var(--dm-accent, #2563eb);
   color: #ffffff;
 }
 
-.project-dialog__button--primary:disabled {
-  opacity: 0.6;
-  cursor: wait;
+.project-dialog__button--primary:hover:not(:disabled) {
+  background: var(--dm-accent-dark, #1d4ed8);
+}
+
+.project-dialog__button--primary:disabled,
+.project-dialog__button:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
 }

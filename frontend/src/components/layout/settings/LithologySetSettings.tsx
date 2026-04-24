@@ -242,7 +242,7 @@ export function LithologySetSettings({ lithologySet }: { lithologySet: Lithology
                   <td>
                     <button
                       type="button"
-                      className="template-row__delete"
+                      className="dm-action dm-action--danger"
                       onClick={() => void handleDeleteRow(entry.id, entry.display_name)}
                     >
                       Delete

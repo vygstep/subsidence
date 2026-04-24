@@ -396,6 +396,72 @@
   font-weight: var(--dm-fw-bold);
 }
 
+/* ─── compact actions ────────────────────────────────────────────────────── */
+
+.dm-action {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  border: 1px solid var(--dm-border-medium);
+  border-radius: var(--dm-radius-pill);
+  background: var(--dm-bg);
+  color: var(--dm-fg-2);
+  font-size: var(--dm-font-xs);
+  font-weight: var(--dm-fw-bold);
+  padding: 3px 8px;
+  cursor: pointer;
+  white-space: nowrap;
+  line-height: 1.4;
+}
+
+.dm-action:hover:not(:disabled) {
+  background: var(--dm-bg-tint);
+  border-color: var(--dm-accent-border);
+  color: var(--dm-accent);
+}
+
+.dm-action:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+.dm-action--primary {
+  background: var(--dm-accent);
+  border-color: var(--dm-accent);
+  color: #ffffff;
+}
+
+.dm-action--primary:hover:not(:disabled) {
+  background: var(--dm-accent-dark);
+  border-color: var(--dm-accent-dark);
+  color: #ffffff;
+}
+
+.dm-action--danger {
+  border-color: transparent;
+  background: transparent;
+  color: var(--dm-danger);
+  padding: 0;
+}
+
+.dm-action--danger:hover:not(:disabled) {
+  background: transparent;
+  border-color: transparent;
+  color: var(--dm-danger-light);
+  text-decoration: underline;
+}
+
+.dm-action--ghost {
+  border-color: transparent;
+  background: transparent;
+  padding: 2px 4px;
+}
+
+.dm-action--ghost:hover:not(:disabled) {
+  background: var(--dm-bg-hover);
+  border-color: transparent;
+}
+
 /* ─── context menu ───────────────────────────────────────────────────────── */
 
 .data-context-menu {
