@@ -393,25 +393,89 @@ Acceptance:
 Problem:
 
 - Curve type detection needs aliases. Example: `CALI`, `CAL`, `CAL1`, `CALI1` should resolve to the same family.
+- The current flat mnemonic dictionary is only a bootstrap and does not support multiple project-specific rule sets inside one project.
 
 Required behavior:
 
-- Resolve first by mnemonic dictionary.
-- If mnemonic has no match, resolve by unit dictionary.
-- Unit dictionary must be project-extensible.
+- Introduce the target domain model:
+  - `Curve Mnemonics` root object
+  - `Curve Mnemonic Set`
+  - `Curve Mnemonic Entry`
+- `Curve Mnemonics` contains multiple mnemonic sets.
+- One built-in set must always exist:
+  - `Default Mnemonics`
+- Existing built-in mnemonic rules become the seeded `Default Mnemonics` set instead of remaining a permanent flat dictionary.
+- Additional user mnemonic sets can be created later per project.
+- `Curve Mnemonic Entry` owns:
+  - pattern
+  - regex flag
+  - priority
+  - family code
+  - canonical mnemonic
+  - canonical unit
+  - active flag
+- The left `Templates` pane must remain a navigation tree:
+  - `Curve Mnemonics`
+    - `Default Mnemonics`
+    - user mnemonic sets
+- Clicking `Curve Mnemonics` root opens a mnemonic-set overview in `Settings`.
+- Clicking a specific mnemonic set opens its rule table in `Settings`.
+- The mnemonic-set table must live in `Settings`, not in the left `Templates` pane.
+- Table columns are:
+  - `Pattern`
+  - `Regex`
+  - `Priority`
+  - `Family`
+  - `Mnemonic`
+  - `Unit`
+  - `Active`
+- Built-in mnemonic sets and built-in entries are immutable.
+- User mnemonic sets can be created, copied, renamed, deleted, and edited later in the rollout.
+- Resolver order must be:
+  - all user mnemonic sets first;
+  - built-in `Default Mnemonics` second.
+- Resolver order between user mnemonic sets must be deterministic.
+- Resolve first by mnemonic sets.
+- If mnemonic sets have no match, resolve by unit dictionary.
+- Unit dictionary must remain project-extensible.
 - User must provide canonical mnemonic/unit dictionaries before final implementation.
+- Validation must reject:
+  - empty pattern;
+  - invalid regex when `Regex = true`.
+- Invalid user rules must not break the resolver for the whole import or viewer flow.
 
 Likely code areas:
 
+- `app/src/subsidence/data/schema.py`
 - `app/src/subsidence/data/dict_resolver.py`
 - `app/src/subsidence/data/dictionaries/curve_families.csv`
-- New unit dictionary table/seed file.
-- Importers that populate `CurveMetadata.family_code`, `standard_mnemonic`, and `curve_type`.
+- new mnemonic-set seed flow in `app/src/subsidence/data/dict_seeder.py`
+- new mnemonic-set API in `app/src/subsidence/api/compaction.py` or a dedicated dictionary API module
+- `frontend/src/components/layout/TemplatesTab.tsx`
+- `frontend/src/components/layout/settings/*`
+- `frontend/src/stores/wellDataStore.ts`
+- Importers that populate `CurveMetadata.family_code`, `standard_mnemonic`, and `curve_type`
 
 Acceptance:
 
+- `Curve Mnemonics` is no longer a flat list.
+- `Default Mnemonics` exists as a read-only built-in set.
+- `Settings`, not the left tree, becomes the main viewing/editing surface for mnemonic rules.
 - Curves with alias mnemonics resolve to the correct canonical family.
 - Curves with unknown mnemonic but known unit can still resolve.
+- Resolver uses user mnemonic sets first and built-in default second.
+- User mnemonic rules can be added later without replacing the built-in dictionary.
+
+Implementation order for DICT-002:
+
+1. Add backend `Curve Mnemonic Set` / `Curve Mnemonic Entry` schema and seed the built-in `Default Mnemonics` set from the current flat dictionary.
+2. Add read-only API to list mnemonic sets and fetch one set with rows.
+3. Replace the flat `Templates -> Curve Mnemonics` view with a navigation tree of mnemonic sets.
+4. Show mnemonic-set tables in `Settings`.
+5. Add user mnemonic-set CRUD.
+6. Add entry CRUD and validation for user mnemonic rules.
+7. Update `dict_resolver.py` to evaluate all user mnemonic sets first and built-in default second.
+8. Add unit-dictionary fallback after mnemonic-set resolution is in place.
 
 ### DICT-003: Lithology sets and compaction presets
 
