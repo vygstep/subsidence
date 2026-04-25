@@ -541,7 +541,7 @@ Implementation order for UNIT-001:
 Implementation checkpoints:
 
 1. `WIZ-001-A`: add the shared wizard shell and preset model, then route existing import actions through the shell without changing backend behavior. (done)
-2. `WIZ-001-B`: add step navigation, blocking validation states, and target-well controls shared by logs/tops/deviation.
+2. `WIZ-001-B`: add step navigation, blocking validation states, and target-well controls shared by logs/tops/deviation. (done)
 3. `WIZ-002-A`: add backend preview endpoints for tabular files and LAS files.
 4. `WIZ-002-B`: render parser settings and preview rows/curve metadata from the preview response.
 5. `WIZ-003-A`: add preset-specific mapping definitions and auto-mapping.

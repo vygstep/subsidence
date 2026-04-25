@@ -24,14 +24,23 @@ export interface ImportWizardStep {
   status?: 'active' | 'done' | 'blocked'
 }
 
+export interface ImportWizardWellOption {
+  well_id: string
+  well_name: string
+}
+
 export interface ImportWizardShellProps {
   preset: ImportWizardPreset
   titleId: string
   steps?: ImportWizardStep[]
+  currentStepIndex?: number
   error: string | null
   isSubmitting: boolean
   canSubmit?: boolean
+  canAdvance?: boolean
+  validationMessages?: string[]
   onClose: () => void
   onSubmit: (event: FormEvent<HTMLFormElement>) => void
+  onStepChange?: (stepIndex: number) => void
   children: ReactNode
 }

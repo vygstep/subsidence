@@ -4,7 +4,13 @@ import type { FormEvent } from 'react'
 import { useProjectStore } from '@/stores'
 import { recordOperation } from '@/utils/diagnostics'
 
-import { ImportWizardShell, importWizardPresets, readImportError } from './importWizard'
+import {
+  ImportWizardShell,
+  ImportWizardTargetWellFields,
+  buildImportWizardSteps,
+  importWizardPresets,
+  readImportError,
+} from './importWizard'
 import { getLastImportRoot, pickFile, rememberImportPath } from './pathMemory'
 
 interface WellOption {
@@ -32,10 +38,14 @@ export function ImportLasDialog({ wells, activeWellId, onClose, onSuccess }: Imp
   const [sourceType, setSourceType] = useState<LogSourceType>('las')
   const [sourcePath, setSourcePath] = useState(() => getLastImportRoot())
   const [depthColumn, setDepthColumn] = useState('')
+  const [currentStepIndex, setCurrentStepIndex] = useState(0)
   const [error, setError] = useState<string | null>(null)
   const [isSubmitting, setIsSubmitting] = useState(false)
   const lastImportRoot = getLastImportRoot()
   const preset = sourceType === 'las' ? importWizardPresets.logsLas : importWizardPresets.logsCsv
+  const sourceIsValid = sourcePath.trim().length > 0
+  const steps = buildImportWizardSteps(currentStepIndex, sourceIsValid)
+  const validationMessages = sourceIsValid ? [] : [`${sourceType === 'las' ? 'LAS' : 'CSV'} path is required.`]
 
   const handleSubmit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault()
@@ -108,73 +118,80 @@ export function ImportLasDialog({ wells, activeWellId, onClose, onSuccess }: Imp
     <ImportWizardShell
       preset={preset}
       titleId="import-las-title"
+      steps={steps}
+      currentStepIndex={currentStepIndex}
       error={error}
       isSubmitting={isSubmitting}
+      canAdvance={currentStepIndex === 0 ? sourceIsValid : true}
+      canSubmit={sourceIsValid}
+      validationMessages={validationMessages}
       onClose={onClose}
       onSubmit={handleSubmit}
+      onStepChange={setCurrentStepIndex}
     >
-        <label className="project-dialog__field">
-          <span>Format</span>
-          <select value={sourceType} onChange={(event) => setSourceType(event.target.value as LogSourceType)}>
-            <option value="las">LAS</option>
-            <option value="csv">CSV</option>
-          </select>
-        </label>
-
-        <label className="project-dialog__field">
-          <span>Target well</span>
-          <select value={wellId} onChange={(event) => setWellId(event.target.value)}>
-            <option value="">
-              {sourceType === 'las' ? 'Reuse by LAS header / create from defaults' : 'Reuse by CSV well_name / create from defaults'}
-            </option>
-            {wells.map((well) => (
-              <option key={well.well_id} value={well.well_id}>{well.well_name}</option>
-            ))}
-          </select>
-        </label>
-
-        <label className="project-dialog__checkbox">
-          <input
-            type="checkbox"
-            checked={createNewWell}
-            disabled={Boolean(wellId)}
-            onChange={(event) => setCreateNewWell(event.target.checked)}
-          />
-          <span>Create new well if a matching well already exists</span>
-        </label>
-
-        <label className="project-dialog__field">
-          <span>{sourceType === 'las' ? 'LAS file path' : 'CSV file path'}</span>
-          <div className="project-dialog__field-row">
-            <input
-              type="text"
-              value={sourcePath}
-              onChange={(event) => setSourcePath(event.target.value)}
-              placeholder={sourceType === 'las' ? 'D:\\data\\well.las' : 'D:\\data\\well_logs.csv'}
-              autoFocus
-            />
-            <div className="project-dialog__path-actions">
-              <button type="button" className="project-dialog__path-action" disabled={!lastImportRoot} onClick={() => setSourcePath(lastImportRoot)}>
-                Use last folder
-              </button>
-              <button type="button" className="project-dialog__path-action" onClick={() => void handleBrowse()}>
-                Browse...
-              </button>
-            </div>
-          </div>
-        </label>
-
-        {sourceType === 'csv' ? (
+      {currentStepIndex === 0 ? (
+        <>
           <label className="project-dialog__field">
-            <span>Depth column</span>
-            <input
-              type="text"
-              value={depthColumn}
-              onChange={(event) => setDepthColumn(event.target.value)}
-              placeholder="Optional: DEPT / DEPTH / MD"
-            />
+            <span>Format</span>
+            <select value={sourceType} onChange={(event) => setSourceType(event.target.value as LogSourceType)}>
+              <option value="las">LAS</option>
+              <option value="csv">CSV</option>
+            </select>
           </label>
-        ) : null}
+
+          <label className="project-dialog__field">
+            <span>{sourceType === 'las' ? 'LAS file path' : 'CSV file path'}</span>
+            <div className="project-dialog__field-row">
+              <input
+                type="text"
+                value={sourcePath}
+                onChange={(event) => setSourcePath(event.target.value)}
+                placeholder={sourceType === 'las' ? 'D:\\data\\well.las' : 'D:\\data\\well_logs.csv'}
+                autoFocus
+              />
+              <div className="project-dialog__path-actions">
+                <button type="button" className="project-dialog__path-action" disabled={!lastImportRoot} onClick={() => setSourcePath(lastImportRoot)}>
+                  Use last folder
+                </button>
+                <button type="button" className="project-dialog__path-action" onClick={() => void handleBrowse()}>
+                  Browse...
+                </button>
+              </div>
+            </div>
+          </label>
+        </>
+      ) : null}
+
+      {currentStepIndex === 1 ? (
+        <>
+          <ImportWizardTargetWellFields
+            wells={wells}
+            wellId={wellId}
+            createNewWell={createNewWell}
+            emptyLabel={sourceType === 'las' ? 'Reuse by LAS header / create from defaults' : 'Reuse by CSV well_name / create from defaults'}
+            onWellIdChange={setWellId}
+            onCreateNewWellChange={setCreateNewWell}
+          />
+          {sourceType === 'csv' ? (
+            <label className="project-dialog__field">
+              <span>Depth column</span>
+              <input
+                type="text"
+                value={depthColumn}
+                onChange={(event) => setDepthColumn(event.target.value)}
+                placeholder="Optional: DEPT / DEPTH / MD"
+              />
+            </label>
+          ) : null}
+        </>
+      ) : null}
+
+      {currentStepIndex === 2 ? (
+        <div className="project-dialog__validation" aria-label="Import summary">
+          <span>Source: {sourcePath.trim()}</span>
+          <span>Target: {wellId || 'file header / defaults'}</span>
+        </div>
+      ) : null}
     </ImportWizardShell>
   )
 }

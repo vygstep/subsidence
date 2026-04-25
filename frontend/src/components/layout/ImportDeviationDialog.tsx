@@ -4,7 +4,13 @@ import type { FormEvent } from 'react'
 import { useProjectStore } from '@/stores'
 import { recordOperation } from '@/utils/diagnostics'
 
-import { ImportWizardShell, importWizardPresets, readImportError } from './importWizard'
+import {
+  ImportWizardShell,
+  ImportWizardTargetWellFields,
+  buildImportWizardSteps,
+  importWizardPresets,
+  readImportError,
+} from './importWizard'
 import { getLastImportRoot, pickFile, rememberImportPath } from './pathMemory'
 
 interface WellOption {
@@ -28,10 +34,14 @@ export function ImportDeviationDialog({ wells, activeWellId, onClose, onSuccess 
   const [wellId, setWellId] = useState(activeWellId ?? '')
   const [createNewWell, setCreateNewWell] = useState(false)
   const [csvPath, setCsvPath] = useState(() => getLastImportRoot())
+  const [currentStepIndex, setCurrentStepIndex] = useState(0)
   const [error, setError] = useState<string | null>(null)
   const [isSubmitting, setIsSubmitting] = useState(false)
   const lastImportRoot = getLastImportRoot()
   const preset = importWizardPresets.deviation
+  const sourceIsValid = csvPath.trim().length > 0
+  const steps = buildImportWizardSteps(currentStepIndex, sourceIsValid)
+  const validationMessages = sourceIsValid ? [] : ['CSV path is required.']
 
   const handleSubmit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault()
@@ -90,31 +100,18 @@ export function ImportDeviationDialog({ wells, activeWellId, onClose, onSuccess 
     <ImportWizardShell
       preset={preset}
       titleId="import-deviation-title"
+      steps={steps}
+      currentStepIndex={currentStepIndex}
       error={error}
       isSubmitting={isSubmitting}
+      canAdvance={currentStepIndex === 0 ? sourceIsValid : true}
+      canSubmit={sourceIsValid}
+      validationMessages={validationMessages}
       onClose={onClose}
       onSubmit={handleSubmit}
+      onStepChange={setCurrentStepIndex}
     >
-        <label className="project-dialog__field">
-          <span>Target well</span>
-          <select value={wellId} onChange={(event) => setWellId(event.target.value)}>
-            <option value="">Reuse by file well_name / create from defaults</option>
-            {wells.map((well) => (
-              <option key={well.well_id} value={well.well_id}>{well.well_name}</option>
-            ))}
-          </select>
-        </label>
-
-        <label className="project-dialog__checkbox">
-          <input
-            type="checkbox"
-            checked={createNewWell}
-            disabled={Boolean(wellId)}
-            onChange={(event) => setCreateNewWell(event.target.checked)}
-          />
-          <span>Create new well if a matching well already exists</span>
-        </label>
-
+      {currentStepIndex === 0 ? (
         <label className="project-dialog__field">
           <span>Deviation CSV path</span>
           <div className="project-dialog__field-row">
@@ -135,6 +132,25 @@ export function ImportDeviationDialog({ wells, activeWellId, onClose, onSuccess 
             </div>
           </div>
         </label>
+      ) : null}
+
+      {currentStepIndex === 1 ? (
+        <ImportWizardTargetWellFields
+          wells={wells}
+          wellId={wellId}
+          createNewWell={createNewWell}
+          emptyLabel="Reuse by file well_name / create from defaults"
+          onWellIdChange={setWellId}
+          onCreateNewWellChange={setCreateNewWell}
+        />
+      ) : null}
+
+      {currentStepIndex === 2 ? (
+        <div className="project-dialog__validation" aria-label="Import summary">
+          <span>Source: {csvPath.trim()}</span>
+          <span>Target: {wellId || 'file well_name / defaults'}</span>
+        </div>
+      ) : null}
     </ImportWizardShell>
   )
 }
