@@ -16,9 +16,126 @@ from .schema import (
     LithologyDictEntry,
     LithologySet,
     LithologySetEntry,
+    MeasurementUnit,
+    MeasurementUnitAlias,
     StratChart,
     StratUnit,
+    UnitDimension,
 )
+from .unit_registry import normalize_unit_key
+
+
+_UNIT_DIMENSIONS = [
+    {
+        'code': 'depth',
+        'display_name': 'Depth',
+        'description': 'Measured depth and true vertical depth values.',
+        'engine_unit_code': 'depth_m',
+        'sort_order': 10,
+    },
+    {
+        'code': 'thickness',
+        'display_name': 'Thickness',
+        'description': 'Layer, erosion, and interval thickness values.',
+        'engine_unit_code': 'thickness_m',
+        'sort_order': 20,
+    },
+    {
+        'code': 'density',
+        'display_name': 'Density',
+        'description': 'Bulk, grain, and matrix density values.',
+        'engine_unit_code': 'density_kg_m3',
+        'sort_order': 30,
+    },
+    {
+        'code': 'fraction',
+        'display_name': 'Fraction',
+        'description': 'Porosity, lithology shares, and other unitless ratios.',
+        'engine_unit_code': 'fraction_vv',
+        'sort_order': 40,
+    },
+    {
+        'code': 'compaction_coeff',
+        'display_name': 'Compaction coefficient',
+        'description': 'Athy compaction coefficient values.',
+        'engine_unit_code': 'compaction_km_inv',
+        'sort_order': 50,
+    },
+    {
+        'code': 'slowness',
+        'display_name': 'Slowness',
+        'description': 'Acoustic and sonic slowness curves.',
+        'engine_unit_code': 'slowness_us_m',
+        'sort_order': 60,
+    },
+    {
+        'code': 'resistivity',
+        'display_name': 'Resistivity',
+        'description': 'Electrical resistivity curves.',
+        'engine_unit_code': 'resistivity_ohm_m',
+        'sort_order': 70,
+    },
+    {
+        'code': 'gamma_ray',
+        'display_name': 'Gamma ray',
+        'description': 'Gamma ray curves.',
+        'engine_unit_code': 'gamma_gapi',
+        'sort_order': 80,
+    },
+    {
+        'code': 'caliper',
+        'display_name': 'Caliper',
+        'description': 'Borehole caliper diameter curves.',
+        'engine_unit_code': 'caliper_in',
+        'sort_order': 90,
+    },
+]
+
+
+_MEASUREMENT_UNITS = [
+    {'code': 'depth_m', 'dimension_code': 'depth', 'symbol': 'm', 'display_name': 'meter', 'factor': 1.0, 'offset': 0.0, 'sort_order': 10},
+    {'code': 'depth_ft', 'dimension_code': 'depth', 'symbol': 'ft', 'display_name': 'foot', 'factor': 0.3048, 'offset': 0.0, 'sort_order': 20},
+    {'code': 'depth_km', 'dimension_code': 'depth', 'symbol': 'km', 'display_name': 'kilometer', 'factor': 1000.0, 'offset': 0.0, 'sort_order': 30},
+    {'code': 'thickness_m', 'dimension_code': 'thickness', 'symbol': 'm', 'display_name': 'meter', 'factor': 1.0, 'offset': 0.0, 'sort_order': 10},
+    {'code': 'thickness_ft', 'dimension_code': 'thickness', 'symbol': 'ft', 'display_name': 'foot', 'factor': 0.3048, 'offset': 0.0, 'sort_order': 20},
+    {'code': 'thickness_km', 'dimension_code': 'thickness', 'symbol': 'km', 'display_name': 'kilometer', 'factor': 1000.0, 'offset': 0.0, 'sort_order': 30},
+    {'code': 'density_kg_m3', 'dimension_code': 'density', 'symbol': 'kg/m3', 'display_name': 'kilogram per cubic meter', 'factor': 1.0, 'offset': 0.0, 'sort_order': 10},
+    {'code': 'density_g_cc', 'dimension_code': 'density', 'symbol': 'g/cc', 'display_name': 'gram per cubic centimeter', 'factor': 1000.0, 'offset': 0.0, 'sort_order': 20},
+    {'code': 'fraction_vv', 'dimension_code': 'fraction', 'symbol': 'v/v', 'display_name': 'volume fraction', 'factor': 1.0, 'offset': 0.0, 'sort_order': 10},
+    {'code': 'fraction_percent', 'dimension_code': 'fraction', 'symbol': '%', 'display_name': 'percent', 'factor': 0.01, 'offset': 0.0, 'sort_order': 20},
+    {'code': 'compaction_km_inv', 'dimension_code': 'compaction_coeff', 'symbol': 'km^-1', 'display_name': 'inverse kilometer', 'factor': 1.0, 'offset': 0.0, 'sort_order': 10},
+    {'code': 'compaction_m_inv', 'dimension_code': 'compaction_coeff', 'symbol': 'm^-1', 'display_name': 'inverse meter', 'factor': 1000.0, 'offset': 0.0, 'sort_order': 20},
+    {'code': 'slowness_us_m', 'dimension_code': 'slowness', 'symbol': 'us/m', 'display_name': 'microsecond per meter', 'factor': 1.0, 'offset': 0.0, 'sort_order': 10},
+    {'code': 'slowness_us_ft', 'dimension_code': 'slowness', 'symbol': 'us/ft', 'display_name': 'microsecond per foot', 'factor': 3.280839895, 'offset': 0.0, 'sort_order': 20},
+    {'code': 'resistivity_ohm_m', 'dimension_code': 'resistivity', 'symbol': 'ohm.m', 'display_name': 'ohm meter', 'factor': 1.0, 'offset': 0.0, 'sort_order': 10},
+    {'code': 'gamma_gapi', 'dimension_code': 'gamma_ray', 'symbol': 'gAPI', 'display_name': 'gamma API unit', 'factor': 1.0, 'offset': 0.0, 'sort_order': 10},
+    {'code': 'caliper_in', 'dimension_code': 'caliper', 'symbol': 'in', 'display_name': 'inch', 'factor': 1.0, 'offset': 0.0, 'sort_order': 10},
+    {'code': 'caliper_mm', 'dimension_code': 'caliper', 'symbol': 'mm', 'display_name': 'millimeter', 'factor': 0.03937007874015748, 'offset': 0.0, 'sort_order': 20},
+    {'code': 'caliper_cm', 'dimension_code': 'caliper', 'symbol': 'cm', 'display_name': 'centimeter', 'factor': 0.3937007874015748, 'offset': 0.0, 'sort_order': 30},
+]
+
+
+_UNIT_ALIASES = {
+    'depth_m': ['m', 'meter', 'meters', 'metre', 'metres'],
+    'depth_ft': ['ft', 'foot', 'feet'],
+    'depth_km': ['km', 'kilometer', 'kilometers', 'kilometre', 'kilometres'],
+    'thickness_m': ['m', 'meter', 'meters', 'metre', 'metres'],
+    'thickness_ft': ['ft', 'foot', 'feet'],
+    'thickness_km': ['km', 'kilometer', 'kilometers', 'kilometre', 'kilometres'],
+    'density_kg_m3': ['kg/m3', 'kg/m^3', 'kg/m\u00b3'],
+    'density_g_cc': ['g/cc', 'g/cm3', 'g/cm^3', 'g/cm\u00b3', 'g/c3'],
+    'fraction_vv': ['v/v', 'fraction', 'frac', 'ratio'],
+    'fraction_percent': ['%', 'percent', 'pct'],
+    'compaction_km_inv': ['km^-1', 'km-1', '1/km'],
+    'compaction_m_inv': ['m^-1', 'm-1', '1/m'],
+    'slowness_us_m': ['us/m', 'usec/m', 'microsecond/m', 'microseconds/m'],
+    'slowness_us_ft': ['us/ft', 'usec/ft', 'microsecond/ft', 'microseconds/ft'],
+    'resistivity_ohm_m': ['ohm.m', 'ohmm', 'ohm-m', 'ohm m'],
+    'gamma_gapi': ['api', 'gapi', 'gAPI'],
+    'caliper_in': ['in', 'inch', 'inches'],
+    'caliper_mm': ['mm', 'millimeter', 'millimeters', 'millimetre', 'millimetres'],
+    'caliper_cm': ['cm', 'centimeter', 'centimeters', 'centimetre', 'centimetres'],
+}
 
 
 def _seed_curve_entries(session: Session, csv_path: Path) -> None:
@@ -306,6 +423,93 @@ def _seed_builtin_mnemonic_set(session: Session, csv_path: Path) -> None:
             existing.canonical_unit = row['canonical_unit'] or None
 
 
+def _seed_measurement_units(session: Session) -> None:
+    """Create the built-in measurement unit dictionary used by importers and calculations."""
+    dimensions_by_code = {
+        row.code: row
+        for row in session.scalars(select(UnitDimension)).all()
+    }
+    for seed in _UNIT_DIMENSIONS:
+        existing = dimensions_by_code.get(seed['code'])
+        if existing is None:
+            session.add(
+                UnitDimension(
+                    code=seed['code'],
+                    display_name=seed['display_name'],
+                    description=seed['description'],
+                    engine_unit_code=seed['engine_unit_code'],
+                    is_builtin=True,
+                    sort_order=seed['sort_order'],
+                )
+            )
+            continue
+        existing.display_name = seed['display_name']
+        existing.description = seed['description']
+        existing.engine_unit_code = seed['engine_unit_code']
+        existing.is_builtin = True
+        existing.sort_order = seed['sort_order']
+
+    session.flush()
+
+    units_by_code = {
+        row.code: row
+        for row in session.scalars(select(MeasurementUnit)).all()
+    }
+    unit_dimension_by_code = {seed['code']: seed['dimension_code'] for seed in _MEASUREMENT_UNITS}
+
+    for seed in _MEASUREMENT_UNITS:
+        existing = units_by_code.get(seed['code'])
+        if existing is None:
+            session.add(
+                MeasurementUnit(
+                    code=seed['code'],
+                    dimension_code=seed['dimension_code'],
+                    symbol=seed['symbol'],
+                    display_name=seed['display_name'],
+                    to_engine_factor=seed['factor'],
+                    to_engine_offset=seed['offset'],
+                    is_builtin=True,
+                    is_active=True,
+                    sort_order=seed['sort_order'],
+                )
+            )
+            continue
+        existing.dimension_code = seed['dimension_code']
+        existing.symbol = seed['symbol']
+        existing.display_name = seed['display_name']
+        existing.to_engine_factor = seed['factor']
+        existing.to_engine_offset = seed['offset']
+        existing.is_builtin = True
+        existing.is_active = True
+        existing.sort_order = seed['sort_order']
+
+    session.flush()
+
+    aliases_by_key = {
+        (row.dimension_code, row.normalized_alias): row
+        for row in session.scalars(select(MeasurementUnitAlias)).all()
+    }
+    for unit_code, aliases in _UNIT_ALIASES.items():
+        dimension_code = unit_dimension_by_code[unit_code]
+        for alias in aliases:
+            normalized = normalize_unit_key(alias)
+            existing = aliases_by_key.get((dimension_code, normalized))
+            if existing is None:
+                existing = MeasurementUnitAlias(
+                    dimension_code=dimension_code,
+                    unit_code=unit_code,
+                    alias=alias,
+                    normalized_alias=normalized,
+                    is_builtin=True,
+                    is_active=True,
+                )
+                session.add(existing)
+                aliases_by_key[(dimension_code, normalized)] = existing
+            existing.unit_code = unit_code
+            existing.is_builtin = True
+            existing.is_active = True
+
+
 def seed_dictionaries(session: Session, db_path: Path) -> None:
     del db_path
     seed_dir = Path(__file__).parent / 'dictionaries'
@@ -338,3 +542,4 @@ def seed_dictionaries(session: Session, db_path: Path) -> None:
     _seed_builtin_compaction_presets(session)
     _seed_builtin_lithology_set(session)
     _seed_builtin_mnemonic_set(session, seed_dir / 'curve_families.csv')
+    _seed_measurement_units(session)

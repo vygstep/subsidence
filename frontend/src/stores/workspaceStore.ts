@@ -19,11 +19,14 @@ export type SelectedObject =
   | { type: 'compaction-presets-root' }
   | { type: 'compaction-preset'; presetId: number }
   | { type: 'compaction-preset-draft' }
+  | { type: 'measurement-units-root' }
+  | { type: 'unit-dimension'; dimensionCode: string }
   | { type: 'lithologies-root' }
   | { type: 'lithology-set'; setId: number }
-  | { type: 'curve-dictionary-entry'; entryId: number }
   | { type: 'lithology-dictionary-entry'; entryId: number }
   | { type: 'compaction-model'; modelId: number }
+  | { type: 'curve-mnemonics-root' }
+  | { type: 'mnemonic-set'; setId: number }
 
 export interface WellViewState {
   tracks: TrackConfig[]

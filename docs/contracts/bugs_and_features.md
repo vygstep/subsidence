@@ -18,14 +18,15 @@ The backlog contains four different levels of work:
 Implementation should not start with lithology upscaling. The safe order is:
 
 1. Add Templates/Dictionaries UI and APIs.
-2. Extend curve classification with mnemonic and unit dictionaries.
-3. Build the Import Wizard shell and preview/mapping engine.
-4. Connect Import Wizard presets for logs, tops, unconformities, deviation, and stratigraphy.
-5. Add discrete lithology curve rendering.
-6. Add percentage lithology tracks.
-7. Add zone aggregation for subsidence inputs.
-8. Improve subsidence chart stratigraphy presentation.
-9. Implement low-risk viewer UX fixes in small independent commits when they do not conflict with the main path.
+2. Extend curve classification with mnemonic dictionaries.
+3. Add the measurement-unit dictionary and engine-unit normalization foundation.
+4. Build the Import Wizard shell and preview/mapping engine.
+5. Connect Import Wizard presets for logs, tops, unconformities, deviation, and stratigraphy.
+6. Add discrete lithology curve rendering.
+7. Add percentage lithology tracks.
+8. Add zone aggregation for subsidence inputs.
+9. Improve subsidence chart stratigraphy presentation.
+10. Implement low-risk viewer UX fixes in small independent commits when they do not conflict with the main path.
 
 ## 1.1 Execution Order
 
@@ -37,15 +38,17 @@ Goal:
 
 Items:
 
-- `DICT-001`: Add Templates tab beside Settings. ✓
-- `DICT-002`: Curve mnemonic and unit resolver. ← **next**
-- `DICT-003`: Lithology sets and compaction presets. ✓
+- `DICT-001`: Add Templates tab beside Settings. (done)
+- `DICT-002`: Curve mnemonic resolver. (done)
+- `DICT-003`: Lithology sets and compaction presets. (done)
+- `UNIT-001`: Measurement unit dictionary and engine-unit normalization. (done)
 
 Exit criteria:
 
-- Built-in dictionaries are visible and read-only. ✓
-- Project dictionaries/templates can be duplicated or extended where required. ✓
-- Curve classification can use mnemonic first and unit fallback second. ← blocked on DICT-002
+- Built-in dictionaries are visible and read-only. (done)
+- Project dictionaries/templates can be duplicated or extended where required. (done)
+- Curve classification can use mnemonic first and measurement-unit fallback second. (done)
+- Imported and edited numeric values can be normalized to the units expected by the calculation engine.
 
 ### Phase B: Import Wizard
 
@@ -356,7 +359,7 @@ Acceptance:
 
 ## 3. Templates and Dictionaries Foundation
 
-### DICT-002: Curve mnemonic and unit resolver
+### DICT-002: Curve mnemonic resolver
 
 Problem:
 
@@ -405,8 +408,8 @@ Required behavior:
 - Resolver order between user mnemonic sets must be deterministic.
 - Resolve first by mnemonic sets.
 - If mnemonic sets have no match, resolve by unit dictionary.
-- Unit dictionary must remain project-extensible.
-- User must provide canonical mnemonic/unit dictionaries before final implementation.
+- Measurement unit fallback is owned by `UNIT-001`; DICT-002 only calls it after mnemonic resolution fails.
+- User-provided canonical unit behavior must be configured through the measurement unit dictionary, not through mnemonic rows alone.
 - Validation must reject:
   - empty pattern;
   - invalid regex when `Regex = true`.
@@ -430,7 +433,7 @@ Acceptance:
 - `Default Mnemonics` exists as a read-only built-in set.
 - `Settings`, not the left tree, becomes the main viewing/editing surface for mnemonic rules.
 - Curves with alias mnemonics resolve to the correct canonical family.
-- Curves with unknown mnemonic but known unit can still resolve.
+- Curves with unknown mnemonic but known unit can resolve only through `UNIT-001`.
 - Resolver uses user mnemonic sets first and built-in default second.
 - User mnemonic rules can be added later without replacing the built-in dictionary.
 
@@ -443,7 +446,93 @@ Implementation order for DICT-002:
 5. Add user mnemonic-set CRUD.
 6. Add entry CRUD and validation for user mnemonic rules.
 7. Update `dict_resolver.py` to evaluate all user mnemonic sets first and built-in default second.
-8. Add unit-dictionary fallback after mnemonic-set resolution is in place.
+8. Add measurement-unit fallback through `UNIT-001` after mnemonic-set resolution is in place.
+
+### UNIT-001: Measurement unit dictionary and engine-unit normalization
+
+Problem:
+
+- Unit conversion is currently hard-coded in `unit_conversion.py` and scattered by use case.
+- Subsidence calculations need numeric inputs normalized to engine units, including:
+  - depth and thickness in metres;
+  - density in `kg/m3`;
+  - lithology percentages and porosity fractions in `v/v`;
+  - compaction coefficient in the engine-defined coefficient unit;
+  - common curve units such as resistivity, sonic slowness, gamma ray, and caliper units.
+- Unit fallback for curve classification must not be derived from mnemonic rows alone. It needs a first-class unit dictionary that can later be edited and extended per project.
+
+Required behavior:
+
+- Introduce the target domain model:
+  - `Measurement Units` root object;
+  - `Unit Dimension`;
+  - `Measurement Unit`;
+  - `Measurement Unit Alias`.
+- A dimension defines the physical quantity and the unit expected by the calculation engine.
+- A measurement unit defines:
+  - code;
+  - symbol;
+  - display name;
+  - dimension code;
+  - conversion to the dimension base or engine unit using factor and offset where possible;
+  - built-in/user ownership;
+  - active flag.
+- A unit alias maps imported labels and LAS mnemonics such as `G/C3`, `g/cc`, `kg/m3`, `%`, `v/v`, `ft`, `m`, and `km` to canonical measurement units.
+- Built-in units and aliases are seeded and read-only.
+- Project units and aliases can be created later without replacing the built-in dictionary.
+- Importers and calculations must normalize values to engine units through the unit dictionary, not by ad hoc string rules.
+- Unit fallback for curve classification may use unit dimensions only after mnemonic resolution fails and only when the unit mapping is unambiguous.
+
+Initial dimensions and engine units:
+
+- `depth`: engine unit `m`.
+- `thickness`: engine unit `m`.
+- `density`: engine unit `kg/m3`.
+- `fraction`: engine unit `v/v`.
+- `percentage`: canonicalized to `fraction` where needed.
+- `compaction_coeff`: engine unit to be explicit in the unit dictionary; current engine behavior stores presets as `km^-1` and converts internally to `m^-1`.
+- `slowness`: support `us/ft` and `us/m`.
+- `resistivity`: support equivalent `ohm.m` labels.
+- `gamma_ray`: support `API` / `gAPI`.
+- `caliper`: support `in` and `mm`/`cm` where needed.
+
+Likely code areas:
+
+- `app/src/subsidence/data/schema.py`
+- `app/src/subsidence/data/dict_seeder.py`
+- `app/src/subsidence/data/unit_conversion.py`
+- new `app/src/subsidence/data/unit_registry.py`
+- new CSV seed files under `app/src/subsidence/data/dictionaries/`
+- `app/src/subsidence/data/importers/las.py`
+- `app/src/subsidence/data/importers/logs_csv.py`
+- `app/src/subsidence/data/backstrip.py`
+- `app/src/subsidence/api/compaction.py` or a dedicated dictionary API module
+- `frontend/src/components/layout/TemplatesTab.tsx`
+- `frontend/src/components/layout/settings/*`
+- `frontend/src/stores/wellDataStore.ts`
+- `frontend/src/types/subsidence.ts`
+
+Acceptance:
+
+- `Measurement Units` appears in the Templates navigation tree.
+- Built-in dimensions, units, and aliases are visible in Settings.
+- Depth import supports `m`, `ft`, and `km` via the unit registry.
+- Density normalization supports at least `kg/m3`, `g/cc`, and `g/cm3`.
+- Fraction normalization supports `%` and `v/v`.
+- Existing curve imports continue to resolve mnemonic aliases first.
+- Unit fallback is deterministic and does not classify curves from ambiguous units.
+- Engine-facing calculation inputs are documented with their required units.
+
+Implementation order for UNIT-001:
+
+1. Add backend schema for unit dimensions, measurement units, and unit aliases. (done)
+2. Seed built-in unit dimensions, units, and aliases. (done)
+3. Add a unit registry service for resolve, normalize, and convert operations. (done)
+4. Add read-only API for dimensions, units, and aliases. (done)
+5. Add `Measurement Units` to Templates and Settings as a read-only tree/table. (done)
+6. Replace hard-coded depth and curve conversion paths in importers with the unit registry. (done)
+7. Normalize compaction/lithology-related inputs to engine units. (done)
+8. Add deterministic unit fallback for curve classification after mnemonic resolution. (done)
 
 ---
 
@@ -813,7 +902,8 @@ Import Wizard is now part of this contract as `WIZ-*`.
 
 Ownership split:
 
-- `DICT-*` owns dictionaries, templates, aliases, units, lithologies, palettes, lithology sets, and compaction presets.
+- `DICT-*` owns dictionaries, templates, curve mnemonic aliases, lithologies, palettes, lithology sets, and compaction presets.
+- `UNIT-*` owns measurement dimensions, units, aliases, unit conversion rules, and engine-unit normalization.
 - `WIZ-*` owns import preview, parser settings, column mapping, target-well selection, validation, execution, logging, and import tests.
 - `LITH-*` owns discrete/percentage lithology data behavior after import.
 - `UX-*` owns viewer interactions and visual presentation.
@@ -828,10 +918,10 @@ Dependency rule:
 
 ## Implemented
 
-### DICT-001: Add Templates tab beside Settings ✓
+### DICT-001: Add Templates tab beside Settings (done)
 
 Templates tab added next to Settings in the Data Manager. Contains Compaction Presets, Curve Mnemonics (flat read-only table), and Lithologies tree. Built-in entries are read-only; user entries can be created/edited. Commits: `8e44815`, `01817d9`.
 
-### DICT-003: Lithology sets and compaction presets ✓
+### DICT-003: Lithology sets and compaction presets (done)
 
 Backend: `LithologySet` / `LithologyEntry` schema, `CompactionPreset` with `id`/`origin`/`is_builtin`, seeded `Default Lithologies` and built-in presets from existing flat dictionary. API: CRUD for presets and lithology sets. Frontend: `CompactionPresetsRootSettings`, `CompactionPresetSettings`, `CompactionPresetDraftSettings`, `LithologySetSettings`, `LithologySetsRootSettings`. Built-in rows are muted/read-only; user rows are editable inline; `Make copy` and `New preset` actions work. Commits: `d5a6b82`, `5005cee`, `0b5c191`.

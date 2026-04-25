@@ -5,13 +5,17 @@ import type {
   CompactionPresetDetail,
   CompactionPresetSummary,
   CurveData,
-  CurveDictionaryEntry,
+  CurveMnemonicEntryItem,
+  CurveMnemonicSetDetail,
+  CurveMnemonicSetSummary,
   FormationTop,
   LithologyDictionaryEntry,
   LithologySetDetail,
   LithologySetSummary,
   LithologyParam,
   StratChartInfo,
+  UnitDimensionDetail,
+  UnitDimensionSummary,
   Well,
   WellInventory,
 } from '@/types'
@@ -78,7 +82,8 @@ export interface WellDataStore {
   stratCharts: StratChartInfo[]
   compactionModels: CompactionModel[]
   compactionPresets: CompactionPresetSummary[]
-  curveDictionaryEntries: CurveDictionaryEntry[]
+  mnemonicSets: CurveMnemonicSetSummary[]
+  unitDimensions: UnitDimensionSummary[]
   lithologyDictionaryEntries: LithologyDictionaryEntry[]
   lithologySets: LithologySetSummary[]
   tvdTable: TVDTable | null
@@ -120,7 +125,29 @@ export interface WellDataStore {
     compaction_coeff?: number
   }) => Promise<CompactionPresetDetail>
   deleteCompactionPreset: (presetId: number) => Promise<void>
-  loadCurveDictionary: () => Promise<void>
+  loadMnemonicSets: () => Promise<void>
+  fetchMnemonicSet: (setId: number) => Promise<CurveMnemonicSetDetail | null>
+  createMnemonicSet: (name: string) => Promise<CurveMnemonicSetSummary>
+  copyMnemonicSet: (setId: number) => Promise<CurveMnemonicSetSummary>
+  updateMnemonicSet: (setId: number, patch: { name?: string }) => Promise<CurveMnemonicSetSummary>
+  deleteMnemonicSet: (setId: number) => Promise<void>
+  createMnemonicSetEntry: (setId: number) => Promise<CurveMnemonicEntryItem>
+  updateMnemonicSetEntry: (
+    setId: number,
+    entryId: number,
+    patch: {
+      pattern?: string
+      is_regex?: boolean
+      priority?: number
+      family_code?: string | null
+      canonical_mnemonic?: string | null
+      canonical_unit?: string | null
+      is_active?: boolean
+    },
+  ) => Promise<CurveMnemonicEntryItem>
+  deleteMnemonicSetEntry: (setId: number, entryId: number) => Promise<void>
+  loadUnitDimensions: () => Promise<void>
+  fetchUnitDimension: (dimensionCode: string) => Promise<UnitDimensionDetail | null>
   loadLithologyDictionary: () => Promise<void>
   loadLithologySets: () => Promise<void>
   fetchLithologySet: (setId: number) => Promise<LithologySetDetail | null>
@@ -210,7 +237,8 @@ const emptyState = {
   stratCharts: [],
   compactionModels: [],
   compactionPresets: [],
-  curveDictionaryEntries: [],
+  mnemonicSets: [],
+  unitDimensions: [],
   lithologyDictionaryEntries: [],
   lithologySets: [],
   tvdTable: null,
@@ -502,10 +530,116 @@ export const useWellDataStore = create<WellDataStore>((set, get) => ({
     if (!response.ok) return
     set({ compactionPresets: (await response.json()) as CompactionPresetSummary[] })
   },
-  async loadCurveDictionary() {
-    const response = await fetch('/api/curve-dictionary')
+  async loadMnemonicSets() {
+    const response = await fetch('/api/mnemonic-sets')
     if (!response.ok) return
-    set({ curveDictionaryEntries: (await response.json()) as CurveDictionaryEntry[] })
+    set({ mnemonicSets: (await response.json()) as CurveMnemonicSetSummary[] })
+  },
+  async fetchMnemonicSet(setId) {
+    const response = await fetch(`/api/mnemonic-sets/${setId}`)
+    if (!response.ok) return null
+    return (await response.json()) as CurveMnemonicSetDetail
+  },
+  async createMnemonicSet(name) {
+    const response = await fetch('/api/mnemonic-sets', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ name }),
+    })
+    if (!response.ok) {
+      throw new Error(await readError(response, `Failed to create mnemonic set (${response.status})`))
+    }
+    const created = (await response.json()) as CurveMnemonicSetSummary
+    set((state) => ({ mnemonicSets: [...state.mnemonicSets, created] }))
+    return created
+  },
+  async copyMnemonicSet(setId) {
+    const response = await fetch(`/api/mnemonic-sets/${setId}/copy`, { method: 'POST' })
+    if (!response.ok) {
+      throw new Error(await readError(response, `Failed to copy mnemonic set (${response.status})`))
+    }
+    const created = (await response.json()) as CurveMnemonicSetSummary
+    set((state) => ({ mnemonicSets: [...state.mnemonicSets, created] }))
+    return created
+  },
+  async updateMnemonicSet(setId, patch) {
+    const response = await fetch(`/api/mnemonic-sets/${setId}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(patch),
+    })
+    if (!response.ok) {
+      throw new Error(await readError(response, `Failed to update mnemonic set (${response.status})`))
+    }
+    const updated = (await response.json()) as CurveMnemonicSetSummary
+    set((state) => ({
+      mnemonicSets: state.mnemonicSets.map((row) => (row.id === updated.id ? updated : row)),
+    }))
+    return updated
+  },
+  async deleteMnemonicSet(setId) {
+    const response = await fetch(`/api/mnemonic-sets/${setId}`, { method: 'DELETE' })
+    if (!response.ok) {
+      throw new Error(await readError(response, `Failed to delete mnemonic set (${response.status})`))
+    }
+    set((state) => ({
+      mnemonicSets: state.mnemonicSets.filter((row) => row.id !== setId),
+    }))
+  },
+  async createMnemonicSetEntry(setId) {
+    const response = await fetch(`/api/mnemonic-sets/${setId}/entries`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({}),
+    })
+    if (!response.ok) {
+      throw new Error(await readError(response, `Failed to add mnemonic row (${response.status})`))
+    }
+    const created = (await response.json()) as CurveMnemonicEntryItem
+    set((state) => ({
+      mnemonicSets: state.mnemonicSets.map((row) => (
+        row.id === setId
+          ? { ...row, entry_count: row.entry_count + 1 }
+          : row
+      )),
+    }))
+    return created
+  },
+  async updateMnemonicSetEntry(setId, entryId, patch) {
+    const response = await fetch(`/api/mnemonic-sets/${setId}/entries/${entryId}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(patch),
+    })
+    if (!response.ok) {
+      throw new Error(await readError(response, `Failed to update mnemonic row (${response.status})`))
+    }
+    return (await response.json()) as CurveMnemonicEntryItem
+  },
+  async deleteMnemonicSetEntry(setId, entryId) {
+    const response = await fetch(`/api/mnemonic-sets/${setId}/entries/${entryId}`, {
+      method: 'DELETE',
+    })
+    if (!response.ok) {
+      throw new Error(await readError(response, `Failed to delete mnemonic row (${response.status})`))
+    }
+    set((state) => ({
+      mnemonicSets: state.mnemonicSets.map((row) => (
+        row.id === setId
+          ? { ...row, entry_count: Math.max(0, row.entry_count - 1) }
+          : row
+      )),
+    }))
+  },
+  async loadUnitDimensions() {
+    const response = await fetch('/api/unit-dimensions')
+    if (!response.ok) return
+    set({ unitDimensions: (await response.json()) as UnitDimensionSummary[] })
+  },
+  async fetchUnitDimension(dimensionCode) {
+    const response = await fetch(`/api/unit-dimensions/${encodeURIComponent(dimensionCode)}`)
+    if (!response.ok) return null
+    return (await response.json()) as UnitDimensionDetail
   },
   async loadLithologyDictionary() {
     const response = await fetch('/api/lithology-dictionary')

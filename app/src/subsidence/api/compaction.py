@@ -1,10 +1,13 @@
 from __future__ import annotations
 
+import re
+
 from fastapi import APIRouter, HTTPException, Request
 from pydantic import BaseModel
 from sqlalchemy import select
 
 from subsidence.data.engine import create_all_tables
+from subsidence.data.unit_registry import normalize_lithology_values_to_engine
 from subsidence.data.schema import (
     CompactionModel,
     CompactionModelParam,
@@ -15,6 +18,9 @@ from subsidence.data.schema import (
     LithologyDictEntry,
     LithologySet,
     LithologySetEntry,
+    MeasurementUnit,
+    MeasurementUnitAlias,
+    UnitDimension,
 )
 
 router = APIRouter(tags=['compaction'])
@@ -61,16 +67,22 @@ class CompactionPresetCreate(BaseModel):
     clone_from_id: int | None = None
     description: str | None = None
     density: float | None = None
+    density_unit: str | None = None
     porosity_surface: float | None = None
+    porosity_surface_unit: str | None = None
     compaction_coeff: float | None = None
+    compaction_coeff_unit: str | None = None
 
 
 class CompactionPresetPatch(BaseModel):
     name: str | None = None
     description: str | None = None
     density: float | None = None
+    density_unit: str | None = None
     porosity_surface: float | None = None
+    porosity_surface_unit: str | None = None
     compaction_coeff: float | None = None
+    compaction_coeff_unit: str | None = None
 
 
 class LithologyParamItem(BaseModel):
@@ -84,8 +96,11 @@ class LithologyParamItem(BaseModel):
 
 class LithologyParamPatch(BaseModel):
     density: float | None = None
+    density_unit: str | None = None
     porosity_surface: float | None = None
+    porosity_surface_unit: str | None = None
     compaction_coeff: float | None = None
+    compaction_coeff_unit: str | None = None
 
 
 class CurveDictionaryItem(BaseModel):
@@ -120,6 +135,34 @@ class CurveMnemonicEntryItem(BaseModel):
 
 class CurveMnemonicSetDetail(CurveMnemonicSetSummary):
     entries: list[CurveMnemonicEntryItem]
+
+
+class CurveMnemonicSetCreate(BaseModel):
+    name: str
+
+
+class CurveMnemonicSetPatch(BaseModel):
+    name: str | None = None
+
+
+class CurveMnemonicEntryCreate(BaseModel):
+    pattern: str | None = None
+    is_regex: bool = False
+    priority: int = 0
+    family_code: str | None = None
+    canonical_mnemonic: str | None = None
+    canonical_unit: str | None = None
+    is_active: bool = True
+
+
+class CurveMnemonicEntryPatch(BaseModel):
+    pattern: str | None = None
+    is_regex: bool | None = None
+    priority: int | None = None
+    family_code: str | None = None
+    canonical_mnemonic: str | None = None
+    canonical_unit: str | None = None
+    is_active: bool | None = None
 
 
 class LithologyDictionaryItem(BaseModel):
@@ -184,6 +227,46 @@ class LithologySetEntryPatch(BaseModel):
     compaction_preset_id: int | None = None
 
 
+class MeasurementUnitAliasItem(BaseModel):
+    id: int
+    dimension_code: str
+    unit_code: str
+    alias: str
+    normalized_alias: str
+    is_builtin: bool
+    is_active: bool
+
+
+class MeasurementUnitItem(BaseModel):
+    id: int
+    code: str
+    dimension_code: str
+    symbol: str
+    display_name: str
+    to_engine_factor: float
+    to_engine_offset: float
+    is_builtin: bool
+    is_active: bool
+    sort_order: int
+    aliases: list[MeasurementUnitAliasItem]
+
+
+class UnitDimensionSummary(BaseModel):
+    id: int
+    code: str
+    display_name: str
+    description: str | None
+    engine_unit_code: str
+    is_builtin: bool
+    sort_order: int
+    unit_count: int
+    alias_count: int
+
+
+class UnitDimensionDetail(UnitDimensionSummary):
+    units: list[MeasurementUnitItem]
+
+
 # ---------------------------------------------------------------------------
 # Helpers
 # ---------------------------------------------------------------------------
@@ -203,6 +286,105 @@ def _ensure_lithology_sets(manager) -> None:
         create_all_tables(session.get_bind())
         manager._seed_dictionaries(session, project_path)
         session.commit()
+
+
+def _ensure_mnemonic_sets(manager) -> None:
+    project_path = manager.project_path
+    if project_path is None:
+        return
+    with manager.get_session() as session:
+        create_all_tables(session.get_bind())
+        manager._seed_dictionaries(session, project_path)
+        session.commit()
+
+
+def _ensure_measurement_units(manager) -> None:
+    project_path = manager.project_path
+    if project_path is None:
+        return
+    with manager.get_session() as session:
+        create_all_tables(session.get_bind())
+        manager._seed_dictionaries(session, project_path)
+        session.commit()
+
+
+def _require_mnemonic_set(session, set_id: int) -> CurveMnemonicSet:
+    row = session.get(CurveMnemonicSet, set_id)
+    if row is None:
+        raise HTTPException(status_code=404, detail=f'Mnemonic set not found: {set_id}')
+    return row
+
+
+def _require_user_mnemonic_set(session, set_id: int) -> CurveMnemonicSet:
+    row = _require_mnemonic_set(session, set_id)
+    if row.is_builtin:
+        raise HTTPException(status_code=403, detail='Built-in mnemonic set cannot be edited')
+    return row
+
+
+def _normalize_mnemonic_set_name(value: str | None) -> str:
+    name = (value or '').strip()
+    if not name:
+        raise HTTPException(status_code=400, detail='Mnemonic set name is required')
+    return name
+
+
+def _next_mnemonic_set_sort_order(session) -> int:
+    values = [
+        row.sort_order
+        for row in session.scalars(
+            select(CurveMnemonicSet).where(CurveMnemonicSet.is_builtin.is_(False))
+        ).all()
+    ]
+    return max(values, default=0) + 1
+
+
+def _normalize_optional_string(value: str | None) -> str | None:
+    if value is None:
+        return None
+    stripped = value.strip()
+    return stripped or None
+
+
+def _normalize_mnemonic_pattern(value: str | None, is_regex: bool) -> str:
+    pattern = (value or '').strip()
+    if not pattern:
+        raise HTTPException(status_code=400, detail='Mnemonic pattern is required')
+    if is_regex:
+        try:
+            re.compile(pattern)
+        except re.error as exc:
+            raise HTTPException(status_code=400, detail=f'Invalid regex pattern: {exc}') from exc
+    return pattern
+
+
+def _next_generated_mnemonic_pattern(session, set_id: int) -> str:
+    existing_patterns = {
+        row.pattern
+        for row in session.scalars(
+            select(CurveMnemonicEntry).where(CurveMnemonicEntry.set_id == set_id)
+        ).all()
+    }
+    index = 1
+    while True:
+        candidate = f'MNEM_{index}'
+        if candidate not in existing_patterns:
+            return candidate
+        index += 1
+
+
+def _require_mnemonic_entry(session, set_id: int, entry_id: int) -> CurveMnemonicEntry:
+    row = session.get(CurveMnemonicEntry, entry_id)
+    if row is None or row.set_id != set_id:
+        raise HTTPException(status_code=404, detail=f'Mnemonic entry not found: {entry_id}')
+    return row
+
+
+def _require_unit_dimension(session, dimension_code: str) -> UnitDimension:
+    row = session.scalar(select(UnitDimension).where(UnitDimension.code == dimension_code))
+    if row is None:
+        raise HTTPException(status_code=404, detail=f'Unit dimension not found: {dimension_code}')
+    return row
 
 
 def _require_lithology_set(session, set_id: int) -> LithologySet:
@@ -259,6 +441,35 @@ def _resolve_compaction_preset_id(session, preset_id: int | None) -> int | None:
     if row is None:
         raise HTTPException(status_code=404, detail=f'Compaction preset not found: {preset_id}')
     return row.id
+
+
+def _normalize_compaction_values(
+    session,
+    *,
+    density: float,
+    porosity_surface: float,
+    compaction_coeff: float,
+    density_unit: str | None = None,
+    porosity_surface_unit: str | None = None,
+    compaction_coeff_unit: str | None = None,
+) -> tuple[float, float, float]:
+    try:
+        return normalize_lithology_values_to_engine(
+            session,
+            density=density,
+            porosity_surface=porosity_surface,
+            compaction_coeff=compaction_coeff,
+            density_unit=density_unit or 'kg/m3',
+            porosity_surface_unit=porosity_surface_unit or 'v/v',
+            compaction_coeff_unit=compaction_coeff_unit or 'km^-1',
+        )
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+
+
+def _reject_unit_without_value(payload, value_field: str, unit_field: str) -> None:
+    if unit_field in payload.model_fields_set and value_field not in payload.model_fields_set:
+        raise HTTPException(status_code=400, detail=f'{unit_field} requires {value_field}')
 
 
 def _next_generated_lithology_code(session, set_id: int) -> str:
@@ -349,6 +560,28 @@ def _lithology_dict_to_item(row: LithologyDictEntry) -> LithologyDictionaryItem:
     )
 
 
+def _mnemonic_set_summary_to_item(row: CurveMnemonicSet, entry_count: int | None = None) -> CurveMnemonicSetSummary:
+    return CurveMnemonicSetSummary(
+        id=row.id,
+        name=row.name,
+        is_builtin=row.is_builtin,
+        entry_count=len(row.entries) if entry_count is None else entry_count,
+    )
+
+
+def _mnemonic_entry_to_item(row: CurveMnemonicEntry) -> CurveMnemonicEntryItem:
+    return CurveMnemonicEntryItem(
+        id=row.id,
+        pattern=row.pattern,
+        is_regex=row.is_regex,
+        priority=row.priority,
+        family_code=row.family_code,
+        canonical_mnemonic=row.canonical_mnemonic,
+        canonical_unit=row.canonical_unit,
+        is_active=row.is_active,
+    )
+
+
 def _lithology_set_summary_to_item(row: LithologySet) -> LithologySetSummary:
     return LithologySetSummary(
         id=row.id,
@@ -377,6 +610,126 @@ def _lithology_set_entry_to_item(row: LithologySetEntry) -> LithologySetEntryIte
         porosity_surface=preset.porosity_surface if preset is not None else None,
         compaction_coeff=preset.compaction_coeff if preset is not None else None,
     )
+
+
+def _unit_alias_to_item(row: MeasurementUnitAlias) -> MeasurementUnitAliasItem:
+    return MeasurementUnitAliasItem(
+        id=row.id,
+        dimension_code=row.dimension_code,
+        unit_code=row.unit_code,
+        alias=row.alias,
+        normalized_alias=row.normalized_alias,
+        is_builtin=row.is_builtin,
+        is_active=row.is_active,
+    )
+
+
+def _unit_to_item(row: MeasurementUnit) -> MeasurementUnitItem:
+    aliases = sorted(row.aliases, key=lambda item: (item.normalized_alias, item.id))
+    return MeasurementUnitItem(
+        id=row.id,
+        code=row.code,
+        dimension_code=row.dimension_code,
+        symbol=row.symbol,
+        display_name=row.display_name,
+        to_engine_factor=row.to_engine_factor,
+        to_engine_offset=row.to_engine_offset,
+        is_builtin=row.is_builtin,
+        is_active=row.is_active,
+        sort_order=row.sort_order,
+        aliases=[_unit_alias_to_item(alias) for alias in aliases],
+    )
+
+
+def _dimension_to_summary(row: UnitDimension) -> UnitDimensionSummary:
+    units = list(row.units)
+    return UnitDimensionSummary(
+        id=row.id,
+        code=row.code,
+        display_name=row.display_name,
+        description=row.description,
+        engine_unit_code=row.engine_unit_code,
+        is_builtin=row.is_builtin,
+        sort_order=row.sort_order,
+        unit_count=len(units),
+        alias_count=sum(len(unit.aliases) for unit in units),
+    )
+
+
+def _dimension_to_detail(row: UnitDimension) -> UnitDimensionDetail:
+    units = sorted(row.units, key=lambda item: (item.sort_order, item.id))
+    summary = _dimension_to_summary(row)
+    return UnitDimensionDetail(
+        **summary.model_dump(),
+        units=[_unit_to_item(unit) for unit in units],
+    )
+
+
+# ---------------------------------------------------------------------------
+# Measurement unit dictionary read-only API
+# ---------------------------------------------------------------------------
+
+@router.get('/unit-dimensions', response_model=list[UnitDimensionSummary])
+def list_unit_dimensions(request: Request) -> list[UnitDimensionSummary]:
+    manager = _require_open_project(request)
+    _ensure_measurement_units(manager)
+    with manager.get_session() as session:
+        rows = session.scalars(
+            select(UnitDimension).order_by(UnitDimension.sort_order.asc(), UnitDimension.id.asc())
+        ).all()
+        return [_dimension_to_summary(row) for row in rows]
+
+
+@router.get('/unit-dimensions/{dimension_code}', response_model=UnitDimensionDetail)
+def get_unit_dimension(dimension_code: str, request: Request) -> UnitDimensionDetail:
+    manager = _require_open_project(request)
+    _ensure_measurement_units(manager)
+    with manager.get_session() as session:
+        row = _require_unit_dimension(session, dimension_code)
+        return _dimension_to_detail(row)
+
+
+@router.get('/measurement-units', response_model=list[MeasurementUnitItem])
+def list_measurement_units(request: Request, dimension_code: str | None = None) -> list[MeasurementUnitItem]:
+    manager = _require_open_project(request)
+    _ensure_measurement_units(manager)
+    with manager.get_session() as session:
+        stmt = select(MeasurementUnit).order_by(
+            MeasurementUnit.dimension_code.asc(),
+            MeasurementUnit.sort_order.asc(),
+            MeasurementUnit.id.asc(),
+        )
+        if dimension_code is not None:
+            _require_unit_dimension(session, dimension_code)
+            stmt = stmt.where(MeasurementUnit.dimension_code == dimension_code)
+        rows = session.scalars(stmt).all()
+        return [_unit_to_item(row) for row in rows]
+
+
+@router.get('/measurement-unit-aliases', response_model=list[MeasurementUnitAliasItem])
+def list_measurement_unit_aliases(
+    request: Request,
+    dimension_code: str | None = None,
+    unit_code: str | None = None,
+) -> list[MeasurementUnitAliasItem]:
+    manager = _require_open_project(request)
+    _ensure_measurement_units(manager)
+    with manager.get_session() as session:
+        stmt = select(MeasurementUnitAlias).order_by(
+            MeasurementUnitAlias.dimension_code.asc(),
+            MeasurementUnitAlias.normalized_alias.asc(),
+            MeasurementUnitAlias.id.asc(),
+        )
+        if dimension_code is not None:
+            _require_unit_dimension(session, dimension_code)
+            stmt = stmt.where(MeasurementUnitAlias.dimension_code == dimension_code)
+        if unit_code is not None:
+            unit = session.scalar(select(MeasurementUnit).where(MeasurementUnit.code == unit_code))
+            if unit is None:
+                raise HTTPException(status_code=404, detail=f'Measurement unit not found: {unit_code}')
+            stmt = stmt.where(MeasurementUnitAlias.unit_code == unit_code)
+        rows = session.scalars(stmt).all()
+        return [_unit_alias_to_item(row) for row in rows]
 
 
 # ---------------------------------------------------------------------------
@@ -417,6 +770,10 @@ def create_compaction_preset(payload: CompactionPresetCreate, request: Request) 
             if source is None:
                 raise HTTPException(status_code=404, detail=f'Compaction preset not found: {payload.clone_from_id}')
 
+        _reject_unit_without_value(payload, 'density', 'density_unit')
+        _reject_unit_without_value(payload, 'porosity_surface', 'porosity_surface_unit')
+        _reject_unit_without_value(payload, 'compaction_coeff', 'compaction_coeff_unit')
+
         name = (payload.name if payload.name is not None else source.name if source is not None else '').strip()
         if not name:
             raise HTTPException(status_code=400, detail='Compaction preset name is required')
@@ -434,6 +791,16 @@ def create_compaction_preset(payload: CompactionPresetCreate, request: Request) 
         )
         if density is None or porosity_surface is None or compaction_coeff is None:
             raise HTTPException(status_code=400, detail='density, porosity_surface, and compaction_coeff are required')
+
+        density, porosity_surface, compaction_coeff = _normalize_compaction_values(
+            session,
+            density=density,
+            porosity_surface=porosity_surface,
+            compaction_coeff=compaction_coeff,
+            density_unit=payload.density_unit if payload.density is not None else None,
+            porosity_surface_unit=payload.porosity_surface_unit if payload.porosity_surface is not None else None,
+            compaction_coeff_unit=payload.compaction_coeff_unit if payload.compaction_coeff is not None else None,
+        )
 
         row = CompactionPreset(
             name=name,
@@ -465,6 +832,10 @@ def patch_compaction_preset(
         if row.is_builtin:
             raise HTTPException(status_code=403, detail='Built-in compaction preset cannot be edited')
 
+        _reject_unit_without_value(payload, 'density', 'density_unit')
+        _reject_unit_without_value(payload, 'porosity_surface', 'porosity_surface_unit')
+        _reject_unit_without_value(payload, 'compaction_coeff', 'compaction_coeff_unit')
+
         if payload.name is not None:
             next_name = payload.name.strip()
             if not next_name:
@@ -473,11 +844,29 @@ def patch_compaction_preset(
         if payload.description is not None:
             row.description = payload.description
         if payload.density is not None:
-            row.density = payload.density
+            row.density = _normalize_compaction_values(
+                session,
+                density=payload.density,
+                porosity_surface=0.0,
+                compaction_coeff=0.0,
+                density_unit=payload.density_unit,
+            )[0]
         if payload.porosity_surface is not None:
-            row.porosity_surface = payload.porosity_surface
+            row.porosity_surface = _normalize_compaction_values(
+                session,
+                density=0.0,
+                porosity_surface=payload.porosity_surface,
+                compaction_coeff=0.0,
+                porosity_surface_unit=payload.porosity_surface_unit,
+            )[1]
         if payload.compaction_coeff is not None:
-            row.compaction_coeff = payload.compaction_coeff
+            row.compaction_coeff = _normalize_compaction_values(
+                session,
+                density=0.0,
+                porosity_surface=0.0,
+                compaction_coeff=payload.compaction_coeff,
+                compaction_coeff_unit=payload.compaction_coeff_unit,
+            )[2]
 
         session.commit()
         session.refresh(row)
@@ -518,6 +907,7 @@ def list_curve_dictionary(request: Request) -> list[CurveDictionaryItem]:
 @router.get('/mnemonic-sets', response_model=list[CurveMnemonicSetSummary])
 def list_mnemonic_sets(request: Request) -> list[CurveMnemonicSetSummary]:
     manager = _require_open_project(request)
+    _ensure_mnemonic_sets(manager)
     with manager.get_session() as session:
         rows = session.scalars(
             select(CurveMnemonicSet).order_by(
@@ -534,12 +924,7 @@ def list_mnemonic_sets(request: Request) -> list[CurveMnemonicSetSummary]:
             ).all()
         )
         return [
-            CurveMnemonicSetSummary(
-                id=row.id,
-                name=row.name,
-                is_builtin=row.is_builtin,
-                entry_count=entry_counts.get(row.id, 0),
-            )
+            _mnemonic_set_summary_to_item(row, entry_counts.get(row.id, 0))
             for row in rows
         ]
 
@@ -547,10 +932,9 @@ def list_mnemonic_sets(request: Request) -> list[CurveMnemonicSetSummary]:
 @router.get('/mnemonic-sets/{set_id}', response_model=CurveMnemonicSetDetail)
 def get_mnemonic_set(set_id: int, request: Request) -> CurveMnemonicSetDetail:
     manager = _require_open_project(request)
+    _ensure_mnemonic_sets(manager)
     with manager.get_session() as session:
-        row = session.get(CurveMnemonicSet, set_id)
-        if row is None:
-            raise HTTPException(status_code=404, detail=f'Mnemonic set {set_id} not found')
+        row = _require_mnemonic_set(session, set_id)
         entries = session.scalars(
             select(CurveMnemonicEntry)
             .where(CurveMnemonicEntry.set_id == set_id)
@@ -561,20 +945,160 @@ def get_mnemonic_set(set_id: int, request: Request) -> CurveMnemonicSetDetail:
             name=row.name,
             is_builtin=row.is_builtin,
             entry_count=len(entries),
-            entries=[
-                CurveMnemonicEntryItem(
-                    id=e.id,
-                    pattern=e.pattern,
-                    is_regex=e.is_regex,
-                    priority=e.priority,
-                    family_code=e.family_code,
-                    canonical_mnemonic=e.canonical_mnemonic,
-                    canonical_unit=e.canonical_unit,
-                    is_active=e.is_active,
-                )
-                for e in entries
-            ],
+            entries=[_mnemonic_entry_to_item(entry) for entry in entries],
         )
+
+
+@router.post('/mnemonic-sets', response_model=CurveMnemonicSetSummary, status_code=201)
+def create_mnemonic_set(payload: CurveMnemonicSetCreate, request: Request) -> CurveMnemonicSetSummary:
+    manager = _require_open_project(request)
+    _ensure_mnemonic_sets(manager)
+    with manager.get_session() as session:
+        row = CurveMnemonicSet(
+            name=_normalize_mnemonic_set_name(payload.name),
+            is_builtin=False,
+            sort_order=_next_mnemonic_set_sort_order(session),
+        )
+        session.add(row)
+        session.commit()
+        session.refresh(row)
+        return _mnemonic_set_summary_to_item(row)
+
+
+@router.post('/mnemonic-sets/{set_id}/copy', response_model=CurveMnemonicSetSummary, status_code=201)
+def copy_mnemonic_set(set_id: int, request: Request) -> CurveMnemonicSetSummary:
+    manager = _require_open_project(request)
+    _ensure_mnemonic_sets(manager)
+    with manager.get_session() as session:
+        source = _require_mnemonic_set(session, set_id)
+        copied = CurveMnemonicSet(
+            name=f'{source.name} Copy',
+            is_builtin=False,
+            sort_order=_next_mnemonic_set_sort_order(session),
+        )
+        session.add(copied)
+        session.flush()
+
+        source_entries = session.scalars(
+            select(CurveMnemonicEntry)
+            .where(CurveMnemonicEntry.set_id == source.id)
+            .order_by(CurveMnemonicEntry.priority.desc(), CurveMnemonicEntry.id.asc())
+        ).all()
+        for entry in source_entries:
+            session.add(
+                CurveMnemonicEntry(
+                    set_id=copied.id,
+                    pattern=entry.pattern,
+                    is_regex=entry.is_regex,
+                    priority=entry.priority,
+                    family_code=entry.family_code,
+                    canonical_mnemonic=entry.canonical_mnemonic,
+                    canonical_unit=entry.canonical_unit,
+                    is_active=entry.is_active,
+                )
+            )
+
+        session.commit()
+        session.refresh(copied)
+        return _mnemonic_set_summary_to_item(copied, len(source_entries))
+
+
+@router.patch('/mnemonic-sets/{set_id}', response_model=CurveMnemonicSetSummary)
+def patch_mnemonic_set(set_id: int, payload: CurveMnemonicSetPatch, request: Request) -> CurveMnemonicSetSummary:
+    manager = _require_open_project(request)
+    _ensure_mnemonic_sets(manager)
+    with manager.get_session() as session:
+        row = _require_user_mnemonic_set(session, set_id)
+        if payload.name is not None:
+            row.name = _normalize_mnemonic_set_name(payload.name)
+        session.commit()
+        session.refresh(row)
+        return _mnemonic_set_summary_to_item(row)
+
+
+@router.delete('/mnemonic-sets/{set_id}', status_code=204)
+def delete_mnemonic_set(set_id: int, request: Request) -> None:
+    manager = _require_open_project(request)
+    _ensure_mnemonic_sets(manager)
+    with manager.get_session() as session:
+        row = _require_user_mnemonic_set(session, set_id)
+        session.delete(row)
+        session.commit()
+
+
+@router.post('/mnemonic-sets/{set_id}/entries', response_model=CurveMnemonicEntryItem, status_code=201)
+def create_mnemonic_set_entry(
+    set_id: int,
+    payload: CurveMnemonicEntryCreate,
+    request: Request,
+) -> CurveMnemonicEntryItem:
+    manager = _require_open_project(request)
+    _ensure_mnemonic_sets(manager)
+    with manager.get_session() as session:
+        _require_user_mnemonic_set(session, set_id)
+        pattern = _normalize_mnemonic_pattern(
+            payload.pattern if payload.pattern is not None else _next_generated_mnemonic_pattern(session, set_id),
+            payload.is_regex,
+        )
+        row = CurveMnemonicEntry(
+            set_id=set_id,
+            pattern=pattern,
+            is_regex=payload.is_regex,
+            priority=payload.priority,
+            family_code=_normalize_optional_string(payload.family_code),
+            canonical_mnemonic=_normalize_optional_string(payload.canonical_mnemonic),
+            canonical_unit=_normalize_optional_string(payload.canonical_unit),
+            is_active=payload.is_active,
+        )
+        session.add(row)
+        session.commit()
+        session.refresh(row)
+        return _mnemonic_entry_to_item(row)
+
+
+@router.patch('/mnemonic-sets/{set_id}/entries/{entry_id}', response_model=CurveMnemonicEntryItem)
+def patch_mnemonic_set_entry(
+    set_id: int,
+    entry_id: int,
+    payload: CurveMnemonicEntryPatch,
+    request: Request,
+) -> CurveMnemonicEntryItem:
+    manager = _require_open_project(request)
+    _ensure_mnemonic_sets(manager)
+    with manager.get_session() as session:
+        _require_user_mnemonic_set(session, set_id)
+        row = _require_mnemonic_entry(session, set_id, entry_id)
+
+        next_pattern = payload.pattern if 'pattern' in payload.model_fields_set else row.pattern
+        next_is_regex = payload.is_regex if payload.is_regex is not None else row.is_regex
+        if 'pattern' in payload.model_fields_set or payload.is_regex is not None:
+            row.pattern = _normalize_mnemonic_pattern(next_pattern, next_is_regex)
+            row.is_regex = next_is_regex
+        if payload.priority is not None:
+            row.priority = payload.priority
+        if 'family_code' in payload.model_fields_set:
+            row.family_code = _normalize_optional_string(payload.family_code)
+        if 'canonical_mnemonic' in payload.model_fields_set:
+            row.canonical_mnemonic = _normalize_optional_string(payload.canonical_mnemonic)
+        if 'canonical_unit' in payload.model_fields_set:
+            row.canonical_unit = _normalize_optional_string(payload.canonical_unit)
+        if payload.is_active is not None:
+            row.is_active = payload.is_active
+
+        session.commit()
+        session.refresh(row)
+        return _mnemonic_entry_to_item(row)
+
+
+@router.delete('/mnemonic-sets/{set_id}/entries/{entry_id}', status_code=204)
+def delete_mnemonic_set_entry(set_id: int, entry_id: int, request: Request) -> None:
+    manager = _require_open_project(request)
+    _ensure_mnemonic_sets(manager)
+    with manager.get_session() as session:
+        _require_user_mnemonic_set(session, set_id)
+        row = _require_mnemonic_entry(session, set_id, entry_id)
+        session.delete(row)
+        session.commit()
 
 
 @router.get('/lithology-dictionary', response_model=list[LithologyDictionaryItem])
@@ -918,12 +1442,34 @@ def patch_model_param(
         if param is None:
             raise HTTPException(status_code=404, detail=f'Param not found: {lithology_code!r}')
 
+        _reject_unit_without_value(payload, 'density', 'density_unit')
+        _reject_unit_without_value(payload, 'porosity_surface', 'porosity_surface_unit')
+        _reject_unit_without_value(payload, 'compaction_coeff', 'compaction_coeff_unit')
+
         if payload.density is not None:
-            param.density = payload.density
+            param.density = _normalize_compaction_values(
+                session,
+                density=payload.density,
+                porosity_surface=0.0,
+                compaction_coeff=0.0,
+                density_unit=payload.density_unit,
+            )[0]
         if payload.porosity_surface is not None:
-            param.porosity_surface = payload.porosity_surface
+            param.porosity_surface = _normalize_compaction_values(
+                session,
+                density=0.0,
+                porosity_surface=payload.porosity_surface,
+                compaction_coeff=0.0,
+                porosity_surface_unit=payload.porosity_surface_unit,
+            )[1]
         if payload.compaction_coeff is not None:
-            param.compaction_coeff = payload.compaction_coeff
+            param.compaction_coeff = _normalize_compaction_values(
+                session,
+                density=0.0,
+                porosity_surface=0.0,
+                compaction_coeff=payload.compaction_coeff,
+                compaction_coeff_unit=payload.compaction_coeff_unit,
+            )[2]
 
         session.flush()
         litho = session.scalar(

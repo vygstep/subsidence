@@ -3,12 +3,13 @@ import type { SelectedObject } from '@/stores/workspaceStore'
 import type {
   CompactionPresetSummary,
   CompactionModel,
-  CurveDictionaryEntry,
+  CurveMnemonicSetSummary,
   FormationTop,
   LithologyDictionaryEntry,
   LithologySetSummary,
   StratChartInfo,
   TrackConfig,
+  UnitDimensionSummary,
   Well,
 } from '@/types'
 
@@ -52,9 +53,12 @@ interface SettingsPaneShellProps {
   selectedCompactionModel: CompactionModel | null
   selectedCompactionPreset: CompactionPresetSummary | null
   compactionPresets: CompactionPresetSummary[]
+  mnemonicSets: CurveMnemonicSetSummary[]
+  selectedMnemonicSet: CurveMnemonicSetSummary | null
+  unitDimensions: UnitDimensionSummary[]
+  selectedUnitDimension: UnitDimensionSummary | null
   lithologySets: LithologySetSummary[]
   selectedLithologySet: LithologySetSummary | null
-  selectedCurveDictionaryEntry: CurveDictionaryEntry | null
   selectedLithologyDictionaryEntry: LithologyDictionaryEntry | null
   curveCount: number
   visibleCurveCount: number

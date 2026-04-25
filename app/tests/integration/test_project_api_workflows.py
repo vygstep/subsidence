@@ -3,10 +3,22 @@ from __future__ import annotations
 from pathlib import Path
 
 import pytest
+import pandas as pd
 from fastapi.testclient import TestClient
+from sqlalchemy import select as sa_select
 
 from subsidence.api.main import app
-from subsidence.data.schema import CurveMnemonicEntry, CurveMnemonicSet, LithologySet, LithologySetEntry
+from subsidence.data.schema import (
+    CurveMetadata,
+    CurveMnemonicEntry,
+    CurveMnemonicSet,
+    LithologySet,
+    LithologySetEntry,
+    MeasurementUnit,
+    MeasurementUnitAlias,
+    UnitDimension,
+)
+from subsidence.data.unit_registry import convert_values, convert_values_to_engine, resolve_unit
 
 
 @pytest.fixture
@@ -136,6 +148,77 @@ def test_logs_csv_import_supports_comma_and_tab_delimiters(api_client: TestClien
     assert [curve['mnemonic'] for curve in wells[0]['curves']] == ['GR', 'RT', 'CALI']
 
 
+def test_logs_csv_import_uses_unit_registry_for_depth_and_fraction_units(
+    api_client: TestClient,
+    tmp_path: Path,
+) -> None:
+    project_path = _create_project(api_client, tmp_path, 'csv-unit-registry')
+    csv_path = tmp_path / 'logs_units.csv'
+    csv_path.write_text(
+        'well_name,DEPT[ft],NPHI[%]\n'
+        'CSV Unit Well,100,35\n'
+        'CSV Unit Well,200,36\n'
+        'CSV Unit Well,300,37\n',
+        encoding='utf-8',
+    )
+
+    response = api_client.post('/api/projects/import-logs-csv', json={'csv_path': str(csv_path)})
+    assert response.status_code == 200, response.text
+
+    manager = app.state.project_manager
+    with manager.get_session() as session:
+        curve = session.scalar(sa_select(CurveMetadata).where(CurveMetadata.mnemonic == 'NPHI'))
+        assert curve is not None
+        assert curve.unit == 'v/v'
+        assert curve.original_unit == '%'
+        frame = pd.read_parquet(project_path / curve.data_uri)
+
+    assert frame['DEPT'].tolist() == pytest.approx([30.48, 60.96, 91.44])
+    assert frame['NPHI'].tolist() == pytest.approx([0.35, 0.36, 0.37])
+
+
+def test_curve_import_uses_unit_fallback_only_for_unambiguous_units(
+    api_client: TestClient,
+    tmp_path: Path,
+) -> None:
+    project_path = _create_project(api_client, tmp_path, 'curve-unit-fallback')
+    csv_path = tmp_path / 'logs_unit_fallback.csv'
+    csv_path.write_text(
+        'well_name,DEPT,BULK[kg/m3],MYSTERY[%],RTLIKE[ohm.m]\n'
+        'Unit Fallback Well,100,2350,35,12\n'
+        'Unit Fallback Well,200,2400,36,13\n'
+        'Unit Fallback Well,300,2450,37,14\n',
+        encoding='utf-8',
+    )
+
+    response = api_client.post('/api/projects/import-logs-csv', json={'csv_path': str(csv_path)})
+    assert response.status_code == 200, response.text
+
+    manager = app.state.project_manager
+    with manager.get_session() as session:
+        curves = {
+            curve.mnemonic: curve
+            for curve in session.scalars(sa_select(CurveMetadata)).all()
+        }
+
+        density = curves['BULK']
+        assert density.family_code == 'bulk_density'
+        assert density.standard_mnemonic is None
+        assert density.unit == 'kg/m3'
+        assert density.original_unit == 'kg/m3'
+        frame = pd.read_parquet(project_path / density.data_uri)
+
+        percent = curves['MYSTERY']
+        assert percent.family_code is None
+        assert percent.unit == '%'
+
+        resistivity = curves['RTLIKE']
+        assert resistivity.family_code is None
+        assert resistivity.unit == 'ohm.m'
+
+    assert frame['BULK'].tolist() == pytest.approx([2350.0, 2400.0, 2450.0])
+
+
 def test_las_import_auto_creates_well_and_survives_reopen(api_client: TestClient, tmp_path: Path):
     project_path = _create_project(api_client, tmp_path, 'las-import')
     las_path = _write_minimal_las(tmp_path / 'minimal.las')
@@ -160,6 +243,44 @@ def test_las_import_auto_creates_well_and_survives_reopen(api_client: TestClient
     assert [well['well_id'] for well in wells] == [well_id]
     assert wells[0]['well_name'] == 'LAS Well'
     assert [curve['mnemonic'] for curve in wells[0]['curves']] == ['GR', 'RHOB']
+
+
+def test_las_import_uses_unit_registry_for_depth_and_curve_units(api_client: TestClient, tmp_path: Path) -> None:
+    project_path = _create_project(api_client, tmp_path, 'las-unit-registry')
+    las_path = tmp_path / 'units.las'
+    las_path.write_text(
+        '~Version Information\n'
+        ' VERS. 2.0 : CWLS LOG ASCII STANDARD\n'
+        ' WRAP. NO  : One line per depth step\n'
+        '~Well Information\n'
+        ' STRT.FT 100.0 : Start depth\n'
+        ' STOP.FT 300.0 : Stop depth\n'
+        ' STEP.FT 100.0 : Step\n'
+        ' NULL. -999.25 : Null value\n'
+        ' WELL. Unit Well : Well name\n'
+        '~Curve Information\n'
+        ' DEPT.FT : Depth\n'
+        ' RHOB.KG/M3 : Bulk density\n'
+        '~ASCII\n'
+        '100.0 2350.0\n'
+        '200.0 2400.0\n'
+        '300.0 2450.0\n',
+        encoding='utf-8',
+    )
+
+    response = api_client.post('/api/projects/import-las', json={'las_path': str(las_path)})
+    assert response.status_code == 200, response.text
+
+    manager = app.state.project_manager
+    with manager.get_session() as session:
+        curve = session.scalar(sa_select(CurveMetadata).where(CurveMetadata.mnemonic == 'RHOB'))
+        assert curve is not None
+        assert curve.unit == 'g/cc'
+        assert curve.original_unit == 'KG/M3'
+        frame = pd.read_parquet(project_path / curve.data_uri)
+
+    assert frame['DEPT'].tolist() == pytest.approx([30.48, 60.96, 91.44])
+    assert frame['RHOB'].tolist() == pytest.approx([2.35, 2.4, 2.45])
 
 
 def test_tops_deviation_and_strat_chart_workflows(api_client: TestClient, tmp_path: Path):
@@ -302,6 +423,65 @@ def test_compaction_presets_seed_and_allow_user_duplicates(api_client: TestClien
     assert builtin['id'] in remaining_ids
     assert user_copy['id'] in remaining_ids
     assert custom['id'] not in remaining_ids
+
+
+def test_compaction_inputs_are_normalized_to_engine_units(api_client: TestClient, tmp_path: Path):
+    _create_project(api_client, tmp_path, 'compaction-unit-normalization')
+
+    response = api_client.post('/api/compaction-presets', json={
+        'name': 'Metric API Input',
+        'density': 2.65,
+        'density_unit': 'g/cc',
+        'porosity_surface': 35.0,
+        'porosity_surface_unit': 'percent',
+        'compaction_coeff': 0.00051,
+        'compaction_coeff_unit': 'm^-1',
+    })
+    assert response.status_code == 201, response.text
+    preset = response.json()
+    assert preset['density'] == pytest.approx(2650.0)
+    assert preset['porosity_surface'] == pytest.approx(0.35)
+    assert preset['compaction_coeff'] == pytest.approx(0.51)
+
+    response = api_client.patch(f"/api/compaction-presets/{preset['id']}", json={
+        'density': 2.72,
+        'density_unit': 'g/cm3',
+        'porosity_surface': 40.0,
+        'porosity_surface_unit': '%',
+    })
+    assert response.status_code == 200, response.text
+    updated = response.json()
+    assert updated['density'] == pytest.approx(2720.0)
+    assert updated['porosity_surface'] == pytest.approx(0.40)
+    assert updated['compaction_coeff'] == pytest.approx(0.51)
+
+    response = api_client.patch(f"/api/compaction-presets/{preset['id']}", json={'density_unit': 'g/cc'})
+    assert response.status_code == 400, response.text
+
+
+def test_compaction_model_params_are_normalized_to_engine_units(api_client: TestClient, tmp_path: Path):
+    _create_project(api_client, tmp_path, 'compaction-model-unit-normalization')
+
+    response = api_client.post('/api/compaction-models', json={'name': 'User model'})
+    assert response.status_code == 201, response.text
+    model = response.json()
+
+    response = api_client.patch(
+        f"/api/compaction-models/{model['id']}/params/shale",
+        json={
+            'density': 2.7,
+            'density_unit': 'g/cc',
+            'porosity_surface': 38.0,
+            'porosity_surface_unit': '%',
+            'compaction_coeff': 0.00049,
+            'compaction_coeff_unit': '1/m',
+        },
+    )
+    assert response.status_code == 200, response.text
+    param = response.json()
+    assert param['density'] == pytest.approx(2700.0)
+    assert param['porosity_surface'] == pytest.approx(0.38)
+    assert param['compaction_coeff'] == pytest.approx(0.49)
 
 
 def test_default_lithology_set_is_seeded(api_client: TestClient, tmp_path: Path):
@@ -564,6 +744,96 @@ def test_checkpoint_create_restore_delete(api_client: TestClient, tmp_path: Path
     assert all(item['id'] != before_restore_checkpoint_id for item in response.json())
 
 
+def test_measurement_units_seeded_on_project_create(api_client: TestClient, tmp_path: Path) -> None:
+    _create_project(api_client, tmp_path, 'measurement-units')
+
+    manager = app.state.project_manager
+    with manager.get_session() as session:
+        dimensions = {
+            row.code: row
+            for row in session.scalars(sa_select(UnitDimension)).all()
+        }
+        units = {
+            row.code: row
+            for row in session.scalars(sa_select(MeasurementUnit)).all()
+        }
+        aliases = session.scalars(sa_select(MeasurementUnitAlias)).all()
+
+        assert dimensions['depth'].engine_unit_code == 'depth_m'
+        assert dimensions['density'].engine_unit_code == 'density_kg_m3'
+        assert dimensions['fraction'].engine_unit_code == 'fraction_vv'
+        assert dimensions['compaction_coeff'].engine_unit_code == 'compaction_km_inv'
+
+        assert units['depth_ft'].to_engine_factor == pytest.approx(0.3048)
+        assert units['density_g_cc'].to_engine_factor == pytest.approx(1000.0)
+        assert units['fraction_percent'].to_engine_factor == pytest.approx(0.01)
+        assert units['compaction_m_inv'].to_engine_factor == pytest.approx(1000.0)
+        assert len(aliases) >= len(units)
+
+
+def test_unit_registry_resolves_by_dimension_and_converts_to_engine(
+    api_client: TestClient,
+    tmp_path: Path,
+) -> None:
+    _create_project(api_client, tmp_path, 'unit-registry')
+
+    manager = app.state.project_manager
+    with manager.get_session() as session:
+        assert resolve_unit(session, 'm') is None
+
+        depth_ft = resolve_unit(session, 'FT', 'depth')
+        depth_m = resolve_unit(session, 'm', 'depth')
+        density_g_cc = resolve_unit(session, 'g/cm3', 'density')
+        fraction_percent = resolve_unit(session, '%', 'fraction')
+        compaction_m_inv = resolve_unit(session, '1/m', 'compaction_coeff')
+
+        assert depth_ft is not None
+        assert depth_m is not None
+        assert density_g_cc is not None
+        assert fraction_percent is not None
+        assert compaction_m_inv is not None
+
+        assert convert_values_to_engine([10.0], depth_ft) == pytest.approx([3.048])
+        assert convert_values([3.048], depth_m, depth_ft) == pytest.approx([10.0])
+        assert convert_values_to_engine([2.65], density_g_cc) == pytest.approx([2650.0])
+        assert convert_values_to_engine([35.0], fraction_percent) == pytest.approx([0.35])
+        assert convert_values_to_engine([0.00051], compaction_m_inv) == pytest.approx([0.51])
+
+
+def test_measurement_unit_read_api(api_client: TestClient, tmp_path: Path) -> None:
+    _create_project(api_client, tmp_path, 'unit-api')
+
+    response = api_client.get('/api/unit-dimensions')
+    assert response.status_code == 200, response.text
+    dimensions = response.json()
+    density_dimension = next(item for item in dimensions if item['code'] == 'density')
+    assert density_dimension['engine_unit_code'] == 'density_kg_m3'
+    assert density_dimension['unit_count'] >= 2
+    assert density_dimension['alias_count'] >= 2
+
+    response = api_client.get('/api/unit-dimensions/density')
+    assert response.status_code == 200, response.text
+    density_detail = response.json()
+    unit_codes = {unit['code'] for unit in density_detail['units']}
+    assert {'density_kg_m3', 'density_g_cc'} <= unit_codes
+    g_cc = next(unit for unit in density_detail['units'] if unit['code'] == 'density_g_cc')
+    assert g_cc['to_engine_factor'] == pytest.approx(1000.0)
+    assert any(alias['normalized_alias'] == 'g/cm3' for alias in g_cc['aliases'])
+
+    response = api_client.get('/api/measurement-units?dimension_code=fraction')
+    assert response.status_code == 200, response.text
+    fraction_units = response.json()
+    assert {unit['code'] for unit in fraction_units} == {'fraction_vv', 'fraction_percent'}
+
+    response = api_client.get('/api/measurement-unit-aliases?unit_code=depth_ft')
+    assert response.status_code == 200, response.text
+    aliases = response.json()
+    assert {alias['normalized_alias'] for alias in aliases} >= {'ft', 'foot', 'feet'}
+
+    response = api_client.get('/api/unit-dimensions/nope')
+    assert response.status_code == 404, response.text
+
+
 def test_mnemonic_sets_seeded_on_project_create(api_client: TestClient, tmp_path: Path) -> None:
     _create_project(api_client, tmp_path)
 
@@ -602,9 +872,169 @@ def test_mnemonic_set_seed_is_idempotent(api_client: TestClient, tmp_path: Path)
 
     manager = app.state.project_manager
     with manager.get_session() as session:
-        from sqlalchemy import select as sa_select
         set_count = len(session.scalars(sa_select(CurveMnemonicSet).where(CurveMnemonicSet.is_builtin.is_(True))).all())
         assert set_count == 1
         entry_count_first = builtin[0]['entry_count']
         actual_count = len(session.scalars(sa_select(CurveMnemonicEntry)).all())
         assert actual_count == entry_count_first
+
+
+def test_mnemonic_set_user_crud(api_client: TestClient, tmp_path: Path) -> None:
+    _create_project(api_client, tmp_path, 'mnemonic-set-crud')
+
+    response = api_client.get('/api/mnemonic-sets')
+    assert response.status_code == 200, response.text
+    default_set = next(item for item in response.json() if item['is_builtin'])
+
+    response = api_client.post('/api/mnemonic-sets', json={'name': 'Project Mnemonics'})
+    assert response.status_code == 201, response.text
+    created = response.json()
+    assert created['name'] == 'Project Mnemonics'
+    assert created['is_builtin'] is False
+    assert created['entry_count'] == 0
+
+    response = api_client.patch(f"/api/mnemonic-sets/{default_set['id']}", json={'name': 'Nope'})
+    assert response.status_code == 403, response.text
+
+    response = api_client.delete(f"/api/mnemonic-sets/{default_set['id']}")
+    assert response.status_code == 403, response.text
+
+    response = api_client.post(f"/api/mnemonic-sets/{default_set['id']}/copy")
+    assert response.status_code == 201, response.text
+    copied = response.json()
+    assert copied['name'] == 'Default Mnemonics Copy'
+    assert copied['is_builtin'] is False
+    assert copied['entry_count'] == default_set['entry_count']
+
+    response = api_client.get(f"/api/mnemonic-sets/{copied['id']}")
+    assert response.status_code == 200, response.text
+    copied_detail = response.json()
+    assert len(copied_detail['entries']) == default_set['entry_count']
+
+    response = api_client.patch(f"/api/mnemonic-sets/{created['id']}", json={'name': 'Edited Mnemonics'})
+    assert response.status_code == 200, response.text
+    assert response.json()['name'] == 'Edited Mnemonics'
+
+    response = api_client.post(f"/api/mnemonic-sets/{default_set['id']}/entries", json={'pattern': 'NOPE'})
+    assert response.status_code == 403, response.text
+
+    response = api_client.post(f"/api/mnemonic-sets/{created['id']}/entries", json={'pattern': '  '})
+    assert response.status_code == 400, response.text
+
+    response = api_client.post(
+        f"/api/mnemonic-sets/{created['id']}/entries",
+        json={'pattern': '[', 'is_regex': True},
+    )
+    assert response.status_code == 400, response.text
+
+    response = api_client.post(
+        f"/api/mnemonic-sets/{created['id']}/entries",
+        json={
+            'pattern': 'CALX',
+            'priority': 50,
+            'family_code': 'caliper',
+            'canonical_mnemonic': 'CALI',
+            'canonical_unit': 'in',
+        },
+    )
+    assert response.status_code == 201, response.text
+    entry = response.json()
+    assert entry['pattern'] == 'CALX'
+    assert entry['family_code'] == 'caliper'
+
+    response = api_client.patch(
+        f"/api/mnemonic-sets/{created['id']}/entries/{entry['id']}",
+        json={'pattern': 'CAL.*', 'is_regex': True, 'is_active': False},
+    )
+    assert response.status_code == 200, response.text
+    edited_entry = response.json()
+    assert edited_entry['pattern'] == 'CAL.*'
+    assert edited_entry['is_regex'] is True
+    assert edited_entry['is_active'] is False
+
+    response = api_client.patch(
+        f"/api/mnemonic-sets/{created['id']}/entries/{entry['id']}",
+        json={'pattern': '[', 'is_regex': True},
+    )
+    assert response.status_code == 400, response.text
+
+    response = api_client.delete(f"/api/mnemonic-sets/{created['id']}/entries/{entry['id']}")
+    assert response.status_code == 204, response.text
+
+    response = api_client.delete(f"/api/mnemonic-sets/{created['id']}")
+    assert response.status_code == 204, response.text
+
+    response = api_client.get('/api/mnemonic-sets')
+    assert response.status_code == 200, response.text
+    remaining_ids = {item['id'] for item in response.json()}
+    assert default_set['id'] in remaining_ids
+    assert copied['id'] in remaining_ids
+    assert created['id'] not in remaining_ids
+
+
+def test_mnemonic_resolver_prefers_user_set_over_builtin(api_client: TestClient, tmp_path: Path) -> None:
+    _create_project(api_client, tmp_path, 'mnemonic-override')
+
+    response = api_client.post('/api/mnemonic-sets', json={'name': 'Project Mnemonics'})
+    assert response.status_code == 201, response.text
+    user_set = response.json()
+
+    response = api_client.post(
+        f"/api/mnemonic-sets/{user_set['id']}/entries",
+        json={
+            'pattern': 'GR',
+            'priority': 1,
+            'family_code': 'caliper',
+            'canonical_mnemonic': 'CALI',
+            'canonical_unit': 'in',
+        },
+    )
+    assert response.status_code == 201, response.text
+
+    csv_path = tmp_path / 'logs_override.csv'
+    csv_path.write_text(
+        'well_name,DEPT,GR\n'
+        'Override Well,100,8.5\n'
+        'Override Well,200,8.6\n',
+        encoding='utf-8',
+    )
+    response = api_client.post('/api/projects/import-logs-csv', json={'csv_path': str(csv_path)})
+    assert response.status_code == 200, response.text
+
+    manager = app.state.project_manager
+    with manager.get_session() as session:
+        curve = session.scalar(sa_select(CurveMetadata).where(CurveMetadata.mnemonic == 'GR'))
+        assert curve is not None
+        assert curve.family_code == 'caliper'
+        assert curve.standard_mnemonic == 'CALI'
+        assert curve.unit == 'in'
+
+
+def test_invalid_user_regex_does_not_break_mnemonic_resolver(api_client: TestClient, tmp_path: Path) -> None:
+    _create_project(api_client, tmp_path, 'mnemonic-invalid-regex')
+
+    manager = app.state.project_manager
+    with manager.get_session() as session:
+        user_set = CurveMnemonicSet(name='Broken Regex Set', is_builtin=False, sort_order=-10)
+        session.add(user_set)
+        session.flush()
+        session.add(
+            CurveMnemonicEntry(
+                set_id=user_set.id,
+                pattern='[',
+                is_regex=True,
+                priority=999,
+                family_code='broken',
+                canonical_mnemonic='BROKEN',
+                canonical_unit='broken',
+                is_active=True,
+            )
+        )
+        session.commit()
+
+    response = api_client.get('/api/projects/dictionary/curves/match?mnemonic=GR')
+    assert response.status_code == 200, response.text
+    payload = response.json()
+    assert payload['matched'] is True
+    assert payload['family_code'] == 'gamma_ray'
+    assert payload['canonical_mnemonic'] == 'GR'

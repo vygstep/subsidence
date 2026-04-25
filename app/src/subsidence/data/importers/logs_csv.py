@@ -6,8 +6,8 @@ from pathlib import Path
 
 from sqlalchemy.orm import Session
 
-from ..dict_resolver import load_curve_alias_rules, resolve_curve_alias
-from ..unit_conversion import canonicalize_gamma_unit, convert_curve_units, normalize_unit_name
+from ..dict_resolver import load_curve_alias_rules, resolve_curve_alias_with_unit
+from ..unit_registry import convert_curve_values_to_target, convert_depth_values_to_meters
 from .common import (
     DEFAULT_WELL_KB,
     DEFAULT_WELL_NAME,
@@ -49,14 +49,16 @@ def _detect_log_csv_depth_column(fieldnames: list[str], explicit_depth_column: s
             return candidate
         lowered = candidate.casefold()
         for field in fieldnames:
-            if field.casefold() == lowered:
+            mnemonic, _unit = _header_curve_parts(field)
+            if field.casefold() == lowered or mnemonic.casefold() == lowered:
                 return field
         raise ValueError(f'CSV log file is missing explicit depth column: {explicit_depth_column}')
 
     for mnemonic in _DEPTH_MNEMONICS:
         lowered = mnemonic.casefold()
         for field in fieldnames:
-            if field.casefold() == lowered:
+            parsed_mnemonic, _unit = _header_curve_parts(field)
+            if field.casefold() == lowered or parsed_mnemonic.casefold() == lowered:
                 return field
     raise ValueError('CSV log file must contain a depth column: DEPT, DEPTH, MD, TVD, or TVDSS')
 
@@ -97,7 +99,9 @@ def import_logs_csv(
         raise ValueError(f'{source_path}: log CSV is empty')
 
     resolved_depth_column = _detect_log_csv_depth_column(fieldnames, depth_column)
-    depths = _validate_strictly_increasing_depth(rows, resolved_depth_column, source_path)
+    raw_depths = _validate_strictly_increasing_depth(rows, resolved_depth_column, source_path)
+    _depth_mnemonic, depth_unit = _header_curve_parts(resolved_depth_column)
+    depths = convert_depth_values_to_meters(session, raw_depths, depth_unit or 'm')
     final_depth = depths[-1] if depths else None
     well = _resolve_or_create_well_for_logs(session, rows, well_id=well_id, td=final_depth, create_new_well=create_new_well)
     apply_imported_well_metadata(well, td=final_depth)
@@ -130,18 +134,21 @@ def import_logs_csv(
 
         clean_depths = sorted(clean_pairs)
         clean_values = [clean_pairs[depth] for depth in clean_depths]
-        match = resolve_curve_alias(mnemonic, rules)
+        match = resolve_curve_alias_with_unit(session, mnemonic, source_unit, rules)
         family_code = match.family_code
         standard_mnemonic = match.canonical_mnemonic
         target_unit = match.canonical_unit or source_unit
 
-        if family_code == 'gamma_ray':
-            target_unit = canonicalize_gamma_unit(target_unit)
-
         values = clean_values
-        if source_unit and target_unit and normalize_unit_name(source_unit) != normalize_unit_name(target_unit):
+        if source_unit and target_unit:
             try:
-                values = convert_curve_units(values, source_unit, target_unit, family_code)
+                values, target_unit = convert_curve_values_to_target(
+                    session,
+                    values,
+                    source_unit,
+                    target_unit,
+                    family_code,
+                )
             except ValueError:
                 target_unit = source_unit
 

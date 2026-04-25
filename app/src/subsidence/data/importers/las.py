@@ -5,8 +5,8 @@ from pathlib import Path
 import lasio
 from sqlalchemy.orm import Session
 
-from ..dict_resolver import load_curve_alias_rules, resolve_curve_alias
-from ..unit_conversion import canonicalize_gamma_unit, convert_curve_units, convert_depth_to_meters, normalize_unit_name
+from ..dict_resolver import load_curve_alias_rules, resolve_curve_alias_with_unit
+from ..unit_registry import convert_curve_values_to_target, convert_depth_values_to_meters
 from .common import (
     DEFAULT_WELL_CRS,
     DEFAULT_WELL_KB,
@@ -83,7 +83,7 @@ def import_las_file(
 
     las = lasio.read(str(source_path))
     depth_unit = (las.curves[0].unit or 'm').strip()
-    depth_values = convert_depth_to_meters([float(value) for value in las.index], depth_unit)
+    depth_values = convert_depth_values_to_meters(session, [float(value) for value in las.index], depth_unit)
     final_depth = max(depth_values) if depth_values else None
     null_value = _coerce_float(getattr(las.well.get('NULL'), 'value', None))
     rules = load_curve_alias_rules(session)
@@ -167,18 +167,21 @@ def import_las_file(
         clean_depths = sorted(clean_pairs)
         clean_values = [clean_pairs[depth] for depth in clean_depths]
         source_unit = (curve.unit or '').strip()
-        match = resolve_curve_alias(mnemonic, rules)
+        match = resolve_curve_alias_with_unit(session, mnemonic, source_unit, rules)
         family_code = match.family_code
         standard_mnemonic = match.canonical_mnemonic
         target_unit = match.canonical_unit or source_unit
 
-        if family_code == 'gamma_ray':
-            target_unit = canonicalize_gamma_unit(target_unit)
-
         values = clean_values
-        if source_unit and target_unit and normalize_unit_name(source_unit) != normalize_unit_name(target_unit):
+        if source_unit and target_unit:
             try:
-                values = convert_curve_units(values, source_unit, target_unit, family_code)
+                values, target_unit = convert_curve_values_to_target(
+                    session,
+                    values,
+                    source_unit,
+                    target_unit,
+                    family_code,
+                )
             except ValueError:
                 target_unit = source_unit
 

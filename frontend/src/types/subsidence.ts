@@ -43,9 +43,15 @@ export interface CompactionPresetDetail extends CompactionPresetSummary {
   compaction_coeff: number
 }
 
-export interface CurveDictionaryEntry {
+export interface CurveMnemonicSetSummary {
   id: number
-  scope: string
+  name: string
+  is_builtin: boolean
+  entry_count: number
+}
+
+export interface CurveMnemonicEntryItem {
+  id: number
   pattern: string
   is_regex: boolean
   priority: number
@@ -53,6 +59,50 @@ export interface CurveDictionaryEntry {
   canonical_mnemonic: string | null
   canonical_unit: string | null
   is_active: boolean
+}
+
+export interface CurveMnemonicSetDetail extends CurveMnemonicSetSummary {
+  entries: CurveMnemonicEntryItem[]
+}
+
+export interface MeasurementUnitAliasItem {
+  id: number
+  dimension_code: string
+  unit_code: string
+  alias: string
+  normalized_alias: string
+  is_builtin: boolean
+  is_active: boolean
+}
+
+export interface MeasurementUnitItem {
+  id: number
+  code: string
+  dimension_code: string
+  symbol: string
+  display_name: string
+  to_engine_factor: number
+  to_engine_offset: number
+  is_builtin: boolean
+  is_active: boolean
+  sort_order: number
+  aliases: MeasurementUnitAliasItem[]
+}
+
+export interface UnitDimensionSummary {
+  id: number
+  code: string
+  display_name: string
+  description: string | null
+  engine_unit_code: string
+  is_builtin: boolean
+  sort_order: number
+  unit_count: number
+  alias_count: number
+}
+
+export interface UnitDimensionDetail extends UnitDimensionSummary {
+  units: MeasurementUnitItem[]
 }
 
 export interface LithologyDictionaryEntry {

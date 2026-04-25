@@ -4,7 +4,13 @@ import { describe, expect, it, vi } from 'vitest'
 import { DataManagerProvider } from '@/components/layout/dataManager/DataManagerContext'
 import { TemplatesTab } from '@/components/layout/TemplatesTab'
 import { WellDataPanel } from '@/components/layout/WellDataPanel'
-import type { CompactionPresetSummary, CurveDictionaryEntry, LithologySetSummary, WellInventory } from '@/types'
+import type {
+  CompactionPresetSummary,
+  CurveMnemonicSetSummary,
+  LithologySetSummary,
+  UnitDimensionSummary,
+  WellInventory,
+} from '@/types'
 
 function createWellInventory(overrides: Partial<WellInventory>): WellInventory {
   return {
@@ -86,28 +92,46 @@ const builtinPreset: CompactionPresetSummary = {
 const userPreset: CompactionPresetSummary = {
   id: 2, name: 'Custom', origin: 'user', is_builtin: false, source_lithology_code: null,
 }
-const curveEntry: CurveDictionaryEntry = {
-  id: 1, scope: 'global', pattern: 'GR', is_regex: false, priority: 1,
-  family_code: 'gamma_ray', canonical_mnemonic: 'GR', canonical_unit: 'API', is_active: true,
+const mnemonicSet: CurveMnemonicSetSummary = {
+  id: 1, name: 'Default Mnemonics', is_builtin: true, entry_count: 12,
 }
 const lithologySet: LithologySetSummary = {
   id: 1, name: 'Default', is_builtin: true, entry_count: 5,
+}
+const unitDimension: UnitDimensionSummary = {
+  id: 1,
+  code: 'density',
+  display_name: 'Density',
+  description: 'Density values',
+  engine_unit_code: 'density_kg_m3',
+  is_builtin: true,
+  sort_order: 30,
+  unit_count: 2,
+  alias_count: 5,
 }
 
 function renderTemplatesTab(overrides: Partial<React.ComponentProps<typeof TemplatesTab>> = {}) {
   const props: React.ComponentProps<typeof TemplatesTab> = {
     compactionPresets: [builtinPreset, userPreset],
-    curveDictionaryEntries: [curveEntry],
+    mnemonicSets: [mnemonicSet],
+    unitDimensions: [unitDimension],
     lithologySets: [lithologySet],
     isCompactionPresetsRootSelected: false,
+    isCurveMnemonicsRootSelected: false,
+    isMeasurementUnitsRootSelected: false,
     isLithologiesRootSelected: false,
     selectedCompactionPresetId: null,
-    selectedCurveDictionaryEntryId: null,
+    selectedMnemonicSetId: null,
+    selectedUnitDimensionCode: null,
     selectedLithologySetId: null,
     onCreateCompactionPresetDraft: vi.fn(),
+    onCreateMnemonicSet: vi.fn(),
     onSelectCompactionPresetsRoot: vi.fn(),
     onSelectCompactionPreset: vi.fn(),
-    onSelectCurveDictionaryEntry: vi.fn(),
+    onSelectCurveMnemonicsRoot: vi.fn(),
+    onSelectMnemonicSet: vi.fn(),
+    onSelectMeasurementUnitsRoot: vi.fn(),
+    onSelectUnitDimension: vi.fn(),
     onSelectLithologiesRoot: vi.fn(),
     onSelectLithologySet: vi.fn(),
     ...overrides,
@@ -127,7 +151,8 @@ describe('Data Manager templates tree', () => {
     renderTemplatesTab()
 
     expect(screen.queryByText('Custom')).toBeNull()
-    expect(screen.queryByText('GR')).toBeNull()
+    expect(screen.queryByText('Default Mnemonics')).toBeNull()
+    expect(screen.queryByText('Density')).toBeNull()
     expect(screen.queryByText('Default')).toBeNull()
   })
 
@@ -148,11 +173,42 @@ describe('Data Manager templates tree', () => {
     const { props } = renderTemplatesTab()
 
     const expandButtons = screen.getAllByLabelText('Expand')
-    fireEvent.click(expandButtons[2])
+    fireEvent.click(expandButtons[3])
 
     expect(screen.getByText('Default')).toBeTruthy()
     fireEvent.click(screen.getByText('Default'))
     expect(props.onSelectLithologySet).toHaveBeenCalledWith(1)
+  })
+
+  it('expands measurement units and fires dimension selection callback', () => {
+    const { props } = renderTemplatesTab()
+
+    const expandButtons = screen.getAllByLabelText('Expand')
+    fireEvent.click(expandButtons[2])
+
+    expect(screen.getByText('Density')).toBeTruthy()
+    fireEvent.click(screen.getByText('Density'))
+    expect(props.onSelectUnitDimension).toHaveBeenCalledWith('density')
+  })
+
+  it('expands curve mnemonics and fires selection callback', () => {
+    const { props } = renderTemplatesTab()
+
+    const expandButtons = screen.getAllByLabelText('Expand')
+    fireEvent.click(expandButtons[1])
+
+    expect(screen.getByText('Default Mnemonics')).toBeTruthy()
+    fireEvent.click(screen.getByText('Default Mnemonics'))
+    expect(props.onSelectMnemonicSet).toHaveBeenCalledWith(1)
+  })
+
+  it('curve mnemonics exposes new set action', () => {
+    const { props } = renderTemplatesTab()
+
+    fireEvent.click(screen.getAllByLabelText('Expand')[1])
+    fireEvent.click(screen.getByText('+ New set'))
+
+    expect(props.onCreateMnemonicSet).toHaveBeenCalledOnce()
   })
 
   it('expanding one section does not expand siblings', () => {
@@ -181,17 +237,25 @@ describe('Data Manager templates tree', () => {
       <DataManagerProvider>
         <TemplatesTab
           compactionPresets={[builtinPreset, userPreset]}
-          curveDictionaryEntries={[curveEntry]}
+          mnemonicSets={[mnemonicSet]}
+          unitDimensions={[unitDimension]}
           lithologySets={[lithologySet]}
           isCompactionPresetsRootSelected={false}
+          isCurveMnemonicsRootSelected={false}
+          isMeasurementUnitsRootSelected={false}
           isLithologiesRootSelected={false}
           selectedCompactionPresetId={2}
-          selectedCurveDictionaryEntryId={null}
+          selectedMnemonicSetId={null}
+          selectedUnitDimensionCode={null}
           selectedLithologySetId={null}
           onCreateCompactionPresetDraft={vi.fn()}
+          onCreateMnemonicSet={vi.fn()}
           onSelectCompactionPresetsRoot={vi.fn()}
           onSelectCompactionPreset={vi.fn()}
-          onSelectCurveDictionaryEntry={vi.fn()}
+          onSelectCurveMnemonicsRoot={vi.fn()}
+          onSelectMnemonicSet={vi.fn()}
+          onSelectMeasurementUnitsRoot={vi.fn()}
+          onSelectUnitDimension={vi.fn()}
           onSelectLithologiesRoot={vi.fn()}
           onSelectLithologySet={vi.fn()}
         />

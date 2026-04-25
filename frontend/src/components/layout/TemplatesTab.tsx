@@ -1,23 +1,32 @@
 import { useDataManager } from './dataManager/DataManagerContext'
 import type {
   CompactionPresetSummary,
-  CurveDictionaryEntry,
+  CurveMnemonicSetSummary,
   LithologySetSummary,
+  UnitDimensionSummary,
 } from '@/types'
 
 interface TemplatesTabProps {
-  curveDictionaryEntries: CurveDictionaryEntry[]
+  mnemonicSets: CurveMnemonicSetSummary[]
+  unitDimensions: UnitDimensionSummary[]
   lithologySets: LithologySetSummary[]
   compactionPresets: CompactionPresetSummary[]
   isCompactionPresetsRootSelected: boolean
+  isCurveMnemonicsRootSelected: boolean
   isLithologiesRootSelected: boolean
+  isMeasurementUnitsRootSelected: boolean
   selectedCompactionPresetId: number | null
-  selectedCurveDictionaryEntryId: number | null
+  selectedMnemonicSetId: number | null
+  selectedUnitDimensionCode: string | null
   selectedLithologySetId: number | null
   onCreateCompactionPresetDraft: () => void
+  onCreateMnemonicSet: () => void
   onSelectCompactionPresetsRoot: () => void
   onSelectCompactionPreset: (presetId: number) => void
-  onSelectCurveDictionaryEntry: (entryId: number) => void
+  onSelectCurveMnemonicsRoot: () => void
+  onSelectMnemonicSet: (setId: number) => void
+  onSelectMeasurementUnitsRoot: () => void
+  onSelectUnitDimension: (dimensionCode: string) => void
   onSelectLithologiesRoot: () => void
   onSelectLithologySet: (setId: number) => void
 }
@@ -27,18 +36,26 @@ function CountBadge({ count }: { count: number }) {
 }
 
 export function TemplatesTab({
-  curveDictionaryEntries,
+  mnemonicSets,
+  unitDimensions,
   lithologySets,
   compactionPresets,
   isCompactionPresetsRootSelected,
+  isCurveMnemonicsRootSelected,
   isLithologiesRootSelected,
+  isMeasurementUnitsRootSelected,
   selectedCompactionPresetId,
-  selectedCurveDictionaryEntryId,
+  selectedMnemonicSetId,
+  selectedUnitDimensionCode,
   selectedLithologySetId,
   onCreateCompactionPresetDraft,
+  onCreateMnemonicSet,
   onSelectCompactionPresetsRoot,
   onSelectCompactionPreset,
-  onSelectCurveDictionaryEntry,
+  onSelectCurveMnemonicsRoot,
+  onSelectMnemonicSet,
+  onSelectMeasurementUnitsRoot,
+  onSelectUnitDimension,
   onSelectLithologiesRoot,
   onSelectLithologySet,
 }: TemplatesTabProps) {
@@ -57,7 +74,7 @@ export function TemplatesTab({
               onClick={() => toggleExpanded('template:compaction-presets')}
               aria-label={isExpanded('template:compaction-presets') ? 'Collapse' : 'Expand'}
             >
-              ▸
+              &gt;
             </button>
             <button
               type="button"
@@ -98,50 +115,86 @@ export function TemplatesTab({
 
         {/* Curve Mnemonics */}
         <div className="tree-node">
-          <div className="tree-node__row">
+          <div className={`tree-node__row ${isCurveMnemonicsRootSelected ? 'tree-node__row--selected' : ''}`}>
             <button
               type="button"
               className={`tree-toggle ${isExpanded('template:curve-mnemonics') ? 'tree-toggle--open' : ''}`}
               onClick={() => toggleExpanded('template:curve-mnemonics')}
               aria-label={isExpanded('template:curve-mnemonics') ? 'Collapse' : 'Expand'}
             >
-              ▸
+              &gt;
             </button>
-            <button type="button" className="tree-node__section-label">
+            <button
+              type="button"
+              className="tree-node__section-label"
+              onClick={onSelectCurveMnemonicsRoot}
+            >
               Curve Mnemonics
             </button>
-            <CountBadge count={curveDictionaryEntries.length} />
+            <CountBadge count={mnemonicSets.length} />
           </div>
           {isExpanded('template:curve-mnemonics') ? (
             <div className="tree-node__children">
-              <div className="dm-table-wrapper">
-                <table className="dm-table">
-                  <thead>
-                    <tr>
-                      <th>Pattern</th>
-                      <th>Scope</th>
-                      <th>Family</th>
-                      <th>Canonical</th>
-                      <th>Unit</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {curveDictionaryEntries.map((entry) => (
-                      <tr
-                        key={entry.id}
-                        className={selectedCurveDictionaryEntryId === entry.id ? 'dm-table__row--selected' : ''}
-                        onClick={() => onSelectCurveDictionaryEntry(entry.id)}
-                      >
-                        <td>{entry.pattern}</td>
-                        <td>{entry.scope}</td>
-                        <td>{entry.family_code ?? '-'}</td>
-                        <td>{entry.canonical_mnemonic ?? '-'}</td>
-                        <td>{entry.canonical_unit ?? '-'}</td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
+              {mnemonicSets.map((set) => (
+                <div
+                  key={set.id}
+                  className={selectedMnemonicSetId === set.id ? 'tree-node__item-selected' : ''}
+                  onClick={() => onSelectMnemonicSet(set.id)}
+                >
+                  <div className="tree-checkbox-leaf">
+                    <span className="tree-checkbox-leaf__label">{set.name}</span>
+                    <span className="tree-checkbox-leaf__meta">{set.is_builtin ? 'built-in' : set.entry_count}</span>
+                  </div>
+                </div>
+              ))}
+              <button
+                type="button"
+                className="dm-action dm-action--primary"
+                onClick={(event) => {
+                  event.stopPropagation()
+                  onCreateMnemonicSet()
+                }}
+              >
+                + New set
+              </button>
+            </div>
+          ) : null}
+        </div>
+
+        {/* Measurement Units */}
+        <div className="tree-node">
+          <div className={`tree-node__row ${isMeasurementUnitsRootSelected ? 'tree-node__row--selected' : ''}`}>
+            <button
+              type="button"
+              className={`tree-toggle ${isExpanded('template:measurement-units') ? 'tree-toggle--open' : ''}`}
+              onClick={() => toggleExpanded('template:measurement-units')}
+              aria-label={isExpanded('template:measurement-units') ? 'Collapse' : 'Expand'}
+            >
+              &gt;
+            </button>
+            <button
+              type="button"
+              className="tree-node__section-label"
+              onClick={onSelectMeasurementUnitsRoot}
+            >
+              Measurement Units
+            </button>
+            <CountBadge count={unitDimensions.length} />
+          </div>
+          {isExpanded('template:measurement-units') ? (
+            <div className="tree-node__children">
+              {unitDimensions.map((dimension) => (
+                <div
+                  key={dimension.code}
+                  className={selectedUnitDimensionCode === dimension.code ? 'tree-node__item-selected' : ''}
+                  onClick={() => onSelectUnitDimension(dimension.code)}
+                >
+                  <div className="tree-checkbox-leaf">
+                    <span className="tree-checkbox-leaf__label">{dimension.display_name}</span>
+                    <span className="tree-checkbox-leaf__meta">{dimension.unit_count}</span>
+                  </div>
+                </div>
+              ))}
             </div>
           ) : null}
         </div>
@@ -155,7 +208,7 @@ export function TemplatesTab({
               onClick={() => toggleExpanded('template:lithologies')}
               aria-label={isExpanded('template:lithologies') ? 'Collapse' : 'Expand'}
             >
-              ▸
+              &gt;
             </button>
             <button
               type="button"

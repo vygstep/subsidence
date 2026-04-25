@@ -15,6 +15,7 @@ from subsidence.data.backstrip import (
     LithologyParam,
     backstrip,
 )
+from subsidence.data.unit_registry import normalize_lithology_values_to_engine
 from subsidence.data.schema import (
     CalculationResult,
     CompactionModel,
@@ -60,6 +61,20 @@ def _manager_project_path(manager) -> str | None:
     return str(manager.project_path) if manager.project_path else None
 
 
+def _engine_lithology_param(session, density: float, porosity_surface: float, compaction_coeff: float) -> LithologyParam:
+    density, porosity_surface, compaction_coeff = normalize_lithology_values_to_engine(
+        session,
+        density=density,
+        porosity_surface=porosity_surface,
+        compaction_coeff=compaction_coeff,
+    )
+    return LithologyParam(
+        density=density,
+        porosity_surface=porosity_surface,
+        compaction_coeff=compaction_coeff,
+    )
+
+
 def _compute_subsidence(manager, well_id: str, water_depth_m: float = 0.0) -> list[SubsidenceResultResponse]:
     with manager.get_session() as session:
         well = session.get(WellModel, well_id)
@@ -81,10 +96,8 @@ def _compute_subsidence(manager, well_id: str, water_depth_m: float = 0.0) -> li
                 .where(CompactionModelParam.model_id == active_model.id)
             ).all()
             litho_params: dict[str, LithologyParam] = {
-                r.lithology_code: LithologyParam(
-                    density=r.density,
-                    porosity_surface=r.porosity_surface,
-                    compaction_coeff=r.compaction_coeff,
+                r.lithology_code: _engine_lithology_param(
+                    session, r.density, r.porosity_surface, r.compaction_coeff
                 )
                 for r in param_rows
             }
@@ -97,10 +110,8 @@ def _compute_subsidence(manager, well_id: str, water_depth_m: float = 0.0) -> li
             ).all()
             if builtin_presets:
                 litho_params = {
-                    r.source_lithology_code: LithologyParam(
-                        density=r.density,
-                        porosity_surface=r.porosity_surface,
-                        compaction_coeff=r.compaction_coeff,
+                    r.source_lithology_code: _engine_lithology_param(
+                        session, r.density, r.porosity_surface, r.compaction_coeff
                     )
                     for r in builtin_presets
                     if r.source_lithology_code
@@ -108,10 +119,8 @@ def _compute_subsidence(manager, well_id: str, water_depth_m: float = 0.0) -> li
             else:
                 litho_rows = session.scalars(select(LithologyDictEntry)).all()
                 litho_params = {
-                    r.lithology_code: LithologyParam(
-                        density=r.density,
-                        porosity_surface=r.porosity_surface,
-                        compaction_coeff=r.compaction_coeff,
+                    r.lithology_code: _engine_lithology_param(
+                        session, r.density, r.porosity_surface, r.compaction_coeff
                     )
                     for r in litho_rows
                 }

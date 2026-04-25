@@ -7,7 +7,7 @@ from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column, relationship
 from sqlalchemy import MetaData
 
 SUBSIDENCE_APP_ID = 0x53554253  # "SUBS" as 4-byte int
-SCHEMA_VERSION = 5
+SCHEMA_VERSION = 6
 
 _NAMING: dict[str, str] = {
     "ix": "ix_%(table_name)s_%(column_0_name)s",
@@ -271,6 +271,70 @@ class CurveMnemonicEntry(Base, AuditMixin):
     is_active: Mapped[bool] = mapped_column(Boolean, default=True)
 
     mnemonic_set: Mapped["CurveMnemonicSet"] = relationship(back_populates="entries")
+
+
+# ---------------------------------------------------------------------------
+# 8c. unit_dimensions + measurement_units + measurement_unit_aliases
+# ---------------------------------------------------------------------------
+
+class UnitDimension(Base, AuditMixin):
+    __tablename__ = "unit_dimensions"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    code: Mapped[str] = mapped_column(String(64), unique=True)
+    display_name: Mapped[str] = mapped_column(String(128))
+    description: Mapped[str | None] = mapped_column(Text, nullable=True)
+    engine_unit_code: Mapped[str] = mapped_column(String(64))
+    is_builtin: Mapped[bool] = mapped_column(Boolean, default=False)
+    sort_order: Mapped[int] = mapped_column(Integer, default=0)
+
+    units: Mapped[list["MeasurementUnit"]] = relationship(
+        back_populates="dimension", cascade="all, delete-orphan"
+    )
+
+
+class MeasurementUnit(Base, AuditMixin):
+    __tablename__ = "measurement_units"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    code: Mapped[str] = mapped_column(String(64), unique=True)
+    dimension_code: Mapped[str] = mapped_column(
+        String(64), ForeignKey("unit_dimensions.code", ondelete="CASCADE"), nullable=False
+    )
+    symbol: Mapped[str] = mapped_column(String(32))
+    display_name: Mapped[str] = mapped_column(String(128))
+    to_engine_factor: Mapped[float] = mapped_column(Float, default=1.0)
+    to_engine_offset: Mapped[float] = mapped_column(Float, default=0.0)
+    is_builtin: Mapped[bool] = mapped_column(Boolean, default=False)
+    is_active: Mapped[bool] = mapped_column(Boolean, default=True)
+    sort_order: Mapped[int] = mapped_column(Integer, default=0)
+
+    dimension: Mapped[UnitDimension] = relationship(back_populates="units")
+    aliases: Mapped[list["MeasurementUnitAlias"]] = relationship(
+        back_populates="unit", cascade="all, delete-orphan"
+    )
+
+
+class MeasurementUnitAlias(Base, AuditMixin):
+    __tablename__ = "measurement_unit_aliases"
+    __table_args__ = (
+        UniqueConstraint("dimension_code", "normalized_alias", name="uq_measurement_unit_aliases_dimension_alias"),
+    )
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    dimension_code: Mapped[str] = mapped_column(
+        String(64), ForeignKey("unit_dimensions.code", ondelete="CASCADE"), nullable=False
+    )
+    unit_code: Mapped[str] = mapped_column(
+        String(64), ForeignKey("measurement_units.code", ondelete="CASCADE"), nullable=False
+    )
+    alias: Mapped[str] = mapped_column(String(64))
+    normalized_alias: Mapped[str] = mapped_column(String(64))
+    is_builtin: Mapped[bool] = mapped_column(Boolean, default=False)
+    is_active: Mapped[bool] = mapped_column(Boolean, default=True)
+
+    dimension: Mapped[UnitDimension] = relationship()
+    unit: Mapped[MeasurementUnit] = relationship(back_populates="aliases")
 
 
 # ---------------------------------------------------------------------------

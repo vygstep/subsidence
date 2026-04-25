@@ -22,7 +22,8 @@ export function useDataManagerController() {
   const stratCharts = useWellDataStore((state) => state.stratCharts)
   const compactionModels = useWellDataStore((state) => state.compactionModels)
   const compactionPresets = useWellDataStore((state) => state.compactionPresets)
-  const curveDictionaryEntries = useWellDataStore((state) => state.curveDictionaryEntries)
+  const mnemonicSets = useWellDataStore((state) => state.mnemonicSets)
+  const unitDimensions = useWellDataStore((state) => state.unitDimensions)
   const lithologyDictionaryEntries = useWellDataStore((state) => state.lithologyDictionaryEntries)
   const lithologySets = useWellDataStore((state) => state.lithologySets)
   const wellInventories = useWellDataStore((state) => state.wellInventories)
@@ -36,6 +37,7 @@ export function useDataManagerController() {
   const activateCompactionModel = useWellDataStore((state) => state.activateCompactionModel)
   const createCompactionModel = useWellDataStore((state) => state.createCompactionModel)
   const deleteCompactionModel = useWellDataStore((state) => state.deleteCompactionModel)
+  const createMnemonicSet = useWellDataStore((state) => state.createMnemonicSet)
 
   const activeSidebarTab = useWorkspaceStore((state) => state.activeSidebarTab)
   const selectedFormationId = useWorkspaceStore((state) => state.selectedFormationId)
@@ -137,10 +139,15 @@ export function useDataManagerController() {
     return compactionPresets.find((preset) => preset.id === selectedObject.presetId) ?? null
   }, [compactionPresets, selectedObject])
 
-  const selectedCurveDictionaryEntry = useMemo(() => {
-    if (selectedObject?.type !== 'curve-dictionary-entry') return null
-    return curveDictionaryEntries.find((entry) => entry.id === selectedObject.entryId) ?? null
-  }, [curveDictionaryEntries, selectedObject])
+  const selectedMnemonicSet = useMemo(() => {
+    if (selectedObject?.type !== 'mnemonic-set') return null
+    return mnemonicSets.find((entry) => entry.id === selectedObject.setId) ?? null
+  }, [mnemonicSets, selectedObject])
+
+  const selectedUnitDimension = useMemo(() => {
+    if (selectedObject?.type !== 'unit-dimension') return null
+    return unitDimensions.find((entry) => entry.code === selectedObject.dimensionCode) ?? null
+  }, [selectedObject, unitDimensions])
 
   const selectedLithologySet = useMemo(() => {
     if (selectedObject?.type !== 'lithology-set') return null
@@ -194,12 +201,13 @@ export function useDataManagerController() {
     activeWellView,
     compactionModels,
     compactionPresets,
-    curveDictionaryEntries,
     curveCount: curves.length,
     deviationVisibilityByWellId,
     formations,
     lithologyDictionaryEntries,
     lithologySets,
+    mnemonicSets,
+    unitDimensions,
     handleCurveSettingUpdate: visibility.handleCurveSettingUpdate,
     handleFocusCurveObject: selection.handleFocusCurveObject,
     handleFocusFormationObject: selection.handleFocusFormationObject,
@@ -223,6 +231,13 @@ export function useDataManagerController() {
     onActivateChart: (chartId: number) => void activateChart(chartId),
     onActivateCompactionModel: (id: number) => void activateCompactionModel(id),
     onCreateCompactionModel: actions.handleCreateCompactionModel,
+    onCreateMnemonicSet: () => {
+      const name = window.prompt('New mnemonic set name:', 'New Mnemonic Set')?.trim()
+      if (!name) return
+      void createMnemonicSet(name)
+        .then((created) => setSelectedObject({ type: 'mnemonic-set', setId: created.id }))
+        .catch((error: unknown) => window.alert(String(error)))
+    },
     onDeleteChart: (chartId: number) => void deleteChart(chartId),
     onDeleteCompactionModel: (id: number) => void deleteCompactionModel(id).catch((e: unknown) => window.alert(String(e))),
     onDeleteCompactionModelById: (id: number, name: string, isBuiltin: boolean, isActive: boolean) =>
@@ -244,7 +259,10 @@ export function useDataManagerController() {
     onSelectCompactionPreset: (presetId: number) => setSelectedObject({ type: 'compaction-preset', presetId }),
     onSelectCompactionPresetsRoot: () => setSelectedObject({ type: 'compaction-presets-root' }),
     onSelectCompactionModel: (modelId: number) => setSelectedObject({ type: 'compaction-model', modelId }),
-    onSelectCurveDictionaryEntry: (entryId: number) => setSelectedObject({ type: 'curve-dictionary-entry', entryId }),
+    onSelectCurveMnemonicsRoot: () => setSelectedObject({ type: 'curve-mnemonics-root' }),
+    onSelectMnemonicSet: (setId: number) => setSelectedObject({ type: 'mnemonic-set', setId }),
+    onSelectMeasurementUnitsRoot: () => setSelectedObject({ type: 'measurement-units-root' }),
+    onSelectUnitDimension: (dimensionCode: string) => setSelectedObject({ type: 'unit-dimension', dimensionCode }),
     onSelectLithologiesRoot: () => setSelectedObject({ type: 'lithologies-root' }),
     onSelectLithologySet: (setId: number) => setSelectedObject({ type: 'lithology-set', setId }),
     onSelectLithologyDictionaryEntry: (entryId: number) => setSelectedObject({ type: 'lithology-dictionary-entry', entryId }),
@@ -257,17 +275,21 @@ export function useDataManagerController() {
     selectedCompactionModelId: selectedObject?.type === 'compaction-model' ? selectedObject.modelId : null,
     selectedCompactionPreset,
     selectedCompactionPresetId: selectedObject?.type === 'compaction-preset' ? selectedObject.presetId : null,
-    selectedCurveDictionaryEntry,
-    selectedCurveDictionaryEntryId: selectedObject?.type === 'curve-dictionary-entry' ? selectedObject.entryId : null,
     selectedCurveConfig,
     selectedFormation,
     selectedFormationId,
     selectedLithologySet,
     selectedLithologySetId: selectedObject?.type === 'lithology-set' ? selectedObject.setId : null,
+    selectedMnemonicSet,
+    selectedMnemonicSetId: selectedObject?.type === 'mnemonic-set' ? selectedObject.setId : null,
+    selectedUnitDimension,
+    selectedUnitDimensionCode: selectedObject?.type === 'unit-dimension' ? selectedObject.dimensionCode : null,
     selectedLithologyDictionaryEntry,
     selectedLithologyDictionaryEntryId: selectedObject?.type === 'lithology-dictionary-entry' ? selectedObject.entryId : null,
     selectedObject,
     isCompactionPresetsRootSelected: selectedObject?.type === 'compaction-presets-root',
+    isCurveMnemonicsRootSelected: selectedObject?.type === 'curve-mnemonics-root',
+    isMeasurementUnitsRootSelected: selectedObject?.type === 'measurement-units-root',
     isLithologiesRootSelected: selectedObject?.type === 'lithologies-root',
     setFormationMove: (formationId: string, depth: number) => {
       if (Number.isFinite(depth)) void updateFormationDepth(formationId, depth)

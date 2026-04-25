@@ -4,10 +4,11 @@ import { WellDataPanel } from './WellDataPanel'
 import type { SelectedObject } from '@/stores/workspaceStore'
 import type {
   CompactionPresetSummary,
-  CurveDictionaryEntry,
+  CurveMnemonicSetSummary,
   FormationInventoryItem,
   LithologySetSummary,
   StratChartInfo,
+  UnitDimensionSummary,
   WellInventory,
 } from '@/types'
 
@@ -15,7 +16,8 @@ interface DataManagerTopPaneProps {
   activeSidebarTab: 'wells' | 'templates' | 'strat-charts'
   activeWellId: string | null
   compactionPresets: CompactionPresetSummary[]
-  curveDictionaryEntries: CurveDictionaryEntry[]
+  mnemonicSets: CurveMnemonicSetSummary[]
+  unitDimensions: UnitDimensionSummary[]
   deviationVisibilityByWellId: Record<string, boolean>
   lithologySets: LithologySetSummary[]
   onActivateChart: (chartId: number) => void
@@ -34,9 +36,13 @@ interface DataManagerTopPaneProps {
   onFocusWellObject: (wellId: string) => void
   onSelectChart: (chartId: number) => void
   onCreateCompactionPresetDraft: () => void
+  onCreateMnemonicSet: () => void
   onSelectCompactionPreset: (id: number) => void
   onSelectCompactionPresetsRoot: () => void
-  onSelectCurveDictionaryEntry: (entryId: number) => void
+  onSelectCurveMnemonicsRoot: () => void
+  onSelectMnemonicSet: (setId: number) => void
+  onSelectMeasurementUnitsRoot: () => void
+  onSelectUnitDimension: (dimensionCode: string) => void
   onSelectLithologiesRoot: () => void
   onSelectLithologySet: (setId: number) => void
   onSelectCurve: (wellId: string, mnemonic: string) => void | Promise<void>
@@ -55,8 +61,11 @@ interface DataManagerTopPaneProps {
   selectedChartId: number | null
   selectedCompactionPresetId: number | null
   isCompactionPresetsRootSelected: boolean
+  isCurveMnemonicsRootSelected: boolean
   isLithologiesRootSelected: boolean
-  selectedCurveDictionaryEntryId: number | null
+  isMeasurementUnitsRootSelected: boolean
+  selectedMnemonicSetId: number | null
+  selectedUnitDimensionCode: string | null
   selectedFormationId: string | null
   selectedLithologySetId: number | null
   selectedObject: SelectedObject | null
@@ -70,7 +79,8 @@ export function DataManagerTopPane({
   activeSidebarTab,
   activeWellId,
   compactionPresets,
-  curveDictionaryEntries,
+  mnemonicSets,
+  unitDimensions,
   deviationVisibilityByWellId,
   lithologySets,
   onActivateChart,
@@ -89,9 +99,13 @@ export function DataManagerTopPane({
   onFocusWellObject,
   onSelectChart,
   onCreateCompactionPresetDraft,
+  onCreateMnemonicSet,
   onSelectCompactionPreset,
   onSelectCompactionPresetsRoot,
-  onSelectCurveDictionaryEntry,
+  onSelectCurveMnemonicsRoot,
+  onSelectMnemonicSet,
+  onSelectMeasurementUnitsRoot,
+  onSelectUnitDimension,
   onSelectLithologiesRoot,
   onSelectLithologySet,
   onSelectCurve,
@@ -110,8 +124,11 @@ export function DataManagerTopPane({
   selectedChartId,
   selectedCompactionPresetId,
   isCompactionPresetsRootSelected,
+  isCurveMnemonicsRootSelected,
   isLithologiesRootSelected,
-  selectedCurveDictionaryEntryId,
+  isMeasurementUnitsRootSelected,
+  selectedMnemonicSetId,
+  selectedUnitDimensionCode,
   selectedFormationId,
   selectedLithologySetId,
   selectedObject,
@@ -188,18 +205,26 @@ export function DataManagerTopPane({
         />
       ) : (
         <TemplatesTab
-          curveDictionaryEntries={curveDictionaryEntries}
+          mnemonicSets={mnemonicSets}
+          unitDimensions={unitDimensions}
           lithologySets={lithologySets}
           compactionPresets={compactionPresets}
           isCompactionPresetsRootSelected={isCompactionPresetsRootSelected}
+          isCurveMnemonicsRootSelected={isCurveMnemonicsRootSelected}
+          isMeasurementUnitsRootSelected={isMeasurementUnitsRootSelected}
           isLithologiesRootSelected={isLithologiesRootSelected}
           selectedCompactionPresetId={selectedCompactionPresetId}
-          selectedCurveDictionaryEntryId={selectedCurveDictionaryEntryId}
+          selectedMnemonicSetId={selectedMnemonicSetId}
+          selectedUnitDimensionCode={selectedUnitDimensionCode}
           selectedLithologySetId={selectedLithologySetId}
           onCreateCompactionPresetDraft={onCreateCompactionPresetDraft}
+          onCreateMnemonicSet={onCreateMnemonicSet}
           onSelectCompactionPresetsRoot={onSelectCompactionPresetsRoot}
           onSelectCompactionPreset={onSelectCompactionPreset}
-          onSelectCurveDictionaryEntry={onSelectCurveDictionaryEntry}
+          onSelectCurveMnemonicsRoot={onSelectCurveMnemonicsRoot}
+          onSelectMnemonicSet={onSelectMnemonicSet}
+          onSelectMeasurementUnitsRoot={onSelectMeasurementUnitsRoot}
+          onSelectUnitDimension={onSelectUnitDimension}
           onSelectLithologiesRoot={onSelectLithologiesRoot}
           onSelectLithologySet={onSelectLithologySet}
         />

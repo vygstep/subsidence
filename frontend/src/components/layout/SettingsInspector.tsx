@@ -2,21 +2,25 @@ import type { SelectedObject } from '@/stores/workspaceStore'
 import type {
   CompactionPresetSummary,
   CompactionModel,
-  CurveDictionaryEntry,
+  CurveMnemonicSetSummary,
   FormationTop,
   LithologyDictionaryEntry,
   LithologySetSummary,
   StratChartInfo,
   TrackConfig,
+  UnitDimensionSummary,
   Well,
 } from '@/types'
 import { CompactionPresetDraftSettings } from './settings/CompactionPresetDraftSettings'
 import { CompactionPresetSettings } from './settings/CompactionPresetSettings'
 import { CompactionPresetsRootSettings } from './settings/CompactionPresetsRootSettings'
-import { CurveDictionarySettings } from './settings/CurveDictionarySettings'
+import { CurveMnemonicSetSettings } from './settings/CurveMnemonicSetSettings'
+import { CurveMnemonicSetsRootSettings } from './settings/CurveMnemonicSetsRootSettings'
 import { LithologyDictionarySettings } from './settings/LithologyDictionarySettings'
 import { LithologySetSettings } from './settings/LithologySetSettings'
 import { LithologySetsRootSettings } from './settings/LithologySetsRootSettings'
+import { MeasurementUnitsRootSettings } from './settings/MeasurementUnitsRootSettings'
+import { UnitDimensionSettings } from './settings/UnitDimensionSettings'
 
 import { CurveSettings } from './settings/CurveSettings'
 import { DepthTrackSettings } from './settings/DepthTrackSettings'
@@ -61,9 +65,12 @@ interface SettingsInspectorProps {
   selectedCompactionModel: CompactionModel | null
   selectedCompactionPreset: CompactionPresetSummary | null
   compactionPresets: CompactionPresetSummary[]
+  mnemonicSets: CurveMnemonicSetSummary[]
+  selectedMnemonicSet: CurveMnemonicSetSummary | null
+  unitDimensions: UnitDimensionSummary[]
+  selectedUnitDimension: UnitDimensionSummary | null
   lithologySets: LithologySetSummary[]
   selectedLithologySet: LithologySetSummary | null
-  selectedCurveDictionaryEntry: CurveDictionaryEntry | null
   selectedLithologyDictionaryEntry: LithologyDictionaryEntry | null
   curveCount: number
   visibleCurveCount: number
@@ -92,9 +99,12 @@ export function SettingsInspector({
   selectedCompactionModel,
   selectedCompactionPreset,
   compactionPresets,
+  mnemonicSets,
+  selectedMnemonicSet,
+  unitDimensions,
+  selectedUnitDimension,
   lithologySets,
   selectedLithologySet,
-  selectedCurveDictionaryEntry,
   selectedLithologyDictionaryEntry,
   curveCount,
   visibleCurveCount,
@@ -197,6 +207,28 @@ export function SettingsInspector({
     return <CompactionPresetDraftSettings />
   }
 
+  if (selectedObject.type === 'curve-mnemonics-root') {
+    return <CurveMnemonicSetsRootSettings sets={mnemonicSets} />
+  }
+
+  if (selectedObject.type === 'mnemonic-set') {
+    if (!selectedMnemonicSet || selectedMnemonicSet.id !== selectedObject.setId) {
+      return <EmptyInspector message="Selected mnemonic set is not loaded yet." />
+    }
+    return <CurveMnemonicSetSettings mnemonicSet={selectedMnemonicSet} />
+  }
+
+  if (selectedObject.type === 'measurement-units-root') {
+    return <MeasurementUnitsRootSettings dimensions={unitDimensions} />
+  }
+
+  if (selectedObject.type === 'unit-dimension') {
+    if (!selectedUnitDimension || selectedUnitDimension.code !== selectedObject.dimensionCode) {
+      return <EmptyInspector message="Selected unit dimension is not loaded yet." />
+    }
+    return <UnitDimensionSettings dimension={selectedUnitDimension} />
+  }
+
   if (selectedObject.type === 'lithologies-root') {
     return <LithologySetsRootSettings sets={lithologySets} />
   }
@@ -213,13 +245,6 @@ export function SettingsInspector({
       return <EmptyInspector message="Selected legacy compaction model is not loaded yet." />
     }
     return <ModelSettings model={selectedCompactionModel} />
-  }
-
-  if (selectedObject.type === 'curve-dictionary-entry') {
-    if (!selectedCurveDictionaryEntry || selectedCurveDictionaryEntry.id !== selectedObject.entryId) {
-      return <EmptyInspector message="Selected curve dictionary rule is not loaded yet." />
-    }
-    return <CurveDictionarySettings entry={selectedCurveDictionaryEntry} />
   }
 
   if (selectedObject.type === 'lithology-dictionary-entry') {

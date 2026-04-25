@@ -19,7 +19,8 @@ function App() {
   const loadStratCharts = useWellDataStore((state) => state.loadStratCharts)
   const loadCompactionModels = useWellDataStore((state) => state.loadCompactionModels)
   const loadCompactionPresets = useWellDataStore((state) => state.loadCompactionPresets)
-  const loadCurveDictionary = useWellDataStore((state) => state.loadCurveDictionary)
+  const loadMnemonicSets = useWellDataStore((state) => state.loadMnemonicSets)
+  const loadUnitDimensions = useWellDataStore((state) => state.loadUnitDimensions)
   const loadLithologyDictionary = useWellDataStore((state) => state.loadLithologyDictionary)
   const loadLithologySets = useWellDataStore((state) => state.loadLithologySets)
   const colorOverrides = useWellDataStore((state) => state.colorOverrides)
@@ -129,10 +130,11 @@ function App() {
 
   useEffect(() => {
     if (!isProjectOpen) return
-    void loadCurveDictionary()
+    void loadMnemonicSets()
+    void loadUnitDimensions()
     void loadLithologyDictionary()
     void loadLithologySets()
-  }, [isProjectOpen, loadCurveDictionary, loadLithologyDictionary, loadLithologySets])
+  }, [isProjectOpen, loadMnemonicSets, loadUnitDimensions, loadLithologyDictionary, loadLithologySets])
 
   useEffect(() => {
     if (!isProjectOpen) {
