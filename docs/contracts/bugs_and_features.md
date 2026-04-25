@@ -59,8 +59,8 @@ Goal:
 Items:
 
 - `WIZ-001`: Shared import wizard shell.
-- `WIZ-002`: File preview and parser detection.
-- `WIZ-003`: Column mapping and required-field validation.
+- `WIZ-002`: File preview and parser detection. (done)
+- `WIZ-003`: Column mapping and required-field validation. (done)
 - `WIZ-004`: Target well resolution.
 - `WIZ-005`: Import presets by data type.
 - `WIZ-006`: Import execution, logging, and tests.
@@ -371,8 +371,8 @@ Implementation checkpoints:
 2. `WIZ-001-B`: add step navigation, blocking validation states, and target-well controls shared by logs/tops/deviation. (done)
 3. `WIZ-002-A`: add backend preview endpoints for tabular files and LAS files. (done)
 4. `WIZ-002-B`: render parser settings and preview rows/curve metadata from the preview response. (done)
-5. `WIZ-003-A`: add preset-specific mapping definitions and auto-mapping.
-6. `WIZ-003-B`: pass explicit mappings into import execution endpoints or adapter functions.
+5. `WIZ-003-A`: add preset-specific mapping definitions and auto-mapping. (done)
+6. `WIZ-003-B`: pass explicit mappings into import execution endpoints or adapter functions. (done)
 
 Shared frontend model:
 
@@ -826,3 +826,11 @@ Backend: `LithologySet` / `LithologyEntry` schema, `CompactionPreset` with `id`/
 ### WIZ-001: Shared import wizard shell (done)
 
 `ImportWizardShell` component with step breadcrumb, footer actions (Cancel / Back / Next / Import), and compact validation summary. `ImportWizardTargetWellFields` for shared well-selection controls. `importWizardPresets.ts` defines data-type-specific preset objects (logsLas, logsCsv, tops, deviation). `buildImportWizardSteps` util drives step status. All three import dialogs (LAS logs, tops, deviation) routed through the shared shell. Commits: `e41f65d`, `2ceb054`.
+
+### WIZ-002: File preview and parser detection (done)
+
+Backend `preview.py` module adds `preview_tabular` (csv.Sniffer auto-delimiter, configurable header row, utf-8-sig/latin-1 fallback, duplicate-column and row-count warnings) and `preview_las` (lasio metadata extraction: well name, UWI, depth unit, start/stop/step/null, curve list). New `/api/import-preview/tabular` and `/api/import-preview/las` POST endpoints. Frontend `useImportPreview` hook with `AbortController` cancellation; `TabularPreviewPane` (delimiter select, header-row input, scrollable preview table); `LasPreviewPane` (well metadata rows, curve table). Step breadcrumb uses `repeat(auto-fit, ...)` to support variable step counts. Integration tests mock `fetch` and use `waitFor` to advance through the async preview step. Commit: `49617e8`.
+
+### WIZ-003: Column mapping and required-field validation (done)
+
+`mapping.ts` defines `FieldDefinition`, `ColumnMapping`, field sets for tops (`TOPS_FIELDS`), deviation (`DEVIATION_FIELDS`), and logs CSV (`LOGS_CSV_FIELDS`), plus `autoMap` (normalized-alias matching, deduplication), `validateTopsMapping`, `validateDeviationMapping` (requires depth + one mode pair), `validateLogsCsvMapping`, and `isMappingValid`. `MappingPane` renders a field→column select table with required/optional status badges. `buildImportWizardSteps` accepts an optional `labels` parameter; `MAPPING_STEP_LABELS` adds a Mapping step between Preview and Options for CSV dialogs. All three CSV import dialogs (tops, deviation, logs CSV) gain the 5-step flow; LAS logs keeps 4 steps. Backend: `_apply_column_map` helper in `common.py` inverts the `{canonical: file_col}` dict to rename columns before importers run; `import_tops_csv` and `import_deviation_csv` accept `column_map`; `ImportTopsRequest` and `ImportDeviationRequest` gain `column_map` field. Commit: `3a12cbc`.
