@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import type { FormEvent } from 'react'
 
 import { useProjectStore } from '@/stores'
@@ -7,12 +7,21 @@ import { recordOperation } from '@/utils/diagnostics'
 import {
   ImportWizardShell,
   ImportWizardTargetWellFields,
+  MappingPane,
   TabularPreviewPane,
+  MAPPING_STEP_LABELS,
   buildImportWizardSteps,
   importWizardPresets,
   readImportError,
   useImportPreview,
 } from './importWizard'
+import {
+  DEVIATION_FIELDS,
+  autoMap,
+  isMappingValid,
+  validateDeviationMapping,
+} from './importWizard/mapping'
+import type { ColumnMapping } from './importWizard/mapping'
 import { getLastImportRoot, pickFile, rememberImportPath } from './pathMemory'
 
 interface WellOption {
@@ -36,6 +45,7 @@ export function ImportDeviationDialog({ wells, activeWellId, onClose, onSuccess 
   const [wellId, setWellId] = useState(activeWellId ?? '')
   const [createNewWell, setCreateNewWell] = useState(false)
   const [csvPath, setCsvPath] = useState(() => getLastImportRoot())
+  const [mapping, setMapping] = useState<ColumnMapping>({})
   const [currentStepIndex, setCurrentStepIndex] = useState(0)
   const [error, setError] = useState<string | null>(null)
   const [isSubmitting, setIsSubmitting] = useState(false)
@@ -50,9 +60,17 @@ export function ImportDeviationDialog({ wells, activeWellId, onClose, onSuccess 
     isOnPreviewStep,
   )
 
-  const previewReady = !previewLoading && tabularPreview !== null
+  useEffect(() => {
+    if (tabularPreview) {
+      setMapping(autoMap(tabularPreview.columns, DEVIATION_FIELDS))
+    }
+  }, [tabularPreview])
 
-  const steps = buildImportWizardSteps(currentStepIndex, sourceIsValid)
+  const previewReady = !previewLoading && tabularPreview !== null
+  const mappingErrors = validateDeviationMapping(mapping)
+  const mappingOk = isMappingValid(mappingErrors)
+
+  const steps = buildImportWizardSteps(currentStepIndex, sourceIsValid, MAPPING_STEP_LABELS)
   const validationMessages = currentStepIndex === 0 && !sourceIsValid ? ['CSV path is required.'] : []
 
   const handleSubmit = async (event: FormEvent<HTMLFormElement>) => {
@@ -61,6 +79,11 @@ export function ImportDeviationDialog({ wells, activeWellId, onClose, onSuccess 
     if (!nextPath) {
       setError('CSV path is required')
       return
+    }
+
+    const columnMap: Record<string, string> = {}
+    for (const [fieldId, col] of Object.entries(mapping)) {
+      if (col) columnMap[fieldId] = col
     }
 
     setIsSubmitting(true)
@@ -74,6 +97,7 @@ export function ImportDeviationDialog({ wells, activeWellId, onClose, onSuccess 
             well_id: wellId || null,
             csv_path: nextPath,
             create_new_well: !wellId && createNewWell,
+            column_map: Object.keys(columnMap).length > 0 ? columnMap : null,
           }),
         })
         if (!response.ok) {
@@ -100,9 +124,7 @@ export function ImportDeviationDialog({ wells, activeWellId, onClose, onSuccess 
     setError(null)
     try {
       const picked = await pickFile(csvPath || lastImportRoot, preset.acceptedFileFilters)
-      if (picked) {
-        setCsvPath(picked)
-      }
+      if (picked) setCsvPath(picked)
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : 'Failed to open file picker')
     }
@@ -111,6 +133,7 @@ export function ImportDeviationDialog({ wells, activeWellId, onClose, onSuccess 
   const canAdvanceFromStep = (step: number): boolean => {
     if (step === 0) return sourceIsValid
     if (step === 1) return !previewLoading && (previewReady || previewError !== null)
+    if (step === 2) return mappingOk
     return true
   }
 
@@ -123,7 +146,7 @@ export function ImportDeviationDialog({ wells, activeWellId, onClose, onSuccess 
       error={error}
       isSubmitting={isSubmitting}
       canAdvance={canAdvanceFromStep(currentStepIndex)}
-      canSubmit={sourceIsValid}
+      canSubmit={sourceIsValid && mappingOk}
       validationMessages={validationMessages}
       onClose={onClose}
       onSubmit={handleSubmit}
@@ -163,6 +186,16 @@ export function ImportDeviationDialog({ wells, activeWellId, onClose, onSuccess 
       ) : null}
 
       {currentStepIndex === 2 ? (
+        <MappingPane
+          columns={tabularPreview?.columns ?? []}
+          fields={DEVIATION_FIELDS}
+          mapping={mapping}
+          validationErrors={mappingErrors}
+          onMappingChange={(fieldId, col) => setMapping((prev) => ({ ...prev, [fieldId]: col }))}
+        />
+      ) : null}
+
+      {currentStepIndex === 3 ? (
         <ImportWizardTargetWellFields
           wells={wells}
           wellId={wellId}
@@ -173,7 +206,7 @@ export function ImportDeviationDialog({ wells, activeWellId, onClose, onSuccess 
         />
       ) : null}
 
-      {currentStepIndex === 3 ? (
+      {currentStepIndex === 4 ? (
         <div className="project-dialog__validation" aria-label="Import summary">
           <span>Source: {csvPath.trim()}</span>
           <span>Target: {wellId || 'file well_name / defaults'}</span>

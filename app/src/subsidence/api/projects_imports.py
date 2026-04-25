@@ -98,6 +98,7 @@ def import_tops(payload: ImportTopsRequest, request: Request) -> ImportTopsRespo
                     payload.well_id,
                     Path(payload.csv_path),
                     payload.depth_ref,
+                    column_map=payload.column_map or None,
                     create_new_well=payload.create_new_well,
                 )
                 target_well_id = imported[0].well_id if imported else payload.well_id
@@ -139,6 +140,7 @@ def import_deviation(payload: ImportDeviationRequest, request: Request) -> Impor
                     manager.project_path,
                     payload.well_id,
                     Path(payload.csv_path),
+                    column_map=payload.column_map or None,
                     create_new_well=payload.create_new_well,
                 )
                 target_well_id = survey.well_id

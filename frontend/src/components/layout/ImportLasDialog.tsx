@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import type { FormEvent } from 'react'
 
 import { useProjectStore } from '@/stores'
@@ -8,12 +8,22 @@ import {
   ImportWizardShell,
   ImportWizardTargetWellFields,
   LasPreviewPane,
+  MappingPane,
   TabularPreviewPane,
+  DEFAULT_STEP_LABELS,
+  MAPPING_STEP_LABELS,
   buildImportWizardSteps,
   importWizardPresets,
   readImportError,
   useImportPreview,
 } from './importWizard'
+import {
+  LOGS_CSV_FIELDS,
+  autoMap,
+  isMappingValid,
+  validateLogsCsvMapping,
+} from './importWizard/mapping'
+import type { ColumnMapping } from './importWizard/mapping'
 import { getLastImportRoot, pickFile, rememberImportPath } from './pathMemory'
 
 interface WellOption {
@@ -40,7 +50,7 @@ export function ImportLasDialog({ wells, activeWellId, onClose, onSuccess }: Imp
   const [createNewWell, setCreateNewWell] = useState(false)
   const [sourceType, setSourceType] = useState<LogSourceType>('las')
   const [sourcePath, setSourcePath] = useState(() => getLastImportRoot())
-  const [depthColumn, setDepthColumn] = useState('')
+  const [mapping, setMapping] = useState<ColumnMapping>({})
   const [currentStepIndex, setCurrentStepIndex] = useState(0)
   const [error, setError] = useState<string | null>(null)
   const [isSubmitting, setIsSubmitting] = useState(false)
@@ -48,6 +58,7 @@ export function ImportLasDialog({ wells, activeWellId, onClose, onSuccess }: Imp
   const preset = sourceType === 'las' ? importWizardPresets.logsLas : importWizardPresets.logsCsv
   const sourceIsValid = sourcePath.trim().length > 0
   const isOnPreviewStep = currentStepIndex === 1
+  const stepLabels = sourceType === 'csv' ? MAPPING_STEP_LABELS : DEFAULT_STEP_LABELS
 
   const { isLoading: previewLoading, error: previewError, tabularPreview, lasPreview, parserSettings, updateParserSettings } = useImportPreview(
     preset.previewMode,
@@ -55,13 +66,28 @@ export function ImportLasDialog({ wells, activeWellId, onClose, onSuccess }: Imp
     isOnPreviewStep,
   )
 
+  useEffect(() => {
+    if (tabularPreview && sourceType === 'csv') {
+      setMapping(autoMap(tabularPreview.columns, LOGS_CSV_FIELDS))
+    }
+  }, [tabularPreview, sourceType])
+
+  const handleSourceTypeChange = (next: LogSourceType) => {
+    setSourceType(next)
+    setCurrentStepIndex(0)
+    setMapping({})
+  }
+
   const previewReady = previewLoading
     ? false
     : preset.previewMode === 'las'
       ? lasPreview !== null
       : tabularPreview !== null
 
-  const steps = buildImportWizardSteps(currentStepIndex, sourceIsValid)
+  const mappingErrors = sourceType === 'csv' ? validateLogsCsvMapping(mapping) : []
+  const mappingOk = isMappingValid(mappingErrors)
+
+  const steps = buildImportWizardSteps(currentStepIndex, sourceIsValid, stepLabels)
   const validationMessages = currentStepIndex === 0 && !sourceIsValid
     ? [`${sourceType === 'las' ? 'LAS' : 'CSV'} path is required.`]
     : []
@@ -72,6 +98,11 @@ export function ImportLasDialog({ wells, activeWellId, onClose, onSuccess }: Imp
     if (!nextPath) {
       setError(sourceType === 'las' ? 'LAS path is required' : 'CSV path is required')
       return
+    }
+
+    const columnMap: Record<string, string> = {}
+    for (const [fieldId, col] of Object.entries(mapping)) {
+      if (col) columnMap[fieldId] = col
     }
 
     setIsSubmitting(true)
@@ -91,7 +122,7 @@ export function ImportLasDialog({ wells, activeWellId, onClose, onSuccess }: Imp
               : {
                   csv_path: nextPath,
                   well_id: wellId || null,
-                  depth_column: depthColumn.trim() || null,
+                  depth_column: columnMap['depth'] ?? null,
                   create_new_well: !wellId && createNewWell,
                 },
           ),
@@ -112,7 +143,7 @@ export function ImportLasDialog({ wells, activeWellId, onClose, onSuccess }: Imp
       }, {
         projectPath,
         activeWellId: wellId || activeWellId || null,
-        details: { inputPath: nextPath, createNewWell, depthColumn: depthColumn.trim() || null },
+        details: { inputPath: nextPath, createNewWell, depthColumn: columnMap['depth'] ?? null },
       })
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : 'Failed to import logs')
@@ -125,17 +156,21 @@ export function ImportLasDialog({ wells, activeWellId, onClose, onSuccess }: Imp
     setError(null)
     try {
       const picked = await pickFile(sourcePath || lastImportRoot, preset.acceptedFileFilters)
-      if (picked) {
-        setSourcePath(picked)
-      }
+      if (picked) setSourcePath(picked)
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : 'Failed to open file picker')
     }
   }
 
+  // For CSV: steps are File(0) Preview(1) Mapping(2) Options(3) Import(4)
+  // For LAS: steps are File(0) Preview(1) Options(2) Import(3)
+  const optionsStep = sourceType === 'csv' ? 3 : 2
+  const summaryStep = sourceType === 'csv' ? 4 : 3
+
   const canAdvanceFromStep = (step: number): boolean => {
     if (step === 0) return sourceIsValid
     if (step === 1) return !previewLoading && (previewReady || previewError !== null)
+    if (step === 2 && sourceType === 'csv') return mappingOk
     return true
   }
 
@@ -148,7 +183,7 @@ export function ImportLasDialog({ wells, activeWellId, onClose, onSuccess }: Imp
       error={error}
       isSubmitting={isSubmitting}
       canAdvance={canAdvanceFromStep(currentStepIndex)}
-      canSubmit={sourceIsValid}
+      canSubmit={sourceIsValid && (sourceType === 'las' || mappingOk)}
       validationMessages={validationMessages}
       onClose={onClose}
       onSubmit={handleSubmit}
@@ -158,7 +193,7 @@ export function ImportLasDialog({ wells, activeWellId, onClose, onSuccess }: Imp
         <>
           <label className="project-dialog__field">
             <span>Format</span>
-            <select value={sourceType} onChange={(event) => setSourceType(event.target.value as LogSourceType)}>
+            <select value={sourceType} onChange={(event) => handleSourceTypeChange(event.target.value as LogSourceType)}>
               <option value="las">LAS</option>
               <option value="csv">CSV</option>
             </select>
@@ -201,31 +236,28 @@ export function ImportLasDialog({ wells, activeWellId, onClose, onSuccess }: Imp
         )
       ) : null}
 
-      {currentStepIndex === 2 ? (
-        <>
-          <ImportWizardTargetWellFields
-            wells={wells}
-            wellId={wellId}
-            createNewWell={createNewWell}
-            emptyLabel={sourceType === 'las' ? 'Reuse by LAS header / create from defaults' : 'Reuse by CSV well_name / create from defaults'}
-            onWellIdChange={setWellId}
-            onCreateNewWellChange={setCreateNewWell}
-          />
-          {sourceType === 'csv' ? (
-            <label className="project-dialog__field">
-              <span>Depth column</span>
-              <input
-                type="text"
-                value={depthColumn}
-                onChange={(event) => setDepthColumn(event.target.value)}
-                placeholder="Optional: DEPT / DEPTH / MD"
-              />
-            </label>
-          ) : null}
-        </>
+      {currentStepIndex === 2 && sourceType === 'csv' ? (
+        <MappingPane
+          columns={tabularPreview?.columns ?? []}
+          fields={LOGS_CSV_FIELDS}
+          mapping={mapping}
+          validationErrors={mappingErrors}
+          onMappingChange={(fieldId, col) => setMapping((prev) => ({ ...prev, [fieldId]: col }))}
+        />
       ) : null}
 
-      {currentStepIndex === 3 ? (
+      {currentStepIndex === optionsStep ? (
+        <ImportWizardTargetWellFields
+          wells={wells}
+          wellId={wellId}
+          createNewWell={createNewWell}
+          emptyLabel={sourceType === 'las' ? 'Reuse by LAS header / create from defaults' : 'Reuse by CSV well_name / create from defaults'}
+          onWellIdChange={setWellId}
+          onCreateNewWellChange={setCreateNewWell}
+        />
+      ) : null}
+
+      {currentStepIndex === summaryStep ? (
         <div className="project-dialog__validation" aria-label="Import summary">
           <span>Source: {sourcePath.trim()}</span>
           <span>Target: {wellId || 'file header / defaults'}</span>

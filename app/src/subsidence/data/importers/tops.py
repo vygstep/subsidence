@@ -11,6 +11,7 @@ from .common import (
     DEFAULT_WELL_KB,
     DEFAULT_WELL_NAME,
     _DEFAULT_TOP_COLOR,
+    _apply_column_map,
     _ensure_row_targets_well,
     _extract_float,
     _extract_note_unconformity_ref,
@@ -52,6 +53,7 @@ def import_tops_csv(
     csv_path: Path | str,
     depth_ref: str = 'MD',
     *,
+    column_map: dict[str, str] | None = None,
     strat_units_path: Path | str | None = None,
     strat_ranks_path: Path | str | None = None,
     create_new_well: bool = False,
@@ -62,6 +64,8 @@ def import_tops_csv(
         )
     path = Path(csv_path)
     fieldnames, rows = _read_csv_rows(path)
+    if column_map:
+        fieldnames, rows = _apply_column_map(fieldnames, rows, column_map)
     required = {'top_name', 'depth_md'}
     missing = required.difference(set(fieldnames))
     if missing:

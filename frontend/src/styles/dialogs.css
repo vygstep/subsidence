@@ -412,3 +412,56 @@
   font-weight: 700;
   color: #526476;
 }
+
+/* ── Import mapping ──────────────────────────────────────────────────── */
+
+.import-mapping {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.import-mapping__table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.82rem;
+}
+
+.import-mapping__table th,
+.import-mapping__table td {
+  padding: 6px 10px;
+  border-bottom: 1px solid #e8edf3;
+  text-align: left;
+}
+
+.import-mapping__table th {
+  font-weight: 600;
+  color: #526476;
+  background: #f5f8fb;
+}
+
+.import-mapping__label {
+  font-weight: 500;
+  color: #2c3e50;
+}
+
+.import-mapping__status {
+  width: 70px;
+  text-align: right;
+}
+
+.import-mapping__status--ok {
+  color: #2c9f5e;
+  font-weight: 600;
+}
+
+.import-mapping__status--missing {
+  color: #c0392b;
+  font-size: 0.75rem;
+  font-weight: 600;
+}
+
+.import-mapping__status--optional {
+  color: #94a3b8;
+  font-size: 0.75rem;
+}

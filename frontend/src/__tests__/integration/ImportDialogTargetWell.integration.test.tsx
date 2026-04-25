@@ -13,8 +13,8 @@ const wells = [
 ]
 
 const TABULAR_PREVIEW_RESPONSE = {
-  columns: ['well_name', 'depth', 'top_name'],
-  rows: [['Well A', '100', 'Top A']],
+  columns: ['well_name', 'depth', 'top_name', 'incl', 'azim'],
+  rows: [['Well A', '100', 'Top A', '0', '0']],
   detected_delimiter: ',',
   header_row: 0,
   total_rows: 1,
@@ -45,6 +45,10 @@ async function advancePastPreview(user: ReturnType<typeof userEvent.setup>) {
   await waitFor(() => {
     expect((screen.getByRole('button', { name: 'Next' }) as HTMLButtonElement).disabled).toBe(false)
   })
+  await user.click(screen.getByRole('button', { name: 'Next' }))
+}
+
+async function advancePastMapping(user: ReturnType<typeof userEvent.setup>) {
   await user.click(screen.getByRole('button', { name: 'Next' }))
 }
 
@@ -86,6 +90,7 @@ describe('Import dialogs target active well by default', () => {
     )
 
     await advancePastPreview(user)
+    await advancePastMapping(user)
     expect((screen.getByLabelText('Target well') as HTMLSelectElement).value).toBe('well-b')
   })
 
@@ -101,6 +106,7 @@ describe('Import dialogs target active well by default', () => {
     )
 
     await advancePastPreview(user)
+    await advancePastMapping(user)
     expect((screen.getByLabelText('Target well') as HTMLSelectElement).value).toBe('well-b')
   })
 

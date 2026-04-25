@@ -1,9 +1,14 @@
 import type { ImportWizardStep } from './types'
 
-const STEP_LABELS = ['File', 'Preview', 'Options', 'Import']
+export const DEFAULT_STEP_LABELS = ['File', 'Preview', 'Options', 'Import']
+export const MAPPING_STEP_LABELS = ['File', 'Preview', 'Mapping', 'Options', 'Import']
 
-export function buildImportWizardSteps(currentStepIndex: number, sourceIsValid: boolean): ImportWizardStep[] {
-  return STEP_LABELS.map((label, index) => {
+export function buildImportWizardSteps(
+  currentStepIndex: number,
+  sourceIsValid: boolean,
+  labels: string[] = DEFAULT_STEP_LABELS,
+): ImportWizardStep[] {
+  return labels.map((label, index) => {
     let status: ImportWizardStep['status'] = 'active'
     if (index < currentStepIndex) {
       status = 'done'

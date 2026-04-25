@@ -12,6 +12,7 @@ from ..schema import DeviationSurveyModel
 from .common import (
     DEFAULT_WELL_KB,
     DEFAULT_WELL_NAME,
+    _apply_column_map,
     _coerce_float,
     _extract_text,
     _find_existing_well_by_identity,
@@ -78,6 +79,7 @@ def import_deviation_csv(
     well_id: str | None,
     csv_path: Path | str,
     *,
+    column_map: dict[str, str] | None = None,
     create_new_well: bool = False,
 ) -> DeviationSurveyModel:
     bundle_path = Path(project_path)
@@ -86,6 +88,8 @@ def import_deviation_csv(
     deviation_dir.mkdir(parents=True, exist_ok=True)
 
     fieldnames, rows = _read_csv_rows(path)
+    if column_map:
+        fieldnames, rows = _apply_column_map(fieldnames, rows, column_map)
     if not rows:
         raise ValueError(f'{path}: deviation CSV is empty')
 

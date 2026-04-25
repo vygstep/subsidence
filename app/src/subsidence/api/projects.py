@@ -69,6 +69,7 @@ class ImportTopsRequest(BaseModel):
     csv_path: str
     depth_ref: str = 'MD'
     create_new_well: bool = False
+    column_map: dict[str, str] | None = None
 
 
 class ImportUnconformitiesRequest(BaseModel):
@@ -80,6 +81,7 @@ class ImportDeviationRequest(BaseModel):
     well_id: str | None = None
     csv_path: str
     create_new_well: bool = False
+    column_map: dict[str, str] | None = None
 
 
 class CreateCheckpointRequest(BaseModel):

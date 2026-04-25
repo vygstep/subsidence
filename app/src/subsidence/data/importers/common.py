@@ -194,6 +194,23 @@ def _find_existing_well_by_identity(
     return None
 
 
+def _apply_column_map(
+    fieldnames: list[str],
+    rows: list[dict[str, str]],
+    column_map: dict[str, str],
+) -> tuple[list[str], list[dict[str, str]]]:
+    """Rename file column names to canonical names.
+
+    column_map maps canonical_name -> file_column_name.
+    Returns updated fieldnames and rows with file column names replaced by
+    their canonical counterparts.
+    """
+    inverse = {file_col: canonical for canonical, file_col in column_map.items()}
+    new_fieldnames = [inverse.get(col, col) for col in fieldnames]
+    new_rows = [{inverse.get(k, k): v for k, v in row.items()} for row in rows]
+    return new_fieldnames, new_rows
+
+
 def _read_csv_rows(path: Path | str) -> tuple[list[str], list[dict[str, str]]]:
     csv_path = Path(path)
     with csv_path.open('r', encoding='utf-8-sig', newline='') as handle:
