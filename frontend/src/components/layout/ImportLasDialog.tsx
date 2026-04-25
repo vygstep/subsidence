@@ -7,9 +7,12 @@ import { recordOperation } from '@/utils/diagnostics'
 import {
   ImportWizardShell,
   ImportWizardTargetWellFields,
+  LasPreviewPane,
+  TabularPreviewPane,
   buildImportWizardSteps,
   importWizardPresets,
   readImportError,
+  useImportPreview,
 } from './importWizard'
 import { getLastImportRoot, pickFile, rememberImportPath } from './pathMemory'
 
@@ -44,8 +47,24 @@ export function ImportLasDialog({ wells, activeWellId, onClose, onSuccess }: Imp
   const lastImportRoot = getLastImportRoot()
   const preset = sourceType === 'las' ? importWizardPresets.logsLas : importWizardPresets.logsCsv
   const sourceIsValid = sourcePath.trim().length > 0
+  const isOnPreviewStep = currentStepIndex === 1
+
+  const { isLoading: previewLoading, error: previewError, tabularPreview, lasPreview, parserSettings, updateParserSettings } = useImportPreview(
+    preset.previewMode,
+    sourcePath,
+    isOnPreviewStep,
+  )
+
+  const previewReady = previewLoading
+    ? false
+    : preset.previewMode === 'las'
+      ? lasPreview !== null
+      : tabularPreview !== null
+
   const steps = buildImportWizardSteps(currentStepIndex, sourceIsValid)
-  const validationMessages = sourceIsValid ? [] : [`${sourceType === 'las' ? 'LAS' : 'CSV'} path is required.`]
+  const validationMessages = currentStepIndex === 0 && !sourceIsValid
+    ? [`${sourceType === 'las' ? 'LAS' : 'CSV'} path is required.`]
+    : []
 
   const handleSubmit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault()
@@ -114,6 +133,12 @@ export function ImportLasDialog({ wells, activeWellId, onClose, onSuccess }: Imp
     }
   }
 
+  const canAdvanceFromStep = (step: number): boolean => {
+    if (step === 0) return sourceIsValid
+    if (step === 1) return !previewLoading && (previewReady || previewError !== null)
+    return true
+  }
+
   return (
     <ImportWizardShell
       preset={preset}
@@ -122,7 +147,7 @@ export function ImportLasDialog({ wells, activeWellId, onClose, onSuccess }: Imp
       currentStepIndex={currentStepIndex}
       error={error}
       isSubmitting={isSubmitting}
-      canAdvance={currentStepIndex === 0 ? sourceIsValid : true}
+      canAdvance={canAdvanceFromStep(currentStepIndex)}
       canSubmit={sourceIsValid}
       validationMessages={validationMessages}
       onClose={onClose}
@@ -163,6 +188,20 @@ export function ImportLasDialog({ wells, activeWellId, onClose, onSuccess }: Imp
       ) : null}
 
       {currentStepIndex === 1 ? (
+        sourceType === 'las' ? (
+          <LasPreviewPane isLoading={previewLoading} error={previewError} preview={lasPreview} />
+        ) : (
+          <TabularPreviewPane
+            isLoading={previewLoading}
+            error={previewError}
+            preview={tabularPreview}
+            settings={parserSettings}
+            onSettingsChange={updateParserSettings}
+          />
+        )
+      ) : null}
+
+      {currentStepIndex === 2 ? (
         <>
           <ImportWizardTargetWellFields
             wells={wells}
@@ -186,7 +225,7 @@ export function ImportLasDialog({ wells, activeWellId, onClose, onSuccess }: Imp
         </>
       ) : null}
 
-      {currentStepIndex === 2 ? (
+      {currentStepIndex === 3 ? (
         <div className="project-dialog__validation" aria-label="Import summary">
           <span>Source: {sourcePath.trim()}</span>
           <span>Target: {wellId || 'file header / defaults'}</span>

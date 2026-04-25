@@ -1,6 +1,6 @@
-import { render, screen } from '@testing-library/react'
+import { render, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
-import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 import { ImportDeviationDialog } from '@/components/layout/ImportDeviationDialog'
 import { ImportLasDialog } from '@/components/layout/ImportLasDialog'
@@ -12,10 +12,51 @@ const wells = [
   { well_id: 'well-b', well_name: 'Well B' },
 ]
 
+const TABULAR_PREVIEW_RESPONSE = {
+  columns: ['well_name', 'depth', 'top_name'],
+  rows: [['Well A', '100', 'Top A']],
+  detected_delimiter: ',',
+  header_row: 0,
+  total_rows: 1,
+  warnings: [],
+}
+
+const LAS_PREVIEW_RESPONSE = {
+  well_name: 'Well B',
+  well_id: null,
+  depth_unit: 'M',
+  curves: [{ mnemonic: 'DEPT', unit: 'M', description: 'Depth' }],
+  start_depth: 100,
+  stop_depth: 3000,
+  step: 0.1524,
+  null_value: -999.25,
+  warnings: [],
+}
+
+function mockFetch(lasResponse = LAS_PREVIEW_RESPONSE, tabularResponse = TABULAR_PREVIEW_RESPONSE) {
+  vi.stubGlobal('fetch', vi.fn().mockImplementation((url: string) => {
+    const body = url.includes('/las') ? lasResponse : tabularResponse
+    return Promise.resolve({ ok: true, json: async () => body })
+  }))
+}
+
+async function advancePastPreview(user: ReturnType<typeof userEvent.setup>) {
+  await user.click(screen.getByRole('button', { name: 'Next' }))
+  await waitFor(() => {
+    expect((screen.getByRole('button', { name: 'Next' }) as HTMLButtonElement).disabled).toBe(false)
+  })
+  await user.click(screen.getByRole('button', { name: 'Next' }))
+}
+
 describe('Import dialogs target active well by default', () => {
   beforeEach(() => {
     useProjectStore.setState({ projectPath: 'D:\\projects\\test.subsidence' })
     window.localStorage.setItem('subsidence:last-import-root', 'D:\\data\\imports')
+    mockFetch()
+  })
+
+  afterEach(() => {
+    vi.unstubAllGlobals()
   })
 
   it('preselects the active well in the logs dialog', async () => {
@@ -29,7 +70,7 @@ describe('Import dialogs target active well by default', () => {
       />,
     )
 
-    await user.click(screen.getByRole('button', { name: 'Next' }))
+    await advancePastPreview(user)
     expect((screen.getByLabelText('Target well') as HTMLSelectElement).value).toBe('well-b')
   })
 
@@ -44,7 +85,7 @@ describe('Import dialogs target active well by default', () => {
       />,
     )
 
-    await user.click(screen.getByRole('button', { name: 'Next' }))
+    await advancePastPreview(user)
     expect((screen.getByLabelText('Target well') as HTMLSelectElement).value).toBe('well-b')
   })
 
@@ -59,7 +100,7 @@ describe('Import dialogs target active well by default', () => {
       />,
     )
 
-    await user.click(screen.getByRole('button', { name: 'Next' }))
+    await advancePastPreview(user)
     expect((screen.getByLabelText('Target well') as HTMLSelectElement).value).toBe('well-b')
   })
 

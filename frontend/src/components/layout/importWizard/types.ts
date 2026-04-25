@@ -29,6 +29,40 @@ export interface ImportWizardWellOption {
   well_name: string
 }
 
+export type TabularDelimiter = 'auto' | ',' | '\t' | ';'
+
+export interface TabularParserSettings {
+  delimiter: TabularDelimiter
+  headerRow: number
+}
+
+export interface TabularPreviewResponse {
+  columns: string[]
+  rows: string[][]
+  detected_delimiter: string
+  header_row: number
+  total_rows: number | null
+  warnings: string[]
+}
+
+export interface LasPreviewCurve {
+  mnemonic: string
+  unit: string
+  description: string | null
+}
+
+export interface LasPreviewResponse {
+  well_name: string | null
+  well_id: string | null
+  depth_unit: string | null
+  curves: LasPreviewCurve[]
+  start_depth: number | null
+  stop_depth: number | null
+  step: number | null
+  null_value: number | null
+  warnings: string[]
+}
+
 export interface ImportWizardShellProps {
   preset: ImportWizardPreset
   titleId: string

@@ -1,6 +1,6 @@
 import type { ImportWizardStep } from './types'
 
-const STEP_LABELS = ['File', 'Options', 'Import']
+const STEP_LABELS = ['File', 'Preview', 'Options', 'Import']
 
 export function buildImportWizardSteps(currentStepIndex: number, sourceIsValid: boolean): ImportWizardStep[] {
   return STEP_LABELS.map((label, index) => {

@@ -1,5 +1,8 @@
 export * from './ImportWizardShell'
 export * from './ImportWizardTargetWellFields'
+export * from './LasPreviewPane'
+export * from './TabularPreviewPane'
 export * from './importWizardPresets'
 export * from './importWizardUtils'
+export * from './useImportPreview'
 export type * from './types'

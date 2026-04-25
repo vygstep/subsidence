@@ -7,9 +7,11 @@ import { recordOperation } from '@/utils/diagnostics'
 import {
   ImportWizardShell,
   ImportWizardTargetWellFields,
+  TabularPreviewPane,
   buildImportWizardSteps,
   importWizardPresets,
   readImportError,
+  useImportPreview,
 } from './importWizard'
 import { getLastImportRoot, pickFile, rememberImportPath } from './pathMemory'
 
@@ -41,8 +43,18 @@ export function ImportTopsDialog({ wells, activeWellId, onClose, onSuccess }: Im
   const lastImportRoot = getLastImportRoot()
   const preset = importWizardPresets.tops
   const sourceIsValid = csvPath.trim().length > 0
+  const isOnPreviewStep = currentStepIndex === 1
+
+  const { isLoading: previewLoading, error: previewError, tabularPreview, parserSettings, updateParserSettings } = useImportPreview(
+    'tabular',
+    csvPath,
+    isOnPreviewStep,
+  )
+
+  const previewReady = !previewLoading && tabularPreview !== null
+
   const steps = buildImportWizardSteps(currentStepIndex, sourceIsValid)
-  const validationMessages = sourceIsValid ? [] : ['CSV path is required.']
+  const validationMessages = currentStepIndex === 0 && !sourceIsValid ? ['CSV path is required.'] : []
 
   const handleSubmit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault()
@@ -98,6 +110,12 @@ export function ImportTopsDialog({ wells, activeWellId, onClose, onSuccess }: Im
     }
   }
 
+  const canAdvanceFromStep = (step: number): boolean => {
+    if (step === 0) return sourceIsValid
+    if (step === 1) return !previewLoading && (previewReady || previewError !== null)
+    return true
+  }
+
   return (
     <ImportWizardShell
       preset={preset}
@@ -106,7 +124,7 @@ export function ImportTopsDialog({ wells, activeWellId, onClose, onSuccess }: Im
       currentStepIndex={currentStepIndex}
       error={error}
       isSubmitting={isSubmitting}
-      canAdvance={currentStepIndex === 0 ? sourceIsValid : true}
+      canAdvance={canAdvanceFromStep(currentStepIndex)}
       canSubmit={sourceIsValid}
       validationMessages={validationMessages}
       onClose={onClose}
@@ -137,6 +155,16 @@ export function ImportTopsDialog({ wells, activeWellId, onClose, onSuccess }: Im
       ) : null}
 
       {currentStepIndex === 1 ? (
+        <TabularPreviewPane
+          isLoading={previewLoading}
+          error={previewError}
+          preview={tabularPreview}
+          settings={parserSettings}
+          onSettingsChange={updateParserSettings}
+        />
+      ) : null}
+
+      {currentStepIndex === 2 ? (
         <>
           <ImportWizardTargetWellFields
             wells={wells}
@@ -146,18 +174,18 @@ export function ImportTopsDialog({ wells, activeWellId, onClose, onSuccess }: Im
             onWellIdChange={setWellId}
             onCreateNewWellChange={setCreateNewWell}
           />
-        <label className="project-dialog__field">
-          <span>Depth reference</span>
-          <select value={depthRef} onChange={(event) => setDepthRef(event.target.value as 'MD' | 'TVD' | 'TVDSS')}>
-            <option value="MD">MD</option>
-            <option value="TVD">TVD</option>
-            <option value="TVDSS">TVDSS</option>
-          </select>
-        </label>
+          <label className="project-dialog__field">
+            <span>Depth reference</span>
+            <select value={depthRef} onChange={(event) => setDepthRef(event.target.value as 'MD' | 'TVD' | 'TVDSS')}>
+              <option value="MD">MD</option>
+              <option value="TVD">TVD</option>
+              <option value="TVDSS">TVDSS</option>
+            </select>
+          </label>
         </>
       ) : null}
 
-      {currentStepIndex === 2 ? (
+      {currentStepIndex === 3 ? (
         <div className="project-dialog__validation" aria-label="Import summary">
           <span>Source: {csvPath.trim()}</span>
           <span>Target: {wellId || 'file well_name / defaults'}</span>

@@ -7,9 +7,11 @@ import { recordOperation } from '@/utils/diagnostics'
 import {
   ImportWizardShell,
   ImportWizardTargetWellFields,
+  TabularPreviewPane,
   buildImportWizardSteps,
   importWizardPresets,
   readImportError,
+  useImportPreview,
 } from './importWizard'
 import { getLastImportRoot, pickFile, rememberImportPath } from './pathMemory'
 
@@ -40,8 +42,18 @@ export function ImportDeviationDialog({ wells, activeWellId, onClose, onSuccess 
   const lastImportRoot = getLastImportRoot()
   const preset = importWizardPresets.deviation
   const sourceIsValid = csvPath.trim().length > 0
+  const isOnPreviewStep = currentStepIndex === 1
+
+  const { isLoading: previewLoading, error: previewError, tabularPreview, parserSettings, updateParserSettings } = useImportPreview(
+    'tabular',
+    csvPath,
+    isOnPreviewStep,
+  )
+
+  const previewReady = !previewLoading && tabularPreview !== null
+
   const steps = buildImportWizardSteps(currentStepIndex, sourceIsValid)
-  const validationMessages = sourceIsValid ? [] : ['CSV path is required.']
+  const validationMessages = currentStepIndex === 0 && !sourceIsValid ? ['CSV path is required.'] : []
 
   const handleSubmit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault()
@@ -96,6 +108,12 @@ export function ImportDeviationDialog({ wells, activeWellId, onClose, onSuccess 
     }
   }
 
+  const canAdvanceFromStep = (step: number): boolean => {
+    if (step === 0) return sourceIsValid
+    if (step === 1) return !previewLoading && (previewReady || previewError !== null)
+    return true
+  }
+
   return (
     <ImportWizardShell
       preset={preset}
@@ -104,7 +122,7 @@ export function ImportDeviationDialog({ wells, activeWellId, onClose, onSuccess 
       currentStepIndex={currentStepIndex}
       error={error}
       isSubmitting={isSubmitting}
-      canAdvance={currentStepIndex === 0 ? sourceIsValid : true}
+      canAdvance={canAdvanceFromStep(currentStepIndex)}
       canSubmit={sourceIsValid}
       validationMessages={validationMessages}
       onClose={onClose}
@@ -135,6 +153,16 @@ export function ImportDeviationDialog({ wells, activeWellId, onClose, onSuccess 
       ) : null}
 
       {currentStepIndex === 1 ? (
+        <TabularPreviewPane
+          isLoading={previewLoading}
+          error={previewError}
+          preview={tabularPreview}
+          settings={parserSettings}
+          onSettingsChange={updateParserSettings}
+        />
+      ) : null}
+
+      {currentStepIndex === 2 ? (
         <ImportWizardTargetWellFields
           wells={wells}
           wellId={wellId}
@@ -145,7 +173,7 @@ export function ImportDeviationDialog({ wells, activeWellId, onClose, onSuccess 
         />
       ) : null}
 
-      {currentStepIndex === 2 ? (
+      {currentStepIndex === 3 ? (
         <div className="project-dialog__validation" aria-label="Import summary">
           <span>Source: {csvPath.trim()}</span>
           <span>Target: {wellId || 'file well_name / defaults'}</span>

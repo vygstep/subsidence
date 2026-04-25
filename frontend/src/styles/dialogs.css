@@ -7,7 +7,7 @@
 }
 
 .project-dialog {
-  width: min(100%, 560px);
+  width: min(100%, 640px);
   display: flex;
   flex-direction: column;
   background: rgba(255, 255, 255, 0.97);
@@ -135,7 +135,7 @@
 
 .project-dialog__steps {
   display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(0, 1fr));
   gap: 6px;
 }
 
@@ -308,4 +308,107 @@
 .project-dialog__button:disabled {
   opacity: 0.4;
   cursor: not-allowed;
+}
+
+.project-dialog__field--inline {
+  flex-direction: row;
+  align-items: center;
+  gap: 8px;
+}
+
+.project-dialog__field--inline span {
+  white-space: nowrap;
+}
+
+.project-dialog__field--inline input,
+.project-dialog__field--inline select {
+  width: auto;
+  min-width: 90px;
+}
+
+/* ── Import preview ─────────────────────────────────────────────────── */
+
+.import-preview {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  min-height: 0;
+}
+
+.import-preview__controls {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.import-preview__meta {
+  font-size: 0.76rem;
+  color: #64748b;
+}
+
+.import-preview__status {
+  margin: 0;
+  font-size: 0.8rem;
+  color: #64748b;
+}
+
+.import-preview__table-wrap {
+  overflow: auto;
+  max-height: 240px;
+  border: 1px solid #d8e2ec;
+  border-radius: 10px;
+  background: #fafcff;
+}
+
+.import-preview__table {
+  border-collapse: collapse;
+  font-size: 0.75rem;
+  min-width: 100%;
+  white-space: nowrap;
+}
+
+.import-preview__table th,
+.import-preview__table td {
+  padding: 5px 10px;
+  border-bottom: 1px solid #e8edf3;
+  text-align: left;
+}
+
+.import-preview__table th {
+  position: sticky;
+  top: 0;
+  background: #f0f5fb;
+  font-weight: 700;
+  color: #314155;
+}
+
+.import-preview__table td {
+  color: #44596e;
+}
+
+.import-preview__table tbody tr:last-child td {
+  border-bottom: 0;
+}
+
+.import-preview__las-meta {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  padding: 10px 12px;
+  border: 1px solid #d8e2ec;
+  border-radius: 10px;
+  background: #f8fbff;
+}
+
+.import-preview__las-meta-row {
+  display: flex;
+  gap: 10px;
+  font-size: 0.8rem;
+}
+
+.import-preview__las-meta-label {
+  min-width: 90px;
+  font-weight: 700;
+  color: #526476;
 }

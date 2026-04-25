@@ -10,6 +10,7 @@ from subsidence.observability import configure_logging, log_event, reset_request
 
 from .compaction import router as compaction_router
 from .formations import router as formations_router
+from .import_preview import router as import_preview_router
 from .projects import router as projects_router
 from .projects_config import router as projects_config_router
 from .projects_export import router as projects_export_router
@@ -93,6 +94,7 @@ app.include_router(formations_router, prefix="/api")
 app.include_router(strat_chart_router, prefix="/api")
 app.include_router(compaction_router, prefix="/api")
 app.include_router(subsidence_router, prefix="/api")
+app.include_router(import_preview_router, prefix="/api/import-preview")
 app.include_router(projects_router, prefix="/api/projects")
 app.include_router(projects_imports_router, prefix="/api/projects")
 app.include_router(projects_config_router, prefix="/api/projects")
