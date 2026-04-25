@@ -1,8 +1,10 @@
 import { useState } from 'react'
+import type { FormEvent } from 'react'
 
 import { useProjectStore } from '@/stores'
 import { recordOperation } from '@/utils/diagnostics'
 
+import { ImportWizardShell, importWizardPresets, readImportError } from './importWizard'
 import { getLastImportRoot, pickFile, rememberImportPath } from './pathMemory'
 
 interface WellOption {
@@ -23,18 +25,6 @@ interface ImportLasResponse {
 
 type LogSourceType = 'las' | 'csv'
 
-async function readError(response: Response, fallback: string): Promise<string> {
-  try {
-    const payload = (await response.json()) as { detail?: string }
-    if (payload.detail) {
-      return payload.detail
-    }
-  } catch {
-    // Ignore non-JSON errors.
-  }
-  return fallback
-}
-
 export function ImportLasDialog({ wells, activeWellId, onClose, onSuccess }: ImportLasDialogProps) {
   const projectPath = useProjectStore((state) => state.projectPath)
   const [wellId, setWellId] = useState(activeWellId ?? '')
@@ -45,8 +35,9 @@ export function ImportLasDialog({ wells, activeWellId, onClose, onSuccess }: Imp
   const [error, setError] = useState<string | null>(null)
   const [isSubmitting, setIsSubmitting] = useState(false)
   const lastImportRoot = getLastImportRoot()
+  const preset = sourceType === 'las' ? importWizardPresets.logsLas : importWizardPresets.logsCsv
 
-  const handleSubmit = async (event: React.FormEvent<HTMLFormElement>) => {
+  const handleSubmit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault()
     const nextPath = sourcePath.trim()
     if (!nextPath) {
@@ -57,8 +48,8 @@ export function ImportLasDialog({ wells, activeWellId, onClose, onSuccess }: Imp
     setIsSubmitting(true)
     setError(null)
     try {
-      await recordOperation(sourceType === 'las' ? 'import.las' : 'import.logs_csv', async () => {
-        const response = await fetch(sourceType === 'las' ? '/api/projects/import-las' : '/api/projects/import-logs-csv', {
+      await recordOperation(preset.executeOperation, async () => {
+        const response = await fetch(preset.executeEndpoint, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify(
@@ -77,7 +68,7 @@ export function ImportLasDialog({ wells, activeWellId, onClose, onSuccess }: Imp
           ),
         })
         if (!response.ok) {
-          throw new Error(await readError(
+          throw new Error(await readImportError(
             response,
             sourceType === 'las'
               ? `Failed to import LAS (${response.status})`
@@ -104,17 +95,7 @@ export function ImportLasDialog({ wells, activeWellId, onClose, onSuccess }: Imp
   const handleBrowse = async () => {
     setError(null)
     try {
-      const picked = await pickFile(sourcePath || lastImportRoot, sourceType === 'las'
-        ? [
-            ['LAS files', '*.las'],
-            ['All files', '*.*'],
-          ]
-        : [
-            ['Delimited text', '*.csv *.tsv *.txt'],
-            ['CSV files', '*.csv'],
-            ['TSV files', '*.tsv'],
-            ['All files', '*.*'],
-          ])
+      const picked = await pickFile(sourcePath || lastImportRoot, preset.acceptedFileFilters)
       if (picked) {
         setSourcePath(picked)
       }
@@ -124,18 +105,14 @@ export function ImportLasDialog({ wells, activeWellId, onClose, onSuccess }: Imp
   }
 
   return (
-    <section className="project-dialog" aria-labelledby="import-las-title">
-      <header className="project-dialog__header">
-        <div>
-          <p className="project-dialog__eyebrow">Phase 3</p>
-          <h2 id="import-las-title" className="project-dialog__title">Load logs</h2>
-        </div>
-        <button type="button" className="project-dialog__link" onClick={onClose}>
-          Close
-        </button>
-      </header>
-
-      <form className="project-dialog__body" onSubmit={handleSubmit}>
+    <ImportWizardShell
+      preset={preset}
+      titleId="import-las-title"
+      error={error}
+      isSubmitting={isSubmitting}
+      onClose={onClose}
+      onSubmit={handleSubmit}
+    >
         <label className="project-dialog__field">
           <span>Format</span>
           <select value={sourceType} onChange={(event) => setSourceType(event.target.value as LogSourceType)}>
@@ -198,18 +175,6 @@ export function ImportLasDialog({ wells, activeWellId, onClose, onSuccess }: Imp
             />
           </label>
         ) : null}
-
-        {error && <p className="project-dialog__error">{error}</p>}
-
-        <div className="project-dialog__actions">
-          <button type="button" className="project-dialog__button" onClick={onClose}>
-            Cancel
-          </button>
-          <button type="submit" className="project-dialog__button project-dialog__button--primary" disabled={isSubmitting}>
-            {isSubmitting ? 'Importing...' : 'Load logs'}
-          </button>
-        </div>
-      </form>
-    </section>
+    </ImportWizardShell>
   )
 }

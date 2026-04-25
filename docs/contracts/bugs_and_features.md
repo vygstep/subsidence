@@ -538,6 +538,28 @@ Implementation order for UNIT-001:
 
 ## 4. Import Wizard
 
+Implementation checkpoints:
+
+1. `WIZ-001-A`: add the shared wizard shell and preset model, then route existing import actions through the shell without changing backend behavior. (done)
+2. `WIZ-001-B`: add step navigation, blocking validation states, and target-well controls shared by logs/tops/deviation.
+3. `WIZ-002-A`: add backend preview endpoints for tabular files and LAS files.
+4. `WIZ-002-B`: render parser settings and preview rows/curve metadata from the preview response.
+5. `WIZ-003-A`: add preset-specific mapping definitions and auto-mapping.
+6. `WIZ-003-B`: pass explicit mappings into import execution endpoints or adapter functions.
+
+Shared frontend model:
+
+- `ImportWizardPreset`: data type, title, accepted file filters, preview mode, required fields, optional fields, target-well policy, execute endpoint, and result labels.
+- `ImportWizardState`: selected file path, parser settings, preview response, column mappings, target-well policy, validation state, execution state, and last error.
+- `ImportWizardShell`: reusable step layout, footer actions, error surface, and progress indicator.
+- Preset-specific components should only provide field definitions, copy, and endpoint adapters.
+
+Backend preview contract:
+
+- `POST /api/import-preview/tabular`: accepts file path and parser settings; returns delimiter, header row, columns, first rows, row count where cheap, warnings, and suggested mappings.
+- `POST /api/import-preview/las`: accepts LAS path; returns well metadata, depth unit, curve list with units, null value, start/stop/step where available, warnings, and suggested logs preset mappings.
+- Preview endpoints do not mutate project state and do not write imported data.
+
 ### WIZ-001: Shared import wizard shell
 
 Problem:
@@ -556,6 +578,16 @@ Required behavior:
   - validate required fields;
   - execute import.
 - Existing direct import dialogs should either be replaced or become thin wrappers around the wizard.
+- The first implementation keeps the current import endpoints and wraps them with the shared shell.
+- File picking continues to use the existing `pickFile`, `getLastImportRoot`, and `rememberImportPath` helpers.
+- The shell must support non-tabular LAS imports and tabular CSV/TSV imports through the same step container.
+- Step buttons:
+  - `Back`;
+  - `Next`;
+  - `Import`;
+  - `Cancel`.
+- Footer actions are disabled while preview/import requests are running.
+- Every step must expose a compact validation summary, not only inline field errors.
 
 Likely code areas:
 
@@ -564,10 +596,15 @@ Likely code areas:
 - `frontend/src/components/layout/ImportDeviationDialog.tsx`
 - `frontend/src/components/layout/LoadStratChartDialog.tsx`
 - New shared wizard components under `frontend/src/components/layout/importWizard/`.
+- `frontend/src/components/layout/ProjectToolbar.tsx`
+- `frontend/src/components/layout/pathMemory.ts`
 
 Acceptance:
 
 - There is one reusable wizard shell and data-type-specific presets plug into it.
+- Logs, tops, and deviation toolbar actions open the same wizard shell with different presets.
+- The initial shell can execute the same imports as the old dialogs.
+- Existing target-well default behavior remains covered by tests.
 
 ### WIZ-002: File preview and parser detection
 
@@ -585,17 +622,31 @@ Required behavior:
 - Auto-detect likely header row.
 - Allow user override for delimiter and header row.
 - Preserve support for LAS imports, but LAS preview can initially show metadata/curve list instead of tabular rows.
+- Preview should be backend-backed so the parsed columns match backend import behavior.
+- Preview response must include warnings for:
+  - empty files;
+  - inconsistent row lengths;
+  - duplicate column names;
+  - missing obvious depth/name fields where a preset expects them.
+- Parser settings:
+  - delimiter: `auto`, `comma`, `tab`, `semicolon`;
+  - header row index;
+  - data start row index;
+  - text encoding can remain UTF-8 in the first pass unless real files force expansion.
 
 Likely code areas:
 
-- New frontend preview parser utilities.
-- Backend preview endpoint if frontend-only parsing is not enough.
+- `app/src/subsidence/api/projects_imports.py` or a dedicated `import_preview.py` router.
+- New backend preview helpers under `app/src/subsidence/data/importers/preview.py`.
+- New frontend preview client utilities under `frontend/src/components/layout/importWizard/`.
 - Existing importers under `app/src/subsidence/data/importers/`.
 
 Acceptance:
 
 - User can see what will be imported before import starts.
 - CSV and TSV previews show the same parsed columns that the import will use.
+- LAS previews show well metadata and curve list before import starts.
+- Changing delimiter/header row refreshes the preview deterministically.
 
 ### WIZ-003: Column mapping and required-field validation
 
@@ -617,16 +668,27 @@ Required behavior:
   - unconformities: name/depth/age fields;
   - deviation: MD/TVD or inclination/azimuth variants;
   - stratigraphy: unit name, rank, age top/base, parent, color.
+- Auto-mapping should use normalized aliases, not exact case-sensitive column names.
+- Unit labels should be parsed from headers such as `DEPT[ft]`, `RHOB (kg/m3)`, and LAS curve metadata.
+- Logs mapping must distinguish:
+  - depth column;
+  - excluded metadata columns;
+  - imported curve columns.
+- Mapping should be represented as data, so preset definitions can be tested without rendering the full wizard.
 
 Likely code areas:
 
 - New import wizard mapping model.
 - Existing backend import endpoints and importers.
+- `frontend/src/components/layout/importWizard/importWizardPresets.ts`
+- `frontend/src/components/layout/importWizard/mapping.ts`
 
 Acceptance:
 
 - Import button is disabled until required mappings are valid.
 - User can fix wrong auto-mapping before import.
+- Auto-mapping handles reordered columns.
+- Invalid mappings never start backend import execution.
 
 ### WIZ-004: Target well resolution
 

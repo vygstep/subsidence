@@ -1,8 +1,10 @@
 import { useState } from 'react'
+import type { FormEvent } from 'react'
 
 import { useProjectStore } from '@/stores'
 import { recordOperation } from '@/utils/diagnostics'
 
+import { ImportWizardShell, importWizardPresets, readImportError } from './importWizard'
 import { getLastImportRoot, pickFile, rememberImportPath } from './pathMemory'
 
 interface WellOption {
@@ -21,18 +23,6 @@ interface ImportTopsResponse {
   well_id: string
 }
 
-async function readError(response: Response, fallback: string): Promise<string> {
-  try {
-    const payload = (await response.json()) as { detail?: string }
-    if (payload.detail) {
-      return payload.detail
-    }
-  } catch {
-    // Ignore non-JSON errors.
-  }
-  return fallback
-}
-
 export function ImportTopsDialog({ wells, activeWellId, onClose, onSuccess }: ImportTopsDialogProps) {
   const projectPath = useProjectStore((state) => state.projectPath)
   const [wellId, setWellId] = useState(activeWellId ?? '')
@@ -42,8 +32,9 @@ export function ImportTopsDialog({ wells, activeWellId, onClose, onSuccess }: Im
   const [error, setError] = useState<string | null>(null)
   const [isSubmitting, setIsSubmitting] = useState(false)
   const lastImportRoot = getLastImportRoot()
+  const preset = importWizardPresets.tops
 
-  const handleSubmit = async (event: React.FormEvent<HTMLFormElement>) => {
+  const handleSubmit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault()
     const nextPath = csvPath.trim()
     if (!nextPath) {
@@ -54,8 +45,8 @@ export function ImportTopsDialog({ wells, activeWellId, onClose, onSuccess }: Im
     setIsSubmitting(true)
     setError(null)
     try {
-      await recordOperation('import.tops', async () => {
-        const response = await fetch('/api/projects/import-tops', {
+      await recordOperation(preset.executeOperation, async () => {
+        const response = await fetch(preset.executeEndpoint, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
@@ -66,7 +57,7 @@ export function ImportTopsDialog({ wells, activeWellId, onClose, onSuccess }: Im
           }),
         })
         if (!response.ok) {
-          throw new Error(await readError(response, `Failed to import tops (${response.status})`))
+          throw new Error(await readImportError(response, `Failed to import tops (${response.status})`))
         }
 
         const payload = (await response.json()) as ImportTopsResponse
@@ -88,12 +79,7 @@ export function ImportTopsDialog({ wells, activeWellId, onClose, onSuccess }: Im
   const handleBrowse = async () => {
     setError(null)
     try {
-      const picked = await pickFile(csvPath || lastImportRoot, [
-        ['Delimited text', '*.csv *.tsv *.txt'],
-        ['CSV files', '*.csv'],
-        ['TSV files', '*.tsv'],
-        ['All files', '*.*'],
-      ])
+      const picked = await pickFile(csvPath || lastImportRoot, preset.acceptedFileFilters)
       if (picked) {
         setCsvPath(picked)
       }
@@ -103,18 +89,14 @@ export function ImportTopsDialog({ wells, activeWellId, onClose, onSuccess }: Im
   }
 
   return (
-    <section className="project-dialog" aria-labelledby="import-tops-title">
-      <header className="project-dialog__header">
-        <div>
-          <p className="project-dialog__eyebrow">Phase 3</p>
-          <h2 id="import-tops-title" className="project-dialog__title">Load Tops</h2>
-        </div>
-        <button type="button" className="project-dialog__link" onClick={onClose}>
-          Close
-        </button>
-      </header>
-
-      <form className="project-dialog__body" onSubmit={handleSubmit}>
+    <ImportWizardShell
+      preset={preset}
+      titleId="import-tops-title"
+      error={error}
+      isSubmitting={isSubmitting}
+      onClose={onClose}
+      onSubmit={handleSubmit}
+    >
         <label className="project-dialog__field">
           <span>Target well</span>
           <select value={wellId} onChange={(event) => setWellId(event.target.value)}>
@@ -164,18 +146,6 @@ export function ImportTopsDialog({ wells, activeWellId, onClose, onSuccess }: Im
             <option value="TVDSS">TVDSS</option>
           </select>
         </label>
-
-        {error && <p className="project-dialog__error">{error}</p>}
-
-        <div className="project-dialog__actions">
-          <button type="button" className="project-dialog__button" onClick={onClose}>
-            Cancel
-          </button>
-          <button type="submit" className="project-dialog__button project-dialog__button--primary" disabled={isSubmitting}>
-            {isSubmitting ? 'Importing...' : 'Load tops'}
-          </button>
-        </div>
-      </form>
-    </section>
+    </ImportWizardShell>
   )
 }

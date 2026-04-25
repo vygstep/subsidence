@@ -1,0 +1,68 @@
+import type { ImportWizardPreset } from './types'
+
+export const DELIMITED_TEXT_FILTERS: [string, string][] = [
+  ['Delimited text', '*.csv *.tsv *.txt'],
+  ['CSV files', '*.csv'],
+  ['TSV files', '*.tsv'],
+  ['All files', '*.*'],
+]
+
+export const LAS_FILE_FILTERS: [string, string][] = [
+  ['LAS files', '*.las'],
+  ['All files', '*.*'],
+]
+
+export const importWizardPresets = {
+  logsLas: {
+    id: 'logs',
+    title: 'Load logs',
+    eyebrow: 'Import Wizard',
+    submitLabel: 'Load logs',
+    busyLabel: 'Importing...',
+    previewMode: 'las',
+    targetWellPolicy: 'optional',
+    acceptedFileFilters: LAS_FILE_FILTERS,
+    executeOperation: 'import.las',
+    executeEndpoint: '/api/projects/import-las',
+    resultWellField: 'well_id',
+  },
+  logsCsv: {
+    id: 'logs',
+    title: 'Load logs',
+    eyebrow: 'Import Wizard',
+    submitLabel: 'Load logs',
+    busyLabel: 'Importing...',
+    previewMode: 'tabular',
+    targetWellPolicy: 'optional',
+    acceptedFileFilters: DELIMITED_TEXT_FILTERS,
+    executeOperation: 'import.logs_csv',
+    executeEndpoint: '/api/projects/import-logs-csv',
+    resultWellField: 'well_id',
+  },
+  tops: {
+    id: 'tops',
+    title: 'Load Tops',
+    eyebrow: 'Import Wizard',
+    submitLabel: 'Load tops',
+    busyLabel: 'Importing...',
+    previewMode: 'tabular',
+    targetWellPolicy: 'optional',
+    acceptedFileFilters: DELIMITED_TEXT_FILTERS,
+    executeOperation: 'import.tops',
+    executeEndpoint: '/api/projects/import-tops',
+    resultWellField: 'well_id',
+  },
+  deviation: {
+    id: 'deviation',
+    title: 'Load Deviation',
+    eyebrow: 'Import Wizard',
+    submitLabel: 'Load deviation',
+    busyLabel: 'Importing...',
+    previewMode: 'tabular',
+    targetWellPolicy: 'optional',
+    acceptedFileFilters: DELIMITED_TEXT_FILTERS,
+    executeOperation: 'import.deviation',
+    executeEndpoint: '/api/projects/import-deviation',
+    resultWellField: 'well_id',
+  },
+} satisfies Record<string, ImportWizardPreset>
