@@ -105,7 +105,7 @@ Goal:
 
 Items:
 
-- `TOPS-001`: TopSet / Horizon / Pick data model.
+- `TOPS-001`: TopSet / Horizon / Pick data model. (done)
 - `TOPS-002`: TVD/TVDSS as stored calculated fields; interactive depth picking.
 - `ZONE-001`: Zone entity and lifecycle.
 - `ZONE-002`: Zone settings UI and manual lithology input.
@@ -1045,6 +1045,24 @@ Acceptance:
 - Importing a new deviation survey triggers recalculation of all existing picks.
 - Legacy wells (no TopSet, no horizon_id) open without errors; all existing tests pass unchanged.
 - `SCHEMA_VERSION` = 8; migrations run cleanly on an existing v7 database.
+
+Implemented: commits `542ade1` (backend) and `1308a0d` (frontend types).
+
+- `app/src/subsidence/data/schema.py`: `TopSet`, `TopSetHorizon`, `WellActiveTopSet` tables; `FormationTopModel` gains `horizon_id`, `depth_tvdss`, nullable `depth_md`; `SCHEMA_VERSION` → 8.
+- `app/src/subsidence/data/deviation_transform.py`: new module — `compute_tvd_tvdss`, `tvd_to_md`, `recalculate_picks_tvd`, `_min_curvature`.
+- `app/src/subsidence/data/undo.py`: `UpdateFormationDepth` accepts `project_path`; updates `depth_tvd`/`depth_tvdss` in same transaction.
+- `app/src/subsidence/api/top_sets.py`: full CRUD router for TopSets/horizons; `PUT /api/wells/{well_id}/active-top-set`; `POST /api/top-sets/{id}/extract-from-well/{well_id}`; `POST /api/wells/{well_id}/recalculate-tvd`.
+- `app/src/subsidence/api/formations.py`: `FormationTopResponse` gains `depth_tvd`, `depth_tvdss`, `horizon_id`; create endpoint computes TVD; `UpdateFormationDepth` gets `project_path`.
+- `app/src/subsidence/api/wells.py`: `FormationInventoryItem`/`FormationResponse` gain TVD fields; `WellInventoryResponse` gains `active_top_set_id`, `active_top_set_name`; inventory query loads `WellActiveTopSet` in one batch.
+- `app/src/subsidence/api/projects_imports.py`: `recalculate_picks_tvd` called after deviation import and tops import.
+- `frontend/src/types/well.ts`: `FormationTop.depth_md` → `number | null`; added `depth_tvd`, `depth_tvdss`, `horizon_id`; `WellInventory` gains `active_top_set_id`, `active_top_set_name`.
+- `frontend/src/types/subsidence.ts`: added `TopSetHorizon`, `TopSetSummary`, `TopSetDetail`.
+- All components null-guarded for `depth_md`: skip rendering if null in `InteractionOverlay`, `FormationColumn`, `WellOverviewMinimap`; display `—` in `FormationTopsList`; drag disabled in `useFormationDrag`.
+
+Not yet implemented from TOPS-001 spec (deferred to TOPS-002 or later):
+- `FormationTopPatch` does not yet accept `depth_tvd`/`depth_tvdss` as alternate inputs (back-calculation via `tvd_to_md`).
+- `import_tops_csv` does not yet match horizon_id by name against active TopSet during import.
+- Integration tests for TopSet lifecycle.
 
 ---
 
