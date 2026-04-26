@@ -107,6 +107,7 @@ Items:
 
 - `TOPS-001`: TopSet / Horizon / Pick data model. (done)
 - `TOPS-002`: TVD/TVDSS as stored calculated fields; interactive depth picking.
+- `DEPTH-001`: Trusted depth reference on import, QC flags, TVD curve display.
 - `ZONE-001`: Zone entity and lifecycle.
 - `ZONE-002`: Zone settings UI and manual lithology input.
 - `ZONE-003`: Auto-lithology aggregation from discrete log (depends `LITH-001`).
@@ -115,6 +116,9 @@ Items:
 Exit criteria:
 
 - One TopSet can be applied to multiple wells; each well carries its own picks but shares horizon definitions and ages.
+- Every imported object (curve, top, deviation) carries an explicit `trusted_depth_reference`; data from files with TVD/TVDSS depth axes is never silently mislabelled as MD.
+- Curves can be displayed in MD, TVD, and TVDSS mode in the viewer using the same deviation survey that drives pick positioning.
+- Import warnings (data below TD, outside deviation range, variable sampling) are surfaced to the user.
 - Zones exist as first-class entities between consecutive horizons; thickness recalculates automatically when picks move.
 - Manual lithology input per zone is available before any log-derived lithology is implemented.
 - Zone-level lithology fractions are available as subsidence engine inputs.
@@ -1143,6 +1147,119 @@ Acceptance:
 - Dragging a pick in TVD mode moves the line in TVD space; the stored MD is updated accordingly.
 - Formations with `depth_md = null` display as "not picked" and can be assigned a depth via click or the inline editor.
 - Existing drag tests still pass; new tests cover click-to-set and the TVD/TVDSS context menu.
+
+---
+
+### DEPTH-001: Trusted depth reference, import QC flags, and TVD curve display
+
+Problem:
+
+- `CurveMetadata` does not record what depth type the imported file used. A LAS or CSV file whose depth column is TVDSS is stored and rendered as if the depths are MD — silent data misinterpretation with no warning.
+- Import does not warn when data extends beyond well TD, curves fall outside the deviation survey range, or sampling is irregular/variable.
+- After TOPS-002, formation picks can be viewed in TVD/TVDSS — but log curves stay in MD regardless of the viewer depth mode. The depth axis is inconsistent between picks and curves when the user switches depth type.
+
+Required behavior:
+
+**Schema changes (SCHEMA_VERSION 8 → 9):**
+
+- `CurveMetadata`: add `trusted_depth_reference` (String 8, default `'MD'`; values: `'MD' | 'TVD' | 'TVDSS'`), `sampling_kind` (String 16, nullable; values: `'CONSTANT' | 'VARIABLE' | 'SINGLE_POINT' | 'UNKNOWN'`), `nominal_step_m` (Float nullable — median depth step for CONSTANT curves, in meters), `qc_status` (String 8, default `'OK'`; values: `'OK' | 'WARNING' | 'ERROR'`), `qc_summary` (Text nullable — JSON blob; see format below).
+- `FormationTopModel`: add `qc_status` (String 8, default `'OK'`), `qc_summary` (Text nullable — JSON blob).
+
+Migration: existing `CurveMetadata` rows default to `trusted_depth_reference = 'MD'`, `qc_status = 'OK'`, `sampling_kind = NULL`. Existing `FormationTopModel` rows default to `qc_status = 'OK'`. These defaults are safe because historical import always treated depths as MD.
+
+**QC flag codes (stable string constants):**
+
+```
+CURVE_BELOW_TD               — curve max depth > well.td_md * 1.001
+TOP_BELOW_TD                 — top depth > well.td_md * 1.001
+DEVIATION_SHORTER_THAN_CURVE — deviation max MD < curve max MD
+VARIABLE_SAMPLING            — depth step varies by more than 10% of median step
+DUPLICATE_DEPTHS             — two or more samples share the same depth
+NON_MONOTONIC_DEPTH          — depth values not strictly increasing after dedup
+LARGE_DEPTH_GAP              — any gap > 20× median step
+HIGH_NULL_FRACTION           — more than 30% of value samples are null
+ALL_VALUES_NULL              — every value sample is null
+DEPTH_UNIT_UNKNOWN           — depth unit not recognised; defaulted to meters
+DEPTH_TRANSFORM_UNAVAILABLE  — TVD/TVDSS display requested but no deviation survey
+```
+
+**QC summary JSON format:**
+
+```json
+{
+  "flags": ["VARIABLE_SAMPLING", "CURVE_BELOW_TD"],
+  "messages": [
+    "Variable sampling: min step 0.18 m, median 0.20 m, max 1.40 m.",
+    "Curve max depth 2540.2 m exceeds well TD 2500.0 m."
+  ],
+  "stats": {
+    "sample_count": 12044,
+    "min_depth_m": 100.0,
+    "max_depth_m": 2540.2,
+    "median_step_m": 0.20,
+    "null_fraction": 0.02
+  }
+}
+```
+
+**Import API changes (backward-compatible new optional fields):**
+
+- `ImportLasRequest`, `ImportLogsCsvRequest`: add `trusted_depth_reference: Literal['MD', 'TVD', 'TVDSS'] = 'MD'`.
+- `ImportTopsRequest`: add `trusted_depth_reference: Literal['MD', 'TVD', 'TVDSS'] = 'MD'` (tops carry their picked depth in this reference; stored as `depth_value` intent even though the column name in `FormationTopModel` is still `depth_md`).
+- `ImportDeviationRequest`: already has `reference` field — rename to `trusted_depth_reference` or alias. No breaking change needed if field is also accepted under `trusted_depth_reference`.
+
+**Importer changes:**
+
+- LAS and logs CSV importers: after parsing, compute `sampling_kind` from depth deltas (CONSTANT if `(max_delta - min_delta) < 0.10 * median_delta`; VARIABLE otherwise; SINGLE_POINT if only one sample; UNKNOWN if detection fails). Store `nominal_step_m` as `median_delta` for CONSTANT curves, NULL otherwise.
+- All importers: run QC checks after parsing and flush. Populate `qc_status` and `qc_summary` on `CurveMetadata` / `FormationTopModel`. Return aggregated `qc_warnings: list[str]` in import response.
+- Tops importer: emit `TOP_BELOW_TD` per top that exceeds `well.td_md`. Currently this would raise no error — behavior is unchanged, only a flag is added.
+
+**TVD curve display (backend, MD-origin curves only):**
+
+- `GET /api/wells/{well_id}/curves` (full curve endpoint): add optional `?depth_basis=MD|TVD|TVDSS` (default `MD`). When `depth_basis != 'MD'` and curve `trusted_depth_reference == 'MD'` and well has an active deviation survey: convert the curve's depth array from MD to TVD/TVDSS using `deviation_transform._interpolate`. Response gains `depth_basis: str` and `native_depth_reference: str` fields. If conversion is unavailable (no survey), return native depths and add `DEPTH_TRANSFORM_UNAVAILABLE` to the response `qc_flags`.
+- Curves with `trusted_depth_reference != 'MD'` are always returned in their native basis regardless of `depth_basis` request; response `depth_basis` reflects actual returned basis.
+- `GET /api/wells/{well_id}/curves/lod` (LOD endpoint): depth_basis NOT added in DEPTH-001. LOD stays MD-only. When viewer is in TVD/TVDSS mode it uses the full curve endpoint instead. This is acceptable for typical well depths (< 5000 samples per curve).
+
+**Viewer changes (frontend):**
+
+- Import dialogs: `ImportLasDialog`, `ImportLogsCsvDialog`, `ImportTopsDialog` — add a `Depth reference` selector (MD / TVD / TVDSS, default MD). Shows a brief tooltip: "Which depth type is in the depth column of this file."
+- Import result dialog: show any `qc_warnings` returned by the API. Yellow warning box listing the flag messages.
+- `wellDataStore`: when `depthType` (from `viewStore`) is `'TVD'` or `'TVDSS'`, the curve fetch path calls the full `/api/wells/{id}/curves` endpoint with `?depth_basis=<depthType>` instead of the LOD endpoint. When `depthType = 'MD'`, continue using the existing LOD path.
+- `CurveInventoryItem` type: add `trusted_depth_reference: string` for display in settings pane.
+
+**Not in DEPTH-001 (deferred):**
+
+- LOD endpoint with `depth_basis` support (performance future work; needs TVD↔MD window conversion).
+- Depth transform Parquet cache (materialised pre-computed table). On-the-fly conversion via `deviation_transform` is sufficient for current scale.
+- Log run grouping model (`log_run_id` FK on `CurveMetadata`). Current grouping by `data_uri` is adequate.
+- Parquet column schema changes for curves (adding `depth_native`, `md`, `tvd`, `tvdss` columns). Native depth column already serves as `depth_native`; on-the-fly conversion covers the rest.
+- Display of TVD/TVDSS-origin curves in MD mode (requires inverse transform, uncommon in practice).
+
+Likely code areas:
+
+- `app/src/subsidence/data/schema.py` — add fields to `CurveMetadata`, `FormationTopModel`; bump `SCHEMA_VERSION` to 9.
+- `app/src/subsidence/data/importers/common.py` — QC helper functions (`compute_sampling_kind`, `run_curve_qc`, `run_top_qc`).
+- `app/src/subsidence/data/importers/las.py`, `logs.py`, `tops.py` — call QC helpers; store `trusted_depth_reference`, `sampling_kind`, `nominal_step_m`.
+- `app/src/subsidence/api/projects_imports.py` — add `trusted_depth_reference` to request models; propagate to importers; include `qc_warnings` in responses.
+- `app/src/subsidence/api/wells.py` — extend `CurveInventoryItem` with `trusted_depth_reference`; add `?depth_basis` to full curve endpoint; apply TVD conversion when needed.
+- `frontend/src/components/layout/ImportLasDialog.tsx` — depth reference selector.
+- `frontend/src/components/layout/ImportLogsCsvDialog.tsx` — depth reference selector.
+- `frontend/src/components/layout/ImportTopsDialog.tsx` — depth reference selector.
+- `frontend/src/stores/wellDataStore.ts` — conditional curve fetch path based on `depthType`.
+- `frontend/src/types/well.ts` — `trusted_depth_reference` on `CurveInventoryItem`.
+- `app/tests/integration/test_project_api_workflows.py` — QC flag tests, TVD curve endpoint test.
+
+Dependencies: `TOPS-002` (for `depthType` extension in viewStore).
+
+Acceptance:
+
+- Importing a LAS with `trusted_depth_reference = 'TVDSS'` stores `CurveMetadata.trusted_depth_reference = 'TVDSS'`; returning the curve always returns TVDSS depths regardless of `?depth_basis` request.
+- Importing a tops CSV where one top exceeds `well.td_md`: import succeeds; response `qc_warnings` includes `TOP_BELOW_TD` message; `FormationTopModel.qc_status = 'WARNING'`.
+- A LAS file with variable 0.18–1.40 m step: `sampling_kind = 'VARIABLE'`; `qc_summary.flags` includes `VARIABLE_SAMPLING`; import does not fail.
+- `GET /api/wells/{id}/curves?depth_basis=TVD` for a MD curve with an active deviation survey: returns TVD depths; `depth_basis = 'TVD'` in response.
+- `GET /api/wells/{id}/curves?depth_basis=TVD` with no deviation survey: returns native MD depths; `qc_flags` includes `DEPTH_TRANSFORM_UNAVAILABLE`.
+- Switching viewer to TVD mode: curves re-fetch from full endpoint with `?depth_basis=TVD`; log tracks and formation lines align on the same TVD axis.
+- All existing import and API tests pass.
 
 ---
 
