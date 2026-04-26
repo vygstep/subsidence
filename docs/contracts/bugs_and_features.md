@@ -60,7 +60,7 @@ Goal:
 
 Items:
 
-- `WIZ-001`: Shared import wizard shell.
+- `WIZ-001`: Shared import wizard shell. (done)
 - `WIZ-002`: File preview and parser detection. (done)
 - `WIZ-003`: Column mapping and required-field validation. (done)
 - `WIZ-004`: Target well resolution. (done)
@@ -81,13 +81,13 @@ Goal:
 
 Items:
 
-- `PAT-001`: Vendor and document the Equinor lithology SVG pattern source.
-- `PAT-002`: Add lithology pattern palette schema and API.
-- `PAT-003`: Seed built-in SVG patterns.
-- `PAT-004`: Add Templates UI for lithology pattern palettes.
-- `PAT-005`: Connect lithology sets to selectable pattern palette entries.
-- `PAT-006`: Render lithology fills from SVG-backed pattern registry.
-- `PAT-007`: Pattern palette tests and migration coverage.
+- `PAT-001`: Vendor and document the Equinor lithology SVG pattern source. (done)
+- `PAT-002`: Add lithology pattern palette schema and API. (done)
+- `PAT-003`: Seed built-in SVG patterns. (done)
+- `PAT-004`: Add Templates UI for lithology pattern palettes. (done)
+- `PAT-005`: Connect lithology sets to selectable pattern palette entries. (done)
+- `PAT-006`: Render lithology fills from SVG-backed pattern registry. (done)
+- `PAT-007`: Pattern palette tests and migration coverage. (done)
 
 Exit criteria:
 
@@ -1177,3 +1177,31 @@ Backend `preview.py` module adds `preview_tabular` (csv.Sniffer auto-delimiter, 
 ### WIZ-006: Import execution, logging, and tests (done)
 
 `operation_log` context manager in `observability.py` already logs start/success/failure with duration_ms, error_type, and error_message for all import endpoints. Four integration tests added to `test_project_api_workflows.py`: `test_tops_import_with_column_map` (non-standard column names remapped via `column_map`), `test_deviation_import_with_column_map` (custom column names for md/incl/azim), `test_tops_import_with_incomplete_column_map_returns_400` (missing required field after remapping → 400 with field name in detail), `test_logs_import_without_well_name_imports_to_explicit_well` (no `well_name` column, explicit `well_id` routes to the correct well). CSV and TSV delimiter detection were already covered in `test_logs_csv_import_supports_comma_and_tab_delimiters`. Commit: `eb3cc52`.
+
+### PAT-001: Vendor and document the Equinor lithology SVG pattern source (done)
+
+10 SVG assets vendored from `https://github.com/equinor/lithology-patterns` (MIT) into `app/src/subsidence/data/dictionaries/lithology_patterns/equinor/svg/` with `manifest.csv` recording code, display name, upstream source code, tile size, and sort order. `docs/lithology-pattern-palettes.md` documents upstream URL, license, source asset folder, local checkout path, and runtime seed snapshot path. Runtime seeding depends only on the vendored snapshot, not the upstream checkout. Commit: `cabe990`.
+
+### PAT-002: Add lithology pattern palette schema and API (done)
+
+`LithologyPatternPalette` and `LithologyPattern` SQLAlchemy models added to `schema.py`. `lithology_patterns.py` router provides: list palettes, fetch palette detail with patterns (including `svg_content`), create/rename/copy/delete user palette, add/edit/delete user pattern entry, import SVG from file path. Built-in palettes return 403 on mutating operations. SVG import validation rejects scripts, event handler attributes (`on*`), external network references, and files over 256 KB. `LithologySetEntry.pattern_id` FK references `LithologyPattern` with `SET NULL` on delete. `SCHEMA_VERSION` bumped. Commit: `cabe990`.
+
+### PAT-003: Seed built-in SVG pattern palettes (done)
+
+`dict_seeder.py` `seed_lithology_pattern_palettes` function seeds the `Equinor Lithology Patterns` palette from `manifest.csv` and SVG files in the vendored snapshot directory. Seeder is idempotent: checks by `origin='equinor'` before inserting, updates missing patterns by code without duplicating. Called from both project create and project open (self-healing). Default lithology set entries for sandstone, siltstone, shale, limestone, etc. reference the corresponding built-in pattern codes. Commit: `cabe990`.
+
+### PAT-004: Add Templates UI for lithology pattern palettes (done)
+
+`Pattern Palettes` subtree added to the Templates tab via `TemplatesTab.tsx` and `DataManagerTopPane.tsx`. `LithologyPatternPalettesRootSettings` lists all palettes with entry counts, create/import actions disabled for built-in. `LithologyPatternPaletteSettings` shows pattern entries with SVG preview swatches (via `LithologyPatternPreview` using CSS `mask` from inline SVG data URI), tile size, code, display name, and source origin. Built-in palettes show read-only badges; user palettes show edit/delete controls. `wellDataStore` gains `lithologyPatternPalettes` slice with load/CRUD actions. `subsidence.ts` types gain `LithologyPatternPaletteSummary` and `LithologyPatternDetail`. Commit: `b8b78a1`.
+
+### PAT-005: Connect lithology sets to selectable pattern palette entries (done)
+
+`LithologySetSettings.tsx` pattern field replaced with a `<select>` populated from all available pattern palettes (built-in + user). Each option shows the pattern display name and palette origin. Solid fill option (`''`) is always present. `wellDataStore` fetches and caches pattern palette summaries for the selector. Built-in lithology sets remain read-only; user sets can mix built-in and user patterns. Pattern deletion blocked by FK constraint returning 409 when a lithology entry references the pattern. Commit: `b8b78a1`.
+
+### PAT-006: Render lithology fills from SVG-backed pattern registry (done)
+
+`lithologyRenderer.ts` rewritten: hardcoded switch-based pattern drawing removed; `drawLithologyBlock` accepts `{ color, patternSvg?: string }` visual style; SVG patterns are converted to `CanvasPattern` via `Image` + `drawImage` pipeline with a per-context cache keyed by stable pattern code. `FormationColumn.tsx` updated to resolve pattern SVG from `wellDataStore` and pass it into the renderer. Solid fill remains the fallback when no pattern or pattern load fails. Commit: `c6a0861`.
+
+### PAT-007: Pattern palette tests and migration coverage (done)
+
+Backend integration tests: `test_lithology_pattern_palettes_seeded` (built-in palette present, SVG content and tile metadata correct, built-in rename blocked with 403), `test_lithology_pattern_palettes_self_heal_for_open_project` (deleted tables re-seeded on next API call), `test_lithology_pattern_palette_user_crud_and_svg_validation` (user palette create/copy, SVG file import, unsafe SVG rejected with 400, pattern deletion blocked by lithology set reference returning 409). Frontend: `DataManagerTree.integration.test.tsx` extended with pattern palette subtree expansion and selection callback tests. Commits: `cabe990`, `b8b78a1`.
