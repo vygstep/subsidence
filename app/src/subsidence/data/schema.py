@@ -7,7 +7,7 @@ from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column, relationship
 from sqlalchemy import MetaData
 
 SUBSIDENCE_APP_ID = 0x53554253  # "SUBS" as 4-byte int
-SCHEMA_VERSION = 9
+SCHEMA_VERSION = 10
 
 _NAMING: dict[str, str] = {
     "ix": "ix_%(table_name)s_%(column_0_name)s",
@@ -213,6 +213,10 @@ class TopSet(Base, AuditMixin):
     )
     active_for_wells: Mapped[list["WellActiveTopSet"]] = relationship(
         back_populates="top_set",
+    )
+    zones: Mapped[list["FormationZone"]] = relationship(
+        back_populates="top_set", cascade="all, delete-orphan",
+        order_by="FormationZone.sort_order",
     )
 
 
@@ -647,3 +651,52 @@ class FormationStratLink(Base):
     formation: Mapped[FormationTopModel] = relationship(back_populates="strat_links")
     strat_unit: Mapped[StratUnit] = relationship()
     chart: Mapped[StratChart] = relationship()
+
+
+# ---------------------------------------------------------------------------
+# 16. formation_zones + zone_well_data
+# ---------------------------------------------------------------------------
+
+class FormationZone(Base):
+    __tablename__ = "formation_zones"
+    __table_args__ = (UniqueConstraint("top_set_id", "upper_horizon_id"),)
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    top_set_id: Mapped[int] = mapped_column(
+        Integer, ForeignKey("top_sets.id", ondelete="CASCADE"), nullable=False
+    )
+    upper_horizon_id: Mapped[int] = mapped_column(
+        Integer, ForeignKey("top_set_horizons.id", ondelete="RESTRICT"), nullable=False
+    )
+    lower_horizon_id: Mapped[int] = mapped_column(
+        Integer, ForeignKey("top_set_horizons.id", ondelete="RESTRICT"), nullable=False
+    )
+    sort_order: Mapped[int] = mapped_column(Integer, default=0)
+
+    top_set: Mapped["TopSet"] = relationship(back_populates="zones")
+    upper_horizon: Mapped["TopSetHorizon"] = relationship(foreign_keys=[upper_horizon_id])
+    lower_horizon: Mapped["TopSetHorizon"] = relationship(foreign_keys=[lower_horizon_id])
+    well_data: Mapped[list["ZoneWellData"]] = relationship(
+        back_populates="zone", cascade="all, delete-orphan"
+    )
+
+
+class ZoneWellData(Base):
+    __tablename__ = "zone_well_data"
+    __table_args__ = (UniqueConstraint("zone_id", "well_id"),)
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    zone_id: Mapped[int] = mapped_column(
+        Integer, ForeignKey("formation_zones.id", ondelete="CASCADE"), nullable=False
+    )
+    well_id: Mapped[str] = mapped_column(
+        String(36), ForeignKey("wells.id", ondelete="CASCADE"), nullable=False
+    )
+    thickness_md: Mapped[float | None] = mapped_column(Float, nullable=True)
+    thickness_tvd: Mapped[float | None] = mapped_column(Float, nullable=True)
+    lithology_fractions: Mapped[str | None] = mapped_column(Text, nullable=True)
+    # JSON {"sandstone": 0.6, "shale": 0.4}
+    lithology_source: Mapped[str] = mapped_column(String(8), default="manual")
+    # "manual" | "auto"
+
+    zone: Mapped["FormationZone"] = relationship(back_populates="well_data")

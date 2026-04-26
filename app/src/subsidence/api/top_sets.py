@@ -13,6 +13,12 @@ from subsidence.data.schema import (
     WellActiveTopSet,
     WellModel,
 )
+from subsidence.data.zone_service import (
+    ensure_zone_well_data,
+    merge_zones_on_horizon_delete,
+    rebuild_zones_for_top_set,
+    recalculate_zone_thickness,
+)
 
 router = APIRouter(tags=['top-sets'])
 
@@ -122,6 +128,15 @@ def _horizon_to_response(h: TopSetHorizon) -> HorizonResponse:
         sort_order=h.sort_order,
         note=h.note,
     )
+
+
+def _linked_well_ids(session, top_set_id: int) -> list[str]:
+    return [
+        row.well_id
+        for row in session.scalars(
+            select(WellActiveTopSet).where(WellActiveTopSet.top_set_id == top_set_id)
+        ).all()
+    ]
 
 
 def _require_top_set(session, top_set_id: int) -> TopSet:
@@ -298,9 +313,15 @@ def add_horizon(top_set_id: int, body: HorizonCreate, request: Request) -> Horiz
         )
         session.add(horizon)
         try:
-            session.commit()
+            session.flush()
         except Exception:
             raise HTTPException(status_code=409, detail='Horizon name already exists in this TopSet')
+        rebuild_zones_for_top_set(session, top_set_id)
+        well_ids = _linked_well_ids(session, top_set_id)
+        for wid in well_ids:
+            ensure_zone_well_data(session, top_set_id, wid)
+            recalculate_zone_thickness(session, top_set_id, wid)
+        session.commit()
         session.refresh(horizon)
         return _horizon_to_response(horizon)
 
@@ -334,7 +355,12 @@ def delete_horizon(top_set_id: int, horizon_id: int, request: Request) -> None:
         horizon = session.get(TopSetHorizon, horizon_id)
         if horizon is None or horizon.top_set_id != top_set_id:
             raise HTTPException(status_code=404, detail=f'Horizon not found: {horizon_id}')
+        well_ids = _linked_well_ids(session, top_set_id)
+        merge_zones_on_horizon_delete(session, top_set_id, horizon_id)
         session.delete(horizon)
+        session.flush()
+        for wid in well_ids:
+            recalculate_zone_thickness(session, top_set_id, wid)
         session.commit()
 
 
@@ -356,6 +382,8 @@ def reorder_horizons(top_set_id: int, body: HorizonReorderRequest, request: Requ
             h = session.get(TopSetHorizon, hid)
             if h is not None:
                 h.sort_order = i
+        session.flush()
+        rebuild_zones_for_top_set(session, top_set_id)
         session.commit()
         loaded = _load_top_set(session, top_set_id)
         return _top_set_detail(loaded)
@@ -390,6 +418,8 @@ def set_active_top_set(well_id: str, body: ActiveTopSetRequest, request: Request
         session.flush()
         _link_picks_to_horizons(session, well_id, body.top_set_id)
         _create_ghost_picks(session, well_id, body.top_set_id)
+        ensure_zone_well_data(session, body.top_set_id, well_id)
+        recalculate_zone_thickness(session, body.top_set_id, well_id)
         session.commit()
 
     return ActiveTopSetResponse(well_id=well_id, top_set_id=body.top_set_id)

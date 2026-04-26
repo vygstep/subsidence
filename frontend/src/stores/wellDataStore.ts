@@ -9,6 +9,7 @@ import type {
   CurveMnemonicSetDetail,
   CurveMnemonicSetSummary,
   FormationTop,
+  FormationZone,
   LithologyDictionaryEntry,
   LithologyPatternEntry,
   LithologyPatternPaletteDetail,
@@ -86,6 +87,7 @@ export interface WellDataStore {
   wellInventories: WellInventory[]
   curves: CurveData[]
   formations: FormationTop[]
+  zones: FormationZone[]
   colorOverrides: Record<string, string>
   stratCharts: StratChartInfo[]
   compactionModels: CompactionModel[]
@@ -191,6 +193,7 @@ export interface WellDataStore {
   updateCompactionModelParam: (modelId: number, lithologyCode: string, patch: Partial<Pick<LithologyParam, 'density' | 'porosity_surface' | 'compaction_coeff'>>) => Promise<LithologyParam>
   fetchCurvesLOD: (depthMin: number, depthMax: number, resolution: number) => Promise<void>
   reloadCurvesForDepthBasis: (depthBasis: 'MD' | 'TVD' | 'TVDSS') => Promise<void>
+  updateZoneLithology: (zoneId: number, lithologyFractions: string | null, lithologySource: 'manual' | 'auto') => Promise<void>
 }
 
 function toFloat32Array(values: number[]): Float32Array {
@@ -253,21 +256,22 @@ function clearPendingDepthPatches(): void {
 
 const emptyState = {
   well: null,
-  wellInventories: [],
-  curves: [],
-  formations: [],
-  colorOverrides: {},
-  stratCharts: [],
-  compactionModels: [],
-  compactionPresets: [],
-  mnemonicSets: [],
-  unitDimensions: [],
-  lithologyDictionaryEntries: [],
-  lithologySets: [],
-  lithologyPatternPalettes: [],
-  tvdTable: null,
+  wellInventories: [] as WellInventory[],
+  curves: [] as CurveData[],
+  formations: [] as FormationTop[],
+  zones: [] as FormationZone[],
+  colorOverrides: {} as Record<string, string>,
+  stratCharts: [] as StratChartInfo[],
+  compactionModels: [] as CompactionModel[],
+  compactionPresets: [] as CompactionPresetSummary[],
+  mnemonicSets: [] as CurveMnemonicSetSummary[],
+  unitDimensions: [] as UnitDimensionSummary[],
+  lithologyDictionaryEntries: [] as LithologyDictionaryEntry[],
+  lithologySets: [] as LithologySetSummary[],
+  lithologyPatternPalettes: [] as LithologyPatternPaletteSummary[],
+  tvdTable: null as TVDTable | null,
   isLoading: false,
-  error: null,
+  error: null as string | null,
 }
 
 export const useWellDataStore = create<WellDataStore>((set, get) => ({
@@ -286,7 +290,9 @@ export const useWellDataStore = create<WellDataStore>((set, get) => ({
         throw new Error(await readError(response, `Failed to load well inventories (${response.status})`))
       }
       const payload = (await response.json()) as WellInventory[]
-      set({ wellInventories: payload, error: null })
+      const activeWellId = get().well?.well_id
+      const activeInventory = activeWellId ? payload.find((w) => w.well_id === activeWellId) : null
+      set({ wellInventories: payload, zones: activeInventory?.zones ?? [], error: null })
       return true
     } catch (error) {
       set({ error: error instanceof Error ? error.message : 'Unknown error' })
@@ -1058,6 +1064,24 @@ export const useWellDataStore = create<WellDataStore>((set, get) => ({
       formations: sortFormations(
         state.formations.map((f) => (f.id === formationId ? updated : f)),
       ),
+    }))
+    await get().loadWellInventories()
+  },
+  async updateZoneLithology(zoneId, lithologyFractions, lithologySource) {
+    const wellId = get().well?.well_id
+    if (!wellId) throw new Error('No well is currently loaded')
+
+    const response = await fetch(`/api/wells/${wellId}/zones/${zoneId}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ lithology_fractions: lithologyFractions, lithology_source: lithologySource }),
+    })
+    if (!response.ok) {
+      throw new Error(await readError(response, `Failed to update zone lithology (${response.status})`))
+    }
+    const updated = (await response.json()) as FormationZone
+    set((state) => ({
+      zones: state.zones.map((z) => (z.zone_id === zoneId ? updated : z)),
     }))
     await get().loadWellInventories()
   },

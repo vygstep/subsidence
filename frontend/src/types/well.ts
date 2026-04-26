@@ -85,6 +85,26 @@ export interface StratUnitOption {
   color_hex?: string | null
 }
 
+export interface ZoneHorizonRef {
+  id: number
+  name: string
+  age_ma: number | null
+}
+
+export interface FormationZone {
+  zone_id: number
+  top_set_id: number
+  upper_horizon: ZoneHorizonRef
+  lower_horizon: ZoneHorizonRef
+  sort_order: number
+  thickness_md: number | null
+  thickness_tvd: number | null
+  age_span_ma: number | null
+  hiatus_ma: number | null
+  lithology_fractions: string | null
+  lithology_source: 'manual' | 'auto'
+}
+
 export interface WellInventory {
   well_id: string
   well_name: string
@@ -105,6 +125,7 @@ export interface WellInventory {
   } | null
   curves: CurveInventoryItem[]
   formations: FormationInventoryItem[]
+  zones: FormationZone[]
 }
 
 export type LithologyType =

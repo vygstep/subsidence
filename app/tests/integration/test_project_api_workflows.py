@@ -1275,3 +1275,164 @@ def test_invalid_user_regex_does_not_break_mnemonic_resolver(api_client: TestCli
     assert payload['matched'] is True
     assert payload['family_code'] == 'gamma_ray'
     assert payload['canonical_mnemonic'] == 'GR'
+
+
+# ---------------------------------------------------------------------------
+# ZONE-001 tests
+# ---------------------------------------------------------------------------
+
+def _create_well_with_top_set(client, tmp_path: Path):
+    """Create a project, a well with 3 picks, a TopSet with 4 horizons, and link them."""
+    _create_project(client, tmp_path, 'zone-test')
+
+    resp = client.post('/api/projects/wells', json={
+        'name': 'Zone Well', 'x': 0.0, 'y': 0.0, 'kb': 0.0, 'td': 1000.0, 'crs': 'local',
+    })
+    assert resp.status_code == 200, resp.text
+    well_id = resp.json()['well_id']
+
+    # Create 4 picks with known depths
+    pick_depths = {'H1': 100.0, 'H2': 300.0, 'H3': 600.0, 'H4': 900.0}
+    for name, depth in pick_depths.items():
+        resp = client.post(f'/api/wells/{well_id}/formations', json={
+            'name': name, 'depth_md': depth, 'color': '#aaaaaa',
+        })
+        assert resp.status_code == 201, resp.text
+
+    # Create TopSet with 4 horizons
+    resp = client.post('/api/top-sets', json={'name': 'Main Set'})
+    assert resp.status_code == 201, resp.text
+    top_set_id = resp.json()['id']
+
+    for name in ['H1', 'H2', 'H3', 'H4']:
+        resp = client.post(f'/api/top-sets/{top_set_id}/horizons', json={'name': name})
+        assert resp.status_code == 201, resp.text
+
+    # Link well to TopSet
+    resp = client.put(f'/api/wells/{well_id}/active-top-set', json={'top_set_id': top_set_id})
+    assert resp.status_code == 200, resp.text
+
+    return well_id, top_set_id
+
+
+def test_zone_lifecycle_four_horizons_create_three_zones(api_client: TestClient, tmp_path: Path):
+    """4 horizons → 3 zones per linked well."""
+    well_id, _ = _create_well_with_top_set(api_client, tmp_path)
+
+    resp = api_client.get(f'/api/wells/{well_id}/zones')
+    assert resp.status_code == 200, resp.text
+    zones = resp.json()
+    assert len(zones) == 3
+    names = [(z['upper_horizon']['name'], z['lower_horizon']['name']) for z in zones]
+    assert names == [('H1', 'H2'), ('H2', 'H3'), ('H3', 'H4')]
+
+    # Zones should have computed thickness_md
+    assert zones[0]['thickness_md'] == pytest.approx(200.0)
+    assert zones[1]['thickness_md'] == pytest.approx(300.0)
+    assert zones[2]['thickness_md'] == pytest.approx(300.0)
+
+    # Zones should appear in inventory
+    resp = api_client.get('/api/wells/inventory')
+    assert resp.status_code == 200, resp.text
+    inv = next(w for w in resp.json() if w['well_id'] == well_id)
+    assert len(inv['zones']) == 3
+
+
+def test_zone_lifecycle_delete_middle_horizon_merges_zones(api_client: TestClient, tmp_path: Path):
+    """Deleting a middle horizon merges adjacent zones; lithology cleared."""
+    well_id, top_set_id = _create_well_with_top_set(api_client, tmp_path)
+
+    # Patch zone H2→H3 with lithology fractions
+    resp = api_client.get(f'/api/wells/{well_id}/zones')
+    assert resp.status_code == 200, resp.text
+    zones = resp.json()
+    zone_h2_h3 = next(z for z in zones if z['upper_horizon']['name'] == 'H2')
+    zone_id = zone_h2_h3['zone_id']
+    resp = api_client.patch(f'/api/wells/{well_id}/zones/{zone_id}', json={
+        'lithology_fractions': '{"sandstone": 0.6, "shale": 0.4}',
+        'lithology_source': 'manual',
+    })
+    assert resp.status_code == 200, resp.text
+    assert resp.json()['lithology_fractions'] == '{"sandstone": 0.6, "shale": 0.4}'
+
+    # Delete H2 horizon (middle)
+    resp = api_client.get(f'/api/top-sets/{top_set_id}')
+    assert resp.status_code == 200, resp.text
+    h2_id = next(h['id'] for h in resp.json()['horizons'] if h['name'] == 'H2')
+    resp = api_client.delete(f'/api/top-sets/{top_set_id}/horizons/{h2_id}')
+    assert resp.status_code == 204, resp.text
+
+    resp = api_client.get(f'/api/wells/{well_id}/zones')
+    assert resp.status_code == 200, resp.text
+    zones = resp.json()
+    assert len(zones) == 2
+    names = {(z['upper_horizon']['name'], z['lower_horizon']['name']) for z in zones}
+    assert ('H1', 'H3') in names
+
+    # Merged zone lithology is cleared
+    merged = next(z for z in zones if z['upper_horizon']['name'] == 'H1' and z['lower_horizon']['name'] == 'H3')
+    assert merged['lithology_fractions'] is None
+    assert merged['lithology_source'] == 'manual'
+
+    # Thickness should be recalculated for merged zone
+    assert merged['thickness_md'] == pytest.approx(500.0)
+
+
+def test_zone_lifecycle_pick_move_updates_thickness(api_client: TestClient, tmp_path: Path):
+    """Moving a pick updates thickness_md; lithology_fractions preserved."""
+    well_id, top_set_id = _create_well_with_top_set(api_client, tmp_path)
+
+    # Set lithology on H1→H2 zone
+    resp = api_client.get(f'/api/wells/{well_id}/zones')
+    zones = resp.json()
+    zone_h1_h2 = next(z for z in zones if z['upper_horizon']['name'] == 'H1')
+    resp = api_client.patch(f'/api/wells/{well_id}/zones/{zone_h1_h2["zone_id"]}', json={
+        'lithology_fractions': '{"sandstone": 1.0}',
+        'lithology_source': 'manual',
+    })
+    assert resp.status_code == 200, resp.text
+
+    # Move H2 pick from 300 to 400
+    resp = api_client.get(f'/api/wells/{well_id}/formations')
+    h2_pick = next(f for f in resp.json() if f['name'] == 'H2')
+    resp = api_client.patch(f'/api/wells/{well_id}/formations/{h2_pick["id"]}', json={'depth_md': 400.0})
+    assert resp.status_code == 200, resp.text
+
+    resp = api_client.get(f'/api/wells/{well_id}/zones')
+    zones = resp.json()
+    z = next(z for z in zones if z['upper_horizon']['name'] == 'H1')
+    assert z['thickness_md'] == pytest.approx(300.0)
+    assert z['lithology_fractions'] == '{"sandstone": 1.0}'
+    assert z['lithology_source'] == 'manual'
+
+
+def test_zone_lithology_fraction_sum_validation(api_client: TestClient, tmp_path: Path):
+    """Fractions summing to > 1.0 return 400."""
+    well_id, _ = _create_well_with_top_set(api_client, tmp_path)
+    resp = api_client.get(f'/api/wells/{well_id}/zones')
+    zone_id = resp.json()[0]['zone_id']
+
+    resp = api_client.patch(f'/api/wells/{well_id}/zones/{zone_id}', json={
+        'lithology_fractions': '{"sandstone": 0.7, "shale": 0.5}',
+        'lithology_source': 'manual',
+    })
+    assert resp.status_code == 400, resp.text
+    assert '1.0' in resp.json()['detail'] or '1.2' in resp.json()['detail']
+
+
+def test_zone_no_active_top_set_returns_empty(api_client: TestClient, tmp_path: Path):
+    """Well with no active TopSet has empty zones array."""
+    _create_project(api_client, tmp_path, 'zone-empty')
+    resp = api_client.post('/api/projects/wells', json={
+        'name': 'Plain Well', 'x': 0.0, 'y': 0.0, 'kb': 0.0, 'td': 500.0, 'crs': 'local',
+    })
+    assert resp.status_code == 200, resp.text
+    well_id = resp.json()['well_id']
+
+    resp = api_client.get(f'/api/wells/{well_id}/zones')
+    assert resp.status_code == 200, resp.text
+    assert resp.json() == []
+
+    resp = api_client.get('/api/wells/inventory')
+    inv = next(w for w in resp.json() if w['well_id'] == well_id)
+    assert inv['zones'] == []

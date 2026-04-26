@@ -11,7 +11,8 @@ from sqlalchemy.orm import selectinload
 
 from subsidence.data import UpdateWell, load_curves_from_parquet
 from subsidence.data.lttb import lttb
-from subsidence.data.schema import CurveMetadata, DeviationSurveyModel, FormationStratLink, FormationTopModel, WellActiveTopSet, WellModel
+from subsidence.data.schema import CurveMetadata, DeviationSurveyModel, FormationStratLink, FormationTopModel, FormationZone, WellActiveTopSet, WellModel, ZoneWellData
+from subsidence.data.zone_service import recalculate_zone_thickness
 
 router = APIRouter(tags=['wells'])
 
@@ -86,6 +87,31 @@ class WellResponse(BaseModel):
     formations: list[FormationResponse]
 
 
+class ZoneHorizonRef(BaseModel):
+    id: int
+    name: str
+    age_ma: float | None
+
+
+class ZoneInventoryItem(BaseModel):
+    zone_id: int
+    top_set_id: int
+    upper_horizon: ZoneHorizonRef
+    lower_horizon: ZoneHorizonRef
+    sort_order: int
+    thickness_md: float | None
+    thickness_tvd: float | None
+    age_span_ma: float | None
+    hiatus_ma: float | None
+    lithology_fractions: str | None
+    lithology_source: str
+
+
+class ZonePatch(BaseModel):
+    lithology_fractions: str | None = None
+    lithology_source: str | None = None
+
+
 class WellInventoryResponse(BaseModel):
     well_id: str
     well_name: str
@@ -102,6 +128,7 @@ class WellInventoryResponse(BaseModel):
     deviation: DeviationSummaryResponse | None = None
     curves: list[CurveInventoryItem]
     formations: list[FormationInventoryItem]
+    zones: list[ZoneInventoryItem] = []
 
 
 class WellPatchRequest(BaseModel):
@@ -153,6 +180,30 @@ def _active_link(row: FormationTopModel) -> FormationStratLink | None:
     return next((link for link in row.strat_links if link.chart.is_active), None)
 
 
+def _zone_to_item(zone: FormationZone, zwd: ZoneWellData) -> ZoneInventoryItem:
+    upper = zone.upper_horizon
+    lower = zone.lower_horizon
+    age_span = (
+        lower.age_ma - upper.age_ma
+        if upper.age_ma is not None and lower.age_ma is not None
+        else None
+    )
+    hiatus = age_span if upper.kind == 'unconformity' else None
+    return ZoneInventoryItem(
+        zone_id=zone.id,
+        top_set_id=zone.top_set_id,
+        upper_horizon=ZoneHorizonRef(id=upper.id, name=upper.name, age_ma=upper.age_ma),
+        lower_horizon=ZoneHorizonRef(id=lower.id, name=lower.name, age_ma=lower.age_ma),
+        sort_order=zone.sort_order,
+        thickness_md=zwd.thickness_md,
+        thickness_tvd=zwd.thickness_tvd,
+        age_span_ma=age_span,
+        hiatus_ma=hiatus,
+        lithology_fractions=zwd.lithology_fractions,
+        lithology_source=zwd.lithology_source,
+    )
+
+
 def _formation_load_options():
     return [
         selectinload(FormationTopModel.strat_links).options(
@@ -187,6 +238,7 @@ def list_well_inventories(request: Request) -> list[WellInventoryResponse]:
         formation_rows_by_well: dict[str, list[FormationTopModel]] = {well_id: [] for well_id in well_ids}
         deviation_by_well: dict[str, DeviationSurveyModel] = {}
         active_top_set_by_well: dict[str, WellActiveTopSet] = {}
+        zones_by_well: dict[str, list[ZoneInventoryItem]] = {well_id: [] for well_id in well_ids}
 
         if well_ids:
             curve_rows = session.scalars(
@@ -217,6 +269,35 @@ def list_well_inventories(request: Request) -> list[WellInventoryResponse]:
                 .options(selectinload(WellActiveTopSet.top_set))
             ).all()
             active_top_set_by_well = {row.well_id: row for row in active_top_sets}
+
+            active_top_set_ids = [row.top_set_id for row in active_top_sets]
+            if active_top_set_ids:
+                zone_rows = session.scalars(
+                    select(FormationZone)
+                    .where(FormationZone.top_set_id.in_(active_top_set_ids))
+                    .options(
+                        selectinload(FormationZone.upper_horizon),
+                        selectinload(FormationZone.lower_horizon),
+                    )
+                    .order_by(FormationZone.sort_order.asc())
+                ).all()
+                zone_by_id = {z.id: z for z in zone_rows}
+                zone_well_data_rows = session.scalars(
+                    select(ZoneWellData).where(
+                        ZoneWellData.zone_id.in_(list(zone_by_id.keys())),
+                        ZoneWellData.well_id.in_(well_ids),
+                    )
+                ).all()
+                top_set_id_by_well = {row.well_id: row.top_set_id for row in active_top_sets}
+                for zwd in zone_well_data_rows:
+                    zone = zone_by_id.get(zwd.zone_id)
+                    if zone is None:
+                        continue
+                    well_id = zwd.well_id
+                    # Only include if this zone belongs to the well's active top set
+                    if top_set_id_by_well.get(well_id) != zone.top_set_id:
+                        continue
+                    zones_by_well.setdefault(well_id, []).append(_zone_to_item(zone, zwd))
 
         payload: list[WellInventoryResponse] = []
         for well in wells:
@@ -265,6 +346,7 @@ def list_well_inventories(request: Request) -> list[WellInventoryResponse]:
                         )
                         for row in formation_rows
                     ],
+                    zones=zones_by_well.get(well.id, []),
                 )
             )
         return payload
@@ -484,6 +566,103 @@ def get_curves_full(
                     )
                 )
         return results
+
+
+@router.get('/wells/{well_id}/zones', response_model=list[ZoneInventoryItem])
+def list_well_zones(well_id: str, request: Request) -> list[ZoneInventoryItem]:
+    manager = _require_open_project(request)
+    with manager.get_session() as session:
+        well = session.get(WellModel, well_id)
+        if well is None:
+            raise HTTPException(status_code=404, detail=f'Well not found: {well_id}')
+
+        from sqlalchemy import select as _select
+        from subsidence.data.schema import WellActiveTopSet as _WATS
+        link = session.scalar(_select(_WATS).where(_WATS.well_id == well_id))
+        if link is None:
+            return []
+
+        zone_rows = session.scalars(
+            select(FormationZone)
+            .where(FormationZone.top_set_id == link.top_set_id)
+            .options(
+                selectinload(FormationZone.upper_horizon),
+                selectinload(FormationZone.lower_horizon),
+            )
+            .order_by(FormationZone.sort_order.asc())
+        ).all()
+        if not zone_rows:
+            return []
+
+        zone_ids = [z.id for z in zone_rows]
+        zwd_by_zone = {
+            row.zone_id: row
+            for row in session.scalars(
+                select(ZoneWellData).where(
+                    ZoneWellData.zone_id.in_(zone_ids),
+                    ZoneWellData.well_id == well_id,
+                )
+            ).all()
+        }
+
+        result: list[ZoneInventoryItem] = []
+        for zone in zone_rows:
+            zwd = zwd_by_zone.get(zone.id)
+            if zwd is None:
+                continue
+            result.append(_zone_to_item(zone, zwd))
+        return result
+
+
+@router.patch('/wells/{well_id}/zones/{zone_id}', response_model=ZoneInventoryItem)
+def patch_well_zone(well_id: str, zone_id: int, body: ZonePatch, request: Request) -> ZoneInventoryItem:
+    import json as _json
+    manager = _require_open_project(request)
+    with manager.get_session() as session:
+        well = session.get(WellModel, well_id)
+        if well is None:
+            raise HTTPException(status_code=404, detail=f'Well not found: {well_id}')
+
+        zone = session.scalar(
+            select(FormationZone)
+            .where(FormationZone.id == zone_id)
+            .options(
+                selectinload(FormationZone.upper_horizon),
+                selectinload(FormationZone.lower_horizon),
+            )
+        )
+        if zone is None:
+            raise HTTPException(status_code=404, detail=f'Zone not found: {zone_id}')
+
+        zwd = session.scalar(
+            select(ZoneWellData).where(
+                ZoneWellData.zone_id == zone_id,
+                ZoneWellData.well_id == well_id,
+            )
+        )
+        if zwd is None:
+            raise HTTPException(status_code=404, detail=f'Zone data not found for well {well_id}')
+
+        if body.lithology_fractions is not None:
+            try:
+                fracs = _json.loads(body.lithology_fractions)
+            except _json.JSONDecodeError:
+                raise HTTPException(status_code=400, detail='lithology_fractions must be valid JSON')
+            if not isinstance(fracs, dict):
+                raise HTTPException(status_code=400, detail='lithology_fractions must be a JSON object')
+            total = sum(fracs.values())
+            if total > 1.0 + 1e-9:
+                raise HTTPException(status_code=400, detail=f'Lithology fractions sum to {total:.3f}; must be ≤ 1.0')
+            zwd.lithology_fractions = body.lithology_fractions
+
+        if body.lithology_source is not None:
+            if body.lithology_source not in ('manual', 'auto'):
+                raise HTTPException(status_code=400, detail="lithology_source must be 'manual' or 'auto'")
+            zwd.lithology_source = body.lithology_source
+
+        session.commit()
+        session.refresh(zwd)
+        return _zone_to_item(zone, zwd)
 
 
 @router.patch('/wells/{well_id}', response_model=WellResponse)
