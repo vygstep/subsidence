@@ -255,7 +255,7 @@ export function useDataManagerController() {
     onDuplicateCompactionModel: (id: number, name: string) => void actions.handleDuplicateCompactionModel(id, name),
     onDuplicateFormation: (
       wellId: string,
-      formation: { name: string; depth_md: number; active_strat_color: string | null },
+      formation: { name: string; depth_md: number | null; active_strat_color: string | null },
     ) => void actions.handleDuplicateFormation(wellId, formation),
     onRenameFormation: (wellId: string, formationId: string, currentName: string) =>
       void actions.handleRenameFormation(wellId, formationId, currentName),

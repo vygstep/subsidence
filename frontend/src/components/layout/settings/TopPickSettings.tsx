@@ -34,7 +34,7 @@ export function TopPickSettings({ selectedFormation, onFormationUpdate, onFormat
         <label className="project-dialog__field">
           <span>Depth</span>
           <input
-            value={selectedFormation.depth_md}
+            value={selectedFormation.depth_md ?? ''}
             onChange={(event) => onFormationMove(selectedFormation.id, Number(event.target.value))}
           />
         </label>

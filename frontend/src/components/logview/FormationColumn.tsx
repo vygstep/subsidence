@@ -37,7 +37,7 @@ export function FormationColumn({ formations, height, maxDepth, width = 80, isSe
   )
 
   const orderedFormations = useMemo(
-    () => [...formations].sort((left, right) => left.depth_md - right.depth_md),
+    () => [...formations].sort((left, right) => (left.depth_md ?? Infinity) - (right.depth_md ?? Infinity)),
     [formations],
   )
 
@@ -67,6 +67,7 @@ export function FormationColumn({ formations, height, maxDepth, width = 80, isSe
       }
 
       orderedFormations.forEach((formation, index) => {
+        if (formation.depth_md === null) return
         const nextDepth = toDisplayDepth(orderedFormations[index + 1]?.depth_md ?? maxDepth)
         const blockTop = Math.max(toDisplayDepth(formation.depth_md), visibleDepthRange.min)
         const blockBottom = Math.min(nextDepth, visibleDepthRange.max)

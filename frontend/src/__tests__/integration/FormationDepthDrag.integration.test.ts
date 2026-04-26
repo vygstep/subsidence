@@ -66,7 +66,7 @@ describe('FormationDepthDrag - Debounce + Optimistic Update', () => {
 
     // Assert: formations should still be sorted by depth
     const depths = result.current.formations.map((f) => f.depth_md)
-    expect(depths).toEqual([...depths].sort((a, b) => a - b))
+    expect(depths).toEqual([...depths].sort((a, b) => (a ?? Infinity) - (b ?? Infinity)))
   })
 
   it('should debounce PATCH request - only send one after multiple rapid updates', async () => {

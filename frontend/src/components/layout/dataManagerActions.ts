@@ -206,7 +206,7 @@ export function makeActionHandlers(deps: ActionDeps) {
 
   async function handleDuplicateFormation(
     wellId: string,
-    formation: { name: string; depth_md: number; active_strat_color: string | null },
+    formation: { name: string; depth_md: number | null; active_strat_color: string | null },
   ): Promise<void> {
     const response = await fetch(`/api/wells/${wellId}/formations`, {
       method: 'POST',

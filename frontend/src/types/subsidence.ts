@@ -172,3 +172,27 @@ export interface LithologyPatternPaletteDetail extends LithologyPatternPaletteSu
   description: string | null
   patterns: LithologyPatternEntry[]
 }
+
+export interface TopSetHorizon {
+  id: number
+  name: string
+  kind: string
+  age_ma: number | null
+  color: string
+  sort_order: number
+  note: string | null
+}
+
+export interface TopSetSummary {
+  id: number
+  name: string
+  description: string | null
+  horizon_count: number
+}
+
+export interface TopSetDetail {
+  id: number
+  name: string
+  description: string | null
+  horizons: TopSetHorizon[]
+}

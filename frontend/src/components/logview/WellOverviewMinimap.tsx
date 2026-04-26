@@ -88,6 +88,7 @@ export function WellOverviewMinimap({ width = 80, height }: WellOverviewMinimapP
     }
 
     for (const f of formations) {
+      if (f.depth_md === null) continue
       const y = depthToY(f.depth_md)
       ctx.beginPath()
       ctx.strokeStyle = f.active_strat_color ?? f.color

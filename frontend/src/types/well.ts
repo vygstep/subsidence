@@ -41,7 +41,10 @@ export interface FormationStratLink {
 export interface FormationTop {
   id: string
   name: string
-  depth_md: number
+  depth_md: number | null
+  depth_tvd: number | null
+  depth_tvdss: number | null
+  horizon_id: number | null
   age_ma?: number
   color: string
   kind: string
@@ -57,7 +60,10 @@ export interface FormationTop {
 export interface FormationInventoryItem {
   id: string
   name: string
-  depth_md: number
+  depth_md: number | null
+  depth_tvd: number | null
+  depth_tvdss: number | null
+  horizon_id: number | null
   active_strat_color: string | null
 }
 
@@ -89,6 +95,8 @@ export interface WellInventory {
   coordinate_semantics?: 'project_xy'
   crs: string
   source_las_path?: string | null
+  active_top_set_id: number | null
+  active_top_set_name: string | null
   deviation?: {
     reference: string
     mode: string

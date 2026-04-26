@@ -15,7 +15,7 @@ type ContextMenuTarget =
   | { type: 'las-group'; wellId: string }
   | { type: 'curve'; wellId: string; mnemonic: string; unit: string }
   | { type: 'tops-group'; wellId: string }
-  | { type: 'top-pick'; wellId: string; formationId: string; name: string; depth_md: number; active_strat_color: string | null }
+  | { type: 'top-pick'; wellId: string; formationId: string; name: string; depth_md: number | null; active_strat_color: string | null }
   | { type: 'deviation-group'; wellId: string }
   | { type: 'strat-chart'; chartId: number; name: string; isBuiltin: boolean }
   | { type: 'compaction-model'; modelId: number; name: string; isBuiltin: boolean; isActive: boolean }

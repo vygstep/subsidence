@@ -28,9 +28,9 @@ export function FormationTopsList() {
     void addFormation({ name: 'New formation', depth_md: depth, color: '#808080' })
   }
 
-  function handleRowClick(id: string, depth: number) {
+  function handleRowClick(id: string, depth: number | null) {
     selectElement(id, 'formation')
-    setScroll(depth - halfViewport)
+    if (depth !== null) setScroll(depth - halfViewport)
   }
 
   function startAgeEdit(e: React.MouseEvent, f: FormationTop) {
@@ -69,7 +69,7 @@ export function FormationTopsList() {
                 className="formations-list__swatch"
                 style={{ background: f.active_strat_color ?? f.color }}
               />
-              <span className="formations-list__depth">{f.depth_md.toFixed(1)}</span>
+              <span className="formations-list__depth">{f.depth_md?.toFixed(1) ?? '—'}</span>
               <span className="formations-list__name">{f.name}</span>
               {editingAgeId === f.id ? (
                 <input

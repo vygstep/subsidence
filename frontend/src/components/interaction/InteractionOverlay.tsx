@@ -40,6 +40,7 @@ export function InteractionOverlay({
         }}
       >
         {formations.map((formation) => {
+          if (formation.depth_md === null) return null
           const y = depthToPixel(formation.depth_md)
           if (y < -30 || y > height + 30) return null
           return <FormationTopLine key={formation.id} formation={formation} yPosition={y} editable={topsEditable} />

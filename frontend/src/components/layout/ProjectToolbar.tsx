@@ -312,7 +312,7 @@ export function ProjectToolbar() {
 
   async function handleMoveSelectedFormation(): Promise<void> {
     if (!selectedFormation) return
-    const value = window.prompt('Move top to depth (MD)', selectedFormation.depth_md.toString())
+    const value = window.prompt('Move top to depth (MD)', selectedFormation.depth_md?.toString() ?? '')
     if (value === null) return
     const nextDepth = Number(value.trim())
     if (!Number.isFinite(nextDepth)) return

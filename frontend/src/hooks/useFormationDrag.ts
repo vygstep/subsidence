@@ -44,6 +44,7 @@ export function useFormationDrag({
     (e: React.PointerEvent) => {
       if (!enabled) return
       if (formation.is_locked) return
+      if (formation.depth_md === null) return
       onDragStart?.()
       e.currentTarget.setPointerCapture(e.pointerId)
 

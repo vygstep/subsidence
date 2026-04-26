@@ -41,7 +41,10 @@ interface WellResponse extends Well {
 interface FormationResponse {
   id: string
   name: string
-  depth_md: number
+  depth_md: number | null
+  depth_tvd: number | null
+  depth_tvdss: number | null
+  horizon_id: number | null
   age_ma?: number
   color: string
   kind: string
@@ -204,7 +207,7 @@ async function readError(response: Response, fallback: string): Promise<string> 
 }
 
 function sortFormations(formations: FormationTop[]): FormationTop[] {
-  return [...formations].sort((left, right) => left.depth_md - right.depth_md)
+  return [...formations].sort((left, right) => (left.depth_md ?? Infinity) - (right.depth_md ?? Infinity))
 }
 
 function mapFormation(row: FormationResponse): FormationTop {
@@ -212,6 +215,9 @@ function mapFormation(row: FormationResponse): FormationTop {
     id: row.id,
     name: row.name,
     depth_md: row.depth_md,
+    depth_tvd: row.depth_tvd ?? null,
+    depth_tvdss: row.depth_tvdss ?? null,
+    horizon_id: row.horizon_id ?? null,
     age_ma: row.age_ma,
     color: row.color,
     kind: row.kind,
