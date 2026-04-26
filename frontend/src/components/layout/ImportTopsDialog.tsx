@@ -44,6 +44,7 @@ export function ImportTopsDialog({ wells, activeWellId, onClose, onSuccess }: Im
   const projectPath = useProjectStore((state) => state.projectPath)
   const [wellId, setWellId] = useState(activeWellId ?? '')
   const [createNewWell, setCreateNewWell] = useState(false)
+  const [wellPolicy, setWellPolicy] = useState<'file' | 'override'>('override')
   const [csvPath, setCsvPath] = useState(() => getLastImportRoot())
   const [depthRef, setDepthRef] = useState<'MD' | 'TVD' | 'TVDSS'>('MD')
   const [mapping, setMapping] = useState<ColumnMapping>({})
@@ -67,6 +68,13 @@ export function ImportTopsDialog({ wells, activeWellId, onClose, onSuccess }: Im
     }
   }, [tabularPreview])
 
+  // The file well source is the mapped column name when well_name is mapped.
+  const fileWellSource = mapping['well_name'] ?? null
+
+  useEffect(() => {
+    setWellPolicy(fileWellSource ? 'file' : 'override')
+  }, [fileWellSource])
+
   const previewReady = !previewLoading && tabularPreview !== null
   const mappingErrors = validateTopsMapping(mapping)
   const mappingOk = isMappingValid(mappingErrors)
@@ -87,6 +95,8 @@ export function ImportTopsDialog({ wells, activeWellId, onClose, onSuccess }: Im
       if (col) columnMap[fieldId] = col
     }
 
+    const useFileWell = wellPolicy === 'file'
+
     setIsSubmitting(true)
     setError(null)
     try {
@@ -95,10 +105,10 @@ export function ImportTopsDialog({ wells, activeWellId, onClose, onSuccess }: Im
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
-            well_id: wellId || null,
+            well_id: useFileWell ? null : (wellId || null),
             csv_path: nextPath,
             depth_ref: depthRef,
-            create_new_well: !wellId && createNewWell,
+            create_new_well: useFileWell ? false : (!wellId && createNewWell),
             column_map: Object.keys(columnMap).length > 0 ? columnMap : null,
           }),
         })
@@ -112,8 +122,8 @@ export function ImportTopsDialog({ wells, activeWellId, onClose, onSuccess }: Im
         onClose()
       }, {
         projectPath,
-        activeWellId: wellId || activeWellId || null,
-        details: { inputPath: nextPath, depthRef, createNewWell },
+        activeWellId: useFileWell ? null : (wellId || activeWellId || null),
+        details: { inputPath: nextPath, depthRef, createNewWell: useFileWell ? false : createNewWell },
       })
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : 'Failed to import tops')
@@ -203,9 +213,12 @@ export function ImportTopsDialog({ wells, activeWellId, onClose, onSuccess }: Im
             wells={wells}
             wellId={wellId}
             createNewWell={createNewWell}
-            emptyLabel="Reuse by file well_name / create from defaults"
+            emptyLabel="Create or match by file well_name"
+            fileWellSource={fileWellSource}
+            wellPolicy={wellPolicy}
             onWellIdChange={setWellId}
             onCreateNewWellChange={setCreateNewWell}
+            onWellPolicyChange={setWellPolicy}
           />
           <label className="project-dialog__field">
             <span>Depth reference</span>
@@ -221,7 +234,7 @@ export function ImportTopsDialog({ wells, activeWellId, onClose, onSuccess }: Im
       {currentStepIndex === 4 ? (
         <div className="project-dialog__validation" aria-label="Import summary">
           <span>Source: {csvPath.trim()}</span>
-          <span>Target: {wellId || 'file well_name / defaults'}</span>
+          <span>Target: {wellPolicy === 'file' ? `file well names (${fileWellSource})` : (wellId || 'new well')}</span>
           <span>Depth reference: {depthRef}</span>
         </div>
       ) : null}

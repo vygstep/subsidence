@@ -52,6 +52,12 @@ async function advancePastMapping(user: ReturnType<typeof userEvent.setup>) {
   await user.click(screen.getByRole('button', { name: 'Next' }))
 }
 
+// When the file contains a well name the policy toggle is shown with 'file' as default.
+// This selects 'override' to expose the target well dropdown.
+async function selectOverridePolicy(user: ReturnType<typeof userEvent.setup>) {
+  await user.click(screen.getByRole('radio', { name: /Override with target well/i }))
+}
+
 describe('Import dialogs target active well by default', () => {
   beforeEach(() => {
     useProjectStore.setState({ projectPath: 'D:\\projects\\test.subsidence' })
@@ -63,7 +69,7 @@ describe('Import dialogs target active well by default', () => {
     vi.unstubAllGlobals()
   })
 
-  it('preselects the active well in the logs dialog', async () => {
+  it('preselects the active well in the logs dialog when override policy is selected', async () => {
     const user = userEvent.setup()
     render(
       <ImportLasDialog
@@ -75,10 +81,28 @@ describe('Import dialogs target active well by default', () => {
     )
 
     await advancePastPreview(user)
-    expect((screen.getByLabelText('Target well') as HTMLSelectElement).value).toBe('well-b')
+    // LAS preview provides a well name, so the policy toggle defaults to 'file'.
+    // Switching to 'override' reveals the target well dropdown.
+    await selectOverridePolicy(user)
+    expect((screen.getByRole('combobox', { name: 'Target well' }) as HTMLSelectElement).value).toBe('well-b')
   })
 
-  it('preselects the active well in the tops dialog', async () => {
+  it('shows file-well policy by default when LAS preview has a well name', async () => {
+    const user = userEvent.setup()
+    render(
+      <ImportLasDialog
+        wells={wells}
+        activeWellId="well-b"
+        onClose={vi.fn()}
+        onSuccess={vi.fn()}
+      />,
+    )
+
+    await advancePastPreview(user)
+    expect((screen.getByRole('radio', { name: /Use file well name/i }) as HTMLInputElement).checked).toBe(true)
+  })
+
+  it('preselects the active well in the tops dialog when override policy is selected', async () => {
     const user = userEvent.setup()
     render(
       <ImportTopsDialog
@@ -91,7 +115,9 @@ describe('Import dialogs target active well by default', () => {
 
     await advancePastPreview(user)
     await advancePastMapping(user)
-    expect((screen.getByLabelText('Target well') as HTMLSelectElement).value).toBe('well-b')
+    // Tops CSV with well_name column mapped → policy defaults to 'file'.
+    await selectOverridePolicy(user)
+    expect((screen.getByRole('combobox', { name: 'Target well' }) as HTMLSelectElement).value).toBe('well-b')
   })
 
   it('preselects the active well in the deviation dialog', async () => {
@@ -107,6 +133,7 @@ describe('Import dialogs target active well by default', () => {
 
     await advancePastPreview(user)
     await advancePastMapping(user)
+    // Deviation CSVs have no well name field — no policy toggle, direct dropdown.
     expect((screen.getByLabelText('Target well') as HTMLSelectElement).value).toBe('well-b')
   })
 

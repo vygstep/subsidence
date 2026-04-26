@@ -48,6 +48,7 @@ export function ImportLasDialog({ wells, activeWellId, onClose, onSuccess }: Imp
   const projectPath = useProjectStore((state) => state.projectPath)
   const [wellId, setWellId] = useState(activeWellId ?? '')
   const [createNewWell, setCreateNewWell] = useState(false)
+  const [wellPolicy, setWellPolicy] = useState<'file' | 'override'>('override')
   const [sourceType, setSourceType] = useState<LogSourceType>('las')
   const [sourcePath, setSourcePath] = useState(() => getLastImportRoot())
   const [mapping, setMapping] = useState<ColumnMapping>({})
@@ -71,6 +72,13 @@ export function ImportLasDialog({ wells, activeWellId, onClose, onSuccess }: Imp
       setMapping(autoMap(tabularPreview.columns, LOGS_CSV_FIELDS))
     }
   }, [tabularPreview, sourceType])
+
+  // LAS files carry a well name in their header; use it as the file well source.
+  const fileWellSource = sourceType === 'las' ? (lasPreview?.well_name ?? null) : null
+
+  useEffect(() => {
+    setWellPolicy(fileWellSource ? 'file' : 'override')
+  }, [fileWellSource])
 
   const handleSourceTypeChange = (next: LogSourceType) => {
     setSourceType(next)
@@ -105,6 +113,8 @@ export function ImportLasDialog({ wells, activeWellId, onClose, onSuccess }: Imp
       if (col) columnMap[fieldId] = col
     }
 
+    const useFileWell = sourceType === 'las' && wellPolicy === 'file'
+
     setIsSubmitting(true)
     setError(null)
     try {
@@ -116,8 +126,8 @@ export function ImportLasDialog({ wells, activeWellId, onClose, onSuccess }: Imp
             sourceType === 'las'
               ? {
                   las_path: nextPath,
-                  well_id: wellId || null,
-                  create_new_well: !wellId && createNewWell,
+                  well_id: useFileWell ? null : (wellId || null),
+                  create_new_well: useFileWell ? false : (!wellId && createNewWell),
                 }
               : {
                   csv_path: nextPath,
@@ -142,7 +152,7 @@ export function ImportLasDialog({ wells, activeWellId, onClose, onSuccess }: Imp
         onClose()
       }, {
         projectPath,
-        activeWellId: wellId || activeWellId || null,
+        activeWellId: useFileWell ? null : (wellId || activeWellId || null),
         details: { inputPath: nextPath, createNewWell, depthColumn: columnMap['depth'] ?? null },
       })
     } catch (cause) {
@@ -251,16 +261,23 @@ export function ImportLasDialog({ wells, activeWellId, onClose, onSuccess }: Imp
           wells={wells}
           wellId={wellId}
           createNewWell={createNewWell}
-          emptyLabel={sourceType === 'las' ? 'Reuse by LAS header / create from defaults' : 'Reuse by CSV well_name / create from defaults'}
+          emptyLabel={sourceType === 'las' ? 'Create or match by LAS well name' : 'Create or match by CSV well_name'}
+          fileWellSource={fileWellSource}
+          wellPolicy={wellPolicy}
           onWellIdChange={setWellId}
           onCreateNewWellChange={setCreateNewWell}
+          onWellPolicyChange={setWellPolicy}
         />
       ) : null}
 
       {currentStepIndex === summaryStep ? (
         <div className="project-dialog__validation" aria-label="Import summary">
           <span>Source: {sourcePath.trim()}</span>
-          <span>Target: {wellId || 'file header / defaults'}</span>
+          <span>Target: {
+            sourceType === 'las' && wellPolicy === 'file'
+              ? `LAS well name: ${fileWellSource}`
+              : (wellId || 'new well')
+          }</span>
         </div>
       ) : null}
     </ImportWizardShell>
