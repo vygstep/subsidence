@@ -40,6 +40,16 @@ export const DEVIATION_FIELDS: FieldDefinition[] = [
   { id: 'dy', label: 'ΔY', required: false, aliases: ['dy', 'delta_y', 'delta_northing', 'dnorth'] },
 ]
 
+export const UNCONFORMITIES_FIELDS: FieldDefinition[] = [
+  { id: 'unc_name', label: 'Unconformity name', required: true, aliases: ['unc_name', 'name', 'unconformity', 'hiatus', 'surface', 'marker'] },
+  { id: 'depth_md', label: 'Depth (MD)', required: true, aliases: ['depth_md', 'depth', 'md', 'dept', 'depth_m', 'md_m'] },
+  { id: 'end_age_ma', label: 'End age (Ma)', required: true, aliases: ['end_age_ma', 'end_age', 'age_top', 'young_age', 'younger_age', 'age_top_ma'] },
+  { id: 'start_age_ma', label: 'Start age (Ma)', required: true, aliases: ['start_age_ma', 'start_age', 'age_base', 'old_age', 'older_age', 'base_age_ma', 'age_base_ma'] },
+  { id: 'well_name', label: 'Well name', required: false, aliases: ['well_name', 'well', 'wellname', 'well_id'] },
+  { id: 'color', label: 'Color', required: false, aliases: ['color', 'colour'] },
+  { id: 'note', label: 'Note', required: false, aliases: ['note', 'notes', 'comment', 'description', 'remark'] },
+]
+
 export const LOGS_CSV_FIELDS: FieldDefinition[] = [
   {
     id: 'depth',
@@ -87,6 +97,12 @@ export function validateDeviationMapping(mapping: ColumnMapping): string[] {
     || (mapping.dx && mapping.dy)
   if (!hasMode) errors.push('At least one pair must be mapped: Inclination/Azimuth, X/Y, or ΔX/ΔY.')
   return errors
+}
+
+export function validateUnconformitiesMapping(mapping: ColumnMapping): string[] {
+  return UNCONFORMITIES_FIELDS.filter((f) => f.required && !mapping[f.id]).map(
+    (f) => `Required field "${f.label}" is not mapped.`,
+  )
 }
 
 export function validateLogsCsvMapping(mapping: ColumnMapping): string[] {

@@ -75,6 +75,7 @@ class ImportTopsRequest(BaseModel):
 class ImportUnconformitiesRequest(BaseModel):
     well_id: str
     csv_path: str
+    column_map: dict[str, str] | None = None
 
 
 class ImportDeviationRequest(BaseModel):

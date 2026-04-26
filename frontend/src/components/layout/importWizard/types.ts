@@ -1,6 +1,6 @@
 import type { FormEvent, ReactNode } from 'react'
 
-export type ImportWizardDataType = 'logs' | 'tops' | 'deviation' | 'strat-chart'
+export type ImportWizardDataType = 'logs' | 'tops' | 'unconformities' | 'deviation' | 'strat-chart'
 export type ImportWizardPreviewMode = 'las' | 'tabular'
 export type ImportWizardTargetWellPolicy = 'optional' | 'required' | 'none'
 

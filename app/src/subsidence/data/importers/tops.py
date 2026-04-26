@@ -117,12 +117,15 @@ def import_unconformities_csv(
     well_id: str,
     csv_path: Path | str,
     *,
+    column_map: dict[str, str] | None = None,
     strat_units_path: Path | str | None = None,
     strat_ranks_path: Path | str | None = None,
 ) -> list[FormationTopModel]:
     well = _resolve_well(session, well_id)
     path = Path(csv_path)
     fieldnames, rows = _read_csv_rows(path)
+    if column_map:
+        fieldnames, rows = _apply_column_map(fieldnames, rows, column_map)
     required = {'well_name', 'unc_name', 'depth_md', 'end_age_ma', 'start_age_ma'}
     missing = required.difference(set(fieldnames))
     if missing:

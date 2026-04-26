@@ -119,7 +119,7 @@ def import_unconformities(payload: ImportUnconformitiesRequest, request: Request
     with operation_log('import.unconformities', project_path=_manager_project_path(manager), input_path=payload.csv_path, well_id=payload.well_id):
         try:
             with manager.get_session() as session:
-                import_unconformities_csv(session, payload.well_id, Path(payload.csv_path))
+                import_unconformities_csv(session, payload.well_id, Path(payload.csv_path), column_map=payload.column_map or None)
                 linked = link_tops_to_unconformities(session, payload.well_id)
                 formation_count = len(list(session.scalars(select(FormationTopModel).where(FormationTopModel.well_id == payload.well_id))))
                 session.commit()
