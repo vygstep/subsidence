@@ -1,104 +1,79 @@
-import type { LithologyType } from '@/types'
+export interface LithologyFillStyle {
+  color: string
+  patternCode?: string | null
+  patternSvg?: string | null
+}
 
-export type LithologyPattern = Exclude<LithologyType, 'metamorphic'>
+interface CachedSvgPattern {
+  image: HTMLImageElement
+  pattern: CanvasPattern | null
+  isLoading: boolean
+}
 
-const patternCaches = new WeakMap<CanvasRenderingContext2D, Map<string, CanvasPattern | null>>()
+const patternCaches = new WeakMap<CanvasRenderingContext2D, Map<string, CachedSvgPattern>>()
 
-function getCachedPattern(
-  ctx: CanvasRenderingContext2D,
-  key: string,
-  draw: (patternCtx: CanvasRenderingContext2D, size: number) => void,
-): CanvasPattern | null {
+function getContextCache(ctx: CanvasRenderingContext2D): Map<string, CachedSvgPattern> {
   let cache = patternCaches.get(ctx)
   if (!cache) {
     cache = new Map()
     patternCaches.set(ctx, cache)
   }
+  return cache
+}
 
-  if (cache.has(key)) {
-    return cache.get(key) ?? null
+function makeSvgDataUrl(svgContent: string): string {
+  return `data:image/svg+xml;charset=utf-8,${encodeURIComponent(svgContent)}`
+}
+
+function getSvgCanvasPattern(
+  ctx: CanvasRenderingContext2D,
+  style: LithologyFillStyle,
+  onPatternReady?: () => void,
+): CanvasPattern | null {
+  if (!style.patternSvg || !style.patternCode || typeof Image === 'undefined') {
+    return null
   }
 
-  let pattern: CanvasPattern | null = null
-  if (typeof document !== 'undefined') {
-    const size = 12
-    const patternCanvas = document.createElement('canvas')
-    patternCanvas.width = size
-    patternCanvas.height = size
-    const patternCtx = patternCanvas.getContext('2d')
-    if (patternCtx) {
-      draw(patternCtx, size)
-      pattern = ctx.createPattern(patternCanvas, 'repeat')
-    }
+  const key = `${style.patternCode}:${style.patternSvg.length}:${style.patternSvg.slice(0, 64)}`
+  const cache = getContextCache(ctx)
+  const cached = cache.get(key)
+  if (cached?.pattern) {
+    return cached.pattern
+  }
+  if (cached?.isLoading) {
+    return null
+  }
+  if (cached?.image.complete && cached.image.naturalWidth > 0) {
+    cached.pattern = ctx.createPattern(cached.image, 'repeat')
+    return cached.pattern
   }
 
-  cache.set(key, pattern)
-  return pattern
+  const image = new Image()
+  const entry: CachedSvgPattern = { image, pattern: null, isLoading: true }
+  cache.set(key, entry)
+  image.onload = () => {
+    entry.isLoading = false
+    entry.pattern = null
+    onPatternReady?.()
+  }
+  image.onerror = () => {
+    entry.isLoading = false
+    entry.pattern = null
+  }
+  image.src = makeSvgDataUrl(style.patternSvg)
+  return null
 }
 
 function overlayPattern(
   ctx: CanvasRenderingContext2D,
-  lithology: LithologyPattern | undefined,
+  style: LithologyFillStyle,
   x: number,
   y: number,
   width: number,
   height: number,
+  onPatternReady?: () => void,
 ): void {
-  let pattern: CanvasPattern | null = null
-
-  switch (lithology) {
-    case 'sandstone':
-      pattern = getCachedPattern(ctx, 'sandstone', (patternCtx, size) => {
-        patternCtx.fillStyle = 'rgba(112, 77, 24, 0.28)'
-        patternCtx.beginPath()
-        patternCtx.arc(size * 0.3, size * 0.3, 1.1, 0, Math.PI * 2)
-        patternCtx.arc(size * 0.72, size * 0.58, 1.1, 0, Math.PI * 2)
-        patternCtx.fill()
-      })
-      break
-    case 'shale':
-      pattern = getCachedPattern(ctx, 'shale', (patternCtx, size) => {
-        patternCtx.strokeStyle = 'rgba(56, 68, 77, 0.22)'
-        patternCtx.lineWidth = 1
-        for (let row = 2; row < size; row += 4) {
-          patternCtx.beginPath()
-          patternCtx.moveTo(0, row)
-          patternCtx.lineTo(size, row)
-          patternCtx.stroke()
-        }
-      })
-      break
-    case 'limestone':
-      pattern = getCachedPattern(ctx, 'limestone', (patternCtx, size) => {
-        patternCtx.strokeStyle = 'rgba(52, 91, 78, 0.24)'
-        patternCtx.lineWidth = 1
-        patternCtx.strokeRect(1, 1, size - 2, size / 2 - 1)
-        patternCtx.strokeRect(1, size / 2, size / 2 - 1, size / 2 - 1)
-        patternCtx.strokeRect(size / 2, size / 2, size / 2 - 1, size / 2 - 1)
-      })
-      break
-    case 'dolomite':
-      pattern = getCachedPattern(ctx, 'dolomite', (patternCtx, size) => {
-        patternCtx.strokeStyle = 'rgba(101, 54, 145, 0.22)'
-        patternCtx.lineWidth = 1
-        patternCtx.beginPath()
-        patternCtx.moveTo(size / 2, 1)
-        patternCtx.lineTo(size - 1, size / 2)
-        patternCtx.lineTo(size / 2, size - 1)
-        patternCtx.lineTo(1, size / 2)
-        patternCtx.closePath()
-        patternCtx.stroke()
-      })
-      break
-    case 'evaporite':
-    case 'igneous':
-    case 'coal':
-    case 'conglomerate':
-    default:
-      pattern = null
-      break
-  }
-
+  const pattern = getSvgCanvasPattern(ctx, style, onPatternReady)
   if (!pattern) {
     return
   }
@@ -111,17 +86,17 @@ function overlayPattern(
 
 export function drawLithologyBlock(
   ctx: CanvasRenderingContext2D,
-  lithology: LithologyPattern | undefined,
-  color: string,
+  style: LithologyFillStyle,
   x: number,
   y: number,
   width: number,
   height: number,
+  onPatternReady?: () => void,
 ): void {
   ctx.save()
-  ctx.fillStyle = color
+  ctx.fillStyle = style.color
   ctx.fillRect(x, y, width, height)
-  overlayPattern(ctx, lithology, x, y, width, height)
+  overlayPattern(ctx, style, x, y, width, height, onPatternReady)
   ctx.strokeStyle = 'rgba(23, 33, 43, 0.2)'
   ctx.lineWidth = 1
   ctx.strokeRect(x + 0.5, y + 0.5, width - 1, height - 1)

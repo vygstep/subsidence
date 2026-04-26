@@ -1,9 +1,9 @@
-import { useMemo } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 
 import { useCanvasRenderer, useDepthScale } from '@/hooks'
 import { useViewStore, useWellDataStore } from '@/stores'
 import { drawLithologyBlock } from '@/renderers'
-import type { FormationTop, LithologyType } from '@/types'
+import type { FormationTop, LithologyPatternEntry, LithologyType } from '@/types'
 import { mdToTvd } from '@/utils/depthTransform'
 
 interface FormationColumnProps {
@@ -26,6 +26,10 @@ export function FormationColumn({ formations, height, maxDepth, width = 80, isSe
   const formationsTrackConfig = useViewStore((state) => state.formationsTrackConfig)
   const depthType = useViewStore((state) => state.depthType)
   const tvdTable = useWellDataStore((state) => state.tvdTable)
+  const patternPalettes = useWellDataStore((state) => state.lithologyPatternPalettes)
+  const fetchPatternPalette = useWellDataStore((state) => state.fetchLithologyPatternPalette)
+  const [patterns, setPatterns] = useState<LithologyPatternEntry[]>([])
+  const [patternRenderTick, setPatternRenderTick] = useState(0)
 
   const toDisplayDepth = useMemo(
     () => (depthType === 'TVD' && tvdTable ? (md: number) => mdToTvd(md, tvdTable) : (md: number) => md),
@@ -36,6 +40,20 @@ export function FormationColumn({ formations, height, maxDepth, width = 80, isSe
     () => [...formations].sort((left, right) => left.depth_md - right.depth_md),
     [formations],
   )
+
+  useEffect(() => {
+    let cancelled = false
+    void Promise.all(patternPalettes.map((palette) => fetchPatternPalette(palette.id))).then((details) => {
+      if (!cancelled) {
+        setPatterns(details.flatMap((palette) => palette?.patterns ?? []))
+      }
+    })
+    return () => {
+      cancelled = true
+    }
+  }, [fetchPatternPalette, patternPalettes])
+
+  const patternByCode = useMemo(() => new Map(patterns.map((pattern) => [pattern.code, pattern])), [patterns])
 
   const { scale: depthScale } = useDepthScale(visibleDepthRange, height)
 
@@ -61,14 +79,20 @@ export function FormationColumn({ formations, height, maxDepth, width = 80, isSe
         const yBottom = depthScale(blockBottom)
         const blockHeight = yBottom - yTop
 
+        const lithologyCode = toRenderableLithology(formation.lithology)
+        const pattern = lithologyCode ? patternByCode.get(lithologyCode) : null
         drawLithologyBlock(
           ctx,
-          toRenderableLithology(formation.lithology),
-          formation.active_strat_color ?? formation.color,
+          {
+            color: formation.active_strat_color ?? formation.color,
+            patternCode: pattern?.code ?? null,
+            patternSvg: pattern?.svg_content ?? null,
+          },
           0,
           yTop,
           canvasWidth,
           blockHeight,
+          () => setPatternRenderTick((value) => value + 1),
         )
 
         if (blockHeight < 28) {
@@ -93,6 +117,8 @@ export function FormationColumn({ formations, height, maxDepth, width = 80, isSe
       formationsTrackConfig.nameSource,
       maxDepth,
       orderedFormations,
+      patternByCode,
+      patternRenderTick,
       toDisplayDepth,
       visibleDepthRange.max,
       visibleDepthRange.min,
