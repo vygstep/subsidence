@@ -41,12 +41,13 @@ def import_las(payload: ImportLasRequest, request: Request) -> ImportLasResponse
     with operation_log('import.las', project_path=_manager_project_path(manager), input_path=payload.las_path, well_id=payload.well_id, create_new_well=payload.create_new_well):
         try:
             with manager.get_session() as session:
-                well = import_las_file(
+                well, qc_warnings = import_las_file(
                     session,
                     manager.project_path,
                     Path(payload.las_path),
                     well_id=payload.well_id,
                     create_new_well=payload.create_new_well,
+                    trusted_depth_reference=payload.trusted_depth_reference,
                 )
                 session.flush()
                 command = ImportWell.capture(session, manager.project_path, well.id)
@@ -58,7 +59,7 @@ def import_las(payload: ImportLasRequest, request: Request) -> ImportLasResponse
             manager.save_project()
         except (ValueError, FileNotFoundError) as error:
             raise HTTPException(status_code=400, detail=str(error)) from error
-        return ImportLasResponse(well_id=well_id, well_name=well_name, curve_count=curve_count)
+        return ImportLasResponse(well_id=well_id, well_name=well_name, curve_count=curve_count, qc_warnings=qc_warnings)
 
 
 @router.post('/import-logs-csv', response_model=ImportLasResponse)
@@ -67,13 +68,14 @@ def import_logs_csv_route(payload: ImportLogsCsvRequest, request: Request) -> Im
     with operation_log('import.logs_csv', project_path=_manager_project_path(manager), input_path=payload.csv_path, well_id=payload.well_id, depth_column=payload.depth_column, create_new_well=payload.create_new_well):
         try:
             with manager.get_session() as session:
-                well = import_logs_csv(
+                well, qc_warnings = import_logs_csv(
                     session,
                     manager.project_path,
                     Path(payload.csv_path),
                     well_id=payload.well_id,
                     depth_column=payload.depth_column,
                     create_new_well=payload.create_new_well,
+                    trusted_depth_reference=payload.trusted_depth_reference,
                 )
                 session.flush()
                 command = ImportWell.capture(session, manager.project_path, well.id)
@@ -85,7 +87,7 @@ def import_logs_csv_route(payload: ImportLogsCsvRequest, request: Request) -> Im
             manager.save_project()
         except (ValueError, FileNotFoundError) as error:
             raise HTTPException(status_code=400, detail=str(error)) from error
-        return ImportLasResponse(well_id=well_id, well_name=well_name, curve_count=curve_count)
+        return ImportLasResponse(well_id=well_id, well_name=well_name, curve_count=curve_count, qc_warnings=qc_warnings)
 
 
 @router.post('/import-tops', response_model=ImportTopsResponse)
@@ -94,7 +96,7 @@ def import_tops(payload: ImportTopsRequest, request: Request) -> ImportTopsRespo
     with operation_log('import.tops', project_path=_manager_project_path(manager), input_path=payload.csv_path, well_id=payload.well_id, depth_ref=payload.depth_ref, create_new_well=payload.create_new_well):
         try:
             with manager.get_session() as session:
-                imported = import_tops_csv(
+                imported, qc_warnings = import_tops_csv(
                     session,
                     payload.well_id,
                     Path(payload.csv_path),
@@ -112,9 +114,9 @@ def import_tops(payload: ImportTopsRequest, request: Request) -> ImportTopsRespo
                 formation_count = len(list(session.scalars(select(FormationTopModel).where(FormationTopModel.well_id == target_well_id))))
                 session.commit()
             manager.save_project()
-        except (ValueError, FileNotFoundError, NotImplementedError) as error:
+        except (ValueError, FileNotFoundError) as error:
             raise HTTPException(status_code=400, detail=str(error)) from error
-        return ImportTopsResponse(well_id=target_well_id, formation_count=formation_count, linked_count=len(linked))
+        return ImportTopsResponse(well_id=target_well_id, formation_count=formation_count, linked_count=len(linked), qc_warnings=qc_warnings)
 
 
 @router.post('/import-unconformities', response_model=ImportUnconformitiesResponse)

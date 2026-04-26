@@ -28,6 +28,7 @@ export interface CurveData {
 export interface CurveInventoryItem {
   mnemonic: string
   unit: string
+  trusted_depth_reference?: string
 }
 
 export interface FormationStratLink {

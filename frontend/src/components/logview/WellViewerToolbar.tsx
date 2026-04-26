@@ -1,4 +1,4 @@
-import { useViewStore } from '@/stores'
+import { useViewStore, useWellDataStore } from '@/stores'
 
 const DEPTH_TYPES = ['MD', 'TVD', 'TVDSS'] as const
 
@@ -11,6 +11,7 @@ export function WellViewerToolbar() {
   const setCurveTooltipVisible = useViewStore((state) => state.setCurveTooltipVisible)
   const setInteractionMode = useViewStore((state) => state.setInteractionMode)
   const setDepthType = useViewStore((state) => state.setDepthType)
+  const reloadCurvesForDepthBasis = useWellDataStore((state) => state.reloadCurvesForDepthBasis)
 
   return (
     <div className="well-viewer-toolbar" aria-label="Well viewer tools">
@@ -41,7 +42,7 @@ export function WellViewerToolbar() {
             key={t}
             type="button"
             className={`well-viewer-toolbar__button well-viewer-toolbar__button--compact ${depthType === t ? 'well-viewer-toolbar__button--active' : ''}`}
-            onClick={() => setDepthType(t)}
+            onClick={() => { setDepthType(t); void reloadCurvesForDepthBasis(t) }}
           >
             {t}
           </button>

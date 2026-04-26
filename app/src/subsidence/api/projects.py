@@ -55,6 +55,7 @@ class ImportLasRequest(BaseModel):
     las_path: str
     well_id: str | None = None
     create_new_well: bool = False
+    trusted_depth_reference: str = 'MD'
 
 
 class ImportLogsCsvRequest(BaseModel):
@@ -62,6 +63,7 @@ class ImportLogsCsvRequest(BaseModel):
     well_id: str | None = None
     depth_column: str | None = None
     create_new_well: bool = False
+    trusted_depth_reference: str = 'MD'
 
 
 class ImportTopsRequest(BaseModel):
@@ -178,12 +180,14 @@ class ImportLasResponse(BaseModel):
     well_id: str
     well_name: str
     curve_count: int
+    qc_warnings: list[str] = []
 
 
 class ImportTopsResponse(BaseModel):
     well_id: str
     formation_count: int
     linked_count: int
+    qc_warnings: list[str] = []
 
 
 class ImportUnconformitiesResponse(BaseModel):

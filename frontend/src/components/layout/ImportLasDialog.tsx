@@ -52,9 +52,11 @@ export function ImportLasDialog({ wells, activeWellId, onClose, onSuccess }: Imp
   const [sourceType, setSourceType] = useState<LogSourceType>('las')
   const [sourcePath, setSourcePath] = useState(() => getLastImportRoot())
   const [mapping, setMapping] = useState<ColumnMapping>({})
+  const [trustedDepthRef, setTrustedDepthRef] = useState<'MD' | 'TVD' | 'TVDSS'>('MD')
   const [currentStepIndex, setCurrentStepIndex] = useState(0)
   const [error, setError] = useState<string | null>(null)
   const [isSubmitting, setIsSubmitting] = useState(false)
+  const [qcWarnings, setQcWarnings] = useState<string[]>([])
   const lastImportRoot = getLastImportRoot()
   const preset = sourceType === 'las' ? importWizardPresets.logsLas : importWizardPresets.logsCsv
   const sourceIsValid = sourcePath.trim().length > 0
@@ -128,12 +130,14 @@ export function ImportLasDialog({ wells, activeWellId, onClose, onSuccess }: Imp
                   las_path: nextPath,
                   well_id: useFileWell ? null : (wellId || null),
                   create_new_well: useFileWell ? false : (!wellId && createNewWell),
+                  trusted_depth_reference: trustedDepthRef,
                 }
               : {
                   csv_path: nextPath,
                   well_id: wellId || null,
                   depth_column: columnMap['depth'] ?? null,
                   create_new_well: !wellId && createNewWell,
+                  trusted_depth_reference: trustedDepthRef,
                 },
           ),
         })
@@ -146,10 +150,14 @@ export function ImportLasDialog({ wells, activeWellId, onClose, onSuccess }: Imp
           ))
         }
 
-        const payload = (await response.json()) as ImportLasResponse
+        const payload = (await response.json()) as ImportLasResponse & { qc_warnings?: string[]; well_id: string }
         rememberImportPath(nextPath)
+        const warnings = payload.qc_warnings ?? []
+        setQcWarnings(warnings)
         await onSuccess(payload.well_id)
-        onClose()
+        if (warnings.length === 0) {
+          onClose()
+        }
       }, {
         projectPath,
         activeWellId: useFileWell ? null : (wellId || activeWellId || null),
@@ -257,17 +265,27 @@ export function ImportLasDialog({ wells, activeWellId, onClose, onSuccess }: Imp
       ) : null}
 
       {currentStepIndex === optionsStep ? (
-        <ImportWizardTargetWellFields
-          wells={wells}
-          wellId={wellId}
-          createNewWell={createNewWell}
-          emptyLabel={sourceType === 'las' ? 'Create or match by LAS well name' : 'Create or match by CSV well_name'}
-          fileWellSource={fileWellSource}
-          wellPolicy={wellPolicy}
-          onWellIdChange={setWellId}
-          onCreateNewWellChange={setCreateNewWell}
-          onWellPolicyChange={setWellPolicy}
-        />
+        <>
+          <ImportWizardTargetWellFields
+            wells={wells}
+            wellId={wellId}
+            createNewWell={createNewWell}
+            emptyLabel={sourceType === 'las' ? 'Create or match by LAS well name' : 'Create or match by CSV well_name'}
+            fileWellSource={fileWellSource}
+            wellPolicy={wellPolicy}
+            onWellIdChange={setWellId}
+            onCreateNewWellChange={setCreateNewWell}
+            onWellPolicyChange={setWellPolicy}
+          />
+          <label className="project-dialog__field">
+            <span>Depth reference</span>
+            <select value={trustedDepthRef} onChange={(e) => setTrustedDepthRef(e.target.value as 'MD' | 'TVD' | 'TVDSS')}>
+              <option value="MD">MD — measured depth (default)</option>
+              <option value="TVD">TVD — true vertical depth</option>
+              <option value="TVDSS">TVDSS — TVD subsea (KB-referenced)</option>
+            </select>
+          </label>
+        </>
       ) : null}
 
       {currentStepIndex === summaryStep ? (
@@ -278,6 +296,22 @@ export function ImportLasDialog({ wells, activeWellId, onClose, onSuccess }: Imp
               ? `LAS well name: ${fileWellSource}`
               : (wellId || 'new well')
           }</span>
+        </div>
+      ) : null}
+
+      {qcWarnings.length > 0 ? (
+        <div className="import-qc-warnings">
+          <div className="import-qc-warnings__header">
+            Import completed with {qcWarnings.length} QC warning{qcWarnings.length > 1 ? 's' : ''}:
+          </div>
+          <ul className="import-qc-warnings__list">
+            {qcWarnings.map((msg, i) => (
+              <li key={i}>{msg}</li>
+            ))}
+          </ul>
+          <button type="button" className="project-dialog__close" onClick={onClose}>
+            Dismiss and close
+          </button>
         </div>
       ) : null}
     </ImportWizardShell>

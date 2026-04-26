@@ -51,6 +51,7 @@ export function ImportTopsDialog({ wells, activeWellId, onClose, onSuccess }: Im
   const [currentStepIndex, setCurrentStepIndex] = useState(0)
   const [error, setError] = useState<string | null>(null)
   const [isSubmitting, setIsSubmitting] = useState(false)
+  const [qcWarnings, setQcWarnings] = useState<string[]>([])
   const lastImportRoot = getLastImportRoot()
   const preset = importWizardPresets.tops
   const sourceIsValid = csvPath.trim().length > 0
@@ -116,10 +117,14 @@ export function ImportTopsDialog({ wells, activeWellId, onClose, onSuccess }: Im
           throw new Error(await readImportError(response, `Failed to import tops (${response.status})`))
         }
 
-        const payload = (await response.json()) as ImportTopsResponse
+        const payload = (await response.json()) as ImportTopsResponse & { qc_warnings?: string[] }
         rememberImportPath(nextPath)
+        const warnings = payload.qc_warnings ?? []
+        setQcWarnings(warnings)
         await onSuccess(payload.well_id)
-        onClose()
+        if (warnings.length === 0) {
+          onClose()
+        }
       }, {
         projectPath,
         activeWellId: useFileWell ? null : (wellId || activeWellId || null),
@@ -236,6 +241,22 @@ export function ImportTopsDialog({ wells, activeWellId, onClose, onSuccess }: Im
           <span>Source: {csvPath.trim()}</span>
           <span>Target: {wellPolicy === 'file' ? `file well names (${fileWellSource})` : (wellId || 'new well')}</span>
           <span>Depth reference: {depthRef}</span>
+        </div>
+      ) : null}
+
+      {qcWarnings.length > 0 ? (
+        <div className="import-qc-warnings">
+          <div className="import-qc-warnings__header">
+            Import completed with {qcWarnings.length} QC warning{qcWarnings.length > 1 ? 's' : ''}:
+          </div>
+          <ul className="import-qc-warnings__list">
+            {qcWarnings.map((msg, i) => (
+              <li key={i}>{msg}</li>
+            ))}
+          </ul>
+          <button type="button" className="project-dialog__close" onClick={onClose}>
+            Dismiss and close
+          </button>
         </div>
       ) : null}
     </ImportWizardShell>

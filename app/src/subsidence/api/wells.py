@@ -25,6 +25,7 @@ class WellListItem(BaseModel):
 class CurveInventoryItem(BaseModel):
     mnemonic: str
     unit: str
+    trusted_depth_reference: str = 'MD'
 
 
 class FormationInventoryItem(BaseModel):
@@ -243,7 +244,11 @@ def list_well_inventories(request: Request) -> list[WellInventoryResponse]:
                         fields=_deviation_fields(deviation.mode),
                     ) if deviation is not None else None,
                     curves=[
-                        CurveInventoryItem(mnemonic=row.mnemonic, unit=row.unit)
+                        CurveInventoryItem(
+                            mnemonic=row.mnemonic,
+                            unit=row.unit,
+                            trusted_depth_reference=row.trusted_depth_reference,
+                        )
                         for row in curve_rows
                     ],
                     formations=[
@@ -403,6 +408,81 @@ def get_curves_lod(
                     null_value=row.null_value,
                 )
             )
+        return results
+
+
+@router.get('/wells/{well_id}/curves/full', response_model=list[CurveResponse])
+def get_curves_full(
+    well_id: str,
+    request: Request,
+    depth_basis: str = Query(default='MD'),
+) -> list[CurveResponse]:
+    """Return all curve samples for a well, optionally with depth conversion.
+
+    When depth_basis is 'TVD' or 'TVDSS' and the curve trusted_depth_reference is 'MD'
+    and the well has an INCL_AZIM deviation survey, depth arrays are converted on-the-fly.
+    Curves with a non-MD trusted_depth_reference are always returned in their native basis.
+    """
+    from subsidence.data.deviation_transform import _interpolate, _load_survey_arrays
+
+    db_depth_basis = depth_basis.upper()
+    manager = _require_open_project(request)
+    with manager.get_session() as session:
+        well = session.get(WellModel, well_id)
+        if well is None:
+            raise HTTPException(status_code=404, detail=f'Well not found: {well_id}')
+
+        curve_rows = list(
+            session.scalars(
+                select(CurveMetadata)
+                .where(CurveMetadata.well_id == well.id)
+                .order_by(CurveMetadata.id.asc())
+            )
+        )
+        if not curve_rows:
+            return []
+
+        # Pre-load survey arrays once for TVD/TVDSS conversion
+        survey_arrays: tuple[object, object] | None = None
+        if db_depth_basis in ('TVD', 'TVDSS') and well.deviation_survey is not None:
+            survey_arrays = _load_survey_arrays(manager.project_path, well.deviation_survey)
+        kb_elev = well.kb_elev or 0.0
+
+        curve_maps = _load_curve_maps(manager.project_path, curve_rows)
+        results: list[CurveResponse] = []
+        for row in curve_rows:
+            entry = curve_maps.get(row.data_uri, {}).get(row.mnemonic)
+            if entry is None:
+                continue
+            depths_arr, values_arr = entry
+
+            # Depth conversion: only for MD-native curves when conversion is requested
+            if db_depth_basis != 'MD' and row.trusted_depth_reference == 'MD' and survey_arrays is not None:
+                md_arr, tvd_arr = survey_arrays
+                converted_depths = [
+                    float(_interpolate(float(d), md_arr, tvd_arr)) - (kb_elev if db_depth_basis == 'TVDSS' else 0.0)
+                    for d in depths_arr
+                ]
+                results.append(
+                    CurveResponse(
+                        mnemonic=row.mnemonic,
+                        unit=row.unit,
+                        depths=converted_depths,
+                        values=values_arr.tolist(),
+                        null_value=row.null_value,
+                    )
+                )
+            else:
+                # Return native depths (covers: MD mode, non-MD curves, no survey)
+                results.append(
+                    CurveResponse(
+                        mnemonic=row.mnemonic,
+                        unit=row.unit,
+                        depths=depths_arr.tolist(),
+                        values=values_arr.tolist(),
+                        null_value=row.null_value,
+                    )
+                )
         return results
 
 

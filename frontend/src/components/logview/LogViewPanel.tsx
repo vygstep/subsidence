@@ -43,6 +43,7 @@ export function LogViewPanel({ tracks, trackOrder, curves, formations, minDepth,
   const activePickId = useViewStore((state) => state.activePickId)
   const setActivePickId = useViewStore((state) => state.setActivePickId)
   const lodEnabled = useViewStore((state) => state.lodEnabled)
+  const depthType = useViewStore((state) => state.depthType)
   const updateFormationDepth = useWellDataStore((state) => state.updateFormationDepth)
 
   const depthWidth = trackWidths[DEPTH_TRACK_ID] ?? DEFAULT_DEPTH_WIDTH
@@ -89,14 +90,15 @@ export function LogViewPanel({ tracks, trackOrder, curves, formations, minDepth,
   useSynchronizedScroll(containerRef, minDepth, maxDepth)
 
   // LOD: when zoomed out past 1 m/px, fetch downsampled curves for the visible window
+  // Disabled in TVD/TVDSS mode — full converted curves are used instead
   useEffect(() => {
-    if (!lodEnabled || depthPerPixel <= 1.0) return
+    if (!lodEnabled || depthPerPixel <= 1.0 || depthType !== 'MD') return
     const resolution = Math.ceil(trackHeight / 2)
     const timer = window.setTimeout(() => {
       void fetchCurvesLOD(visibleDepthRange.min, visibleDepthRange.max, resolution)
     }, 200)
     return () => window.clearTimeout(timer)
-  }, [lodEnabled, depthPerPixel, visibleDepthRange.min, visibleDepthRange.max, trackHeight, fetchCurvesLOD])
+  }, [lodEnabled, depthType, depthPerPixel, visibleDepthRange.min, visibleDepthRange.max, trackHeight, fetchCurvesLOD])
 
   useEffect(() => {
     const element = containerRef.current

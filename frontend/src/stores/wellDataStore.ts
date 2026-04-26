@@ -190,6 +190,7 @@ export interface WellDataStore {
   fetchCompactionModelParams: (modelId: number) => Promise<LithologyParam[]>
   updateCompactionModelParam: (modelId: number, lithologyCode: string, patch: Partial<Pick<LithologyParam, 'density' | 'porosity_surface' | 'compaction_coeff'>>) => Promise<LithologyParam>
   fetchCurvesLOD: (depthMin: number, depthMax: number, resolution: number) => Promise<void>
+  reloadCurvesForDepthBasis: (depthBasis: 'MD' | 'TVD' | 'TVDSS') => Promise<void>
 }
 
 function toFloat32Array(values: number[]): Float32Array {
@@ -1023,6 +1024,23 @@ export const useWellDataStore = create<WellDataStore>((set, get) => ({
         }
       }),
     }))
+  },
+  async reloadCurvesForDepthBasis(depthBasis) {
+    const wellId = get().well?.well_id
+    if (!wellId) return
+    const url = `/api/wells/${wellId}/curves/full?depth_basis=${depthBasis}`
+    const response = await fetch(url)
+    if (!response.ok) return
+    const fullCurves = (await response.json()) as WellResponse['curves']
+    set({
+      curves: fullCurves.map((curve) => ({
+        mnemonic: curve.mnemonic,
+        unit: curve.unit,
+        depths: toFloat32Array(curve.depths),
+        values: toFloat32Array(curve.values),
+        null_value: curve.null_value,
+      })),
+    })
   },
   async linkFormationToChart(formationId, chartId, stratUnitId) {
     const wellId = get().well?.well_id

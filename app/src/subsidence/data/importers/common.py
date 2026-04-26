@@ -342,6 +342,144 @@ def _validate_strictly_increasing_depth(rows: list[dict[str, str]], depth_column
     return depths
 
 
+def compute_sampling_kind(
+    depths: list[float],
+) -> tuple[str, float | None]:
+    """Return (sampling_kind, nominal_step_m) from a cleaned, sorted depth list."""
+    if len(depths) < 2:
+        return 'SINGLE_POINT', None
+    steps = [depths[i + 1] - depths[i] for i in range(len(depths) - 1)]
+    if not steps:
+        return 'UNKNOWN', None
+    median_step = sorted(steps)[len(steps) // 2]
+    if median_step <= 0:
+        return 'UNKNOWN', None
+    max_step = max(steps)
+    min_step = min(steps)
+    if (max_step - min_step) < 0.10 * median_step:
+        return 'CONSTANT', float(median_step)
+    return 'VARIABLE', None
+
+
+def run_curve_qc(
+    depths: list[float],
+    values: list[float],
+    mnemonic: str,
+    well_td_md: float | None,
+    survey_max_md: float | None,
+) -> dict[str, object]:
+    """Return QC result dict with keys: qc_status, qc_summary (JSON-string)."""
+    flags: list[str] = []
+    messages: list[str] = []
+
+    if len(depths) < 2:
+        stats: dict[str, object] = {'sample_count': len(depths), 'min_depth_m': depths[0] if depths else None,
+                                     'max_depth_m': depths[-1] if depths else None, 'median_step_m': None,
+                                     'null_fraction': 0.0}
+        return {
+            'qc_status': 'OK',
+            'qc_summary': json.dumps({'flags': [], 'messages': [], 'stats': stats}),
+        }
+
+    min_depth = depths[0]
+    max_depth = depths[-1]
+    n = len(depths)
+
+    steps = [depths[i + 1] - depths[i] for i in range(n - 1)]
+    median_step = sorted(steps)[len(steps) // 2]
+
+    # Monotonicity / duplicates
+    seen: set[float] = set()
+    has_dups = False
+    has_nonmono = False
+    for d in depths:
+        if d in seen:
+            has_dups = True
+        seen.add(d)
+    sorted_unique = sorted(seen)
+    if sorted_unique != list(dict.fromkeys(depths)):
+        has_nonmono = True
+
+    if has_dups:
+        flags.append('DUPLICATE_DEPTHS')
+        messages.append(f'{mnemonic}: {len(depths) - len(set(depths))} duplicate depth value(s).')
+    if has_nonmono:
+        flags.append('NON_MONOTONIC_DEPTH')
+        messages.append(f'{mnemonic}: depth values are not strictly increasing.')
+
+    # Variable sampling
+    max_step = max(steps)
+    min_step = min(steps)
+    if median_step > 0 and (max_step - min_step) >= 0.10 * median_step:
+        flags.append('VARIABLE_SAMPLING')
+        messages.append(
+            f'{mnemonic}: variable sampling — min step {min_step:.2f} m, '
+            f'median {median_step:.2f} m, max {max_step:.2f} m.'
+        )
+
+    # Large depth gap
+    if median_step > 0 and max_step > 20 * median_step:
+        flags.append('LARGE_DEPTH_GAP')
+        messages.append(f'{mnemonic}: depth gap {max_step:.1f} m exceeds 20× median step.')
+
+    # Beyond well TD
+    if well_td_md is not None and max_depth > well_td_md * 1.001:
+        flags.append('CURVE_BELOW_TD')
+        messages.append(
+            f'{mnemonic}: max depth {max_depth:.1f} m exceeds well TD {well_td_md:.1f} m.'
+        )
+
+    # Beyond deviation survey
+    if survey_max_md is not None and max_depth > survey_max_md:
+        flags.append('DEVIATION_SHORTER_THAN_CURVE')
+        messages.append(
+            f'{mnemonic}: curve max depth {max_depth:.1f} m exceeds deviation survey max {survey_max_md:.1f} m.'
+        )
+
+    # Null fraction
+    null_count = sum(1 for v in values if v is None or (isinstance(v, float) and math.isnan(v)))
+    null_fraction = null_count / n
+    if null_fraction >= 1.0:
+        flags.append('ALL_VALUES_NULL')
+        messages.append(f'{mnemonic}: all value samples are null.')
+    elif null_fraction > 0.30:
+        flags.append('HIGH_NULL_FRACTION')
+        messages.append(f'{mnemonic}: {null_fraction * 100:.0f}% null fraction.')
+
+    qc_status = 'OK' if not flags else 'WARNING'
+    stats = {
+        'sample_count': n,
+        'min_depth_m': min_depth,
+        'max_depth_m': max_depth,
+        'median_step_m': float(median_step) if median_step > 0 else None,
+        'null_fraction': round(null_fraction, 4),
+    }
+    return {
+        'qc_status': qc_status,
+        'qc_summary': json.dumps({'flags': flags, 'messages': messages, 'stats': stats}),
+    }
+
+
+def run_top_qc(
+    top_name: str,
+    depth_md: float,
+    well_td_md: float | None,
+) -> dict[str, object]:
+    """Return QC result dict for a single formation top."""
+    flags: list[str] = []
+    messages: list[str] = []
+    if well_td_md is not None and depth_md > well_td_md * 1.001:
+        flags.append('TOP_BELOW_TD')
+        messages.append(
+            f'{top_name}: depth {depth_md:.1f} m exceeds well TD {well_td_md:.1f} m.'
+        )
+    qc_status = 'WARNING' if flags else 'OK'
+    return {
+        'qc_status': qc_status,
+        'qc_summary': json.dumps({'flags': flags, 'messages': messages}) if flags else None,
+    }
+
+
 def _write_curve_payloads(
     session: Session,
     bundle_path: Path,
@@ -385,13 +523,18 @@ def _write_curve_payloads(
                 family_code=payload['family_code'],
                 unit=str(payload['unit']),
                 original_unit=(str(payload['original_unit']) or None),
-                curve_type='continuous',
+                curve_type=str(payload.get('curve_type', 'continuous')),
                 depth_min=min(clean_depths),
                 depth_max=max(clean_depths),
                 n_samples=len(clean_depths),
                 data_uri=parquet_relative_path,
                 source_hash=str(payload['source_hash']),
                 null_value=float(payload['null_value']),
+                trusted_depth_reference=str(payload.get('trusted_depth_reference', 'MD')),
+                sampling_kind=str(payload['sampling_kind']) if payload.get('sampling_kind') else None,
+                nominal_step_m=float(payload['nominal_step_m']) if payload.get('nominal_step_m') is not None else None,
+                qc_status=str(payload.get('qc_status', 'OK')),
+                qc_summary=str(payload['qc_summary']) if payload.get('qc_summary') else None,
             )
         )
 

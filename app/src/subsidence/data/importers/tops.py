@@ -25,6 +25,7 @@ from .common import (
     _resolve_well,
     apply_imported_well_metadata,
     create_empty_well,
+    run_top_qc,
 )
 
 
@@ -57,10 +58,11 @@ def import_tops_csv(
     strat_units_path: Path | str | None = None,
     strat_ranks_path: Path | str | None = None,
     create_new_well: bool = False,
-) -> list[FormationTopModel]:
-    if depth_ref.upper() not in ('MD',):
-        raise NotImplementedError(
-            f'depth_ref={depth_ref!r} is not yet supported; only MD is implemented'
+) -> tuple[list[FormationTopModel], list[str]]:
+    depth_ref_upper = depth_ref.upper()
+    if depth_ref_upper not in ('MD', 'TVD', 'TVDSS'):
+        raise ValueError(
+            f'depth_ref={depth_ref!r} is not supported; valid values: MD, TVD, TVDSS'
         )
     path = Path(csv_path)
     fieldnames, rows = _read_csv_rows(path)
@@ -91,6 +93,8 @@ def import_tops_csv(
         color = explicit_color or _resolve_ics_color(strat_age, ics_units) or _DEFAULT_TOP_COLOR
         note = _merge_note(_extract_text(row, 'note'), _extract_text(row, 'unconformity_ref'))
 
+        qc = run_top_qc(top_name, depth_md, well.td_md)
+
         top = FormationTopModel(
             well_id=well.id,
             name=top_name,
@@ -103,13 +107,24 @@ def import_tops_csv(
             color=color,
             is_locked=False,
             note=note,
+            qc_status=str(qc['qc_status']),
+            qc_summary=str(qc['qc_summary']) if qc.get('qc_summary') else None,
         )
         session.add(top)
         auto_link_to_active_chart(session, top)
         imported.append(top)
 
     session.flush()
-    return imported
+
+    # Collect QC warning messages
+    import json as _json
+    qc_warnings: list[str] = []
+    for top in imported:
+        if top.qc_summary:
+            summary = _json.loads(top.qc_summary)
+            qc_warnings.extend(summary.get('messages', []))
+
+    return imported, qc_warnings
 
 
 def import_unconformities_csv(

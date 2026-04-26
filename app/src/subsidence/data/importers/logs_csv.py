@@ -22,7 +22,9 @@ from .common import (
     _validate_strictly_increasing_depth,
     _write_curve_payloads,
     apply_imported_well_metadata,
+    compute_sampling_kind,
     create_empty_well,
+    run_curve_qc,
 )
 
 
@@ -90,7 +92,8 @@ def import_logs_csv(
     well_id: str | None = None,
     depth_column: str | None = None,
     create_new_well: bool = False,
-) -> object:
+    trusted_depth_reference: str = 'MD',
+) -> tuple[object, list[str]]:
     bundle_path = Path(project_path)
     source_path = Path(csv_path)
     source_hash = _sha256(source_path)
@@ -152,6 +155,9 @@ def import_logs_csv(
             except ValueError:
                 target_unit = source_unit
 
+        sampling_kind, nominal_step_m = compute_sampling_kind(clean_depths)
+        qc = run_curve_qc(clean_depths, values, mnemonic, well.td_md, None)
+
         curve_payloads.append({
             'mnemonic': mnemonic,
             'standard_mnemonic': standard_mnemonic,
@@ -162,10 +168,23 @@ def import_logs_csv(
             'values': values,
             'source_hash': source_hash,
             'null_value': -999.25,
+            'trusted_depth_reference': trusted_depth_reference,
+            'sampling_kind': sampling_kind,
+            'nominal_step_m': nominal_step_m,
+            'qc_status': qc['qc_status'],
+            'qc_summary': qc['qc_summary'],
         })
 
     if not curve_payloads:
         raise ValueError(f'No importable curves were found in CSV file: {source_path}')
 
     _write_curve_payloads(session, bundle_path, well, curve_payloads)
-    return well
+
+    import json as _json
+    qc_warnings: list[str] = []
+    for p in curve_payloads:
+        if p.get('qc_summary'):
+            summary = _json.loads(str(p['qc_summary']))
+            qc_warnings.extend(summary.get('messages', []))
+
+    return well, qc_warnings

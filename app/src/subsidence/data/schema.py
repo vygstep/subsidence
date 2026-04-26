@@ -7,7 +7,7 @@ from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column, relationship
 from sqlalchemy import MetaData
 
 SUBSIDENCE_APP_ID = 0x53554253  # "SUBS" as 4-byte int
-SCHEMA_VERSION = 8
+SCHEMA_VERSION = 9
 
 _NAMING: dict[str, str] = {
     "ix": "ix_%(table_name)s_%(column_0_name)s",
@@ -127,6 +127,16 @@ class CurveMetadata(Base, AuditMixin):
     data_uri: Mapped[str] = mapped_column(Text)  # relative path to Parquet
     source_hash: Mapped[str] = mapped_column(String(64))  # sha256 of source file
     null_value: Mapped[float] = mapped_column(Float, default=-999.25)
+    trusted_depth_reference: Mapped[str] = mapped_column(String(8), default="MD")
+    # "MD" | "TVD" | "TVDSS" — depth type used in the source file
+    sampling_kind: Mapped[str | None] = mapped_column(String(16), nullable=True)
+    # "CONSTANT" | "VARIABLE" | "SINGLE_POINT" | "UNKNOWN" | NULL (unknown/not computed)
+    nominal_step_m: Mapped[float | None] = mapped_column(Float, nullable=True)
+    # median depth step for CONSTANT curves, meters; NULL for VARIABLE / SINGLE_POINT
+    qc_status: Mapped[str] = mapped_column(String(8), default="OK")
+    # "OK" | "WARNING" | "ERROR"
+    qc_summary: Mapped[str | None] = mapped_column(Text, nullable=True)
+    # JSON blob: {flags, messages, stats}
 
     well: Mapped[WellModel] = relationship(back_populates="curve_metadata")
 
@@ -274,6 +284,10 @@ class FormationTopModel(Base, AuditMixin):
     # compacted thickness of section eroded above this boundary (unconformity only, m)
     lithology: Mapped[str | None] = mapped_column(String(32), nullable=True)
     note: Mapped[str | None] = mapped_column(Text, nullable=True)
+    qc_status: Mapped[str] = mapped_column(String(8), default="OK")
+    # "OK" | "WARNING" | "ERROR"
+    qc_summary: Mapped[str | None] = mapped_column(Text, nullable=True)
+    # JSON blob: {flags, messages}
 
     well: Mapped[WellModel] = relationship(back_populates="formation_tops")
     strat_links: Mapped[list["FormationStratLink"]] = relationship(
