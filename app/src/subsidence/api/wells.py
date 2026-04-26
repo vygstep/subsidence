@@ -11,7 +11,7 @@ from sqlalchemy.orm import selectinload
 
 from subsidence.data import UpdateWell, load_curves_from_parquet
 from subsidence.data.lttb import lttb
-from subsidence.data.schema import CurveMetadata, DeviationSurveyModel, FormationStratLink, FormationTopModel, WellModel
+from subsidence.data.schema import CurveMetadata, DeviationSurveyModel, FormationStratLink, FormationTopModel, WellActiveTopSet, WellModel
 
 router = APIRouter(tags=['wells'])
 
@@ -30,7 +30,10 @@ class CurveInventoryItem(BaseModel):
 class FormationInventoryItem(BaseModel):
     id: str
     name: str
-    depth_md: float
+    depth_md: float | None
+    depth_tvd: float | None = None
+    depth_tvdss: float | None = None
+    horizon_id: int | None = None
     active_strat_color: str | None = None
 
 
@@ -45,7 +48,10 @@ class CurveResponse(BaseModel):
 class FormationResponse(BaseModel):
     id: str
     name: str
-    depth_md: float
+    depth_md: float | None
+    depth_tvd: float | None = None
+    depth_tvdss: float | None = None
+    horizon_id: int | None = None
     age_ma: float | None = None
     color: str
     kind: str
@@ -90,6 +96,8 @@ class WellInventoryResponse(BaseModel):
     coordinate_semantics: str = 'project_xy'
     crs: str
     source_las_path: str | None = None
+    active_top_set_id: int | None = None
+    active_top_set_name: str | None = None
     deviation: DeviationSummaryResponse | None = None
     curves: list[CurveInventoryItem]
     formations: list[FormationInventoryItem]
@@ -177,6 +185,7 @@ def list_well_inventories(request: Request) -> list[WellInventoryResponse]:
         curve_rows_by_well: dict[str, list[CurveMetadata]] = {well_id: [] for well_id in well_ids}
         formation_rows_by_well: dict[str, list[FormationTopModel]] = {well_id: [] for well_id in well_ids}
         deviation_by_well: dict[str, DeviationSurveyModel] = {}
+        active_top_set_by_well: dict[str, WellActiveTopSet] = {}
 
         if well_ids:
             curve_rows = session.scalars(
@@ -190,7 +199,7 @@ def list_well_inventories(request: Request) -> list[WellInventoryResponse]:
             formation_rows = session.scalars(
                 select(FormationTopModel)
                 .where(FormationTopModel.well_id.in_(well_ids))
-                .order_by(FormationTopModel.well_id.asc(), FormationTopModel.depth_md.asc(), FormationTopModel.id.asc())
+                .order_by(FormationTopModel.well_id.asc(), FormationTopModel.depth_md.asc().nulls_last(), FormationTopModel.id.asc())
                 .options(*_formation_load_options())
             ).all()
             for row in formation_rows:
@@ -201,11 +210,19 @@ def list_well_inventories(request: Request) -> list[WellInventoryResponse]:
             ).all()
             deviation_by_well = {row.well_id: row for row in deviations}
 
+            active_top_sets = session.scalars(
+                select(WellActiveTopSet)
+                .where(WellActiveTopSet.well_id.in_(well_ids))
+                .options(selectinload(WellActiveTopSet.top_set))
+            ).all()
+            active_top_set_by_well = {row.well_id: row for row in active_top_sets}
+
         payload: list[WellInventoryResponse] = []
         for well in wells:
             curve_rows = curve_rows_by_well.get(well.id, [])
             formation_rows = formation_rows_by_well.get(well.id, [])
             deviation = deviation_by_well.get(well.id)
+            active_top_set = active_top_set_by_well.get(well.id)
             payload.append(
                 WellInventoryResponse(
                     well_id=well.id,
@@ -218,6 +235,8 @@ def list_well_inventories(request: Request) -> list[WellInventoryResponse]:
                     coordinate_semantics='project_xy',
                     crs=well.crs,
                     source_las_path=well.source_las_path,
+                    active_top_set_id=active_top_set.top_set_id if active_top_set else None,
+                    active_top_set_name=active_top_set.top_set.name if active_top_set else None,
                     deviation=DeviationSummaryResponse(
                         reference=deviation.reference,
                         mode=deviation.mode,
@@ -232,6 +251,9 @@ def list_well_inventories(request: Request) -> list[WellInventoryResponse]:
                             id=str(row.id),
                             name=row.name,
                             depth_md=row.depth_md,
+                            depth_tvd=row.depth_tvd,
+                            depth_tvdss=row.depth_tvdss,
+                            horizon_id=row.horizon_id,
                             active_strat_color=(
                                 _active_link(row).strat_unit.color_hex if _active_link(row) else None
                             ),
@@ -285,6 +307,9 @@ def get_well(well_id: str, request: Request) -> WellResponse:
                 id=str(row.id),
                 name=row.name,
                 depth_md=row.depth_md,
+                depth_tvd=row.depth_tvd,
+                depth_tvdss=row.depth_tvdss,
+                horizon_id=row.horizon_id,
                 age_ma=row.age_top_ma,
                 color=row.color,
                 kind=row.kind,

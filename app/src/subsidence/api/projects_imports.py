@@ -14,7 +14,8 @@ from subsidence.data import (
     import_unconformities_csv,
     link_tops_to_unconformities,
 )
-from subsidence.data.schema import CurveMetadata, FormationTopModel
+from subsidence.data.deviation_transform import recalculate_picks_tvd
+from subsidence.data.schema import CurveMetadata, FormationTopModel, WellModel
 from subsidence.observability import operation_log
 
 from .projects import (
@@ -105,6 +106,9 @@ def import_tops(payload: ImportTopsRequest, request: Request) -> ImportTopsRespo
                 if target_well_id is None:
                     raise HTTPException(status_code=500, detail='Import created no well')
                 linked = link_tops_to_unconformities(session, target_well_id)
+                well = session.get(WellModel, target_well_id)
+                if well:
+                    recalculate_picks_tvd(session, manager.project_path, well)
                 formation_count = len(list(session.scalars(select(FormationTopModel).where(FormationTopModel.well_id == target_well_id))))
                 session.commit()
             manager.save_project()
@@ -147,6 +151,8 @@ def import_deviation(payload: ImportDeviationRequest, request: Request) -> Impor
                 reference = survey.reference
                 mode = survey.mode
                 data_uri = survey.data_uri
+                well = session.get(WellModel, target_well_id)
+                updated_count = recalculate_picks_tvd(session, manager.project_path, well) if well else 0
                 session.commit()
             manager.save_project()
         except (ValueError, FileNotFoundError) as error:

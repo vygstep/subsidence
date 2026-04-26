@@ -7,7 +7,7 @@ from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column, relationship
 from sqlalchemy import MetaData
 
 SUBSIDENCE_APP_ID = 0x53554253  # "SUBS" as 4-byte int
-SCHEMA_VERSION = 7
+SCHEMA_VERSION = 8
 
 _NAMING: dict[str, str] = {
     "ix": "ix_%(table_name)s_%(column_0_name)s",
@@ -93,6 +93,12 @@ class WellModel(Base, AuditMixin):
     )
     formation_tops: Mapped[list[FormationTopModel]] = relationship(
         back_populates="well", cascade="all, delete-orphan"
+    )
+    active_top_set: Mapped["WellActiveTopSet | None"] = relationship(
+        "WellActiveTopSet",
+        back_populates="well",
+        uselist=False,
+        cascade="all, delete-orphan",
     )
 
 
@@ -181,7 +187,61 @@ class StratUnit(Base):
 
 
 # ---------------------------------------------------------------------------
-# 7. formation_tops
+# 7. top_sets + top_set_horizons + well_active_top_sets
+# ---------------------------------------------------------------------------
+
+class TopSet(Base, AuditMixin):
+    __tablename__ = "top_sets"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    name: Mapped[str] = mapped_column(String(256))
+    description: Mapped[str | None] = mapped_column(Text, nullable=True)
+
+    horizons: Mapped[list["TopSetHorizon"]] = relationship(
+        back_populates="top_set", cascade="all, delete-orphan",
+        order_by="TopSetHorizon.sort_order",
+    )
+    active_for_wells: Mapped[list["WellActiveTopSet"]] = relationship(
+        back_populates="top_set",
+    )
+
+
+class TopSetHorizon(Base, AuditMixin):
+    __tablename__ = "top_set_horizons"
+    __table_args__ = (UniqueConstraint("top_set_id", "name"),)
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    top_set_id: Mapped[int] = mapped_column(
+        Integer, ForeignKey("top_sets.id", ondelete="CASCADE"), nullable=False
+    )
+    name: Mapped[str] = mapped_column(String(256))
+    kind: Mapped[str] = mapped_column(String(16), default="strat")
+    # "strat" | "unconformity"
+    age_ma: Mapped[float | None] = mapped_column(Float, nullable=True)
+    color: Mapped[str] = mapped_column(String(9), default="#90a4ae")
+    sort_order: Mapped[int] = mapped_column(Integer, default=0)
+    note: Mapped[str | None] = mapped_column(Text, nullable=True)
+
+    top_set: Mapped[TopSet] = relationship(back_populates="horizons")
+
+
+class WellActiveTopSet(Base):
+    __tablename__ = "well_active_top_sets"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    well_id: Mapped[str] = mapped_column(
+        String(36), ForeignKey("wells.id", ondelete="CASCADE"), nullable=False, unique=True
+    )
+    top_set_id: Mapped[int] = mapped_column(
+        Integer, ForeignKey("top_sets.id", ondelete="RESTRICT"), nullable=False
+    )
+
+    top_set: Mapped[TopSet] = relationship(back_populates="active_for_wells")
+    well: Mapped["WellModel"] = relationship(back_populates="active_top_set")
+
+
+# ---------------------------------------------------------------------------
+# 8. formation_tops
 # ---------------------------------------------------------------------------
 
 class FormationTopModel(Base, AuditMixin):
@@ -191,12 +251,16 @@ class FormationTopModel(Base, AuditMixin):
     well_id: Mapped[str] = mapped_column(
         String(36), ForeignKey("wells.id"), nullable=False
     )
+    horizon_id: Mapped[int | None] = mapped_column(
+        Integer, ForeignKey("top_set_horizons.id", ondelete="SET NULL"), nullable=True
+    )
     name: Mapped[str] = mapped_column(String(256))
     kind: Mapped[str] = mapped_column(String(16), default="strat")
     # "strat"        — conformable formation top
     # "unconformity" — erosional boundary; carries hiatus age bounds
-    depth_md: Mapped[float] = mapped_column(Float)
+    depth_md: Mapped[float | None] = mapped_column(Float, nullable=True)
     depth_tvd: Mapped[float | None] = mapped_column(Float, nullable=True)
+    depth_tvdss: Mapped[float | None] = mapped_column(Float, nullable=True)
     age_top_ma: Mapped[float | None] = mapped_column(Float, nullable=True)
     # strat: age of this pick; unconformity: start of hiatus (younger)
     age_base_ma: Mapped[float | None] = mapped_column(Float, nullable=True)
@@ -205,7 +269,7 @@ class FormationTopModel(Base, AuditMixin):
     color: Mapped[str] = mapped_column(String(9), default="#90a4ae")
     is_locked: Mapped[bool] = mapped_column(Boolean, default=False)
     water_depth_m: Mapped[float] = mapped_column(Float, default=0.0, server_default='0.0')
-    # paleobathymetry + sea level at time of deposition for this interval (m); used in Airy backstripping
+    # paleobathymetry + sea level at time of deposition for this interval (m)
     eroded_thickness_m: Mapped[float] = mapped_column(Float, default=0.0, server_default='0.0')
     # compacted thickness of section eroded above this boundary (unconformity only, m)
     lithology: Mapped[str | None] = mapped_column(String(32), nullable=True)

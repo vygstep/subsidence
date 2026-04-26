@@ -18,6 +18,7 @@ from .projects_export import router as projects_export_router
 from .projects_imports import router as projects_imports_router
 from .strat_chart import router as strat_chart_router
 from .subsidence import router as subsidence_router
+from .top_sets import router as top_sets_router
 from .wells import router as wells_router
 
 configure_logging()
@@ -92,6 +93,7 @@ app.add_middleware(
 
 app.include_router(wells_router, prefix="/api")
 app.include_router(formations_router, prefix="/api")
+app.include_router(top_sets_router, prefix="/api")
 app.include_router(strat_chart_router, prefix="/api")
 app.include_router(compaction_router, prefix="/api")
 app.include_router(lithology_patterns_router, prefix="/api")

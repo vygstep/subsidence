@@ -13,6 +13,7 @@ from subsidence.data import (
     UpdateFormationDepth,
     UpdateFormationStratLink,
 )
+from subsidence.data.deviation_transform import compute_tvd_tvdss
 from subsidence.data.undo import _model_to_dict
 from subsidence.data.schema import FormationStratLink, FormationTopModel, StratChart, StratUnit, WellModel
 from subsidence.data.strat_link import auto_link_to_active_chart, find_strat_unit_by_name
@@ -55,7 +56,10 @@ class FormationStratLinkResponse(BaseModel):
 class FormationTopResponse(BaseModel):
     id: str
     name: str
-    depth_md: float
+    depth_md: float | None
+    depth_tvd: float | None
+    depth_tvdss: float | None
+    horizon_id: int | None
     color: str
     kind: str
     lithology: str | None
@@ -131,6 +135,9 @@ def _to_response(row: FormationTopModel) -> FormationTopResponse:
         id=str(row.id),
         name=row.name,
         depth_md=row.depth_md,
+        depth_tvd=row.depth_tvd,
+        depth_tvdss=row.depth_tvdss,
+        horizon_id=row.horizon_id,
         color=row.color,
         kind=row.kind,
         lithology=row.lithology,
@@ -186,10 +193,14 @@ def create_formation(well_id: str, body: FormationTopCreate, request: Request) -
     manager = _require_open_project(request)
     with manager.get_session() as session:
         _require_well(session, well_id)
+        well = session.get(WellModel, well_id)
+        tvd, tvdss = compute_tvd_tvdss(manager.project_path, well, body.depth_md) if well is not None else (None, None)
         row = FormationTopModel(
             well_id=well_id,
             name=body.name,
             depth_md=body.depth_md,
+            depth_tvd=tvd,
+            depth_tvdss=tvdss,
             age_top_ma=body.age_ma,
             color=body.color,
             kind=body.kind,
@@ -251,7 +262,7 @@ def update_formation(well_id: str, formation_id: int, body: FormationTopPatch, r
             return _to_response(existing)
 
     if set(new_values) == {'depth_md'}:
-        manager.execute_command(UpdateFormationDepth(formation_id, float(old_values['depth_md']), float(new_values['depth_md'])))
+        manager.execute_command(UpdateFormationDepth(formation_id, float(old_values['depth_md']), float(new_values['depth_md']), project_path=manager.project_path))
     else:
         manager.execute_command(UpdateFormation(formation_id, old_values, new_values))
 

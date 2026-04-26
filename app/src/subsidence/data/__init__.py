@@ -5,6 +5,7 @@ from .dict_resolver import (
     resolve_curve_alias,
     resolve_curve_alias_with_unit,
 )
+from .deviation_transform import compute_tvd_tvdss, recalculate_picks_tvd, tvd_to_md
 from .engine import create_all_tables, create_engine_for_project, get_session, validate_project_db
 from .importers import (
     DEFAULT_WELL_CRS,
@@ -51,6 +52,9 @@ from .undo import (
 )
 
 __all__ = [
+    "compute_tvd_tvdss",
+    "recalculate_picks_tvd",
+    "tvd_to_md",
     "CurveMatchResult",
     "DEFAULT_WELL_CRS",
     "DEFAULT_WELL_KB",
