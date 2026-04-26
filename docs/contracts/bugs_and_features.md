@@ -109,7 +109,7 @@ Items:
 - `TOPS-002`: TVD/TVDSS as stored calculated fields; interactive depth picking. (done)
 - `DEPTH-001`: Trusted depth reference on import, QC flags, TVD curve display. (done)
 - `ZONE-001`: Zone entity and lifecycle. (done)
-- `ZONE-002`: Zone settings UI and manual lithology input.
+- `ZONE-002`: Zone settings UI and manual lithology input. (done)
 - `ZONE-003`: Auto-lithology aggregation from discrete log (depends `LITH-001`).
 - `ZONE-004`: Zone attributes as subsidence calculation inputs (supersedes `LITH-003`).
 
