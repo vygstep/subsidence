@@ -112,6 +112,7 @@ Items:
 - `ZONE-002`: Zone settings UI and manual lithology input. (done)
 - `ZONE-003`: Auto-lithology aggregation from discrete log (depends `LITH-001`).
 - `ZONE-004`: Zone attributes as subsidence calculation inputs (supersedes `LITH-003`). (done)
+- `BSTRIP-001`: Per-zone paleobathymetry and eustatic sea level correction.
 
 Exit criteria:
 
@@ -122,6 +123,7 @@ Exit criteria:
 - Zones exist as first-class entities between consecutive horizons; thickness recalculates automatically when picks move.
 - Manual lithology input per zone is available before any log-derived lithology is implemented.
 - Zone-level lithology fractions are available as subsidence engine inputs.
+- Per-zone paleobathymetry feeds into the backstrip engine; a eustatic sea level curve can be loaded and applied to shift all burial depths by the sea level at each time step.
 
 ### Phase E: Lithology Curves
 
@@ -1493,6 +1495,94 @@ Acceptance:
 - Subsidence calculated via zone inputs for a two-zone well reproduces the result of the legacy single-lithology path when zone lithology fractions are `{legacy_code: 1.0}`.
 - Zones without lithology do not crash the calculation; they use the project default.
 - Legacy wells (no TopSet) continue to calculate without modification.
+
+---
+
+### BSTRIP-001: Per-zone paleobathymetry and eustatic sea level correction
+
+Problem:
+
+- The backstrip engine currently takes a single constant `water_depth_m` for the whole well at all time steps. In reality each zone was deposited at a different water depth (paleobathymetry), and the absolute sea level shifted over geological time (eustasy).
+- `FormationTopModel.water_depth_m` is already stored per pick but is not passed to the engine.
+- `FormationTopModel.eroded_thickness_m` is stored but not used in decompaction; an eroded section represents missing matrix volume that must be restored before backstripping.
+- There is no concept of a eustatic sea level curve in the project yet.
+
+**Semantics of existing attributes (clarification):**
+
+- `water_depth_m` on a pick: depth of the water column at the time this horizon was deposited. Positive = below sea level (marine); negative = above sea level (emerged, non-marine, terrestrial). Default 0 (sea surface).
+- `eroded_thickness_m` on a pick: thickness of rock removed by erosion at this surface. Default 0 means a pure time gap (hiatus) with no rock loss. Values > 0 mean additional solid material existed above this surface and was eroded before the next layer was deposited; this must be added back to the decompaction calculation as a "ghost" layer.
+
+**Required behavior — per-zone water depth:**
+
+- `ZoneLayerInput` gains a `water_depth_m: float` field (default 0.0).
+- `build_zone_layer_inputs` populates it from the upper pick's `FormationTopModel.water_depth_m`.
+- The `backstrip()` engine uses `water_depth_m` per time step rather than a single constant: at each time step the column is shifted down by the water depth of the shallowest active zone (the zone currently at the depositional surface).
+- Legacy `FormationInput` path: `water_depth_m` is taken from the corresponding `FormationTopModel.water_depth_m`; the existing single-constant fallback remains for wells that have never set per-pick water depths.
+
+**Required behavior — eroded thickness:**
+
+- `ZoneLayerInput` gains an `eroded_thickness_m: float` field (default 0.0), taken from the upper pick's `eroded_thickness_m`.
+- In `backstrip()`, before computing `solid_m` for a zone, the ghost eroded section is added: `effective_base_m = current_base_m + eroded_thickness_m`. The solid matrix for the ghost layer is computed separately and included in the decompaction but is not returned as a `SubsidenceResult` (it is invisible — it was eroded).
+
+**Required behavior — eustatic sea level curve:**
+
+New schema table `SeaLevelCurve` (SCHEMA_VERSION → next):
+- `id` (int PK autoincrement)
+- `name` (String 256) — e.g. "Haq 1987", "Miller 2020"
+- `source` (String 256 nullable) — reference / citation
+- `is_builtin` (bool, default False)
+- `created_at`, `modified_at`
+
+New schema table `SeaLevelPoint`:
+- `id` (int PK autoincrement)
+- `curve_id` (int FK → `sea_level_curves.id` CASCADE DELETE)
+- `age_ma` (Float) — time in Ma (older = larger)
+- `sea_level_m` (Float) — meters relative to modern sea level (0); positive = sea level higher than today; negative = lower
+
+New schema table `WellActiveSeaLevelCurve`:
+- `well_id` (str FK → `wells.id` CASCADE DELETE, UNIQUE)
+- `curve_id` (int FK → `sea_level_curves.id` RESTRICT)
+
+The active sea level curve for a well (if any) is interpolated at each time step of the backstrip calculation; the resulting `sea_level_at(age_ma)` value is added to the burial depth offset alongside `water_depth_m`. Multiple curves can coexist in the project; each well independently selects one.
+
+**Import:**
+
+- `POST /api/sea-level-curves` — create a named curve.
+- `POST /api/sea-level-curves/{id}/points` — bulk upload as `[{age_ma, sea_level_m}]` array (JSON body or CSV file).
+- `GET /api/sea-level-curves` — list all curves with point count.
+- `DELETE /api/sea-level-curves/{id}` — only if not referenced by any well.
+- `PUT /api/wells/{well_id}/active-sea-level-curve` body `{curve_id}` or `{curve_id: null}` to clear.
+
+**Engine change:**
+
+- `backstrip()` receives an optional `sea_level_curve: list[tuple[float, float]] | None` (sorted by age_ma descending). At each time step, if a curve is provided, `sea_level_at(t_ma)` is computed by linear interpolation and added to the depth offset.
+- Combined offset at time step t for zone i: `depth = paleo_top[i] + water_depth_at(t) + sea_level_at(t)`.
+
+**UI — Settings panel:**
+
+- In the well settings (`WellSettings`), a "Sea level correction" row shows the active curve name (or "None") and a dropdown/button to select a curve from the project list.
+- Per-zone `water_depth_m` is editable in `ZoneDetailSettings` (numeric input, labelled "Paleobathymetry (m)", hint: negative = emerged).
+
+Likely code areas:
+
+- `app/src/subsidence/data/schema.py` — `SeaLevelCurve`, `SeaLevelPoint`, `WellActiveSeaLevelCurve` tables.
+- `app/src/subsidence/api/sea_level.py` — new router.
+- `app/src/subsidence/data/backstrip.py` — `ZoneLayerInput.water_depth_m`, `ZoneLayerInput.eroded_thickness_m`, sea level interpolation in `backstrip()`.
+- `app/src/subsidence/data/zone_service.py` — pass `water_depth_m` and `eroded_thickness_m` from picks into `ZoneLayerInput`.
+- `app/src/subsidence/api/subsidence.py` — fetch active sea level curve and pass to engine.
+- `frontend/src/types/` — `SeaLevelCurve` type; `FormationZone` gains `water_depth_m`.
+- `frontend/src/components/layout/settings/ZoneDetailSettings.tsx` — paleobathymetry input field.
+- `frontend/src/components/layout/settings/WellSettings.tsx` — active sea level curve selector.
+
+Dependencies: `ZONE-004`.
+
+Acceptance:
+
+- A two-zone well where both zones have `water_depth_m = 50` produces burial depths 50 m deeper than the same well with `water_depth_m = 0` at every time step.
+- A zone with `water_depth_m = -20` (emerged) shifts burial paths upward by 20 m.
+- Assigning a sea level curve shifts burial depths by the interpolated curve value at each time step; removing the curve restores the original depths.
+- `eroded_thickness_m = 100` on a zone boundary increases the decompacted column height vs the same zone with `eroded_thickness_m = 0`.
+- Legacy wells without a TopSet are unaffected by this change.
 
 ---
 
