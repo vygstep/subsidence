@@ -15,6 +15,8 @@ export type SelectedObject =
   | { type: 'curve'; wellId: string; mnemonic: string }
   | { type: 'tops-group'; wellId: string }
   | { type: 'top-pick'; wellId: string; formationId: string }
+  | { type: 'zones-group'; wellId: string }
+  | { type: 'zone'; wellId: string; zoneId: number }
   | { type: 'strat-chart'; chartId: number }
   | { type: 'compaction-presets-root' }
   | { type: 'compaction-preset'; presetId: number }

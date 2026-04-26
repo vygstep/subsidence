@@ -19,6 +19,7 @@ export function useDataManagerController() {
   const well = useWellDataStore((state) => state.well)
   const curves = useWellDataStore((state) => state.curves)
   const formations = useWellDataStore((state) => state.formations)
+  const zones = useWellDataStore((state) => state.zones)
   const stratCharts = useWellDataStore((state) => state.stratCharts)
   const compactionModels = useWellDataStore((state) => state.compactionModels)
   const compactionPresets = useWellDataStore((state) => state.compactionPresets)
@@ -227,6 +228,8 @@ export function useDataManagerController() {
     handleSelectLasGroup: selection.handleSelectLasGroup,
     handleSelectTopsGroup: selection.handleSelectTopsGroup,
     handleSelectWell: selection.handleSelectWell,
+    handleSelectZonesGroup: selection.handleSelectZonesGroup,
+    handleSelectZone: selection.handleSelectZone,
     handleSetDeviationVisible: visibility.handleSetDeviationVisible,
     handleToggleAllCurves: visibility.handleToggleAllCurves,
     handleToggleAllFormations: visibility.handleToggleAllFormations,
@@ -317,5 +320,7 @@ export function useDataManagerController() {
     well,
     wellInspectorDraft,
     wellInventories,
+    zones,
+    selectedZoneId: selectedObject?.type === 'zone' ? selectedObject.zoneId : null,
   }
 }

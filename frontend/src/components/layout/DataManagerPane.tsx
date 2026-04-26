@@ -309,6 +309,9 @@ export function DataManagerPane({ sidebarRef, onInternalSplitterMouseDown }: Dat
           visibleCurveMnemonicsByWellId={controller.visibleCurveMnemonicsByWellId}
           visibleFormationIdsByWellId={controller.visibleFormationIdsByWellId}
           wellInventories={controller.wellInventories}
+          onSelectZonesGroup={controller.handleSelectZonesGroup}
+          onSelectZone={controller.handleSelectZone}
+          selectedZoneId={controller.selectedZoneId}
         />
       </div>
 
@@ -351,6 +354,9 @@ export function DataManagerPane({ sidebarRef, onInternalSplitterMouseDown }: Dat
           visibleCurveCount={controller.visibleCurveCount}
           minDepth={controller.minDepth}
           maxDepth={controller.maxDepth}
+          zones={controller.zones}
+          selectedZoneId={controller.selectedZoneId}
+          onSelectZone={(zoneId) => controller.handleSelectZone(controller.activeWellId ?? '', zoneId)}
         />
       </div>
 

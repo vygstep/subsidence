@@ -4,6 +4,7 @@ import type {
   CompactionModel,
   CurveMnemonicSetSummary,
   FormationTop,
+  FormationZone,
   LithologyDictionaryEntry,
   LithologyPatternPaletteSummary,
   LithologySetSummary,
@@ -34,6 +35,8 @@ import { StratChartSettings } from './settings/StratChartSettings'
 import { TopPickSettings } from './settings/TopPickSettings'
 import { TopsSettings } from './settings/TopsSettings'
 import { WellSettings } from './settings/WellSettings'
+import { ZoneDetailSettings } from './settings/ZoneDetailSettings'
+import { ZoneSettings } from './settings/ZoneSettings'
 import type { WellInspectorDraft } from './settings/WellSettings'
 
 export type { WellInspectorDraft }
@@ -81,6 +84,9 @@ interface SettingsInspectorProps {
   visibleCurveCount: number
   minDepth: number
   maxDepth: number
+  zones: FormationZone[]
+  selectedZoneId: number | null
+  onSelectZone: (zoneId: number) => void
 }
 
 function EmptyInspector({ message }: { message: string }) {
@@ -117,6 +123,9 @@ export function SettingsInspector({
   visibleCurveCount,
   minDepth,
   maxDepth,
+  zones,
+  selectedZoneId,
+  onSelectZone,
 }: SettingsInspectorProps) {
   if (!selectedObject) {
     return <EmptyInspector message="Select an object in Data Manager to inspect its settings." />
@@ -177,6 +186,24 @@ export function SettingsInspector({
       return <EmptyInspector message="Selected TOPS group is not loaded yet." />
     }
     return <TopsSettings formations={formations} visibleFormationIds={visibleFormationIds} />
+  }
+
+  if (selectedObject.type === 'zones-group') {
+    return (
+      <ZoneSettings
+        wellId={selectedObject.wellId}
+        onSelectZone={onSelectZone}
+        selectedZoneId={selectedZoneId}
+      />
+    )
+  }
+
+  if (selectedObject.type === 'zone') {
+    const zone = zones.find((z) => z.zone_id === selectedObject.zoneId)
+    if (!zone) {
+      return <EmptyInspector message="Selected zone is not loaded yet." />
+    }
+    return <ZoneDetailSettings zone={zone} />
   }
 
   if (selectedObject.type === 'top-pick') {

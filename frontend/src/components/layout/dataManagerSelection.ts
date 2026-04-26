@@ -40,6 +40,20 @@ export function makeSelectionHandlers(deps: SelectionDeps) {
     setSelectedObject({ type: 'tops-group', wellId })
   }
 
+  function handleSelectZonesGroup(wellId: string): void {
+    setSelectedObject({ type: 'zones-group', wellId })
+    loadWellInBackground(wellId)
+  }
+
+  function handleSelectZone(wellId: string, zoneId: number): void {
+    if (selectedObject?.type === 'zone' && selectedObject.wellId === wellId && selectedObject.zoneId === zoneId) {
+      setSelectedObject(null)
+    } else {
+      setSelectedObject({ type: 'zone', wellId, zoneId })
+    }
+    loadWellInBackground(wellId)
+  }
+
   async function handleSelectLasGroup(wellId: string): Promise<void> {
     setSelectedObject({ type: 'las-group', wellId })
     loadWellInBackground(wellId)
@@ -87,5 +101,7 @@ export function makeSelectionHandlers(deps: SelectionDeps) {
     handleSelectTopsGroup,
     handleSelectFormation,
     handleFocusFormationObject,
+    handleSelectZonesGroup,
+    handleSelectZone,
   }
 }

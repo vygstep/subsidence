@@ -2,6 +2,7 @@ import { useLayoutEffect, useRef } from 'react'
 
 import { useDataManager } from './dataManager/DataManagerContext'
 import type { FormationInventoryItem, WellInventory } from '@/types'
+import type { FormationZone } from '@/types'
 
 interface WellDataPanelProps {
   wells: WellInventory[]
@@ -32,6 +33,9 @@ interface WellDataPanelProps {
   onContextMenuLasGroup: (event: React.MouseEvent, wellId: string) => void
   onContextMenuTopsGroup: (event: React.MouseEvent, wellId: string) => void
   onContextMenuWell: (event: React.MouseEvent, well: WellInventory) => void
+  onSelectZonesGroup: (wellId: string) => void
+  onSelectZone: (wellId: string, zoneId: number) => void
+  selectedZoneId: number | null
 }
 
 type ToggleState = 'none' | 'partial' | 'all'
@@ -151,6 +155,9 @@ export function WellDataPanel({
   onContextMenuLasGroup,
   onContextMenuTopsGroup,
   onContextMenuWell,
+  onSelectZonesGroup,
+  onSelectZone,
+  selectedZoneId,
 }: WellDataPanelProps) {
   const { isExpanded, toggleExpanded } = useDataManager()
 
@@ -359,6 +366,48 @@ export function WellDataPanel({
                       </div>
                     ) : null}
                   </div>
+
+                  {item.active_top_set_id !== null ? (
+                    <div className="tree-node">
+                      <div
+                        className={`tree-node__row ${
+                          selectedObject?.type === 'zones-group' && selectedObject.wellId === item.well_id ? 'tree-node__row--selected' : ''
+                        }`}
+                        onClick={() => onSelectZonesGroup(item.well_id)}
+                      >
+                        <TreeToggleButton
+                          isOpen={isOpen(`${rootId}:zones`)}
+                          onToggle={() => toggleNode(`${rootId}:zones`)}
+                        />
+                        <button type="button" className="tree-node__section-label">
+                          ZONES
+                        </button>
+                        <span className="tree-node__count">{item.zones.length}</span>
+                      </div>
+                      {isOpen(`${rootId}:zones`) ? (
+                        <div className="tree-node__children">
+                          {item.zones.length > 0 ? (
+                            item.zones.map((zone: FormationZone) => {
+                              const thickness = zone.thickness_md !== null ? ` ${zone.thickness_md.toFixed(1)} m` : ''
+                              const isZoneSelected = selectedObject?.type === 'zone' && selectedObject.wellId === item.well_id && selectedObject.zoneId === zone.zone_id
+                              return (
+                                <div
+                                  key={zone.zone_id}
+                                  className={`tree-leaf tree-leaf--clickable${isZoneSelected ? ' tree-leaf--selected' : ''}`}
+                                  onClick={() => onSelectZone(item.well_id, zone.zone_id)}
+                                >
+                                  <span>{zone.upper_horizon.name} → {zone.lower_horizon.name}</span>
+                                  <span>{thickness}</span>
+                                </div>
+                              )
+                            })
+                          ) : (
+                            <p className="sidebar-panel__empty">No zones loaded.</p>
+                          )}
+                        </div>
+                      ) : null}
+                    </div>
+                  ) : null}
                 </div>
               ) : null}
             </div>

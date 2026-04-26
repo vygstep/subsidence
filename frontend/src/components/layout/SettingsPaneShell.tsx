@@ -5,6 +5,7 @@ import type {
   CompactionModel,
   CurveMnemonicSetSummary,
   FormationTop,
+  FormationZone,
   LithologyDictionaryEntry,
   LithologyPatternPaletteSummary,
   LithologySetSummary,
@@ -67,16 +68,19 @@ interface SettingsPaneShellProps {
   visibleCurveCount: number
   minDepth: number
   maxDepth: number
+  zones: FormationZone[]
+  selectedZoneId: number | null
+  onSelectZone: (zoneId: number) => void
 }
 
-export function SettingsPaneShell(props: SettingsPaneShellProps) {
+export function SettingsPaneShell({ zones, selectedZoneId, onSelectZone, ...rest }: SettingsPaneShellProps) {
   return (
     <section className="sidebar-panel app-sidebar__zone">
       <header className="sidebar-panel__header">
         <h2 className="sidebar-panel__title">Settings</h2>
       </header>
       <div className="sidebar-panel__body">
-        <SettingsInspector {...props} />
+        <SettingsInspector {...rest} zones={zones} selectedZoneId={selectedZoneId} onSelectZone={onSelectZone} />
       </div>
     </section>
   )
