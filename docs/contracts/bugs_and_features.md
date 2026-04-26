@@ -97,23 +97,43 @@ Exit criteria:
 - Existing hardcoded canvas patterns are no longer the source of truth.
 - Pattern palette behavior is covered before `LITH-001` starts.
 
-### Phase D: Lithology and Zone Data Model
+### Phase D: Formation Tops Model and Stratigraphic Zones
 
 Goal:
 
-- Add discrete and percentage lithology support after dictionaries, import wizard, and pattern palettes are stable.
+- Separate the concepts of "horizon definition" and "well pick" so a named set of formation tops can be applied to multiple wells and compared. Build the stratigraphic zone entity that sits between consecutive horizons and carries aggregated well-specific attributes.
+
+Items:
+
+- `TOPS-001`: TopSet / Horizon / Pick data model.
+- `TOPS-002`: TVD/TVDSS as stored calculated fields; interactive depth picking.
+- `ZONE-001`: Zone entity and lifecycle.
+- `ZONE-002`: Zone settings UI and manual lithology input.
+- `ZONE-003`: Auto-lithology aggregation from discrete log (depends `LITH-001`).
+- `ZONE-004`: Zone attributes as subsidence calculation inputs (supersedes `LITH-003`).
+
+Exit criteria:
+
+- One TopSet can be applied to multiple wells; each well carries its own picks but shares horizon definitions and ages.
+- Zones exist as first-class entities between consecutive horizons; thickness recalculates automatically when picks move.
+- Manual lithology input per zone is available before any log-derived lithology is implemented.
+- Zone-level lithology fractions are available as subsidence engine inputs.
+
+### Phase E: Lithology Curves
+
+Goal:
+
+- Add discrete and percentage lithology curve support after zones are stable.
 
 Items:
 
 - `LITH-001`: Discrete log import and rendering.
 - `LITH-002`: Percentage lithology curves and Lithology track.
-- `LITH-003`: Zone upscaling for subsidence inputs.
 
 Exit criteria:
 
 - Discrete lithology curves render as blocks.
 - Percentage lithology curves can be grouped into Lithology tracks.
-- Zone-level lithology attributes are available for calculations.
 
 ### Phase E: Tops, Unconformities, and Subsidence Charts
 
@@ -930,6 +950,372 @@ Acceptance:
 
 ---
 
+## 6. Formation Tops Model and Stratigraphic Zones
+
+### TOPS-001: TopSet / Horizon / Pick data model
+
+Problem:
+
+- `FormationTopModel` merges two distinct concepts: the definition of a stratigraphic horizon (name, age, color, kind) and the well-specific observation of that horizon (depth). There is no way to define a named set of formation tops once and apply it to multiple wells.
+- Applying the same pick framework to a second well currently requires a duplicate import. Ages and colors must be re-entered or re-matched.
+- Comparing the same stratigraphic interval across two wells is impossible because the interval is not an independent entity.
+
+Required behavior:
+
+**New schema tables (SCHEMA_VERSION 7 → 8):**
+
+- `TopSet`: named collection of horizon definitions belonging to the project. Fields: `id` (int PK autoincrement), `name` (String 256), `description` (Text nullable), `created_at`, `modified_at`.
+
+- `TopSetHorizon`: one horizon definition within a TopSet. Fields: `id` (int PK autoincrement), `top_set_id` (int FK → `top_sets.id` CASCADE DELETE), `name` (String 256), `kind` (String 16, default `'strat'`, values `'strat'` | `'unconformity'`), `age_ma` (Float nullable — canonical reference age of this boundary), `color` (String 9, default `'#90a4ae'`), `sort_order` (int — explicit ascending integer, managed by service), `note` (Text nullable). Unique constraint on `(top_set_id, name)`.
+
+- `WellActiveTopSet`: which TopSet a well currently uses. Fields: `id` (int PK autoincrement), `well_id` (str FK → `wells.id` CASCADE DELETE, UNIQUE — one active set per well), `top_set_id` (int FK → `top_sets.id` RESTRICT — cannot delete a TopSet while any well references it).
+
+**Modified `FormationTopModel`:**
+
+- Add `horizon_id` (int nullable FK → `top_set_horizons.id` SET NULL on delete). Default NULL. Existing records are unaffected.
+- Add `depth_tvdss` (Float nullable). Existing `depth_tvd` field starts being populated by the backend (was always nullable but never written).
+- Make `depth_md` nullable (Float nullable). Rationale: when a TopSet is applied to a well and a pick has not yet been assigned a depth, the record exists but has no valid MD. The UI shows these as "unset" with a dashed line or empty depth cell. Existing records keep their numeric value; the migration adds `NULL` as a valid state.
+
+**Backend service: `app/src/subsidence/data/deviation_transform.py` (new file):**
+
+- `build_tvd_table(project_path, deviation_survey) → tuple[np.ndarray, np.ndarray] | None`: loads the parquet file at `deviation_survey.data_uri`, reads columns `md` and `incl_deg` / `azim_deg` (for INCL_AZIM mode), runs the minimum-curvature algorithm identical to the JavaScript in `frontend/src/utils/depthTransform.ts`, returns `(md_array, tvd_array)`. Returns `None` if survey is absent or mode is not INCL_AZIM.
+- `interpolate_tvd(md_value, md_array, tvd_array) → float`: binary search + linear interpolation, mirrors `mdToTvd` in `depthTransform.ts`.
+- `compute_tvd_tvdss(project_path, well, depth_md) → tuple[float | None, float | None]`: builds the TVD table for the well's deviation survey, interpolates TVD at `depth_md`, computes TVDSS as `tvd - well.kb_elev`. Returns `(None, None)` if no survey or mode is unsupported.
+- `tvd_to_md(tvd_value, md_array, tvd_array) → float | None`: inverse lookup — binary search on the TVD array to find the corresponding MD. Returns `None` if TVD array is not monotonically increasing or value is out of range.
+- `recalculate_picks_tvd(session, project_path, well) → int`: for every `FormationTopModel` record belonging to `well` that has a non-null `depth_md`, call `compute_tvd_tvdss` and write `depth_tvd` and `depth_tvdss`. Returns count of updated records.
+
+**Changes to existing undo commands:**
+
+- `UpdateFormationDepth` (in `app/src/subsidence/data/undo.py` or wherever it lives): after updating `depth_md`, call `compute_tvd_tvdss` and write `depth_tvd` / `depth_tvdss` to the same record within the same transaction. Command must receive `project_path` for this. The command currently only stores old/new `depth_md` — also store old/new `depth_tvd` and `depth_tvdss` for correct undo.
+- `CreateFormation`: after creating the record, call `compute_tvd_tvdss` and populate the two TVD fields.
+
+**TopSet API (`app/src/subsidence/api/top_sets.py`, new router):**
+
+- `GET /api/top-sets` → list all TopSets with id, name, description, horizon_count.
+- `POST /api/top-sets` → create new TopSet (body: name, description?). Returns created TopSet.
+- `GET /api/top-sets/{id}` → full detail with ordered list of horizons (id, name, kind, age_ma, color, sort_order).
+- `PATCH /api/top-sets/{id}` → rename or update description.
+- `DELETE /api/top-sets/{id}` → blocked with 409 if any well has this TopSet active (`WellActiveTopSet` row exists); otherwise cascade-deletes all horizons and zones.
+- `POST /api/top-sets/{id}/horizons` → add horizon (body: name, kind, age_ma?, color?, insert_after_sort_order?). Service assigns `sort_order`, creates the new `FormationZone` records for every well using this TopSet.
+- `PATCH /api/top-sets/{id}/horizons/{hid}` → update name, age_ma, color, kind, sort_order. Reordering triggers zone rebuild for all wells.
+- `DELETE /api/top-sets/{id}/horizons/{hid}` → deletes horizon, merges adjacent zones, clears `lithology_fractions` in merged `ZoneWellData`.
+- `POST /api/top-sets/{id}/extract-from-well` → body: `well_id`. Creates a TopSet whose horizons mirror the existing `FormationTopModel` records of that well (by name, age, color, kind, sorted by current depth_md). Sets `horizon_id` on each existing `FormationTopModel` record to point to the corresponding new horizon. Creates `WellActiveTopSet` for that well.
+- `POST /api/wells/{well_id}/apply-top-set` → body: `top_set_id`. Creates `WellActiveTopSet`. For each `TopSetHorizon` in the set: if a `FormationTopModel` record with matching `name` already exists for this well, sets its `horizon_id`; otherwise creates a new `FormationTopModel` with `depth_md = NULL`, `horizon_id` set, `name`/`age_top_ma`/`color`/`kind` copied from the horizon. Triggers zone rebuild for this well.
+
+**Formation response changes:**
+
+- `FormationTopResponse` gains `depth_tvd: float | None`, `depth_tvdss: float | None`, `horizon_id: int | None`.
+- `FormationInventoryItem` (in inventory response) gains `depth_tvd: float | None`, `depth_tvdss: float | None` for display in data manager and subsidence chart.
+- `GET /api/wells/inventory` builds `formations` with depth_tvd and depth_tvdss from stored fields — no on-the-fly calculation.
+- A new inventory response field per well: `active_top_set: { id, name } | null`.
+
+**Import flow changes:**
+
+- `import_tops_csv` (`app/src/subsidence/data/importers/tops.py`): after creating each `FormationTopModel` record, call `compute_tvd_tvdss` and populate `depth_tvd` / `depth_tvdss`. If the well has an active TopSet, attempt name-match to set `horizon_id`.
+- `PATCH /api/wells/{well_id}/formations/{formation_id}` (`formations.py`): extend `FormationTopPatch` to accept optional `depth_tvd: float | None` and `depth_tvdss: float | None` as alternative depth inputs. When `depth_tvd` is provided instead of `depth_md`, back-calculate MD using `tvd_to_md`; when `depth_tvdss` is provided, convert via `tvd_to_md(tvdss + well.kb_elev, ...)`. If back-calculation fails (no survey), return 400 with clear message. In all cases, store all three depth fields after resolution.
+
+**Trigger: recalculate TVD after deviation import:**
+
+- `POST /api/projects/import-deviation` handler: after successful import, call `recalculate_picks_tvd` for the well. This ensures all existing `FormationTopModel` records immediately reflect the new survey.
+- New endpoint `POST /api/wells/{well_id}/formations/recalculate-tvd`: explicit call, returns `{ updated_count: int }`.
+
+**Strat link functionality unchanged.** `FormationStratLink`, `auto_link_to_active_chart`, `PUT /api/wells/{well_id}/formations/{formation_id}/strat-link` — all remain exactly as implemented.
+
+Likely code areas:
+
+- `app/src/subsidence/data/schema.py` — add `TopSet`, `TopSetHorizon`, `WellActiveTopSet`; modify `FormationTopModel`; bump `SCHEMA_VERSION` to 8.
+- `app/src/subsidence/data/deviation_transform.py` — new module.
+- `app/src/subsidence/data/undo.py` — update `UpdateFormationDepth`, `CreateFormation`.
+- `app/src/subsidence/api/top_sets.py` — new router.
+- `app/src/subsidence/api/main.py` — register new router.
+- `app/src/subsidence/api/formations.py` — extend `FormationTopPatch`, `FormationTopResponse`; add TVD logic to create/update paths.
+- `app/src/subsidence/api/wells.py` — extend `FormationInventoryItem`, `WellInventoryResponse`.
+- `app/src/subsidence/data/importers/tops.py` — call TVD calculation after each pick creation.
+- `app/src/subsidence/api/projects_imports.py` — call `recalculate_picks_tvd` after deviation import.
+- `frontend/src/types/well.ts` — extend `FormationTop` with `depth_tvd`, `depth_tvdss`, `horizon_id`.
+- `frontend/src/stores/wellDataStore.ts` — load and expose `active_top_set`, top set CRUD actions.
+- `frontend/src/types/subsidence.ts` — add `TopSetSummary`, `TopSetDetail`, `TopSetHorizon` types.
+
+Dependencies: none.
+
+Acceptance:
+
+- `extract-from-well` on Well A produces a TopSet; `apply-top-set` on Well B creates picks with depths null; after importing a tops CSV for Well B matched by horizon name, the picks have depths.
+- Moving a pick triggers TVD/TVDSS update; the inventory response reflects updated values.
+- Importing a new deviation survey triggers recalculation of all existing picks.
+- Legacy wells (no TopSet, no horizon_id) open without errors; all existing tests pass unchanged.
+- `SCHEMA_VERSION` = 8; migrations run cleanly on an existing v7 database.
+
+---
+
+### TOPS-002: TVD/TVDSS display, interactive depth picking, and Set Depth
+
+Problem:
+
+- The current depth track and all UI inputs only use MD. There is no way to view or edit picks in TVD or TVDSS.
+- Setting a pick depth requires importing a file or manually dragging in the viewer. There is no direct numeric input and no click-to-set workflow.
+- The drag interaction only updates MD; TVD/TVDSS are not recalculated from the drag result.
+
+Required behavior:
+
+**Depth type extension:**
+
+- `viewStore.depthType` currently `'MD' | 'TVD'` → extend to `'MD' | 'TVD' | 'TVDSS'`. Update `setDepthType` signature and all consumers: `DepthTrack`, `FormationColumn`, `StatusBar`, depth display in Data Manager, `useFormationDrag`.
+- When `depthType = 'TVD'` or `'TVDSS'`: `FormationColumn` reads the stored `depth_tvd` / `depth_tvdss` from the formation record to position the line. `DepthTrack` renders TVD/TVDSS scale from the loaded TVD table (already computed in `depthTransform.ts` from the well's survey points; expose as a hook `useTVDTable(): TVDTable | null` in `wellDataStore`).
+- The frontend keeps `depthTransform.ts` for rendering the depth scale; authoritative stored values always come from the backend.
+
+**Active pick mode:**
+
+- Add `activePickId: string | null` and `setActivePickId: (id: string | null) => void` to `viewStore` (or `workspaceStore`, whichever holds transient viewer state).
+- In `interactionMode = 'edit-tops'`, clicking a formation line in `FormationTopLine` (without dragging) sets `activePickId` to that formation's id and marks it as "active target for depth input".
+- Active pick is highlighted differently from the selected pick: a filled circle handle at the pick depth, brighter stroke, cursor `crosshair` on the track area.
+- Pressing Escape clears `activePickId`.
+- Only one active pick at a time, cleared when switching wells or exiting `edit-tops` mode.
+
+**Click-to-set depth:**
+
+- When `interactionMode = 'edit-tops'` AND `activePickId` is set: `LogViewPanel` adds an `onClick` handler to the tracks container (alongside existing `onMouseMove`). On click: read `cursorDepth` (already maintained by `handleMouseMove`), call `wellDataStore.updateFormationDepth(activePickId, cursorDepth)`. The depth is always sent as MD regardless of `depthType`; the backend calculates and stores TVD/TVDSS.
+- Visual feedback: while hovering with active pick mode, show a temporary ghost line at cursor position (same color as the active pick, dashed, 50% opacity).
+
+**Drag interaction update:**
+
+- `useFormationDrag.ts`: `dragState.current.startDepth` currently reads `formation.depth_md`. When `depthType = 'TVD'`, start from `formation.depth_tvd`; for `'TVDSS'`, from `formation.depth_tvdss`. During drag, convert displayed delta to MD delta for the backend call — use the frontend `TVDTable` (`mdToTvd` in reverse via `tvdToMd` helper in `depthTransform.ts`): add `tvdToMd(targetTVD, table) - tvdToMd(startTVD, table)` to get the MD delta. The final `onDragEnd` still calls `updateFormationDepth` with the resolved MD. Add `tvdToMd` to `depthTransform.ts` (binary search on `tvd` array).
+- `wellDataStore.updateFormationDepth`: currently `PATCH depth_md`. After TOPS-001, the backend recalculates TVD/TVDSS internally — no change needed on the API call, but the frontend must re-fetch or optimistically update all three depth fields from the PATCH response.
+
+**Set Depth context menu:**
+
+- `FormationTopLine.tsx`: add `onContextMenu` handler. Opens a small popover/tooltip anchored to the pick line position. The popover contains:
+  - Three labeled inputs: MD, TVD, TVDSS (each showing current stored value, or `—` if null).
+  - Only the input for the current `depthType` is focused/editable by default; the other two are read-only and reflect what the backend will compute.
+  - Confirm on Enter or click-away dismisses. On confirm: `PATCH /api/wells/{well_id}/formations/{formation_id}` with `{depth_md: value}` if MD was edited, or `{depth_tvd: value}` / `{depth_tvdss: value}` if TVD/TVDSS was edited (TOPS-001 endpoint accepts these).
+  - The popover must be dismissible with Escape.
+- Data Manager row for a formation: add an inline editable depth cell. Single-click shows the numeric value; double-click or "edit" icon activates an `<input>` pre-filled with the depth in current `depthType`. Saving triggers the same PATCH call.
+
+**"Set depth" from Data Manager pick list:**
+
+- `FormationTopsList.tsx` (or the inline per-formation row in `WellDataPanel`): replace the current read-only depth display with an editable field. The field label shows `MD` / `TVD` / `TVDSS` based on `depthType`. Editing sends the same PATCH with the appropriate field.
+
+**"Not picked" state:**
+
+- `FormationTopModel.depth_md` is now nullable (TOPS-001). The frontend `FormationTop.depth_md` type becomes `number | null`.
+- In `FormationColumn`: if `depth_md` (and all three depth fields) are null, render the formation as a dashed horizontal line at the top of the visible area with a badge "not picked", not as a draggable line. Click on it in `edit-tops` mode activates it for click-to-set.
+- In `FormationTopsList`: show `—` for depth; cell is editable.
+- `useFormationDrag`: guard against null `formation.depth_md`; drag is disabled if depth is null.
+
+Likely code areas:
+
+- `frontend/src/stores/viewStore.ts` — extend `depthType`, add `activePickId`.
+- `frontend/src/utils/depthTransform.ts` — add `tvdToMd(tvd, table)`.
+- `frontend/src/hooks/useFormationDrag.ts` — depth-type-aware drag start and delta calculation.
+- `frontend/src/components/interaction/FormationTopLine.tsx` — context menu, active-pick highlighting, click handler.
+- `frontend/src/components/logview/LogViewPanel.tsx` — `onClick` for click-to-set.
+- `frontend/src/components/logview/FormationColumn.tsx` — render "not picked" state; use `depth_tvd`/`depth_tvdss` for positioning in non-MD modes.
+- `frontend/src/components/logview/DepthTrack.tsx` — TVD/TVDSS scale rendering.
+- `frontend/src/components/layout/FormationTopsList.tsx` — editable depth cell.
+- `frontend/src/components/layout/WellDataPanel.tsx` — depth display using `depthType`.
+- `app/src/subsidence/api/formations.py` — `FormationTopPatch` accepts `depth_tvd`, `depth_tvdss`; back-calculation logic.
+
+Dependencies: `TOPS-001`.
+
+Acceptance:
+
+- Switching depth type to TVD repositions all formation lines to stored `depth_tvd` values.
+- Clicking on a track with an active pick in `edit-tops` mode sets the pick depth; the response includes updated `depth_tvd` and `depth_tvdss`.
+- Right-click "Set depth" popover: editing TVD updates MD correctly via back-calculation; without a survey it returns 400 and the UI shows an error.
+- Dragging a pick in TVD mode moves the line in TVD space; the stored MD is updated accordingly.
+- Formations with `depth_md = null` display as "not picked" and can be assigned a depth via click or the inline editor.
+- Existing drag tests still pass; new tests cover click-to-set and the TVD/TVDSS context menu.
+
+---
+
+### ZONE-001: Zone entity and lifecycle
+
+Problem:
+
+- The stratigraphic interval between two consecutive formation tops is not a persistent entity. Its attributes — thickness, age span, hiatus duration — are recomputed ad hoc or not at all.
+- There is no place to store user-entered lithology percentages for a zone, nor to record whether those percentages came from a log or manual input.
+- Without a persistent zone entity, multi-well comparison of intervals is impossible.
+
+Required behavior:
+
+**New schema tables (same SCHEMA_VERSION 8 migration as TOPS-001):**
+
+- `FormationZone`: one interval between two consecutive horizons in a TopSet. Fields: `id` (int PK autoincrement), `top_set_id` (int FK → `top_sets.id` CASCADE DELETE), `upper_horizon_id` (int FK → `top_set_horizons.id` RESTRICT), `lower_horizon_id` (int FK → `top_set_horizons.id` RESTRICT), `sort_order` (int — equals `upper_horizon.sort_order`, updated when horizons reorder). Unique constraint on `(top_set_id, upper_horizon_id)`. Zones are created and deleted exclusively by the service layer; no direct user creation.
+
+- `ZoneWellData`: well-specific attributes for one zone. Fields: `id` (int PK autoincrement), `zone_id` (int FK → `formation_zones.id` CASCADE DELETE), `well_id` (str FK → `wells.id` CASCADE DELETE), `thickness_md` (Float nullable — recalculated from picks), `thickness_tvd` (Float nullable — recalculated from picks), `lithology_fractions` (Text nullable — JSON `{"sandstone": 0.6, "shale": 0.4}`), `lithology_source` (`String(8)`, `'manual'` | `'auto'`, default `'manual'`). Unique constraint on `(zone_id, well_id)`.
+
+**Zone service: `app/src/subsidence/data/zone_service.py` (new file):**
+
+- `rebuild_zones_for_top_set(session, top_set_id)`: queries all `TopSetHorizon` records for the set ordered by `sort_order`. Creates `FormationZone` records for each consecutive pair. Deletes any `FormationZone` records that no longer correspond to an adjacent horizon pair. Preserves `ZoneWellData` records whose `zone_id` still exists.
+- `ensure_zone_well_data(session, top_set_id, well_id)`: ensures a `ZoneWellData` row exists for every `FormationZone` in the TopSet for this well. Called when a well is linked to a TopSet.
+- `recalculate_zone_thickness(session, top_set_id, well_id)`: for each `FormationZone` of this TopSet, finds the `FormationTopModel` records for this well that carry `horizon_id` matching `upper_horizon_id` and `lower_horizon_id`. Computes `thickness_md = lower_pick.depth_md - upper_pick.depth_md` and `thickness_tvd = lower_pick.depth_tvd - upper_pick.depth_tvd` (null if either pick is missing or null). Writes to `ZoneWellData`.
+- `merge_zones_on_horizon_delete(session, top_set_id, horizon_id)`: identifies the two zones that shared this horizon as lower and upper boundary respectively. Deletes both. Creates a new zone spanning the gap. For each well: creates a new `ZoneWellData` with `lithology_fractions = NULL`, `lithology_source = 'manual'` (user data is discarded on merge as documented). Recalculates thickness.
+- `split_zone_on_horizon_insert(session, top_set_id, new_horizon_id)`: identifies the existing zone whose sort_order range now contains the new horizon. Deletes that zone and its `ZoneWellData`. Creates two new zones. New `ZoneWellData` records have no lithology.
+
+**Trigger points:**
+
+- `POST /api/top-sets/{id}/horizons` → calls `rebuild_zones_for_top_set`, `ensure_zone_well_data` for all linked wells, `recalculate_zone_thickness` for all linked wells.
+- `DELETE /api/top-sets/{id}/horizons/{hid}` → calls `merge_zones_on_horizon_delete`, then `recalculate_zone_thickness`.
+- `PATCH /api/top-sets/{id}/horizons/{hid}` (reorder only) → calls `rebuild_zones_for_top_set`.
+- `POST /api/wells/{well_id}/apply-top-set` → calls `ensure_zone_well_data`, `recalculate_zone_thickness`.
+- `PATCH /api/wells/{well_id}/formations/{formation_id}` when `depth_md` changes → calls `recalculate_zone_thickness` for the well and its active TopSet.
+- `UpdateFormationDepth` command (undo stack) → same as above.
+
+**API:**
+
+- `GET /api/wells/{well_id}/zones` → list of zones for the well's active TopSet, ordered by sort_order. Each item: `zone_id`, `top_set_id`, `upper_horizon: {id, name, age_ma}`, `lower_horizon: {id, name, age_ma}`, `sort_order`, `thickness_md`, `thickness_tvd`, `age_span_ma` (derived: `lower_horizon.age_ma - upper_horizon.age_ma`, null if either age is null), `hiatus_ma` (derived: `lower_horizon.age_ma - upper_horizon.age_ma` if `upper_horizon.kind = 'unconformity'`, else null), `lithology_fractions`, `lithology_source`.
+- `PATCH /api/wells/{well_id}/zones/{zone_id}` → update `lithology_fractions` and/or `lithology_source`. Only user-editable fields. Validates that fraction values sum to ≤ 1.0; returns 400 if not.
+- Zones are also included in `GET /api/wells/inventory` under a `zones` array (same fields, for the active TopSet only).
+
+**Behavior on pick move (TOPS-002 drag / TOPS-001 click-to-set):**
+
+- Thickness recalculates; `lithology_fractions` and `lithology_source` are preserved.
+
+**Behavior on horizon delete:**
+
+- Adjacent zones merge; `lithology_fractions` reset to null; `lithology_source = 'manual'`.
+
+**Behavior on horizon insert:**
+
+- Containing zone splits; new zone `ZoneWellData` records have no lithology.
+
+Likely code areas:
+
+- `app/src/subsidence/data/schema.py` — add `FormationZone`, `ZoneWellData`.
+- `app/src/subsidence/data/zone_service.py` — new module.
+- `app/src/subsidence/api/top_sets.py` — zone trigger calls in horizon add/delete/reorder.
+- `app/src/subsidence/api/formations.py` — zone thickness recalculation after depth change.
+- `app/src/subsidence/api/wells.py` — add `zones` to inventory response; add `GET /api/wells/{id}/zones`, `PATCH /api/wells/{id}/zones/{zone_id}`.
+- `frontend/src/types/well.ts` — add `FormationZone`, `ZoneWellData` types.
+- `frontend/src/stores/wellDataStore.ts` — load zones, expose `updateZoneLithology` action.
+- `app/tests/integration/test_project_api_workflows.py` — zone lifecycle tests.
+
+Dependencies: `TOPS-001`.
+
+Acceptance:
+
+- Creating a TopSet with 4 horizons → 3 zones per linked well.
+- Deleting a middle horizon → 2 zones; the middle zone's `ZoneWellData` are merged (lithology cleared).
+- Dragging a pick → `thickness_md` updates; `lithology_fractions` unchanged; `lithology_source` unchanged.
+- `PATCH /api/wells/{id}/zones/{zone_id}` with fractions summing to 1.1 → 400.
+- A well with no active TopSet has an empty `zones` array in inventory.
+- All operations are covered by integration tests.
+
+---
+
+### ZONE-002: Zone settings UI and manual lithology input
+
+Problem:
+
+- There is no UI to inspect zone attributes or enter per-zone lithology percentages.
+
+Required behavior:
+
+**Zone list in well settings:**
+
+- In the well Settings pane, add a **Zones** section below Tops (or as a sibling tab). The section is hidden if the well has no active TopSet.
+- Each zone row shows: upper horizon name → lower horizon name, `thickness_md` in the project depth unit, `age_span_ma` (e.g. "12.3 Ma"), and a compact lithology bar if lithology fractions are set.
+- Selecting a zone opens a detail panel.
+
+**Zone detail panel:**
+
+- Read-only calculated fields (with grey "calculated" label):
+  - Thickness (MD), thickness (TVD) if available.
+  - Age span (Ma).
+  - Hiatus (Ma) if the upper horizon is an unconformity.
+- Lithology section:
+  - If `lithology_source = 'auto'`: shows the auto-derived fractions with a "from log" badge. An "Override" button switches to manual mode.
+  - If `lithology_source = 'manual'` and no fractions yet: shows an "Add lithology" button that reveals the entry form.
+  - If `lithology_source = 'manual'` and fractions exist: shows an editable rows table with `{lithology_name: %}` using lithology entries from the well's active lithology set (from `DICT-003`). Each row: lithology selector (dropdown from active LithologySet), percentage input (0–100). Total shown below rows; turns red if > 100. Save button disabled while total > 100.
+  - If `lithology_source = 'auto'`: "Reset to auto" button reverts to auto fractions (sets `lithology_source = 'auto'`). Only visible when `LITH-001` is implemented and the well has a discrete lithology curve.
+
+**Multi-well zone comparison panel (optional, later):**
+
+- Placeholder in the Data Manager for a future "Compare zones across wells" view. Not implemented in ZONE-002.
+
+Likely code areas:
+
+- `frontend/src/components/layout/settings/ZoneSettings.tsx` — new component.
+- `frontend/src/components/layout/settings/ZoneDetailSettings.tsx` — new component.
+- `frontend/src/components/layout/SettingsInspector.tsx` — register zone panel.
+- `frontend/src/stores/wellDataStore.ts` — `updateZoneLithology` action.
+- `frontend/src/styles/data-manager.css` — zone lithology bar style.
+
+Dependencies: `ZONE-001`, `DICT-003`.
+
+Acceptance:
+
+- Zone list visible in settings for a well with an active TopSet.
+- Entering lithology fractions > 100% prevents saving.
+- Manually entered fractions survive a pick move (server confirms `lithology_source = 'manual'`).
+- Fractions are cleared after a horizon merge (server returns null fractions; UI shows "Add lithology").
+
+---
+
+### ZONE-003: Auto-lithology aggregation from discrete log
+
+Problem:
+
+- If a well has a discrete lithology curve, zone lithology fractions should be computable automatically instead of manually.
+
+Required behavior:
+
+- When a well has a `CurveMetadata` record with `curve_type = 'discrete'` and `family_code = 'lithology'`, the backend can aggregate sample values over each zone's depth interval.
+- Service function `aggregate_zone_lithology_from_curve(session, project_path, well, zone_well_data)`: loads the parquet for the discrete curve, selects rows where `depth_md` falls within `[upper_pick.depth_md, lower_pick.depth_md]`, counts occurrences of each integer code, maps codes to lithology codes via the `CurveMnemonicEntry` or a direct lithology-code lookup, returns `{code: fraction}` dict.
+- The service writes the result to `ZoneWellData.lithology_fractions` and sets `lithology_source = 'auto'` only when `existing.lithology_source != 'manual'` (does not overwrite manual overrides).
+- Triggered on: discrete curve import for a well, pick depth change, zone rebuild.
+- `POST /api/wells/{well_id}/zones/recalculate-lithology` — explicit recalculation endpoint.
+
+Likely code areas:
+
+- `app/src/subsidence/data/zone_service.py` — add `aggregate_zone_lithology_from_curve`.
+- `app/src/subsidence/api/projects_imports.py` — call after discrete curve import.
+- `app/src/subsidence/api/wells.py` — add `recalculate-lithology` endpoint.
+
+Dependencies: `ZONE-001`, `ZONE-002`, `LITH-001`.
+
+Acceptance:
+
+- Importing a discrete lithology curve for a well updates `lithology_fractions` and sets `lithology_source = 'auto'` for all zones.
+- A zone with `lithology_source = 'manual'` is not overwritten by auto-recalculation.
+- Explicit `recalculate-lithology` call refreshes auto zones without affecting manual ones.
+
+---
+
+### ZONE-004: Zone attributes as subsidence calculation inputs
+
+Problem:
+
+- The subsidence calculation engine currently receives lithology in an ad-hoc format. Zone entities (ZONE-001) should become the canonical input layer, replacing or wrapping the current per-formation lithology field.
+- `LITH-003` (old item) is superseded by this item.
+
+Required behavior:
+
+- Backend function `build_zone_layer_inputs(session, well_id) → list[ZoneLayerInput]`: for each `ZoneWellData` of the well's active TopSet (ordered by `sort_order`):
+  - `thickness_md`: from `ZoneWellData.thickness_md`.
+  - `age_top_ma`, `age_base_ma`: from the zone's upper and lower horizon `age_ma`.
+  - `hiatus_ma`: `lower.age_ma - upper.age_ma` if upper horizon `kind = 'unconformity'`, else 0.
+  - `lithology_fractions`: from `ZoneWellData.lithology_fractions` if set; otherwise falls back to `FormationTopModel.lithology` of the upper pick (existing single-lithology field) mapped to `{code: 1.0}`; if that is also null, uses the project default lithology.
+  - `compaction_params`: weighted average of `CompactionPreset` fields (density, porosity_surface, compaction_coeff) by lithology fraction, using the well's active `LithologySet`.
+- The subsidence API `POST /api/wells/{well_id}/subsidence` calls `build_zone_layer_inputs` when the well has an active TopSet. Falls back to existing logic (using `FormationTopModel` records directly) if no TopSet is active.
+- No breaking change to the existing calculation path for legacy wells.
+
+Likely code areas:
+
+- `app/src/subsidence/data/zone_service.py` — add `build_zone_layer_inputs`.
+- `app/src/subsidence/api/subsidence.py` — branch on TopSet presence.
+- `app/src/subsidence/data/backstrip.py` — accept `ZoneLayerInput` list.
+
+Dependencies: `ZONE-001`, `ZONE-002`, `DICT-003`.
+
+Acceptance:
+
+- Subsidence calculated via zone inputs for a two-zone well reproduces the result of the legacy single-lithology path when zone lithology fractions are `{legacy_code: 1.0}`.
+- Zones without lithology do not crash the calculation; they use the project default.
+- Legacy wells (no TopSet) continue to calculate without modification.
+
+---
+
 ## 6. Lithology Curve Support
 
 ### LITH-001: Discrete log import and rendering
@@ -1007,23 +1393,11 @@ Acceptance:
 
 ### LITH-003: Zone upscaling for subsidence inputs
 
-Problem:
-
-- Lithology needs to be aggregated by stratigraphic zones between top and base picks for subsidence calculations.
-
-Required behavior:
-
-- Define a zone as the interval between adjacent formation tops.
-- Calculate average/weighted lithology attributes per zone.
-- For source curves, output names follow:
-  - `<curve mnemonic>:<lithology>` for source curve-derived percentages.
-  - `<Lithology track name>:<lithology>` for composition-track-derived percentages.
-- Store results in a form usable by subsidence calculations.
+> **Superseded by `ZONE-004`.** The zone entity, lithology aggregation, and subsidence input pipeline are specified in full detail in the `ZONE-*` series. `LITH-003` is retained only as a pointer.
 
 Dependencies:
 
-- `LITH-001`
-- `LITH-002`
+- `ZONE-004` (implements this)
 
 Likely code areas:
 
