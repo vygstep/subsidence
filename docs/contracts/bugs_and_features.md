@@ -1150,7 +1150,7 @@ Acceptance:
 
 #### Implemented (TOPS-002)
 
-Commit `TBD` — all frontend and backend changes landed together.
+Commit `9d79cae` — all frontend and backend changes landed together.
 
 Backend:
 - `FormationTopPatch` now accepts `depth_tvd` and `depth_tvdss` as alternate depth inputs. When `depth_md` is not set, the backend back-calculates MD using `tvd_to_md()` (or adds `kb_elev` for TVDSS → TVD first). Returns 400 if no deviation survey is available.
