@@ -63,7 +63,7 @@ Items:
 - `WIZ-003`: Column mapping and required-field validation. (done)
 - `WIZ-004`: Target well resolution. (done)
 - `WIZ-005`: Import presets by data type. (done)
-- `WIZ-006`: Import execution, logging, and tests.
+- `WIZ-006`: Import execution, logging, and tests. (done)
 
 Exit criteria:
 
@@ -842,3 +842,7 @@ Backend `preview.py` module adds `preview_tabular` (csv.Sniffer auto-delimiter, 
 ### WIZ-005: Data-type import presets (done)
 
 `UNCONFORMITIES_FIELDS` added to `mapping.ts` (unc_name/depth_md/end_age_ma/start_age_ma required; well_name/color/note optional) with `validateUnconformitiesMapping`. `ImportWizardDataType` extended with `'unconformities'`. `unconformities` preset added to `importWizardPresets.ts` (`targetWellPolicy: 'required'`). New `ImportUnconformitiesDialog`: 5-step wizard, required well dropdown (no create-new or file-well-source toggle), `canSubmit` requires a selected well. "Load unconformities" button added to `topsModeActions` in `ProjectToolbar`. Backend: `import_unconformities_csv` gains `column_map` kwarg with `_apply_column_map` applied before field processing; `ImportUnconformitiesRequest` gains `column_map` field. Commit: `6746c76`.
+
+### WIZ-006: Import execution, logging, and tests (done)
+
+`operation_log` context manager in `observability.py` already logs start/success/failure with duration_ms, error_type, and error_message for all import endpoints. Four integration tests added to `test_project_api_workflows.py`: `test_tops_import_with_column_map` (non-standard column names remapped via `column_map`), `test_deviation_import_with_column_map` (custom column names for md/incl/azim), `test_tops_import_with_incomplete_column_map_returns_400` (missing required field after remapping → 400 with field name in detail), `test_logs_import_without_well_name_imports_to_explicit_well` (no `well_name` column, explicit `well_id` routes to the correct well). CSV and TSV delimiter detection were already covered in `test_logs_csv_import_supports_comma_and_tab_delimiters`. Commit: pending.

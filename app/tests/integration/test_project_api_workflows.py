@@ -1010,6 +1010,143 @@ def test_mnemonic_resolver_prefers_user_set_over_builtin(api_client: TestClient,
         assert curve.unit == 'in'
 
 
+def test_tops_import_with_column_map(api_client: TestClient, tmp_path: Path) -> None:
+    _create_project(api_client, tmp_path, 'tops-column-map')
+    response = api_client.post('/api/projects/wells', json={
+        'name': 'Map Well',
+        'x': 0.0,
+        'y': 0.0,
+        'kb': 10.0,
+        'td': 500.0,
+        'crs': 'local',
+    })
+    assert response.status_code == 200, response.text
+    well_id = response.json()['well_id']
+
+    csv_path = tmp_path / 'tops_nonstandard.csv'
+    csv_path.write_text(
+        'well_name,formation,md_depth,age\n'
+        'Map Well,Jurassic Top,100,15\n'
+        'Map Well,Cretaceous Base,300,80\n',
+        encoding='utf-8',
+    )
+
+    response = api_client.post('/api/projects/import-tops', json={
+        'csv_path': str(csv_path),
+        'well_id': well_id,
+        'column_map': {'top_name': 'formation', 'depth_md': 'md_depth'},
+    })
+    assert response.status_code == 200, response.text
+    assert response.json()['formation_count'] == 2
+
+    response = api_client.get('/api/wells/inventory')
+    assert response.status_code == 200, response.text
+    well = next(w for w in response.json() if w['well_id'] == well_id)
+    top_names = [f['name'] for f in well['formations']]
+    assert 'Jurassic Top' in top_names
+    assert 'Cretaceous Base' in top_names
+
+
+def test_deviation_import_with_column_map(api_client: TestClient, tmp_path: Path) -> None:
+    _create_project(api_client, tmp_path, 'deviation-column-map')
+    response = api_client.post('/api/projects/wells', json={
+        'name': 'Deviated Well',
+        'x': 0.0,
+        'y': 0.0,
+        'kb': 10.0,
+        'td': 500.0,
+        'crs': 'local',
+    })
+    assert response.status_code == 200, response.text
+    well_id = response.json()['well_id']
+
+    csv_path = tmp_path / 'deviation_nonstandard.csv'
+    csv_path.write_text(
+        'well_name,depth,inclination,bearing\n'
+        'Deviated Well,0,0,0\n'
+        'Deviated Well,100,2,45\n'
+        'Deviated Well,300,5,50\n',
+        encoding='utf-8',
+    )
+
+    response = api_client.post('/api/projects/import-deviation', json={
+        'csv_path': str(csv_path),
+        'well_id': well_id,
+        'column_map': {'md': 'depth', 'incl_deg': 'inclination', 'azim_deg': 'bearing'},
+    })
+    assert response.status_code == 200, response.text
+    assert response.json()['mode'] == 'INCL_AZIM'
+
+
+def test_tops_import_with_incomplete_column_map_returns_400(api_client: TestClient, tmp_path: Path) -> None:
+    _create_project(api_client, tmp_path, 'tops-bad-map')
+    response = api_client.post('/api/projects/wells', json={
+        'name': 'Bad Map Well',
+        'x': 0.0,
+        'y': 0.0,
+        'kb': 10.0,
+        'td': 500.0,
+        'crs': 'local',
+    })
+    assert response.status_code == 200, response.text
+    well_id = response.json()['well_id']
+
+    csv_path = tmp_path / 'tops_bad_map.csv'
+    csv_path.write_text(
+        'well_name,formation,md_depth\n'
+        'Bad Map Well,Some Top,100\n',
+        encoding='utf-8',
+    )
+
+    # column_map maps top_name but NOT depth_md — depth_md will be missing after remapping
+    response = api_client.post('/api/projects/import-tops', json={
+        'csv_path': str(csv_path),
+        'well_id': well_id,
+        'column_map': {'top_name': 'formation'},
+    })
+    assert response.status_code == 400, response.text
+    assert 'depth_md' in response.json()['detail']
+
+
+def test_logs_import_without_well_name_imports_to_explicit_well(api_client: TestClient, tmp_path: Path) -> None:
+    _create_project(api_client, tmp_path, 'logs-no-well-name')
+    response = api_client.post('/api/projects/wells', json={
+        'name': 'Target Well',
+        'x': 0.0,
+        'y': 0.0,
+        'kb': 10.0,
+        'td': 500.0,
+        'crs': 'local',
+    })
+    assert response.status_code == 200, response.text
+    well_id = response.json()['well_id']
+
+    csv_path = tmp_path / 'logs_no_wellname.csv'
+    csv_path.write_text(
+        'DEPT,GR,RHOB\n'
+        '100,75,2.3\n'
+        '200,78,2.4\n'
+        '300,80,2.5\n',
+        encoding='utf-8',
+    )
+
+    response = api_client.post('/api/projects/import-logs-csv', json={
+        'csv_path': str(csv_path),
+        'well_id': well_id,
+    })
+    assert response.status_code == 200, response.text
+    payload = response.json()
+    assert payload['well_id'] == well_id
+    assert payload['curve_count'] == 2
+
+    response = api_client.get('/api/wells/inventory')
+    assert response.status_code == 200, response.text
+    wells = response.json()
+    target = next(w for w in wells if w['well_id'] == well_id)
+    assert target['well_name'] == 'Target Well'
+    assert {c['mnemonic'] for c in target['curves']} == {'GR', 'RHOB'}
+
+
 def test_invalid_user_regex_does_not_break_mnemonic_resolver(api_client: TestClient, tmp_path: Path) -> None:
     _create_project(api_client, tmp_path, 'mnemonic-invalid-regex')
 
