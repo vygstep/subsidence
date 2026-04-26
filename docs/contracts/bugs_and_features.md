@@ -61,7 +61,7 @@ Items:
 - `WIZ-001`: Shared import wizard shell.
 - `WIZ-002`: File preview and parser detection. (done)
 - `WIZ-003`: Column mapping and required-field validation. (done)
-- `WIZ-004`: Target well resolution.
+- `WIZ-004`: Target well resolution. (done)
 - `WIZ-005`: Import presets by data type.
 - `WIZ-006`: Import execution, logging, and tests.
 
@@ -834,3 +834,7 @@ Backend `preview.py` module adds `preview_tabular` (csv.Sniffer auto-delimiter, 
 ### WIZ-003: Column mapping and required-field validation (done)
 
 `mapping.ts` defines `FieldDefinition`, `ColumnMapping`, field sets for tops (`TOPS_FIELDS`), deviation (`DEVIATION_FIELDS`), and logs CSV (`LOGS_CSV_FIELDS`), plus `autoMap` (normalized-alias matching, deduplication), `validateTopsMapping`, `validateDeviationMapping` (requires depth + one mode pair), `validateLogsCsvMapping`, and `isMappingValid`. `MappingPane` renders a field→column select table with required/optional status badges. `buildImportWizardSteps` accepts an optional `labels` parameter; `MAPPING_STEP_LABELS` adds a Mapping step between Preview and Options for CSV dialogs. All three CSV import dialogs (tops, deviation, logs CSV) gain the 5-step flow; LAS logs keeps 4 steps. Backend: `_apply_column_map` helper in `common.py` inverts the `{canonical: file_col}` dict to rename columns before importers run; `import_tops_csv` and `import_deviation_csv` accept `column_map`; `ImportTopsRequest` and `ImportDeviationRequest` gain `column_map` field. Commit: `3a12cbc`.
+
+### WIZ-004: Target well resolution (done)
+
+`ImportWizardTargetWellFields` gains optional `fileWellSource`, `wellPolicy`, and `onWellPolicyChange` props. When `fileWellSource` is set, the Options step shows a radio toggle — "Use file well name" (default) vs "Override with target well" — instead of the plain dropdown. The override path exposes a target well select (`aria-label="Target well"`) pre-filled with the active well. `fileWellSource` is derived from `lasPreview.well_name` in `ImportLasDialog` (LAS source only) and from `mapping['well_name']` in `ImportTopsDialog` (when the well_name column is mapped). Submit logic passes `well_id: null, create_new_well: false` when policy is `'file'`, and the selected well id when policy is `'override'`. Deviation and logs-CSV imports have no file well name concept and retain the plain dropdown. Tests extended to verify default file policy and active-well preselection under override. Commit: `d5b2ebd`.
