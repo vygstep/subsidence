@@ -1,0 +1,11 @@
+code,display_name,source_code,source_name,svg_path,tile_width,tile_height,sort_order
+sandstone,Sandstone,30000,Sandstone,svg/30000.svg,64,64,10
+siltstone,Siltstone,40000,Siltstone,svg/40000.svg,64,64,20
+mudstone,Mudstone,50000,Mudstone,svg/50000.svg,64,64,30
+claystone,Claystone,60000,Claystone,svg/60000.svg,64,64,40
+shale,Shale,65000,Shale,svg/65000.svg,64,64,50
+limestone,Limestone,70000,Limestone,svg/70000.svg,64,64,60
+marl,Marl,80000,Marl,svg/80000.svg,64,64,70
+gypsum,Gypsum,85000,Gypsum,svg/85000.svg,64,64,80
+dolomite,Dolomite,74000,Dolostone,svg/74000.svg,64,64,90
+conglomerate,Conglomerate,10000,Conglomerate,svg/10000.svg,64,64,100

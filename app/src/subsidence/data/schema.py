@@ -7,7 +7,7 @@ from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column, relationship
 from sqlalchemy import MetaData
 
 SUBSIDENCE_APP_ID = 0x53554253  # "SUBS" as 4-byte int
-SCHEMA_VERSION = 6
+SCHEMA_VERSION = 7
 
 _NAMING: dict[str, str] = {
     "ix": "ix_%(table_name)s_%(column_0_name)s",
@@ -335,6 +335,51 @@ class MeasurementUnitAlias(Base, AuditMixin):
 
     dimension: Mapped[UnitDimension] = relationship()
     unit: Mapped[MeasurementUnit] = relationship(back_populates="aliases")
+
+
+# ---------------------------------------------------------------------------
+# 8d. lithology_pattern_palettes + lithology_patterns
+# ---------------------------------------------------------------------------
+
+class LithologyPatternPalette(Base, AuditMixin):
+    __tablename__ = "lithology_pattern_palettes"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    name: Mapped[str] = mapped_column(String(256))
+    origin: Mapped[str] = mapped_column(String(32), default="user")
+    is_builtin: Mapped[bool] = mapped_column(Boolean, default=False)
+    source_url: Mapped[str | None] = mapped_column(Text, nullable=True)
+    license_name: Mapped[str | None] = mapped_column(String(64), nullable=True)
+    description: Mapped[str | None] = mapped_column(Text, nullable=True)
+    sort_order: Mapped[int] = mapped_column(Integer, default=0)
+
+    patterns: Mapped[list["LithologyPattern"]] = relationship(
+        back_populates="palette", cascade="all, delete-orphan"
+    )
+
+
+class LithologyPattern(Base, AuditMixin):
+    __tablename__ = "lithology_patterns"
+    __table_args__ = (
+        UniqueConstraint("palette_id", "code", name="uq_lithology_patterns_palette_code"),
+    )
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    palette_id: Mapped[int] = mapped_column(
+        Integer, ForeignKey("lithology_pattern_palettes.id", ondelete="CASCADE"), nullable=False
+    )
+    code: Mapped[str] = mapped_column(String(64), unique=True)
+    display_name: Mapped[str] = mapped_column(String(128))
+    svg_content: Mapped[str] = mapped_column(Text)
+    source_code: Mapped[str | None] = mapped_column(String(64), nullable=True)
+    source_name: Mapped[str | None] = mapped_column(String(128), nullable=True)
+    source_path: Mapped[str | None] = mapped_column(Text, nullable=True)
+    tile_width: Mapped[int] = mapped_column(Integer, default=64)
+    tile_height: Mapped[int] = mapped_column(Integer, default=64)
+    description: Mapped[str | None] = mapped_column(Text, nullable=True)
+    sort_order: Mapped[int] = mapped_column(Integer, default=0)
+
+    palette: Mapped["LithologyPatternPalette"] = relationship(back_populates="patterns")
 
 
 # ---------------------------------------------------------------------------

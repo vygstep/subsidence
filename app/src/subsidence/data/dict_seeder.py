@@ -14,6 +14,8 @@ from .schema import (
     CurveMnemonicEntry,
     CurveMnemonicSet,
     LithologyDictEntry,
+    LithologyPattern,
+    LithologyPatternPalette,
     LithologySet,
     LithologySetEntry,
     MeasurementUnit,
@@ -22,6 +24,7 @@ from .schema import (
     StratUnit,
     UnitDimension,
 )
+from .lithology_patterns import sanitize_svg_content
 from .unit_registry import normalize_unit_key
 
 
@@ -379,6 +382,76 @@ def _seed_builtin_lithology_set(session: Session) -> None:
         existing.compaction_preset_id = preset_id
 
 
+def _seed_builtin_lithology_patterns(session: Session, palette_dir: Path) -> None:
+    manifest_path = palette_dir / 'manifest.csv'
+    if not manifest_path.exists():
+        return
+
+    palette = session.scalar(
+        select(LithologyPatternPalette)
+        .where(LithologyPatternPalette.is_builtin.is_(True), LithologyPatternPalette.origin == 'equinor')
+        .order_by(LithologyPatternPalette.id.asc())
+    )
+    if palette is None:
+        palette = LithologyPatternPalette(
+            name='Equinor Lithology Patterns',
+            origin='equinor',
+            is_builtin=True,
+            source_url='https://github.com/equinor/lithology-patterns',
+            license_name='MIT',
+            description='Built-in SVG lithology patterns sourced from equinor/lithology-patterns assets/svg.',
+            sort_order=0,
+        )
+        session.add(palette)
+        session.flush()
+    else:
+        palette.name = 'Equinor Lithology Patterns'
+        palette.source_url = 'https://github.com/equinor/lithology-patterns'
+        palette.license_name = 'MIT'
+        palette.description = 'Built-in SVG lithology patterns sourced from equinor/lithology-patterns assets/svg.'
+        palette.sort_order = 0
+
+    existing_by_code = {
+        row.code: row
+        for row in session.scalars(select(LithologyPattern).where(LithologyPattern.palette_id == palette.id)).all()
+    }
+
+    with manifest_path.open('r', encoding='utf-8', newline='') as handle:
+        for row in csv.DictReader(handle):
+            code = row['code']
+            svg_path = palette_dir / row['svg_path']
+            if not svg_path.exists():
+                continue
+            svg_content, inferred_width, inferred_height = sanitize_svg_content(svg_path.read_text(encoding='utf-8'))
+            tile_width = int(row.get('tile_width') or inferred_width)
+            tile_height = int(row.get('tile_height') or inferred_height)
+            existing = existing_by_code.get(code)
+            if existing is None:
+                session.add(
+                    LithologyPattern(
+                        palette_id=palette.id,
+                        code=code,
+                        display_name=row['display_name'],
+                        svg_content=svg_content,
+                        source_code=row.get('source_code') or None,
+                        source_name=row.get('source_name') or None,
+                        source_path=row.get('svg_path') or None,
+                        tile_width=tile_width,
+                        tile_height=tile_height,
+                        sort_order=int(row.get('sort_order') or 0),
+                    )
+                )
+                continue
+            existing.display_name = row['display_name']
+            existing.svg_content = svg_content
+            existing.source_code = row.get('source_code') or None
+            existing.source_name = row.get('source_name') or None
+            existing.source_path = row.get('svg_path') or None
+            existing.tile_width = tile_width
+            existing.tile_height = tile_height
+            existing.sort_order = int(row.get('sort_order') or 0)
+
+
 def _seed_builtin_mnemonic_set(session: Session, csv_path: Path) -> None:
     """Create the built-in Default Mnemonics set from the flat curve_families.csv."""
     default_set = session.scalar(
@@ -540,6 +613,7 @@ def seed_dictionaries(session: Session, db_path: Path) -> None:
 
     _seed_builtin_compaction_model(session)
     _seed_builtin_compaction_presets(session)
+    _seed_builtin_lithology_patterns(session, seed_dir / 'lithology_patterns' / 'equinor')
     _seed_builtin_lithology_set(session)
     _seed_builtin_mnemonic_set(session, seed_dir / 'curve_families.csv')
     _seed_measurement_units(session)

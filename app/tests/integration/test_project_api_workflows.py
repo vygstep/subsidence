@@ -12,6 +12,8 @@ from subsidence.data.schema import (
     CurveMetadata,
     CurveMnemonicEntry,
     CurveMnemonicSet,
+    LithologyPattern,
+    LithologyPatternPalette,
     LithologySet,
     LithologySetEntry,
     MeasurementUnit,
@@ -582,6 +584,104 @@ def test_lithology_set_user_crud(api_client: TestClient, tmp_path: Path):
     assert default_set['id'] in remaining_ids
     assert copied['id'] in remaining_ids
     assert created['id'] not in remaining_ids
+
+
+def test_lithology_pattern_palettes_seeded(api_client: TestClient, tmp_path: Path):
+    _create_project(api_client, tmp_path, 'pattern-palettes')
+
+    response = api_client.get('/api/lithology-pattern-palettes')
+    assert response.status_code == 200, response.text
+    palettes = response.json()
+    builtin = next(item for item in palettes if item['is_builtin'])
+    assert builtin['name'] == 'Equinor Lithology Patterns'
+    assert builtin['origin'] == 'equinor'
+    assert builtin['license_name'] == 'MIT'
+    assert builtin['entry_count'] >= 10
+
+    response = api_client.get(f"/api/lithology-pattern-palettes/{builtin['id']}")
+    assert response.status_code == 200, response.text
+    detail = response.json()
+    codes = {row['code'] for row in detail['patterns']}
+    assert {'sandstone', 'shale', 'limestone', 'dolomite', 'conglomerate'} <= codes
+    sandstone = next(row for row in detail['patterns'] if row['code'] == 'sandstone')
+    assert sandstone['svg_content'].startswith('<svg')
+    assert sandstone['source_code'] == '30000'
+    assert sandstone['tile_width'] == 64
+
+    response = api_client.patch(f"/api/lithology-pattern-palettes/{builtin['id']}", json={'name': 'Nope'})
+    assert response.status_code == 403, response.text
+
+
+def test_lithology_pattern_palettes_self_heal_for_open_project(api_client: TestClient, tmp_path: Path):
+    _create_project(api_client, tmp_path, 'pattern-self-heal')
+
+    manager = api_client.app.state.project_manager
+    with manager.get_session() as session:
+        session.execute(LithologyPattern.__table__.delete())
+        session.execute(LithologyPatternPalette.__table__.delete())
+        session.commit()
+
+    response = api_client.get('/api/lithology-pattern-palettes')
+    assert response.status_code == 200, response.text
+    assert any(item['name'] == 'Equinor Lithology Patterns' for item in response.json())
+
+
+def test_lithology_pattern_palette_user_crud_and_svg_validation(api_client: TestClient, tmp_path: Path):
+    _create_project(api_client, tmp_path, 'pattern-crud')
+
+    response = api_client.get('/api/lithology-pattern-palettes')
+    assert response.status_code == 200, response.text
+    builtin = next(item for item in response.json() if item['is_builtin'])
+
+    response = api_client.post('/api/lithology-pattern-palettes', json={'name': 'Project Patterns'})
+    assert response.status_code == 201, response.text
+    palette = response.json()
+    assert palette['name'] == 'Project Patterns'
+    assert palette['is_builtin'] is False
+
+    svg_path = tmp_path / 'custom.svg'
+    svg_path.write_text(
+        '<svg viewBox="0 0 8 8" xmlns="http://www.w3.org/2000/svg"><path d="M0 0h8v8H0z"/></svg>',
+        encoding='utf-8',
+    )
+    response = api_client.post(
+        f"/api/lithology-pattern-palettes/{palette['id']}/patterns/import",
+        json={'path': str(svg_path), 'code': 'custom_dot', 'display_name': 'Custom Dot'},
+    )
+    assert response.status_code == 201, response.text
+    pattern = response.json()
+    assert pattern['code'] == 'custom_dot'
+    assert pattern['tile_width'] == 8
+
+    bad_svg = '<svg xmlns="http://www.w3.org/2000/svg"><script>alert(1)</script></svg>'
+    response = api_client.post(
+        f"/api/lithology-pattern-palettes/{palette['id']}/patterns",
+        json={'code': 'bad', 'display_name': 'Bad', 'svg_content': bad_svg},
+    )
+    assert response.status_code == 400, response.text
+
+    response = api_client.post('/api/lithology-pattern-palettes', json={
+        'name': 'Equinor Copy',
+        'clone_from_id': builtin['id'],
+    })
+    assert response.status_code == 201, response.text
+    copied = response.json()
+    assert copied['is_builtin'] is False
+    assert copied['entry_count'] == builtin['entry_count']
+
+    response = api_client.post('/api/lithology-sets', json={'name': 'Pattern Linked Lithologies'})
+    assert response.status_code == 201, response.text
+    lithology_set = response.json()
+    response = api_client.post(
+        f"/api/lithology-sets/{lithology_set['id']}/entries",
+        json={'lithology_code': 'CUSTOM', 'pattern_id': 'custom_dot'},
+    )
+    assert response.status_code == 201, response.text
+
+    response = api_client.delete(
+        f"/api/lithology-pattern-palettes/{palette['id']}/patterns/{pattern['id']}"
+    )
+    assert response.status_code == 409, response.text
 
 
 def test_subsidence_rest_and_websocket_recalculation(api_client: TestClient, tmp_path: Path):
