@@ -26,6 +26,7 @@ export function useDataManagerController() {
   const unitDimensions = useWellDataStore((state) => state.unitDimensions)
   const lithologyDictionaryEntries = useWellDataStore((state) => state.lithologyDictionaryEntries)
   const lithologySets = useWellDataStore((state) => state.lithologySets)
+  const lithologyPatternPalettes = useWellDataStore((state) => state.lithologyPatternPalettes)
   const wellInventories = useWellDataStore((state) => state.wellInventories)
   const loadWell = useWellDataStore((state) => state.loadWell)
   const updateFormation = useWellDataStore((state) => state.updateFormation)
@@ -154,6 +155,11 @@ export function useDataManagerController() {
     return lithologySets.find((entry) => entry.id === selectedObject.setId) ?? null
   }, [lithologySets, selectedObject])
 
+  const selectedLithologyPatternPalette = useMemo(() => {
+    if (selectedObject?.type !== 'lithology-pattern-palette') return null
+    return lithologyPatternPalettes.find((entry) => entry.id === selectedObject.paletteId) ?? null
+  }, [lithologyPatternPalettes, selectedObject])
+
   const selectedLithologyDictionaryEntry = useMemo(() => {
     if (selectedObject?.type !== 'lithology-dictionary-entry') return null
     return lithologyDictionaryEntries.find((entry) => entry.id === selectedObject.entryId) ?? null
@@ -205,6 +211,7 @@ export function useDataManagerController() {
     deviationVisibilityByWellId,
     formations,
     lithologyDictionaryEntries,
+    lithologyPatternPalettes,
     lithologySets,
     mnemonicSets,
     unitDimensions,
@@ -265,6 +272,8 @@ export function useDataManagerController() {
     onSelectUnitDimension: (dimensionCode: string) => setSelectedObject({ type: 'unit-dimension', dimensionCode }),
     onSelectLithologiesRoot: () => setSelectedObject({ type: 'lithologies-root' }),
     onSelectLithologySet: (setId: number) => setSelectedObject({ type: 'lithology-set', setId }),
+    onSelectPatternPalettesRoot: () => setSelectedObject({ type: 'pattern-palettes-root' }),
+    onSelectLithologyPatternPalette: (paletteId: number) => setSelectedObject({ type: 'lithology-pattern-palette', paletteId }),
     onSelectLithologyDictionaryEntry: (entryId: number) => setSelectedObject({ type: 'lithology-dictionary-entry', entryId }),
     onSelectTemplatesTab: () => setActiveSidebarTab('templates'),
     onSelectStratChartsTab: () => setActiveSidebarTab('strat-charts'),
@@ -280,6 +289,8 @@ export function useDataManagerController() {
     selectedFormationId,
     selectedLithologySet,
     selectedLithologySetId: selectedObject?.type === 'lithology-set' ? selectedObject.setId : null,
+    selectedLithologyPatternPalette,
+    selectedLithologyPatternPaletteId: selectedObject?.type === 'lithology-pattern-palette' ? selectedObject.paletteId : null,
     selectedMnemonicSet,
     selectedMnemonicSetId: selectedObject?.type === 'mnemonic-set' ? selectedObject.setId : null,
     selectedUnitDimension,
@@ -291,6 +302,7 @@ export function useDataManagerController() {
     isCurveMnemonicsRootSelected: selectedObject?.type === 'curve-mnemonics-root',
     isMeasurementUnitsRootSelected: selectedObject?.type === 'measurement-units-root',
     isLithologiesRootSelected: selectedObject?.type === 'lithologies-root',
+    isPatternPalettesRootSelected: selectedObject?.type === 'pattern-palettes-root',
     setFormationMove: (formationId: string, depth: number) => {
       if (Number.isFinite(depth)) void updateFormationDepth(formationId, depth)
     },

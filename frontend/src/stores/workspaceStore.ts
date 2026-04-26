@@ -21,6 +21,8 @@ export type SelectedObject =
   | { type: 'compaction-preset-draft' }
   | { type: 'measurement-units-root' }
   | { type: 'unit-dimension'; dimensionCode: string }
+  | { type: 'pattern-palettes-root' }
+  | { type: 'lithology-pattern-palette'; paletteId: number }
   | { type: 'lithologies-root' }
   | { type: 'lithology-set'; setId: number }
   | { type: 'lithology-dictionary-entry'; entryId: number }

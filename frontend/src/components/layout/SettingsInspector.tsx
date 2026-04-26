@@ -5,6 +5,7 @@ import type {
   CurveMnemonicSetSummary,
   FormationTop,
   LithologyDictionaryEntry,
+  LithologyPatternPaletteSummary,
   LithologySetSummary,
   StratChartInfo,
   TrackConfig,
@@ -17,6 +18,8 @@ import { CompactionPresetsRootSettings } from './settings/CompactionPresetsRootS
 import { CurveMnemonicSetSettings } from './settings/CurveMnemonicSetSettings'
 import { CurveMnemonicSetsRootSettings } from './settings/CurveMnemonicSetsRootSettings'
 import { LithologyDictionarySettings } from './settings/LithologyDictionarySettings'
+import { LithologyPatternPaletteSettings } from './settings/LithologyPatternPaletteSettings'
+import { LithologyPatternPalettesRootSettings } from './settings/LithologyPatternPalettesRootSettings'
 import { LithologySetSettings } from './settings/LithologySetSettings'
 import { LithologySetsRootSettings } from './settings/LithologySetsRootSettings'
 import { MeasurementUnitsRootSettings } from './settings/MeasurementUnitsRootSettings'
@@ -70,7 +73,9 @@ interface SettingsInspectorProps {
   unitDimensions: UnitDimensionSummary[]
   selectedUnitDimension: UnitDimensionSummary | null
   lithologySets: LithologySetSummary[]
+  lithologyPatternPalettes: LithologyPatternPaletteSummary[]
   selectedLithologySet: LithologySetSummary | null
+  selectedLithologyPatternPalette: LithologyPatternPaletteSummary | null
   selectedLithologyDictionaryEntry: LithologyDictionaryEntry | null
   curveCount: number
   visibleCurveCount: number
@@ -104,7 +109,9 @@ export function SettingsInspector({
   unitDimensions,
   selectedUnitDimension,
   lithologySets,
+  lithologyPatternPalettes,
   selectedLithologySet,
+  selectedLithologyPatternPalette,
   selectedLithologyDictionaryEntry,
   curveCount,
   visibleCurveCount,
@@ -231,6 +238,17 @@ export function SettingsInspector({
 
   if (selectedObject.type === 'lithologies-root') {
     return <LithologySetsRootSettings sets={lithologySets} />
+  }
+
+  if (selectedObject.type === 'pattern-palettes-root') {
+    return <LithologyPatternPalettesRootSettings palettes={lithologyPatternPalettes} />
+  }
+
+  if (selectedObject.type === 'lithology-pattern-palette') {
+    if (!selectedLithologyPatternPalette || selectedLithologyPatternPalette.id !== selectedObject.paletteId) {
+      return <EmptyInspector message="Selected pattern palette is not loaded yet." />
+    }
+    return <LithologyPatternPaletteSettings palette={selectedLithologyPatternPalette} />
   }
 
   if (selectedObject.type === 'lithology-set') {

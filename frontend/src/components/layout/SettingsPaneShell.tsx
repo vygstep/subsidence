@@ -6,6 +6,7 @@ import type {
   CurveMnemonicSetSummary,
   FormationTop,
   LithologyDictionaryEntry,
+  LithologyPatternPaletteSummary,
   LithologySetSummary,
   StratChartInfo,
   TrackConfig,
@@ -58,7 +59,9 @@ interface SettingsPaneShellProps {
   unitDimensions: UnitDimensionSummary[]
   selectedUnitDimension: UnitDimensionSummary | null
   lithologySets: LithologySetSummary[]
+  lithologyPatternPalettes: LithologyPatternPaletteSummary[]
   selectedLithologySet: LithologySetSummary | null
+  selectedLithologyPatternPalette: LithologyPatternPaletteSummary | null
   selectedLithologyDictionaryEntry: LithologyDictionaryEntry | null
   curveCount: number
   visibleCurveCount: number

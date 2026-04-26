@@ -775,6 +775,29 @@
 
 /* ─── template track card ────────────────────────────────────────────────── */
 
+.lithology-pattern-preview {
+  display: inline-block;
+  width: 24px;
+  height: 18px;
+  border: 1px solid var(--dm-border);
+  border-radius: 3px;
+  background-color: var(--dm-bg-panel);
+  background-repeat: repeat;
+  background-size: 18px 18px;
+  vertical-align: middle;
+}
+
+.lithology-pattern-preview--solid {
+  background-image: linear-gradient(135deg, transparent 0 46%, rgba(96, 112, 128, 0.35) 46% 54%, transparent 54%);
+}
+
+.lithology-pattern-cell {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+}
+
 .template-track-card {
   border: 1px solid var(--dm-border);
   border-radius: var(--dm-radius-lg);

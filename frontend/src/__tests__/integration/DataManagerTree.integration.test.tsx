@@ -7,6 +7,7 @@ import { WellDataPanel } from '@/components/layout/WellDataPanel'
 import type {
   CompactionPresetSummary,
   CurveMnemonicSetSummary,
+  LithologyPatternPaletteSummary,
   LithologySetSummary,
   UnitDimensionSummary,
   WellInventory,
@@ -98,6 +99,15 @@ const mnemonicSet: CurveMnemonicSetSummary = {
 const lithologySet: LithologySetSummary = {
   id: 1, name: 'Default', is_builtin: true, entry_count: 5,
 }
+const patternPalette: LithologyPatternPaletteSummary = {
+  id: 1,
+  name: 'Equinor Lithology Patterns',
+  origin: 'equinor',
+  is_builtin: true,
+  source_url: 'https://github.com/equinor/lithology-patterns',
+  license_name: 'MIT',
+  entry_count: 10,
+}
 const unitDimension: UnitDimensionSummary = {
   id: 1,
   code: 'density',
@@ -116,14 +126,17 @@ function renderTemplatesTab(overrides: Partial<React.ComponentProps<typeof Templ
     mnemonicSets: [mnemonicSet],
     unitDimensions: [unitDimension],
     lithologySets: [lithologySet],
+    lithologyPatternPalettes: [patternPalette],
     isCompactionPresetsRootSelected: false,
     isCurveMnemonicsRootSelected: false,
     isMeasurementUnitsRootSelected: false,
     isLithologiesRootSelected: false,
+    isPatternPalettesRootSelected: false,
     selectedCompactionPresetId: null,
     selectedMnemonicSetId: null,
     selectedUnitDimensionCode: null,
     selectedLithologySetId: null,
+    selectedLithologyPatternPaletteId: null,
     onCreateCompactionPresetDraft: vi.fn(),
     onCreateMnemonicSet: vi.fn(),
     onSelectCompactionPresetsRoot: vi.fn(),
@@ -134,6 +147,8 @@ function renderTemplatesTab(overrides: Partial<React.ComponentProps<typeof Templ
     onSelectUnitDimension: vi.fn(),
     onSelectLithologiesRoot: vi.fn(),
     onSelectLithologySet: vi.fn(),
+    onSelectPatternPalettesRoot: vi.fn(),
+    onSelectLithologyPatternPalette: vi.fn(),
     ...overrides,
   }
   return {
@@ -154,6 +169,7 @@ describe('Data Manager templates tree', () => {
     expect(screen.queryByText('Default Mnemonics')).toBeNull()
     expect(screen.queryByText('Density')).toBeNull()
     expect(screen.queryByText('Default')).toBeNull()
+    expect(screen.queryByText('Equinor Lithology Patterns')).toBeNull()
   })
 
   it('expands compaction presets and fires selection callback', () => {
@@ -173,11 +189,22 @@ describe('Data Manager templates tree', () => {
     const { props } = renderTemplatesTab()
 
     const expandButtons = screen.getAllByLabelText('Expand')
-    fireEvent.click(expandButtons[3])
+    fireEvent.click(expandButtons[4])
 
     expect(screen.getByText('Default')).toBeTruthy()
     fireEvent.click(screen.getByText('Default'))
     expect(props.onSelectLithologySet).toHaveBeenCalledWith(1)
+  })
+
+  it('expands pattern palettes and fires selection callback', () => {
+    const { props } = renderTemplatesTab()
+
+    const expandButtons = screen.getAllByLabelText('Expand')
+    fireEvent.click(expandButtons[3])
+
+    expect(screen.getByText('Equinor Lithology Patterns')).toBeTruthy()
+    fireEvent.click(screen.getByText('Equinor Lithology Patterns'))
+    expect(props.onSelectLithologyPatternPalette).toHaveBeenCalledWith(1)
   })
 
   it('expands measurement units and fires dimension selection callback', () => {
@@ -240,14 +267,17 @@ describe('Data Manager templates tree', () => {
           mnemonicSets={[mnemonicSet]}
           unitDimensions={[unitDimension]}
           lithologySets={[lithologySet]}
+          lithologyPatternPalettes={[patternPalette]}
           isCompactionPresetsRootSelected={false}
           isCurveMnemonicsRootSelected={false}
           isMeasurementUnitsRootSelected={false}
           isLithologiesRootSelected={false}
+          isPatternPalettesRootSelected={false}
           selectedCompactionPresetId={2}
           selectedMnemonicSetId={null}
           selectedUnitDimensionCode={null}
           selectedLithologySetId={null}
+          selectedLithologyPatternPaletteId={null}
           onCreateCompactionPresetDraft={vi.fn()}
           onCreateMnemonicSet={vi.fn()}
           onSelectCompactionPresetsRoot={vi.fn()}
@@ -258,6 +288,8 @@ describe('Data Manager templates tree', () => {
           onSelectUnitDimension={vi.fn()}
           onSelectLithologiesRoot={vi.fn()}
           onSelectLithologySet={vi.fn()}
+          onSelectPatternPalettesRoot={vi.fn()}
+          onSelectLithologyPatternPalette={vi.fn()}
         />
       </DataManagerProvider>,
     )

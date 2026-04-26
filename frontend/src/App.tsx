@@ -23,6 +23,7 @@ function App() {
   const loadUnitDimensions = useWellDataStore((state) => state.loadUnitDimensions)
   const loadLithologyDictionary = useWellDataStore((state) => state.loadLithologyDictionary)
   const loadLithologySets = useWellDataStore((state) => state.loadLithologySets)
+  const loadLithologyPatternPalettes = useWellDataStore((state) => state.loadLithologyPatternPalettes)
   const colorOverrides = useWellDataStore((state) => state.colorOverrides)
   const well = useWellDataStore((state) => state.well)
 
@@ -134,7 +135,8 @@ function App() {
     void loadUnitDimensions()
     void loadLithologyDictionary()
     void loadLithologySets()
-  }, [isProjectOpen, loadMnemonicSets, loadUnitDimensions, loadLithologyDictionary, loadLithologySets])
+    void loadLithologyPatternPalettes()
+  }, [isProjectOpen, loadMnemonicSets, loadUnitDimensions, loadLithologyDictionary, loadLithologySets, loadLithologyPatternPalettes])
 
   useEffect(() => {
     if (!isProjectOpen) {

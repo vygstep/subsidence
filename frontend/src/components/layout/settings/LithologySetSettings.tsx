@@ -1,7 +1,8 @@
 import { useEffect, useState } from 'react'
 
 import { useWellDataStore, useWorkspaceStore } from '@/stores'
-import type { LithologySetDetail, LithologySetSummary } from '@/types'
+import type { LithologyPatternEntry, LithologySetDetail, LithologySetSummary } from '@/types'
+import { LithologyPatternPreview } from './LithologyPatternPreview'
 
 function formatOrDash(value: number | null, digits: number): string {
   return value === null ? '-' : value.toFixed(digits)
@@ -9,6 +10,8 @@ function formatOrDash(value: number | null, digits: number): string {
 
 export function LithologySetSettings({ lithologySet }: { lithologySet: LithologySetSummary }) {
   const compactionPresets = useWellDataStore((state) => state.compactionPresets)
+  const patternPalettes = useWellDataStore((state) => state.lithologyPatternPalettes)
+  const fetchPatternPalette = useWellDataStore((state) => state.fetchLithologyPatternPalette)
   const fetchLithologySet = useWellDataStore((state) => state.fetchLithologySet)
   const copyLithologySet = useWellDataStore((state) => state.copyLithologySet)
   const loadLithologySets = useWellDataStore((state) => state.loadLithologySets)
@@ -20,6 +23,7 @@ export function LithologySetSettings({ lithologySet }: { lithologySet: Lithology
   const setSelectedObject = useWorkspaceStore((state) => state.setSelectedObject)
 
   const [detail, setDetail] = useState<LithologySetDetail | null>(null)
+  const [patterns, setPatterns] = useState<LithologyPatternEntry[]>([])
 
   async function reloadSet() {
     const next = await fetchLithologySet(lithologySet.id)
@@ -38,6 +42,17 @@ export function LithologySetSettings({ lithologySet }: { lithologySet: Lithology
       cancelled = true
     }
   }, [fetchLithologySet, lithologySet.id])
+
+  useEffect(() => {
+    let cancelled = false
+    void Promise.all(patternPalettes.map((palette) => fetchPatternPalette(palette.id))).then((details) => {
+      if (cancelled) return
+      setPatterns(details.flatMap((palette) => palette?.patterns ?? []))
+    })
+    return () => {
+      cancelled = true
+    }
+  }, [fetchPatternPalette, patternPalettes])
 
   async function handleCopy() {
     try {
@@ -121,6 +136,25 @@ export function LithologySetSettings({ lithologySet }: { lithologySet: Lithology
     }
   }
 
+  async function handlePatternChange(entryId: number, value: string) {
+    try {
+      const updated = await updateLithologySetEntry(lithologySet.id, entryId, {
+        pattern_id: value || null,
+      })
+      setDetail((current) => (
+        current
+          ? {
+            ...current,
+            entries: current.entries.map((entry) => (entry.id === updated.id ? updated : entry)),
+          }
+          : current
+      ))
+    } catch (error) {
+      window.alert(String(error))
+      await reloadSet()
+    }
+  }
+
   async function handleDeleteRow(entryId: number, lithologyName: string) {
     if (!window.confirm(`Delete lithology row "${lithologyName}"?`)) return
     try {
@@ -141,6 +175,7 @@ export function LithologySetSettings({ lithologySet }: { lithologySet: Lithology
   }
 
   const resolved = detail ?? { ...lithologySet, entries: [] }
+  const patternByCode = new Map(patterns.map((pattern) => [pattern.code, pattern]))
 
   return (
     <div className={`template-panel ${resolved.is_builtin ? 'template-panel--muted' : ''}`}>
@@ -207,14 +242,26 @@ export function LithologySetSettings({ lithologySet }: { lithologySet: Lithology
                 </td>
                 <td>
                   {resolved.is_builtin ? (
-                    entry.pattern_id ?? 'Solid fill'
+                    <span className="lithology-pattern-cell">
+                      <LithologyPatternPreview pattern={entry.pattern_id ? patternByCode.get(entry.pattern_id) : null} />
+                      {entry.pattern_id ?? 'Solid fill'}
+                    </span>
                   ) : (
-                    <input
-                      className="dm-table__input"
-                      defaultValue={entry.pattern_id ?? ''}
-                      key={`${entry.id}-pattern-${entry.pattern_id ?? ''}`}
-                      onBlur={(event) => void handleEntryBlur(entry.id, 'pattern_id', event.target.value)}
-                    />
+                    <span className="lithology-pattern-cell">
+                      <LithologyPatternPreview pattern={entry.pattern_id ? patternByCode.get(entry.pattern_id) : null} />
+                      <select
+                        className="dm-table__select"
+                        value={entry.pattern_id ?? ''}
+                        onChange={(event) => void handlePatternChange(entry.id, event.target.value)}
+                      >
+                        <option value="">Solid fill</option>
+                        {patterns.map((pattern) => (
+                          <option key={pattern.id} value={pattern.code}>
+                            {pattern.display_name}
+                          </option>
+                        ))}
+                      </select>
+                    </span>
                   )}
                 </td>
                 <td>

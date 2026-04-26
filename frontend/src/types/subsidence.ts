@@ -142,3 +142,33 @@ export interface LithologySetEntry {
 export interface LithologySetDetail extends LithologySetSummary {
   entries: LithologySetEntry[]
 }
+
+export interface LithologyPatternPaletteSummary {
+  id: number
+  name: string
+  origin: string
+  is_builtin: boolean
+  source_url: string | null
+  license_name: string | null
+  entry_count: number
+}
+
+export interface LithologyPatternEntry {
+  id: number
+  palette_id: number
+  code: string
+  display_name: string
+  svg_content: string
+  source_code: string | null
+  source_name: string | null
+  source_path: string | null
+  tile_width: number
+  tile_height: number
+  description: string | null
+  sort_order: number
+}
+
+export interface LithologyPatternPaletteDetail extends LithologyPatternPaletteSummary {
+  description: string | null
+  patterns: LithologyPatternEntry[]
+}

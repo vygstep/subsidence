@@ -10,6 +10,9 @@ import type {
   CurveMnemonicSetSummary,
   FormationTop,
   LithologyDictionaryEntry,
+  LithologyPatternEntry,
+  LithologyPatternPaletteDetail,
+  LithologyPatternPaletteSummary,
   LithologySetDetail,
   LithologySetSummary,
   LithologyParam,
@@ -86,6 +89,7 @@ export interface WellDataStore {
   unitDimensions: UnitDimensionSummary[]
   lithologyDictionaryEntries: LithologyDictionaryEntry[]
   lithologySets: LithologySetSummary[]
+  lithologyPatternPalettes: LithologyPatternPaletteSummary[]
   tvdTable: TVDTable | null
   isLoading: boolean
   error: string | null
@@ -150,6 +154,16 @@ export interface WellDataStore {
   fetchUnitDimension: (dimensionCode: string) => Promise<UnitDimensionDetail | null>
   loadLithologyDictionary: () => Promise<void>
   loadLithologySets: () => Promise<void>
+  loadLithologyPatternPalettes: () => Promise<void>
+  fetchLithologyPatternPalette: (paletteId: number) => Promise<LithologyPatternPaletteDetail | null>
+  createLithologyPatternPalette: (name: string, cloneFromId?: number) => Promise<LithologyPatternPaletteSummary>
+  updateLithologyPatternPalette: (paletteId: number, patch: { name?: string; description?: string | null }) => Promise<LithologyPatternPaletteSummary>
+  deleteLithologyPatternPalette: (paletteId: number) => Promise<void>
+  importLithologyPattern: (
+    paletteId: number,
+    payload: { path: string; code?: string | null; display_name?: string | null; description?: string | null },
+  ) => Promise<LithologyPatternEntry>
+  deleteLithologyPattern: (paletteId: number, patternId: number) => Promise<void>
   fetchLithologySet: (setId: number) => Promise<LithologySetDetail | null>
   createLithologySet: (name: string) => Promise<LithologySetSummary>
   copyLithologySet: (setId: number) => Promise<LithologySetSummary>
@@ -241,6 +255,7 @@ const emptyState = {
   unitDimensions: [],
   lithologyDictionaryEntries: [],
   lithologySets: [],
+  lithologyPatternPalettes: [],
   tvdTable: null,
   isLoading: false,
   error: null,
@@ -650,6 +665,81 @@ export const useWellDataStore = create<WellDataStore>((set, get) => ({
     const response = await fetch('/api/lithology-sets')
     if (!response.ok) return
     set({ lithologySets: (await response.json()) as LithologySetSummary[] })
+  },
+  async loadLithologyPatternPalettes() {
+    const response = await fetch('/api/lithology-pattern-palettes')
+    if (!response.ok) return
+    set({ lithologyPatternPalettes: (await response.json()) as LithologyPatternPaletteSummary[] })
+  },
+  async fetchLithologyPatternPalette(paletteId) {
+    const response = await fetch(`/api/lithology-pattern-palettes/${paletteId}`)
+    if (!response.ok) return null
+    return (await response.json()) as LithologyPatternPaletteDetail
+  },
+  async createLithologyPatternPalette(name, cloneFromId) {
+    const response = await fetch('/api/lithology-pattern-palettes', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ name, clone_from_id: cloneFromId ?? null }),
+    })
+    if (!response.ok) {
+      throw new Error(await readError(response, `Failed to create pattern palette (${response.status})`))
+    }
+    const created = (await response.json()) as LithologyPatternPaletteSummary
+    set((state) => ({ lithologyPatternPalettes: [...state.lithologyPatternPalettes, created] }))
+    return created
+  },
+  async updateLithologyPatternPalette(paletteId, patch) {
+    const response = await fetch(`/api/lithology-pattern-palettes/${paletteId}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(patch),
+    })
+    if (!response.ok) {
+      throw new Error(await readError(response, `Failed to update pattern palette (${response.status})`))
+    }
+    const updated = (await response.json()) as LithologyPatternPaletteSummary
+    set((state) => ({
+      lithologyPatternPalettes: state.lithologyPatternPalettes.map((row) => (row.id === updated.id ? updated : row)),
+    }))
+    return updated
+  },
+  async deleteLithologyPatternPalette(paletteId) {
+    const response = await fetch(`/api/lithology-pattern-palettes/${paletteId}`, { method: 'DELETE' })
+    if (!response.ok) {
+      throw new Error(await readError(response, `Failed to delete pattern palette (${response.status})`))
+    }
+    set((state) => ({
+      lithologyPatternPalettes: state.lithologyPatternPalettes.filter((row) => row.id !== paletteId),
+    }))
+  },
+  async importLithologyPattern(paletteId, payload) {
+    const response = await fetch(`/api/lithology-pattern-palettes/${paletteId}/patterns/import`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload),
+    })
+    if (!response.ok) {
+      throw new Error(await readError(response, `Failed to import lithology pattern (${response.status})`))
+    }
+    const created = (await response.json()) as LithologyPatternEntry
+    set((state) => ({
+      lithologyPatternPalettes: state.lithologyPatternPalettes.map((row) => (
+        row.id === paletteId ? { ...row, entry_count: row.entry_count + 1 } : row
+      )),
+    }))
+    return created
+  },
+  async deleteLithologyPattern(paletteId, patternId) {
+    const response = await fetch(`/api/lithology-pattern-palettes/${paletteId}/patterns/${patternId}`, { method: 'DELETE' })
+    if (!response.ok) {
+      throw new Error(await readError(response, `Failed to delete lithology pattern (${response.status})`))
+    }
+    set((state) => ({
+      lithologyPatternPalettes: state.lithologyPatternPalettes.map((row) => (
+        row.id === paletteId ? { ...row, entry_count: Math.max(0, row.entry_count - 1) } : row
+      )),
+    }))
   },
   async createLithologySet(name) {
     const response = await fetch('/api/lithology-sets', {

@@ -2,6 +2,7 @@ import { useDataManager } from './dataManager/DataManagerContext'
 import type {
   CompactionPresetSummary,
   CurveMnemonicSetSummary,
+  LithologyPatternPaletteSummary,
   LithologySetSummary,
   UnitDimensionSummary,
 } from '@/types'
@@ -10,15 +11,18 @@ interface TemplatesTabProps {
   mnemonicSets: CurveMnemonicSetSummary[]
   unitDimensions: UnitDimensionSummary[]
   lithologySets: LithologySetSummary[]
+  lithologyPatternPalettes: LithologyPatternPaletteSummary[]
   compactionPresets: CompactionPresetSummary[]
   isCompactionPresetsRootSelected: boolean
   isCurveMnemonicsRootSelected: boolean
   isLithologiesRootSelected: boolean
+  isPatternPalettesRootSelected: boolean
   isMeasurementUnitsRootSelected: boolean
   selectedCompactionPresetId: number | null
   selectedMnemonicSetId: number | null
   selectedUnitDimensionCode: string | null
   selectedLithologySetId: number | null
+  selectedLithologyPatternPaletteId: number | null
   onCreateCompactionPresetDraft: () => void
   onCreateMnemonicSet: () => void
   onSelectCompactionPresetsRoot: () => void
@@ -29,6 +33,8 @@ interface TemplatesTabProps {
   onSelectUnitDimension: (dimensionCode: string) => void
   onSelectLithologiesRoot: () => void
   onSelectLithologySet: (setId: number) => void
+  onSelectPatternPalettesRoot: () => void
+  onSelectLithologyPatternPalette: (paletteId: number) => void
 }
 
 function CountBadge({ count }: { count: number }) {
@@ -39,15 +45,18 @@ export function TemplatesTab({
   mnemonicSets,
   unitDimensions,
   lithologySets,
+  lithologyPatternPalettes,
   compactionPresets,
   isCompactionPresetsRootSelected,
   isCurveMnemonicsRootSelected,
   isLithologiesRootSelected,
+  isPatternPalettesRootSelected,
   isMeasurementUnitsRootSelected,
   selectedCompactionPresetId,
   selectedMnemonicSetId,
   selectedUnitDimensionCode,
   selectedLithologySetId,
+  selectedLithologyPatternPaletteId,
   onCreateCompactionPresetDraft,
   onCreateMnemonicSet,
   onSelectCompactionPresetsRoot,
@@ -58,6 +67,8 @@ export function TemplatesTab({
   onSelectUnitDimension,
   onSelectLithologiesRoot,
   onSelectLithologySet,
+  onSelectPatternPalettesRoot,
+  onSelectLithologyPatternPalette,
 }: TemplatesTabProps) {
   const { isExpanded, toggleExpanded } = useDataManager()
 
@@ -192,6 +203,44 @@ export function TemplatesTab({
                   <div className="tree-checkbox-leaf">
                     <span className="tree-checkbox-leaf__label">{dimension.display_name}</span>
                     <span className="tree-checkbox-leaf__meta">{dimension.unit_count}</span>
+                  </div>
+                </div>
+              ))}
+            </div>
+          ) : null}
+        </div>
+
+        {/* Pattern Palettes */}
+        <div className="tree-node">
+          <div className={`tree-node__row ${isPatternPalettesRootSelected ? 'tree-node__row--selected' : ''}`}>
+            <button
+              type="button"
+              className={`tree-toggle ${isExpanded('template:pattern-palettes') ? 'tree-toggle--open' : ''}`}
+              onClick={() => toggleExpanded('template:pattern-palettes')}
+              aria-label={isExpanded('template:pattern-palettes') ? 'Collapse' : 'Expand'}
+            >
+              &gt;
+            </button>
+            <button
+              type="button"
+              className="tree-node__section-label"
+              onClick={onSelectPatternPalettesRoot}
+            >
+              Pattern Palettes
+            </button>
+            <CountBadge count={lithologyPatternPalettes.length} />
+          </div>
+          {isExpanded('template:pattern-palettes') ? (
+            <div className="tree-node__children">
+              {lithologyPatternPalettes.map((palette) => (
+                <div
+                  key={palette.id}
+                  className={selectedLithologyPatternPaletteId === palette.id ? 'tree-node__item-selected' : ''}
+                  onClick={() => onSelectLithologyPatternPalette(palette.id)}
+                >
+                  <div className="tree-checkbox-leaf">
+                    <span className="tree-checkbox-leaf__label">{palette.name}</span>
+                    <span className="tree-checkbox-leaf__meta">{palette.is_builtin ? 'built-in' : palette.entry_count}</span>
                   </div>
                 </div>
               ))}

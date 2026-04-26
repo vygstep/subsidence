@@ -6,6 +6,7 @@ import type {
   CompactionPresetSummary,
   CurveMnemonicSetSummary,
   FormationInventoryItem,
+  LithologyPatternPaletteSummary,
   LithologySetSummary,
   StratChartInfo,
   UnitDimensionSummary,
@@ -20,6 +21,7 @@ interface DataManagerTopPaneProps {
   unitDimensions: UnitDimensionSummary[]
   deviationVisibilityByWellId: Record<string, boolean>
   lithologySets: LithologySetSummary[]
+  lithologyPatternPalettes: LithologyPatternPaletteSummary[]
   onActivateChart: (chartId: number) => void
   onContextMenuCurve: (event: React.MouseEvent, wellId: string, curve: { mnemonic: string; unit: string }) => void
   onContextMenuDeviation: (event: React.MouseEvent, wellId: string) => void
@@ -45,6 +47,8 @@ interface DataManagerTopPaneProps {
   onSelectUnitDimension: (dimensionCode: string) => void
   onSelectLithologiesRoot: () => void
   onSelectLithologySet: (setId: number) => void
+  onSelectPatternPalettesRoot: () => void
+  onSelectLithologyPatternPalette: (paletteId: number) => void
   onSelectCurve: (wellId: string, mnemonic: string) => void | Promise<void>
   onSelectFormation: (wellId: string, formationId: string) => void | Promise<void>
   onSelectLasGroup: (wellId: string) => void | Promise<void>
@@ -63,11 +67,13 @@ interface DataManagerTopPaneProps {
   isCompactionPresetsRootSelected: boolean
   isCurveMnemonicsRootSelected: boolean
   isLithologiesRootSelected: boolean
+  isPatternPalettesRootSelected: boolean
   isMeasurementUnitsRootSelected: boolean
   selectedMnemonicSetId: number | null
   selectedUnitDimensionCode: string | null
   selectedFormationId: string | null
   selectedLithologySetId: number | null
+  selectedLithologyPatternPaletteId: number | null
   selectedObject: SelectedObject | null
   stratCharts: StratChartInfo[]
   visibleCurveMnemonicsByWellId: Record<string, string[]>
@@ -83,6 +89,7 @@ export function DataManagerTopPane({
   unitDimensions,
   deviationVisibilityByWellId,
   lithologySets,
+  lithologyPatternPalettes,
   onActivateChart,
   onContextMenuCurve,
   onContextMenuDeviation,
@@ -108,6 +115,8 @@ export function DataManagerTopPane({
   onSelectUnitDimension,
   onSelectLithologiesRoot,
   onSelectLithologySet,
+  onSelectPatternPalettesRoot,
+  onSelectLithologyPatternPalette,
   onSelectCurve,
   onSelectFormation,
   onSelectLasGroup,
@@ -126,11 +135,13 @@ export function DataManagerTopPane({
   isCompactionPresetsRootSelected,
   isCurveMnemonicsRootSelected,
   isLithologiesRootSelected,
+  isPatternPalettesRootSelected,
   isMeasurementUnitsRootSelected,
   selectedMnemonicSetId,
   selectedUnitDimensionCode,
   selectedFormationId,
   selectedLithologySetId,
+  selectedLithologyPatternPaletteId,
   selectedObject,
   stratCharts,
   visibleCurveMnemonicsByWellId,
@@ -208,15 +219,18 @@ export function DataManagerTopPane({
           mnemonicSets={mnemonicSets}
           unitDimensions={unitDimensions}
           lithologySets={lithologySets}
+          lithologyPatternPalettes={lithologyPatternPalettes}
           compactionPresets={compactionPresets}
           isCompactionPresetsRootSelected={isCompactionPresetsRootSelected}
           isCurveMnemonicsRootSelected={isCurveMnemonicsRootSelected}
           isMeasurementUnitsRootSelected={isMeasurementUnitsRootSelected}
           isLithologiesRootSelected={isLithologiesRootSelected}
+          isPatternPalettesRootSelected={isPatternPalettesRootSelected}
           selectedCompactionPresetId={selectedCompactionPresetId}
           selectedMnemonicSetId={selectedMnemonicSetId}
           selectedUnitDimensionCode={selectedUnitDimensionCode}
           selectedLithologySetId={selectedLithologySetId}
+          selectedLithologyPatternPaletteId={selectedLithologyPatternPaletteId}
           onCreateCompactionPresetDraft={onCreateCompactionPresetDraft}
           onCreateMnemonicSet={onCreateMnemonicSet}
           onSelectCompactionPresetsRoot={onSelectCompactionPresetsRoot}
@@ -227,6 +241,8 @@ export function DataManagerTopPane({
           onSelectUnitDimension={onSelectUnitDimension}
           onSelectLithologiesRoot={onSelectLithologiesRoot}
           onSelectLithologySet={onSelectLithologySet}
+          onSelectPatternPalettesRoot={onSelectPatternPalettesRoot}
+          onSelectLithologyPatternPalette={onSelectLithologyPatternPalette}
         />
       )}
     </section>

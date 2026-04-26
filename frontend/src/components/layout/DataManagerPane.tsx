@@ -272,6 +272,8 @@ export function DataManagerPane({ sidebarRef, onInternalSplitterMouseDown }: Dat
           onSelectUnitDimension={controller.onSelectUnitDimension}
           onSelectLithologiesRoot={controller.onSelectLithologiesRoot}
           onSelectLithologySet={controller.onSelectLithologySet}
+          onSelectPatternPalettesRoot={controller.onSelectPatternPalettesRoot}
+          onSelectLithologyPatternPalette={controller.onSelectLithologyPatternPalette}
           onSelectCurve={controller.handleSelectCurve}
           onSelectFormation={controller.handleSelectFormation}
           onFocusFormationObject={controller.handleFocusFormationObject}
@@ -295,10 +297,13 @@ export function DataManagerPane({ sidebarRef, onInternalSplitterMouseDown }: Dat
           isCurveMnemonicsRootSelected={controller.isCurveMnemonicsRootSelected}
           isMeasurementUnitsRootSelected={controller.isMeasurementUnitsRootSelected}
           isLithologiesRootSelected={controller.isLithologiesRootSelected}
+          isPatternPalettesRootSelected={controller.isPatternPalettesRootSelected}
           selectedMnemonicSetId={controller.selectedMnemonicSetId}
           selectedUnitDimensionCode={controller.selectedUnitDimensionCode}
           selectedFormationId={controller.selectedFormationId}
           selectedLithologySetId={controller.selectedLithologySetId}
+          selectedLithologyPatternPaletteId={controller.selectedLithologyPatternPaletteId}
+          lithologyPatternPalettes={controller.lithologyPatternPalettes}
           selectedObject={controller.selectedObject}
           stratCharts={controller.stratCharts}
           visibleCurveMnemonicsByWellId={controller.visibleCurveMnemonicsByWellId}
@@ -338,7 +343,9 @@ export function DataManagerPane({ sidebarRef, onInternalSplitterMouseDown }: Dat
           unitDimensions={controller.unitDimensions}
           selectedUnitDimension={controller.selectedUnitDimension}
           lithologySets={controller.lithologySets}
+          lithologyPatternPalettes={controller.lithologyPatternPalettes}
           selectedLithologySet={controller.selectedLithologySet}
+          selectedLithologyPatternPalette={controller.selectedLithologyPatternPalette}
           selectedLithologyDictionaryEntry={controller.selectedLithologyDictionaryEntry}
           curveCount={controller.curveCount}
           visibleCurveCount={controller.visibleCurveCount}
