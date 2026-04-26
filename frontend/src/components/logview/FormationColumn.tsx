@@ -26,15 +26,17 @@ export function FormationColumn({ formations, height, maxDepth, width = 80, isSe
   const formationsTrackConfig = useViewStore((state) => state.formationsTrackConfig)
   const depthType = useViewStore((state) => state.depthType)
   const tvdTable = useWellDataStore((state) => state.tvdTable)
+  const kbElev = useWellDataStore((state) => state.well?.kb_elev ?? 0)
   const patternPalettes = useWellDataStore((state) => state.lithologyPatternPalettes)
   const fetchPatternPalette = useWellDataStore((state) => state.fetchLithologyPatternPalette)
   const [patterns, setPatterns] = useState<LithologyPatternEntry[]>([])
   const [patternRenderTick, setPatternRenderTick] = useState(0)
 
-  const toDisplayDepth = useMemo(
-    () => (depthType === 'TVD' && tvdTable ? (md: number) => mdToTvd(md, tvdTable) : (md: number) => md),
-    [depthType, tvdTable],
-  )
+  const toDisplayDepth = useMemo(() => {
+    if (depthType === 'TVD' && tvdTable) return (md: number) => mdToTvd(md, tvdTable)
+    if (depthType === 'TVDSS' && tvdTable) return (md: number) => mdToTvd(md, tvdTable) - kbElev
+    return (md: number) => md
+  }, [depthType, tvdTable, kbElev])
 
   const orderedFormations = useMemo(
     () => [...formations].sort((left, right) => (left.depth_md ?? Infinity) - (right.depth_md ?? Infinity)),
@@ -65,6 +67,27 @@ export function FormationColumn({ formations, height, maxDepth, width = 80, isSe
       if (orderedFormations.length === 0) {
         return
       }
+
+      // Render "not picked" badges at top for unpicked formations
+      let notPickedOffset = 2
+      orderedFormations.forEach((formation) => {
+        if (formation.depth_md !== null) return
+        const color = formation.active_strat_color ?? formation.color
+        const badgeH = 16
+        ctx.save()
+        ctx.fillStyle = color
+        ctx.globalAlpha = 0.7
+        ctx.fillRect(2, notPickedOffset, canvasWidth - 4, badgeH)
+        ctx.globalAlpha = 1
+        ctx.fillStyle = '#ffffff'
+        ctx.font = '500 10px Segoe UI'
+        ctx.textAlign = 'left'
+        ctx.textBaseline = 'middle'
+        const label = formation.name
+        ctx.fillText(label, 5, notPickedOffset + badgeH / 2, canvasWidth - 12)
+        ctx.restore()
+        notPickedOffset += badgeH + 1
+      })
 
       orderedFormations.forEach((formation, index) => {
         if (formation.depth_md === null) return

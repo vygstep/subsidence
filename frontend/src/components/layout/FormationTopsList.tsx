@@ -12,6 +12,7 @@ export function FormationTopsList() {
 
   const cursorDepth = useViewStore((s) => s.cursorDepth)
   const visibleDepthRange = useViewStore((s) => s.visibleDepthRange)
+  const depthType = useViewStore((s) => s.depthType)
   const setScroll = useViewStore((s) => s.setScroll)
   const selectElement = useViewStore((s) => s.selectElement)
 
@@ -19,6 +20,8 @@ export function FormationTopsList() {
 
   const [editingAgeId, setEditingAgeId] = useState<string | null>(null)
   const [draftAge, setDraftAge] = useState('')
+  const [editingDepthId, setEditingDepthId] = useState<string | null>(null)
+  const [draftDepth, setDraftDepth] = useState('')
 
   const midDepth = (visibleDepthRange.min + visibleDepthRange.max) / 2
   const halfViewport = (visibleDepthRange.max - visibleDepthRange.min) / 2
@@ -52,6 +55,34 @@ export function FormationTopsList() {
     if (e.key === 'Escape') setEditingAgeId(null)
   }
 
+  function getDisplayDepth(f: FormationTop): number | null {
+    if (depthType === 'TVD') return f.depth_tvd
+    if (depthType === 'TVDSS') return f.depth_tvdss
+    return f.depth_md
+  }
+
+  function startDepthEdit(e: React.MouseEvent, f: FormationTop) {
+    e.stopPropagation()
+    setEditingDepthId(f.id)
+    const d = getDisplayDepth(f)
+    setDraftDepth(d != null ? String(d.toFixed(2)) : '')
+  }
+
+  function commitDepth(f: FormationTop) {
+    const val = parseFloat(draftDepth)
+    if (!isNaN(val)) {
+      const field =
+        depthType === 'TVD' ? 'depth_tvd' : depthType === 'TVDSS' ? 'depth_tvdss' : 'depth_md'
+      void updateFormation(f.id, { [field]: val })
+    }
+    setEditingDepthId(null)
+  }
+
+  function handleDepthKeyDown(e: React.KeyboardEvent, f: FormationTop) {
+    if (e.key === 'Enter') commitDepth(f)
+    if (e.key === 'Escape') setEditingDepthId(null)
+  }
+
   return (
     <div className="formations-list">
       <div className="formations-list__toolbar">
@@ -69,7 +100,27 @@ export function FormationTopsList() {
                 className="formations-list__swatch"
                 style={{ background: f.active_strat_color ?? f.color }}
               />
-              <span className="formations-list__depth">{f.depth_md?.toFixed(1) ?? '—'}</span>
+              {editingDepthId === f.id ? (
+                <input
+                  className="formations-list__depth-input"
+                  type="number"
+                  step="0.1"
+                  autoFocus
+                  value={draftDepth}
+                  onChange={(e) => setDraftDepth(e.target.value)}
+                  onBlur={() => commitDepth(f)}
+                  onKeyDown={(e) => handleDepthKeyDown(e, f)}
+                  onClick={(e) => e.stopPropagation()}
+                />
+              ) : (
+                <span
+                  className="formations-list__depth"
+                  title={`${depthType} — double-click to edit`}
+                  onDoubleClick={(e) => startDepthEdit(e, f)}
+                >
+                  {getDisplayDepth(f)?.toFixed(1) ?? '—'}
+                </span>
+              )}
               <span className="formations-list__name">{f.name}</span>
               {editingAgeId === f.id ? (
                 <input

@@ -106,7 +106,7 @@ Goal:
 Items:
 
 - `TOPS-001`: TopSet / Horizon / Pick data model. (done)
-- `TOPS-002`: TVD/TVDSS as stored calculated fields; interactive depth picking.
+- `TOPS-002`: TVD/TVDSS as stored calculated fields; interactive depth picking. (done)
 - `DEPTH-001`: Trusted depth reference on import, QC flags, TVD curve display.
 - `ZONE-001`: Zone entity and lifecycle.
 - `ZONE-002`: Zone settings UI and manual lithology input.
@@ -1147,6 +1147,31 @@ Acceptance:
 - Dragging a pick in TVD mode moves the line in TVD space; the stored MD is updated accordingly.
 - Formations with `depth_md = null` display as "not picked" and can be assigned a depth via click or the inline editor.
 - Existing drag tests still pass; new tests cover click-to-set and the TVD/TVDSS context menu.
+
+#### Implemented (TOPS-002)
+
+Commit `TBD` — all frontend and backend changes landed together.
+
+Backend:
+- `FormationTopPatch` now accepts `depth_tvd` and `depth_tvdss` as alternate depth inputs. When `depth_md` is not set, the backend back-calculates MD using `tvd_to_md()` (or adds `kb_elev` for TVDSS → TVD first). Returns 400 if no deviation survey is available.
+- Import in `formations.py`: added `tvd_to_md` from `deviation_transform`.
+
+Frontend:
+- `viewStore.depthType` extended to `'MD' | 'TVD' | 'TVDSS'`. `activePickId: string | null` and `setActivePickId` added. `setInteractionMode('view')` clears `activePickId`.
+- `depthTransform.ts`: added `tvdToMd(tvdValue, table)` (binary search on `tvd` array, mirrors `mdToTvd`).
+- `DepthTrack.tsx`: TVDSS label transform = `mdToTvd(md, table) − kbElev`.
+- `FormationColumn.tsx`: TVDSS display depth = `mdToTvd(md, table) − kbElev`. "Not picked" formations render as colored name badges at the top of the column canvas.
+- `WellViewerToolbar.tsx`: added MD / TVD / TVDSS toggle button group.
+- `StatusBar.tsx`: cursor depth displayed as TVD or TVDSS when applicable.
+- `InteractionOverlay.tsx`: not-picked formations rendered as clickable SVG strip; clicking sets `activePickId`. Ghost line at cursor when a pick is active. `FormationTopLine` receives `isActivePick` and `onSetActivePick` props.
+- `FormationTopLine.tsx`: active-pick highlight (filled circle handle, wider stroke, crosshair cursor). Single click toggles `activePickId`. Right-click opens "Set depth" popover with MD / TVD / TVDSS inputs (current depthType is focused/editable; others are read-only). Popover dismisses on Escape, Enter, or outside click.
+- `LogViewPanel.tsx`: `onClick` handler on tracks div — when `interactionMode = 'edit-tops'` and `activePickId` is set, click depth is sent to `updateFormationDepth(activePickId, depth)` and `activePickId` is cleared.
+- `FormationTopsList.tsx`: depth column shows value for current `depthType` (MD/TVD/TVDSS). Double-click activates an inline `<input>` pre-filled with the current-depthType value; saving sends the appropriate `depth_md`/`depth_tvd`/`depth_tvdss` PATCH field.
+- `wellDataStore.ts`: `FormationPatchPayload` now includes `depth_tvd?: number` and `depth_tvdss?: number`.
+
+Not yet implemented (deferred):
+- Drag in TVD/TVDSS mode still uses MD pixel delta (depth_md as start depth). TVD-aware drag with `tvdToMd` delta requires additional work in `useFormationDrag.ts`.
+- Integration tests for click-to-set and the Set Depth context menu.
 
 ---
 

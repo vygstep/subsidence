@@ -16,16 +16,18 @@ export function DepthTrack({ height, width = 60, isSelected = false }: DepthTrac
   const depthTrackConfig = useViewStore((state) => state.depthTrackConfig)
   const depthType = useViewStore((state) => state.depthType)
   const tvdTable = useWellDataStore((state) => state.tvdTable)
+  const kbElev = useWellDataStore((state) => state.well?.kb_elev ?? 0)
   const { scale: depthScale } = useDepthScale(visibleDepthRange, height)
 
   const unitFactor = depthTrackConfig.unit === 'km' ? 1000 : depthTrackConfig.unit === 'ft' ? 0.3048 : 1
   const majorInterval = Math.max(depthTrackConfig.majorInterval * unitFactor, unitFactor)
   const minorInterval = Math.max(depthTrackConfig.minorInterval * unitFactor, unitFactor / 10)
 
-  const labelTransform = useMemo(
-    () => (depthType === 'TVD' && tvdTable ? (md: number) => mdToTvd(md, tvdTable) : undefined),
-    [depthType, tvdTable],
-  )
+  const labelTransform = useMemo(() => {
+    if (depthType === 'TVD' && tvdTable) return (md: number) => mdToTvd(md, tvdTable)
+    if (depthType === 'TVDSS' && tvdTable) return (md: number) => mdToTvd(md, tvdTable) - kbElev
+    return undefined
+  }, [depthType, tvdTable, kbElev])
 
   const canvasRef = useCanvasRenderer(
     (ctx, canvasWidth, canvasHeight) => {

@@ -47,6 +47,24 @@ export function minCurvatureToTVD(survey: SurveyPoint[]): TVDTable {
   return { md, tvd }
 }
 
+export function tvdToMd(tvdValue: number, table: TVDTable): number {
+  const { md, tvd } = table
+  if (tvd.length === 0) return tvdValue
+  if (tvdValue <= tvd[0]) return md[0]
+  if (tvdValue >= tvd[tvd.length - 1]) return md[md.length - 1]
+
+  let lo = 0
+  let hi = tvd.length - 1
+  while (hi - lo > 1) {
+    const mid = (lo + hi) >>> 1
+    if (tvd[mid] <= tvdValue) lo = mid
+    else hi = mid
+  }
+
+  const t = (tvdValue - tvd[lo]) / (tvd[hi] - tvd[lo])
+  return md[lo] + t * (md[hi] - md[lo])
+}
+
 export function mdToTvd(mdValue: number, table: TVDTable): number {
   const { md, tvd } = table
   if (md.length === 0) return mdValue

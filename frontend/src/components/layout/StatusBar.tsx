@@ -8,10 +8,11 @@ export function StatusBar() {
   const projectName = useProjectStore((state) => state.projectName)
   const isComputing = useComputedStore((state) => state.isComputing)
   const tvdTable = useWellDataStore((state) => state.tvdTable)
+  const kbElev = useWellDataStore((state) => state.well?.kb_elev ?? 0)
 
-  const displayDepth = cursorDepth !== null
-    ? (depthType === 'TVD' && tvdTable ? mdToTvd(cursorDepth, tvdTable) : cursorDepth)
-    : null
+  const displayDepth = cursorDepth !== null && tvdTable
+    ? (depthType === 'TVD' ? mdToTvd(cursorDepth, tvdTable) : depthType === 'TVDSS' ? mdToTvd(cursorDepth, tvdTable) - kbElev : cursorDepth)
+    : cursorDepth
 
   return (
     <div className="status-bar">

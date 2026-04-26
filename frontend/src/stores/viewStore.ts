@@ -46,7 +46,8 @@ export interface ViewStore {
   viewportHeight: number
   subsidenceWidth: number
   subsidenceBottomHeight: number
-  depthType: 'MD' | 'TVD'
+  depthType: 'MD' | 'TVD' | 'TVDSS'
+  activePickId: string | null
   setScroll: (depth: number) => void
   setScale: (dpp: number) => void
 
@@ -54,6 +55,7 @@ export interface ViewStore {
   setOverviewVisible: (visible: boolean) => void
   setCurveTooltipVisible: (visible: boolean) => void
   setInteractionMode: (mode: 'view' | 'edit-tops') => void
+  setActivePickId: (id: string | null) => void
   updateDepthTrackConfig: (patch: Partial<DepthTrackConfig>) => void
   updateFormationsTrackConfig: (patch: Partial<FormationsTrackConfig>) => void
   selectTrack: (trackId: string | null) => void
@@ -63,7 +65,7 @@ export interface ViewStore {
   setTrackWidth: (id: string, width: number) => void
   setSubsidenceWidth: (width: number) => void
   setSubsidenceBottomHeight: (height: number) => void
-  setDepthType: (t: 'MD' | 'TVD') => void
+  setDepthType: (t: 'MD' | 'TVD' | 'TVDSS') => void
   lodEnabled: boolean
   setLodEnabled: (v: boolean) => void
   applyActiveWellTrackWidths: (trackWidths: Record<string, number>) => void
@@ -127,6 +129,7 @@ export const useViewStore = create<ViewStore>((set) => ({
   subsidenceWidth: initialSubsidenceWidth,
   subsidenceBottomHeight: initialSubsidenceBottomHeight,
   depthType: 'MD',
+  activePickId: null,
   lodEnabled: true,
   setScroll(depth) {
     set((state) => ({
@@ -150,7 +153,10 @@ export const useViewStore = create<ViewStore>((set) => ({
     set({ curveTooltipVisible })
   },
   setInteractionMode(interactionMode) {
-    set({ interactionMode })
+    set({ interactionMode, ...(interactionMode === 'view' ? { activePickId: null } : {}) })
+  },
+  setActivePickId(activePickId) {
+    set({ activePickId })
   },
   updateDepthTrackConfig(patch) {
     set((state) => ({
@@ -253,6 +259,7 @@ export const useViewStore = create<ViewStore>((set) => ({
       depthTrackConfig: initialDepthTrackConfig,
       formationsTrackConfig: initialFormationsTrackConfig,
       depthType: 'MD',
+      activePickId: null,
       visibleDepthRange: deriveVisibleDepthRange(state.scrollDepth, initialDepthPerPixel, state.viewportHeight),
     }))
   },

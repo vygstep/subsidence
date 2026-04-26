@@ -70,6 +70,8 @@ interface FormationCreatePayload {
 interface FormationPatchPayload {
   name?: string
   depth_md?: number
+  depth_tvd?: number
+  depth_tvdss?: number
   color?: string
   kind?: string
   lithology?: FormationTop['lithology']

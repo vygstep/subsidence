@@ -13,7 +13,7 @@ from subsidence.data import (
     UpdateFormationDepth,
     UpdateFormationStratLink,
 )
-from subsidence.data.deviation_transform import compute_tvd_tvdss
+from subsidence.data.deviation_transform import compute_tvd_tvdss, tvd_to_md
 from subsidence.data.undo import _model_to_dict
 from subsidence.data.schema import FormationStratLink, FormationTopModel, StratChart, StratUnit, WellModel
 from subsidence.data.strat_link import auto_link_to_active_chart, find_strat_unit_by_name
@@ -36,6 +36,8 @@ class FormationTopCreate(BaseModel):
 class FormationTopPatch(BaseModel):
     name: str | None = None
     depth_md: float | None = None
+    depth_tvd: float | None = None
+    depth_tvdss: float | None = None
     color: str | None = None
     kind: str | None = None
     lithology: str | None = None
@@ -230,12 +232,27 @@ def update_formation(well_id: str, formation_id: int, body: FormationTopPatch, r
         if row is None or row.well_id != well_id:
             raise HTTPException(status_code=404, detail=f'Formation not found: {formation_id}')
 
+        # Resolve depth_md from TVD or TVDSS inputs when depth_md not explicitly set
+        resolved_depth_md = body.depth_md
+        if resolved_depth_md is None and (body.depth_tvd is not None or body.depth_tvdss is not None):
+            well = session.get(WellModel, well_id)
+            if well is None:
+                raise HTTPException(status_code=404, detail=f'Well not found: {well_id}')
+            if body.depth_tvdss is not None:
+                tvd_for_calc = body.depth_tvdss + well.kb_elev
+            else:
+                tvd_for_calc = body.depth_tvd
+            md_result = tvd_to_md(tvd_for_calc, manager.project_path, well)
+            if md_result is None:
+                raise HTTPException(status_code=400, detail='No deviation survey available for TVD/TVDSS-to-MD back-calculation')
+            resolved_depth_md = md_result
+
         old_values: dict[str, object] = {}
         new_values: dict[str, object] = {}
 
         patch_map = {
             'name': ('name', body.name),
-            'depth_md': ('depth_md', body.depth_md),
+            'depth_md': ('depth_md', resolved_depth_md),
             'color': ('color', body.color),
             'kind': ('kind', body.kind),
             'lithology': ('lithology', body.lithology),

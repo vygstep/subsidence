@@ -40,7 +40,10 @@ export function LogViewPanel({ tracks, trackOrder, curves, formations, minDepth,
   const overviewVisible = useViewStore((state) => state.overviewVisible)
   const curveTooltipVisible = useViewStore((state) => state.curveTooltipVisible)
   const interactionMode = useViewStore((state) => state.interactionMode)
+  const activePickId = useViewStore((state) => state.activePickId)
+  const setActivePickId = useViewStore((state) => state.setActivePickId)
   const lodEnabled = useViewStore((state) => state.lodEnabled)
+  const updateFormationDepth = useWellDataStore((state) => state.updateFormationDepth)
 
   const depthWidth = trackWidths[DEPTH_TRACK_ID] ?? DEFAULT_DEPTH_WIDTH
   const formationWidth = trackWidths[FORMATION_TRACK_ID] ?? DEFAULT_FORMATION_WIDTH
@@ -67,6 +70,18 @@ export function LogViewPanel({ tracks, trackOrder, curves, formations, minDepth,
     setCursorDepth(null)
     setMouseClient(null)
   }, [setCursorDepth])
+
+  const handleTracksClick = useCallback(
+    (e: React.MouseEvent<HTMLDivElement>) => {
+      if (interactionMode !== 'edit-tops' || activePickId === null) return
+      const rect = e.currentTarget.getBoundingClientRect()
+      const y = e.clientY - rect.top
+      const depth = scrollDepth + y * depthPerPixel
+      void updateFormationDepth(activePickId, depth)
+      setActivePickId(null)
+    },
+    [interactionMode, activePickId, scrollDepth, depthPerPixel, updateFormationDepth, setActivePickId],
+  )
 
   const visibleDepthRange = useViewStore((state) => state.visibleDepthRange)
   const fetchCurvesLOD = useWellDataStore((state) => state.fetchCurvesLOD)
@@ -105,7 +120,7 @@ export function LogViewPanel({ tracks, trackOrder, curves, formations, minDepth,
         <WellViewerToolbar />
         <div className="log-view-panel__content">
           <TrackHeaderRow tracks={tracks} trackOrder={trackOrder} />
-          <div className="log-view-panel__tracks" onMouseMove={handleMouseMove} onMouseLeave={handleMouseLeave}>
+          <div className="log-view-panel__tracks" onMouseMove={handleMouseMove} onMouseLeave={handleMouseLeave} onClick={handleTracksClick}>
             {trackOrder.map((trackId) => {
               if (trackId === DEPTH_TRACK_ID) {
                 return (

@@ -1,3 +1,4 @@
+import { useViewStore } from '@/stores'
 import type { CurveData, FormationTop } from '@/types'
 
 import { CurveTooltip } from './CurveTooltip'
@@ -25,6 +26,12 @@ export function InteractionOverlay({
   tooltipVisible,
   topsEditable,
 }: InteractionOverlayProps) {
+  const activePickId = useViewStore((state) => state.activePickId)
+  const setActivePickId = useViewStore((state) => state.setActivePickId)
+
+  // Collect not-picked formations for indicator strip at top
+  const notPickedFormations = formations.filter((f) => f.depth_md === null)
+
   return (
     <>
       <svg
@@ -43,9 +50,63 @@ export function InteractionOverlay({
           if (formation.depth_md === null) return null
           const y = depthToPixel(formation.depth_md)
           if (y < -30 || y > height + 30) return null
-          return <FormationTopLine key={formation.id} formation={formation} yPosition={y} editable={topsEditable} />
+          return (
+            <FormationTopLine
+              key={formation.id}
+              formation={formation}
+              yPosition={y}
+              editable={topsEditable}
+              isActivePick={activePickId === formation.id}
+              onSetActivePick={setActivePickId}
+            />
+          )
         })}
+        {/* Ghost line at cursor when a pick (including not-picked) is active */}
+        {topsEditable && activePickId !== null && cursorDepth !== null && (
+          <line
+            x1={0}
+            y1={depthToPixel(cursorDepth)}
+            x2="100%"
+            y2={depthToPixel(cursorDepth)}
+            stroke={
+              formations.find((f) => f.id === activePickId)?.active_strat_color ??
+              formations.find((f) => f.id === activePickId)?.color ??
+              '#9ca3af'
+            }
+            strokeWidth={1.5}
+            strokeDasharray="4 4"
+            strokeOpacity={0.5}
+            style={{ pointerEvents: 'none' }}
+          />
+        )}
         {cursorDepth !== null && <DepthCursor yPosition={depthToPixel(cursorDepth)} />}
+        {/* Not-picked formation tap targets near the top */}
+        {topsEditable && notPickedFormations.map((formation, i) => {
+          const color = formation.active_strat_color ?? formation.color
+          const isActive = activePickId === formation.id
+          const rowH = 18
+          const rowY = i * (rowH + 2) + 2
+          return (
+            <g
+              key={formation.id}
+              style={{ pointerEvents: 'auto', cursor: 'crosshair' }}
+              onClick={() => setActivePickId(isActive ? null : formation.id)}
+            >
+              <rect x={2} y={rowY} width={120} height={rowH} fill={color} opacity={isActive ? 1 : 0.6} rx={2} />
+              <text
+                x={6}
+                y={rowY + rowH / 2}
+                dominantBaseline="middle"
+                fill="#ffffff"
+                fontSize={10}
+                fontWeight={isActive ? 700 : 500}
+                style={{ userSelect: 'none' }}
+              >
+                {formation.name} (not picked)
+              </text>
+            </g>
+          )
+        })}
       </svg>
       {mouseClient !== null && cursorDepth !== null && (
         <CurveTooltip
