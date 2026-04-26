@@ -62,7 +62,7 @@ Items:
 - `WIZ-002`: File preview and parser detection. (done)
 - `WIZ-003`: Column mapping and required-field validation. (done)
 - `WIZ-004`: Target well resolution. (done)
-- `WIZ-005`: Import presets by data type.
+- `WIZ-005`: Import presets by data type. (done)
 - `WIZ-006`: Import execution, logging, and tests.
 
 Exit criteria:
@@ -838,3 +838,7 @@ Backend `preview.py` module adds `preview_tabular` (csv.Sniffer auto-delimiter, 
 ### WIZ-004: Target well resolution (done)
 
 `ImportWizardTargetWellFields` gains optional `fileWellSource`, `wellPolicy`, and `onWellPolicyChange` props. When `fileWellSource` is set, the Options step shows a radio toggle — "Use file well name" (default) vs "Override with target well" — instead of the plain dropdown. The override path exposes a target well select (`aria-label="Target well"`) pre-filled with the active well. `fileWellSource` is derived from `lasPreview.well_name` in `ImportLasDialog` (LAS source only) and from `mapping['well_name']` in `ImportTopsDialog` (when the well_name column is mapped). Submit logic passes `well_id: null, create_new_well: false` when policy is `'file'`, and the selected well id when policy is `'override'`. Deviation and logs-CSV imports have no file well name concept and retain the plain dropdown. Tests extended to verify default file policy and active-well preselection under override. Commit: `d5b2ebd`.
+
+### WIZ-005: Data-type import presets (done)
+
+`UNCONFORMITIES_FIELDS` added to `mapping.ts` (unc_name/depth_md/end_age_ma/start_age_ma required; well_name/color/note optional) with `validateUnconformitiesMapping`. `ImportWizardDataType` extended with `'unconformities'`. `unconformities` preset added to `importWizardPresets.ts` (`targetWellPolicy: 'required'`). New `ImportUnconformitiesDialog`: 5-step wizard, required well dropdown (no create-new or file-well-source toggle), `canSubmit` requires a selected well. "Load unconformities" button added to `topsModeActions` in `ProjectToolbar`. Backend: `import_unconformities_csv` gains `column_map` kwarg with `_apply_column_map` applied before field processing; `ImportUnconformitiesRequest` gains `column_map` field. Commit: `6746c76`.
