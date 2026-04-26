@@ -13,9 +13,11 @@ from sqlalchemy import select
 from subsidence.data.backstrip import (
     FormationInput,
     LithologyParam,
+    ZoneLayerInput,
     backstrip,
 )
 from subsidence.data.unit_registry import normalize_lithology_values_to_engine
+from subsidence.data.zone_service import build_zone_layer_inputs, get_well_active_top_set_id
 from subsidence.data.schema import (
     CalculationResult,
     CompactionModel,
@@ -81,12 +83,6 @@ def _compute_subsidence(manager, well_id: str, water_depth_m: float = 0.0) -> li
         if well is None:
             raise ValueError(f'Well not found: {well_id}')
 
-        formations = session.scalars(
-            select(FormationTopModel)
-            .where(FormationTopModel.well_id == well_id)
-            .order_by(FormationTopModel.depth_md.asc(), FormationTopModel.id.asc())
-        ).all()
-
         active_model = session.scalar(
             select(CompactionModel).where(CompactionModel.is_active.is_(True))
         )
@@ -125,55 +121,57 @@ def _compute_subsidence(manager, well_id: str, water_depth_m: float = 0.0) -> li
                     for r in litho_rows
                 }
 
-        td_m = well.td_md if well.td_md is not None else 0.0
-        inputs: list[FormationInput] = []
+        top_set_id = get_well_active_top_set_id(session, well_id)
+        if top_set_id is not None:
+            zone_inputs = build_zone_layer_inputs(session, well_id, litho_params)
+            results = backstrip(zone_inputs, litho_params, water_depth_m=water_depth_m)
+        else:
+            td_m = well.td_md if well.td_md is not None else 0.0
+            formations = session.scalars(
+                select(FormationTopModel)
+                .where(FormationTopModel.well_id == well_id)
+                .order_by(FormationTopModel.depth_md.asc(), FormationTopModel.id.asc())
+            ).all()
+            inputs: list[FormationInput] = []
 
-        def _is_undated_unconformity(pick: FormationTopModel) -> bool:
-            """An unconformity with no real hiatus (ages absent or equal) — treat as conformity."""
-            if pick.kind != 'unconformity':
-                return False
-            if pick.age_top_ma is None or pick.age_base_ma is None:
-                return True
-            return pick.age_base_ma <= pick.age_top_ma
+            def _is_undated_unconformity(pick: FormationTopModel) -> bool:
+                if pick.kind != 'unconformity':
+                    return False
+                if pick.age_top_ma is None or pick.age_base_ma is None:
+                    return True
+                return pick.age_base_ma <= pick.age_top_ma
 
-        for idx, f in enumerate(formations):
-            next_f = formations[idx + 1] if idx + 1 < len(formations) else None
-            base_m = next_f.depth_md if next_f is not None else max(td_m, f.depth_md + 1.0)
+            for idx, f in enumerate(formations):
+                next_f = formations[idx + 1] if idx + 1 < len(formations) else None
+                base_m = next_f.depth_md if next_f is not None else max(td_m, f.depth_md + 1.0)
 
-            # Unconformity with a real hiatus (age_base_ma > age_top_ma): the interval below
-            # it started at age_base_ma (older end of the gap).  Undated/zero-gap unconformities
-            # are transparent — treat exactly like a conformity surface.
-            if (f.kind == 'unconformity'
-                    and f.age_top_ma is not None
-                    and f.age_base_ma is not None
-                    and f.age_base_ma > f.age_top_ma):
-                age_top = f.age_base_ma
-            else:
-                age_top = f.age_top_ma
+                if (f.kind == 'unconformity'
+                        and f.age_top_ma is not None
+                        and f.age_base_ma is not None
+                        and f.age_base_ma > f.age_top_ma):
+                    age_top = f.age_base_ma
+                else:
+                    age_top = f.age_top_ma
 
-            # age_base: derived from the next pick's age.
-            # Undated unconformities are transparent — look through them to the
-            # formation below.  For the deepest formation (no next pick) fall back
-            # to its own age_base_ma so it is not silently dropped.
-            if next_f is None:
-                age_base = f.age_base_ma
-            elif _is_undated_unconformity(next_f):
-                skip_f = formations[idx + 2] if idx + 2 < len(formations) else None
-                age_base = skip_f.age_top_ma if skip_f is not None else f.age_base_ma
-            else:
-                age_base = next_f.age_top_ma
+                if next_f is None:
+                    age_base = f.age_base_ma
+                elif _is_undated_unconformity(next_f):
+                    skip_f = formations[idx + 2] if idx + 2 < len(formations) else None
+                    age_base = skip_f.age_top_ma if skip_f is not None else f.age_base_ma
+                else:
+                    age_base = next_f.age_top_ma
 
-            inputs.append(FormationInput(
-                name=f.name,
-                color=f.color,
-                lithology=f.lithology or '',
-                age_top_ma=age_top,
-                age_base_ma=age_base,
-                current_top_m=f.depth_md,
-                current_base_m=base_m,
-            ))
+                inputs.append(FormationInput(
+                    name=f.name,
+                    color=f.color,
+                    lithology=f.lithology or '',
+                    age_top_ma=age_top,
+                    age_base_ma=age_base,
+                    current_top_m=f.depth_md,
+                    current_base_m=base_m,
+                ))
 
-        results = backstrip(inputs, litho_params, water_depth_m=water_depth_m)
+            results = backstrip(inputs, litho_params, water_depth_m=water_depth_m)
 
     return [
         SubsidenceResultResponse(

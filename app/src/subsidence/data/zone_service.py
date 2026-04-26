@@ -1,8 +1,11 @@
 from __future__ import annotations
 
+import json
+
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
+from .backstrip import DEFAULT_LITHO_PARAM, LithologyParam, ZoneLayerInput
 from .schema import (
     FormationTopModel,
     FormationZone,
@@ -198,3 +201,103 @@ def get_well_active_top_set_id(session: Session, well_id: str) -> int | None:
         select(WellActiveTopSet).where(WellActiveTopSet.well_id == well_id)
     )
     return link.top_set_id if link is not None else None
+
+
+def _weighted_litho_param(
+    fractions: dict[str, float],
+    litho_params: dict[str, LithologyParam],
+) -> LithologyParam:
+    if not fractions:
+        return DEFAULT_LITHO_PARAM
+    density = porosity = coeff = total = 0.0
+    for code, frac in fractions.items():
+        p = litho_params.get(code, DEFAULT_LITHO_PARAM)
+        density += frac * p.density
+        porosity += frac * p.porosity_surface
+        coeff += frac * p.compaction_coeff
+        total += frac
+    remaining = max(0.0, 1.0 - total)
+    if remaining > 1e-9:
+        density += remaining * DEFAULT_LITHO_PARAM.density
+        porosity += remaining * DEFAULT_LITHO_PARAM.porosity_surface
+        coeff += remaining * DEFAULT_LITHO_PARAM.compaction_coeff
+    return LithologyParam(density=density, porosity_surface=porosity, compaction_coeff=coeff)
+
+
+def build_zone_layer_inputs(
+    session: Session,
+    well_id: str,
+    litho_params: dict[str, LithologyParam],
+) -> list[ZoneLayerInput]:
+    top_set_id = get_well_active_top_set_id(session, well_id)
+    if top_set_id is None:
+        return []
+
+    zones = session.scalars(
+        select(FormationZone)
+        .where(FormationZone.top_set_id == top_set_id)
+        .order_by(FormationZone.sort_order.asc())
+    ).all()
+    if not zones:
+        return []
+
+    horizon_ids = {z.upper_horizon_id for z in zones} | {z.lower_horizon_id for z in zones}
+    picks_by_horizon: dict[int, FormationTopModel] = {
+        pick.horizon_id: pick
+        for pick in session.scalars(
+            select(FormationTopModel).where(
+                FormationTopModel.well_id == well_id,
+                FormationTopModel.horizon_id.in_(horizon_ids),
+            )
+        ).all()
+        if pick.horizon_id is not None
+    }
+
+    zwd_by_zone: dict[int, ZoneWellData] = {
+        row.zone_id: row
+        for row in session.scalars(
+            select(ZoneWellData).where(
+                ZoneWellData.zone_id.in_([z.id for z in zones]),
+                ZoneWellData.well_id == well_id,
+            )
+        ).all()
+    }
+
+    result: list[ZoneLayerInput] = []
+    for zone in zones:
+        upper = zone.upper_horizon
+        lower = zone.lower_horizon
+        upper_pick = picks_by_horizon.get(upper.id)
+        lower_pick = picks_by_horizon.get(lower.id)
+
+        if (
+            upper_pick is None or lower_pick is None
+            or upper_pick.depth_md is None or lower_pick.depth_md is None
+        ):
+            continue
+
+        zwd = zwd_by_zone.get(zone.id)
+        fractions: dict[str, float] = {}
+        if zwd is not None and zwd.lithology_fractions:
+            try:
+                parsed = json.loads(zwd.lithology_fractions)
+                if isinstance(parsed, dict):
+                    fractions = {k: float(v) for k, v in parsed.items()}
+            except (ValueError, TypeError):
+                pass
+        elif upper_pick.lithology:
+            fractions = {upper_pick.lithology: 1.0}
+
+        dominant = max(fractions, key=lambda c: fractions[c]) if fractions else (upper_pick.lithology or '')
+        result.append(ZoneLayerInput(
+            name=f'{upper.name} → {lower.name}',
+            color=upper.color,
+            lithology=dominant,
+            litho_param=_weighted_litho_param(fractions, litho_params),
+            age_top_ma=upper.age_ma,
+            age_base_ma=lower.age_ma,
+            current_top_m=upper_pick.depth_md,
+            current_base_m=lower_pick.depth_md,
+        ))
+
+    return result

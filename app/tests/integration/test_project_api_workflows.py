@@ -1436,3 +1436,143 @@ def test_zone_no_active_top_set_returns_empty(api_client: TestClient, tmp_path: 
     resp = api_client.get('/api/wells/inventory')
     inv = next(w for w in resp.json() if w['well_id'] == well_id)
     assert inv['zones'] == []
+
+
+# ---------------------------------------------------------------------------
+# ZONE-004 tests
+# ---------------------------------------------------------------------------
+
+def _create_well_with_zone_subsidence(client, tmp_path: Path):
+    """Create a project + well with 3 dated picks and a linked TopSet for subsidence tests."""
+    _create_project(client, tmp_path, 'zone-sub')
+
+    resp = client.post('/api/projects/wells', json={
+        'name': 'Sub Well', 'x': 0.0, 'y': 0.0, 'kb': 0.0, 'td': 300.0, 'crs': 'local',
+    })
+    assert resp.status_code == 200, resp.text
+    well_id = resp.json()['well_id']
+
+    for name, depth, age in [('A', 0.0, 10.0), ('B', 100.0, 50.0), ('C', 200.0, 100.0)]:
+        resp = client.post(f'/api/wells/{well_id}/formations', json={
+            'name': name, 'depth_md': depth, 'color': '#aaaaaa',
+            'age_ma': age, 'lithology': 'sandstone',
+        })
+        assert resp.status_code == 201, resp.text
+
+    resp = client.post('/api/top-sets', json={'name': 'Sub Set'})
+    assert resp.status_code == 201, resp.text
+    top_set_id = resp.json()['id']
+
+    for name, age in [('A', 10.0), ('B', 50.0), ('C', 100.0)]:
+        resp = client.post(f'/api/top-sets/{top_set_id}/horizons', json={'name': name, 'age_ma': age})
+        assert resp.status_code == 201, resp.text
+
+    resp = client.put(f'/api/wells/{well_id}/active-top-set', json={'top_set_id': top_set_id})
+    assert resp.status_code == 200, resp.text
+
+    return well_id, top_set_id
+
+
+def test_zone004_legacy_path_requires_no_top_set(api_client: TestClient, tmp_path: Path):
+    """Without an active TopSet, subsidence uses legacy FormationTopModel path."""
+    _create_project(api_client, tmp_path, 'zone-legacy')
+    resp = api_client.post('/api/projects/wells', json={
+        'name': 'Legacy Well', 'x': 0.0, 'y': 0.0, 'kb': 0.0, 'td': 300.0, 'crs': 'local',
+    })
+    well_id = resp.json()['well_id']
+    for name, depth, age in [('A', 0.0, 10.0), ('B', 100.0, 50.0), ('C', 200.0, 100.0)]:
+        api_client.post(f'/api/wells/{well_id}/formations', json={
+            'name': name, 'depth_md': depth, 'color': '#aaaaaa',
+            'age_ma': age, 'lithology': 'sandstone',
+        })
+
+    resp = api_client.post(f'/api/wells/{well_id}/subsidence')
+    assert resp.status_code == 200, resp.text
+    results = resp.json()
+    assert len(results) == 2
+    names = [r['formation_name'] for r in results]
+    assert 'A' in names and 'B' in names
+
+
+def test_zone004_zone_path_used_when_top_set_active(api_client: TestClient, tmp_path: Path):
+    """With an active TopSet, subsidence uses zone path; formation names become horizon pairs."""
+    well_id, top_set_id = _create_well_with_zone_subsidence(api_client, tmp_path)
+
+    resp = api_client.get(f'/api/wells/{well_id}/zones')
+    zones = resp.json()
+    for zone in zones:
+        api_client.patch(f'/api/wells/{well_id}/zones/{zone["zone_id"]}', json={
+            'lithology_fractions': '{"sandstone": 1.0}',
+            'lithology_source': 'manual',
+        })
+
+    resp = api_client.post(f'/api/wells/{well_id}/subsidence')
+    assert resp.status_code == 200, resp.text
+    results = resp.json()
+    assert len(results) == 2
+    names = {r['formation_name'] for r in results}
+    assert 'A → B' in names
+    assert 'B → C' in names
+
+
+def test_zone004_zone_path_matches_legacy_for_single_lithology(api_client: TestClient, tmp_path: Path):
+    """Zone path with {sandstone: 1.0} fractions reproduces legacy single-lithology burial depths."""
+    _create_project(api_client, tmp_path, 'zone-match')
+    resp = api_client.post('/api/projects/wells', json={
+        'name': 'Match Well', 'x': 0.0, 'y': 0.0, 'kb': 0.0, 'td': 300.0, 'crs': 'local',
+    })
+    well_id = resp.json()['well_id']
+    for name, depth, age in [('X', 0.0, 10.0), ('Y', 100.0, 50.0), ('Z', 200.0, 100.0)]:
+        api_client.post(f'/api/wells/{well_id}/formations', json={
+            'name': name, 'depth_md': depth, 'color': '#aaaaaa',
+            'age_ma': age, 'lithology': 'sandstone',
+        })
+
+    resp = api_client.post(f'/api/wells/{well_id}/subsidence')
+    assert resp.status_code == 200, resp.text
+    legacy = {r['formation_name']: r['burial_path'] for r in resp.json()}
+
+    resp = api_client.post('/api/top-sets', json={'name': 'Match Set'})
+    top_set_id = resp.json()['id']
+    for name, age in [('X', 10.0), ('Y', 50.0), ('Z', 100.0)]:
+        api_client.post(f'/api/top-sets/{top_set_id}/horizons', json={'name': name, 'age_ma': age})
+    api_client.put(f'/api/wells/{well_id}/active-top-set', json={'top_set_id': top_set_id})
+
+    resp = api_client.get(f'/api/wells/{well_id}/zones')
+    for zone in resp.json():
+        api_client.patch(f'/api/wells/{well_id}/zones/{zone["zone_id"]}', json={
+            'lithology_fractions': '{"sandstone": 1.0}',
+            'lithology_source': 'manual',
+        })
+
+    resp = api_client.post(f'/api/wells/{well_id}/subsidence')
+    assert resp.status_code == 200, resp.text
+    zone_results = {r['formation_name']: r['burial_path'] for r in resp.json()}
+
+    assert len(legacy) == len(zone_results) == 2
+
+    legacy_x = legacy['X']
+    zone_xy = zone_results['X → Y']
+    assert len(legacy_x) == len(zone_xy)
+    for lp, zp in zip(legacy_x, zone_xy):
+        assert lp['age_ma'] == pytest.approx(zp['age_ma'])
+        assert lp['depth_m'] == pytest.approx(zp['depth_m'], abs=1e-6)
+
+    legacy_y = legacy['Y']
+    zone_yz = zone_results['Y → Z']
+    assert len(legacy_y) == len(zone_yz)
+    for lp, zp in zip(legacy_y, zone_yz):
+        assert lp['age_ma'] == pytest.approx(zp['age_ma'])
+        assert lp['depth_m'] == pytest.approx(zp['depth_m'], abs=1e-6)
+
+
+def test_zone004_zones_without_lithology_use_default(api_client: TestClient, tmp_path: Path):
+    """Zones with null lithology_fractions still produce subsidence results (using default params)."""
+    well_id, _ = _create_well_with_zone_subsidence(api_client, tmp_path)
+
+    resp = api_client.post(f'/api/wells/{well_id}/subsidence')
+    assert resp.status_code == 200, resp.text
+    results = resp.json()
+    assert len(results) == 2
+    for r in results:
+        assert len(r['burial_path']) > 0

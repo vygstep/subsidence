@@ -19,6 +19,7 @@ from subsidence.data.backstrip import (
     BurialPoint,
     FormationInput,
     LithologyParam,
+    ZoneLayerInput,
     SubsidenceResult,
     backstrip,
 )
@@ -119,3 +120,48 @@ def test_result_color_matches_input():
     by_name = {r.formation_name: r for r in results}
     assert by_name['Shale A'].color == '#aaaaaa'
     assert by_name['Shale B'].color == '#bbbbbb'
+
+
+# ---------------------------------------------------------------------------
+# ZoneLayerInput tests
+# ---------------------------------------------------------------------------
+
+def _two_zone_column() -> list[ZoneLayerInput]:
+    return [
+        ZoneLayerInput(
+            name='A → B',
+            color='#aaaaaa',
+            lithology='shale',
+            litho_param=SHALE,
+            age_top_ma=30.0,
+            age_base_ma=50.0,
+            current_top_m=0.0,
+            current_base_m=500.0,
+        ),
+        ZoneLayerInput(
+            name='B → C',
+            color='#bbbbbb',
+            lithology='shale',
+            litho_param=SHALE,
+            age_top_ma=0.0,
+            age_base_ma=30.0,
+            current_top_m=500.0,
+            current_base_m=1000.0,
+        ),
+    ]
+
+
+def test_zone_layer_input_returns_two_results():
+    results = backstrip(_two_zone_column(), {})
+    assert len(results) == 2
+
+
+def test_zone_layer_input_matches_formation_input():
+    """ZoneLayerInput with pre-resolved param gives identical burial depths as FormationInput."""
+    f_results = backstrip(_two_formation_column(), LITHO)
+    z_results = backstrip(_two_zone_column(), {})
+    assert len(f_results) == len(z_results) == 2
+    for fr, zr in zip(f_results, z_results):
+        for fp, zp in zip(fr.burial_path, zr.burial_path):
+            assert fp.age_ma == zp.age_ma
+            assert abs(fp.depth_m - zp.depth_m) < 1e-6

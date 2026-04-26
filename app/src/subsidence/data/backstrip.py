@@ -65,6 +65,16 @@ def _layer_thickness_at_depth(
 # ---------------------------------------------------------------------------
 
 @dataclass
+class LithologyParam:
+    density: float           # grain density, kg/m³
+    porosity_surface: float  # φ₀, fraction 0–1
+    compaction_coeff: float  # c, km⁻¹ — converted to m⁻¹ inside engine
+
+
+DEFAULT_LITHO_PARAM = LithologyParam(density=2720.0, porosity_surface=0.63, compaction_coeff=0.51)
+
+
+@dataclass
 class FormationInput:
     name: str
     color: str           # hex color for display (from LithologyDictEntry or formation itself)
@@ -76,10 +86,15 @@ class FormationInput:
 
 
 @dataclass
-class LithologyParam:
-    density: float           # grain density, kg/m³
-    porosity_surface: float  # φ₀, fraction 0–1
-    compaction_coeff: float  # c, km⁻¹ — converted to m⁻¹ inside engine
+class ZoneLayerInput:
+    name: str
+    color: str
+    lithology: str            # dominant lithology code (for display)
+    litho_param: LithologyParam  # pre-computed weighted params
+    age_top_ma: float | None
+    age_base_ma: float | None
+    current_top_m: float
+    current_base_m: float
 
 
 @dataclass
@@ -101,12 +116,15 @@ class SubsidenceResult:
 # ---------------------------------------------------------------------------
 
 def backstrip(
-    formations: list[FormationInput],
+    formations: list[FormationInput | ZoneLayerInput],
     litho_params: dict[str, LithologyParam],
     water_depth_m: float = 0.0,
 ) -> list[SubsidenceResult]:
     """
     Airy backstripping with Athy decompaction (Stratya2D algorithm pattern).
+
+    Accepts FormationInput (looks up litho_params by lithology code) or
+    ZoneLayerInput (uses its pre-computed litho_param directly).
 
     Formations without both age_top_ma and age_base_ma are silently skipped.
     Returns one SubsidenceResult per valid formation with a burial_path point
@@ -125,11 +143,10 @@ def backstrip(
 
     valid.sort(key=lambda f: f.age_base_ma, reverse=True)  # oldest base = index 0
 
-    # Fetch lithology params; fall back to shale defaults if unknown lithology
-    _default_litho = LithologyParam(density=2720.0, porosity_surface=0.63, compaction_coeff=0.51)
-
-    def _litho(f: FormationInput) -> LithologyParam:
-        return litho_params.get(f.lithology, _default_litho)
+    def _litho(f: FormationInput | ZoneLayerInput) -> LithologyParam:
+        if isinstance(f, ZoneLayerInput):
+            return f.litho_param
+        return litho_params.get(f.lithology, DEFAULT_LITHO_PARAM)
 
     # Pre-compute solid matrix thickness for each formation (conserved quantity)
     solid_m: dict[int, float] = {}
