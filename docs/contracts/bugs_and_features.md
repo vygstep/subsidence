@@ -108,7 +108,7 @@ Items:
 - `TOPS-001`: TopSet / Horizon / Pick data model. (done)
 - `TOPS-002`: TVD/TVDSS as stored calculated fields; interactive depth picking. (done)
 - `DEPTH-001`: Trusted depth reference on import, QC flags, TVD curve display. (done)
-- `ZONE-001`: Zone entity and lifecycle.
+- `ZONE-001`: Zone entity and lifecycle. (done)
 - `ZONE-002`: Zone settings UI and manual lithology input.
 - `ZONE-003`: Auto-lithology aggregation from discrete log (depends `LITH-001`).
 - `ZONE-004`: Zone attributes as subsidence calculation inputs (supersedes `LITH-003`).
@@ -1371,6 +1371,15 @@ Acceptance:
 - `PATCH /api/wells/{id}/zones/{zone_id}` with fractions summing to 1.1 → 400.
 - A well with no active TopSet has an empty `zones` array in inventory.
 - All operations are covered by integration tests.
+
+Implemented: commit `0c70f25` (2026-04-26).
+
+- Schema: SCHEMA_VERSION 9→10; `FormationZone` (id, top_set_id, upper_horizon_id, lower_horizon_id, sort_order) and `ZoneWellData` (zone_id, well_id, thickness_md, thickness_tvd, lithology_fractions, lithology_source) tables added.
+- `zone_service.py`: `rebuild_zones_for_top_set`, `ensure_zone_well_data`, `recalculate_zone_thickness`, `merge_zones_on_horizon_delete`, `get_well_active_top_set_id`.
+- `top_sets.py`: zone triggers on horizon add/delete/reorder and `set_active_top_set`.
+- `formations.py`, `undo.py`: zone thickness recalculation after pick depth change (including undo/redo).
+- `wells.py`: `ZoneInventoryItem` in `WellInventoryResponse`; `GET /wells/{id}/zones`; `PATCH /wells/{id}/zones/{zone_id}` with fraction sum validation.
+- Frontend: `FormationZone`, `ZoneHorizonRef` types; `zones: FormationZone[]` in store; `updateZoneLithology` action.
 
 ---
 
