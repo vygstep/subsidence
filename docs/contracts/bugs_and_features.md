@@ -1,19 +1,20 @@
 # Bugs and Feature Backlog Contract
 
 **Status:** Active backlog contract  
-**Scope:** Dictionary/template foundation, configurable import wizard, lithology curve support, viewer UX fixes, and subsidence chart presentation improvements.  
+**Scope:** Dictionary/template foundation, configurable import wizard, lithology pattern palettes, lithology curve support, viewer UX fixes, and subsidence chart presentation improvements.  
 **Rule:** This is the single active contract for the next data-import and viewer backlog. The former future Import Wizard Contract is merged here as `WIZ-*`.
 
 ---
 
 ## 1. Summary
 
-The backlog contains four different levels of work:
+The backlog contains five different levels of work:
 
 1. Fast viewer/UI fixes that can be implemented in small commits.
 2. Dictionary and template infrastructure needed before advanced curve classification.
 3. Configurable import wizard work for CSV/TSV/LAS and other tabular inputs.
-4. New lithology data-model work that will affect curve rendering, settings, subsidence inputs, and zone upscaling.
+4. Lithology visual palette infrastructure needed before lithology log rendering.
+5. New lithology data-model work that will affect curve rendering, settings, subsidence inputs, and zone upscaling.
 
 Implementation should not start with lithology upscaling. The safe order is:
 
@@ -22,11 +23,12 @@ Implementation should not start with lithology upscaling. The safe order is:
 3. Add the measurement-unit dictionary and engine-unit normalization foundation.
 4. Build the Import Wizard shell and preview/mapping engine.
 5. Connect Import Wizard presets for logs, tops, unconformities, deviation, and stratigraphy.
-6. Add discrete lithology curve rendering.
-7. Add percentage lithology tracks.
-8. Add zone aggregation for subsidence inputs.
-9. Improve subsidence chart stratigraphy presentation.
-10. Implement low-risk viewer UX fixes in small independent commits when they do not conflict with the main path.
+6. Add lithology pattern palette registry, built-in SVG patterns, and user SVG imports.
+7. Add discrete lithology curve rendering.
+8. Add percentage lithology tracks.
+9. Add zone aggregation for subsidence inputs.
+10. Improve subsidence chart stratigraphy presentation.
+11. Implement low-risk viewer UX fixes in small independent commits when they do not conflict with the main path.
 
 ## 1.1 Execution Order
 
@@ -71,11 +73,35 @@ Exit criteria:
 - Missing well names are assigned to the active/selected target well.
 - Import behavior is covered by tests before adding lithology-specific imports.
 
-### Phase C: Lithology and Zone Data Model
+### Phase C: Lithology Pattern Palette Foundation
 
 Goal:
 
-- Add discrete and percentage lithology support after dictionaries and import wizard are stable.
+- Replace hardcoded canvas lithology patterns with a dictionary-backed pattern palette registry.
+
+Items:
+
+- `PAT-001`: Vendor and document the Equinor lithology SVG pattern source.
+- `PAT-002`: Add lithology pattern palette schema and API.
+- `PAT-003`: Seed built-in SVG patterns.
+- `PAT-004`: Add Templates UI for lithology pattern palettes.
+- `PAT-005`: Connect lithology sets to selectable pattern palette entries.
+- `PAT-006`: Render lithology fills from SVG-backed pattern registry.
+- `PAT-007`: Pattern palette tests and migration coverage.
+
+Exit criteria:
+
+- Built-in pattern palettes are visible and read-only.
+- User SVG pattern palettes can be imported and reused.
+- Lithology set entries select pattern ids from the registry instead of free-text ids.
+- Existing hardcoded canvas patterns are no longer the source of truth.
+- Pattern palette behavior is covered before `LITH-001` starts.
+
+### Phase D: Lithology and Zone Data Model
+
+Goal:
+
+- Add discrete and percentage lithology support after dictionaries, import wizard, and pattern palettes are stable.
 
 Items:
 
@@ -89,7 +115,7 @@ Exit criteria:
 - Percentage lithology curves can be grouped into Lithology tracks.
 - Zone-level lithology attributes are available for calculations.
 
-### Phase D: Tops, Unconformities, and Subsidence Charts
+### Phase E: Tops, Unconformities, and Subsidence Charts
 
 Goal:
 
@@ -109,7 +135,7 @@ Exit criteria:
 - Unconformities are editable and visually distinct.
 - Subsidence charts show the intended labels and stratigraphy context.
 
-### Phase E: Independent Viewer UX Fixes
+### Phase F: Independent Viewer UX Fixes
 
 Goal:
 
@@ -609,7 +635,302 @@ Acceptance:
 
 ---
 
-## 5. Lithology Curve Support
+## 5. Lithology Pattern Palettes
+
+### PAT-001: Vendor and document the Equinor lithology SVG pattern source
+
+Problem:
+
+- Lithology patterns are currently hardcoded in `frontend/src/renderers/lithologyRenderer.ts`.
+- The project needs a larger and auditable built-in pattern library before lithology logs are rendered.
+- The initial external source should be `https://github.com/equinor/lithology-patterns`, whose SVG patterns are stored under `assets/svg` and licensed under MIT.
+
+Required behavior:
+
+- Clone or vendor `equinor/lithology-patterns` under `repos/lithology-patterns`.
+- Record the upstream repository URL, license, and source asset path in project documentation.
+- Do not make runtime rendering depend directly on the external repository checkout.
+- Treat the upstream repository as a source snapshot for seeding/copying built-in assets into the application model.
+- Preserve a clear boundary between:
+  - upstream SVG pattern assets;
+  - the app's built-in pattern palette rows;
+  - user-imported SVG palettes.
+
+Likely code areas:
+
+- `repos/lithology-patterns/`
+- `docs/contracts/bugs_and_features.md`
+- New or existing dictionary documentation under `docs/`
+- `app/src/subsidence/data/dictionaries/`
+
+Acceptance:
+
+- Upstream source is available under `repos/lithology-patterns`.
+- The contract or supporting docs identify the source URL, license, and asset folder.
+- Built-in seeding can proceed without using the upstream checkout as a runtime dependency.
+
+### PAT-002: Add lithology pattern palette schema and API
+
+Problem:
+
+- `LithologySetEntry.pattern_id` is currently a free-text string.
+- There is no database-backed pattern registry equivalent to unit dimensions or lithology sets.
+- User SVG palettes need stable persistence, validation, preview metadata, and read-only built-in behavior.
+
+Required behavior:
+
+- Add a database-backed pattern registry with two levels:
+  - `LithologyPatternPalette`: palette/set metadata.
+  - `LithologyPattern`: one repeatable SVG pattern entry inside a palette.
+- Built-in palettes are read-only.
+- User palettes can be created, renamed, copied, deleted, and extended.
+- Pattern entries store at least:
+  - stable code/id used by lithology entries;
+  - display name;
+  - SVG content or internal asset reference;
+  - tile width and tile height where available;
+  - optional description/source metadata;
+  - sort order;
+  - built-in/read-only state inherited from palette.
+- The API exposes:
+  - list palettes;
+  - fetch palette with pattern entries;
+  - create/copy/rename/delete user palette;
+  - add/edit/delete user pattern entry;
+  - import SVG file(s) into a user palette.
+- SVG import validation must reject clearly unsafe content before storage or rendering:
+  - scripts;
+  - event handler attributes;
+  - external network references;
+  - oversized files beyond a documented limit.
+- Existing `LithologySetEntry.pattern_id` behavior must be migrated or wrapped so old projects still open.
+
+Likely code areas:
+
+- `app/src/subsidence/data/schema.py`
+- `app/src/subsidence/data/dict_seeder.py`
+- `app/src/subsidence/api/compaction.py` or a new `patterns.py` router
+- `app/src/subsidence/api/main.py`
+- `app/tests/integration/test_project_api_workflows.py`
+- `frontend/src/types/subsidence.ts`
+- `frontend/src/stores/wellDataStore.ts`
+
+Acceptance:
+
+- Built-in and user pattern palettes are persisted in the project database.
+- Built-in rows cannot be edited or deleted through the API.
+- User SVG imports are validated and stored.
+- API responses provide enough data for UI previews and canvas rendering.
+- Existing lithology sets with old `pattern_id` strings remain readable.
+
+### PAT-003: Seed built-in SVG pattern palettes
+
+Problem:
+
+- Built-in lithology patterns should come from data, not frontend switch statements.
+- The default lithology set should reference real pattern registry entries.
+
+Required behavior:
+
+- Seed a built-in palette from the Equinor SVG assets.
+- Include at minimum the upstream pattern names currently documented by Equinor:
+  - sandstone;
+  - siltstone;
+  - mudstone;
+  - claystone;
+  - shale;
+  - limestone;
+  - marl;
+  - gypsum;
+  - dolostone;
+  - conglomerate.
+- Map existing default lithology rows to the closest built-in SVG pattern codes.
+- Keep solid fill as a valid explicit option for entries with no pattern.
+- The seeder must be idempotent and self-healing for open projects, following the existing dictionary seeder pattern.
+- Do not overwrite user palettes or user lithology set choices.
+
+Likely code areas:
+
+- `app/src/subsidence/data/dictionaries/`
+- `app/src/subsidence/data/dict_seeder.py`
+- `app/src/subsidence/data/schema.py`
+- `app/tests/integration/test_project_api_workflows.py`
+
+Acceptance:
+
+- A new project contains a read-only built-in lithology pattern palette.
+- Existing projects receive missing built-in palette rows on open.
+- Default lithology set entries reference available built-in pattern codes where appropriate.
+- Re-running seed logic does not duplicate palettes or pattern rows.
+
+### PAT-004: Add Templates UI for lithology pattern palettes
+
+Problem:
+
+- Users need to inspect built-in patterns and manage project-specific SVG palettes from the same Templates area as lithology sets and units.
+
+Required behavior:
+
+- Add a `Pattern Palettes` subtree in the Templates tab.
+- The root panel lists built-in and user palettes with entry counts.
+- The palette detail panel shows:
+  - pattern preview swatch;
+  - code;
+  - display name;
+  - tile size;
+  - source/origin;
+  - description where available.
+- Built-in palette details are read-only.
+- User palette details allow:
+  - rename palette;
+  - add/import SVG pattern;
+  - edit display name/code where safe;
+  - delete pattern;
+  - delete palette.
+- Preview rendering should use the same sanitized SVG-to-pattern path that the log renderer will use, not a separate fake preview.
+
+Likely code areas:
+
+- `frontend/src/components/layout/TemplatesTab.tsx`
+- `frontend/src/components/layout/SettingsInspector.tsx`
+- New settings components under `frontend/src/components/layout/settings/`
+- `frontend/src/stores/wellDataStore.ts`
+- `frontend/src/types/subsidence.ts`
+- `frontend/src/styles/data-manager.css`
+
+Acceptance:
+
+- Pattern palettes are discoverable from Templates.
+- Built-in palettes are visibly read-only.
+- User palettes can be created/imported and previewed.
+- Pattern preview matches the renderer's final tile behavior.
+
+### PAT-005: Connect lithology sets to selectable pattern palette entries
+
+Problem:
+
+- `LithologySetSettings` currently exposes `pattern_id` as a free-text field.
+- Lithology entries should choose from known pattern registry entries, while still allowing solid fill.
+- A lithology entry already links visual style and compaction preset; this should remain the central per-lithology configuration point.
+
+Required behavior:
+
+- Replace free-text pattern entry editing with a pattern selector.
+- Selector options include:
+  - solid fill / no pattern;
+  - built-in pattern entries;
+  - user-imported pattern entries.
+- Each selectable pattern shows a compact preview and display name.
+- Lithology set entries continue to expose:
+  - lithology code;
+  - display name;
+  - color;
+  - selected pattern;
+  - linked compaction preset;
+  - derived density, surface porosity, and compaction coefficient.
+- Built-in lithology sets remain read-only.
+- User lithology sets can use either built-in or user pattern entries.
+- If a referenced user pattern is deleted, dependent lithology entries must fall back predictably:
+  - either block deletion with a clear API error;
+  - or set affected entries to solid fill.
+  - The chosen policy must be explicit before implementation.
+
+Likely code areas:
+
+- `frontend/src/components/layout/settings/LithologySetSettings.tsx`
+- `frontend/src/stores/wellDataStore.ts`
+- `frontend/src/types/subsidence.ts`
+- `app/src/subsidence/api/compaction.py`
+- Pattern palette API module
+
+Acceptance:
+
+- Users cannot type invalid pattern ids by accident.
+- Lithology set rows preview the actual selected pattern.
+- User lithology sets can combine built-in compaction presets with user-imported visual patterns.
+- Pattern deletion behavior is deterministic and tested.
+
+### PAT-006: Render lithology fills from SVG-backed pattern registry
+
+Problem:
+
+- `frontend/src/renderers/lithologyRenderer.ts` currently renders only a few canvas-drawn hardcoded pattern names.
+- Discrete and percentage lithology tracks need a generic renderer that can repeat SVG patterns from the registry.
+
+Required behavior:
+
+- Replace the hardcoded switch-based pattern renderer with a registry-backed renderer.
+- Renderer input should be a resolved visual style, not only a lithology enum:
+  - fill color;
+  - optional pattern code/id;
+  - optional SVG content or resolved pattern asset;
+  - fallback label/color for unknown values.
+- Convert sanitized SVG patterns to repeatable canvas patterns.
+- Cache canvas patterns by rendering context and stable pattern version/key.
+- Preserve solid fill behavior when no pattern is selected or pattern loading fails.
+- Unknown or missing lithology values must use a visible fallback style.
+- The renderer must support:
+  - current formation/lithology block usage;
+  - future `curve_type = discrete` block tracks;
+  - future percentage lithology composition tracks.
+
+Likely code areas:
+
+- `frontend/src/renderers/lithologyRenderer.ts`
+- `frontend/src/renderers/index.ts`
+- `frontend/src/components/logview/DataTrack.tsx`
+- `frontend/src/components/layout/settings/`
+- `frontend/src/types/tracks.ts`
+
+Acceptance:
+
+- Existing lithology blocks still render.
+- Built-in SVG patterns render as repeatable canvas fills.
+- User-imported SVG patterns render through the same path.
+- Renderer no longer depends on hardcoded lithology string cases for pattern drawing.
+- Pattern rendering failures degrade to solid fill plus normal block border, without breaking the viewer.
+
+### PAT-007: Pattern palette tests and migration coverage
+
+Problem:
+
+- Pattern registry changes affect database schema, API behavior, Templates UI, and rendering.
+- Regression coverage is needed before lithology log import and rendering depend on these patterns.
+
+Required behavior:
+
+- Backend tests cover:
+  - built-in palette seeding;
+  - idempotent self-healing;
+  - read-only built-in protection;
+  - user palette CRUD;
+  - SVG import validation;
+  - lithology set references to pattern entries;
+  - old `pattern_id` compatibility/migration.
+- Frontend tests cover:
+  - Templates tree shows pattern palettes;
+  - built-in palette is read-only;
+  - lithology set pattern selector lists built-in and user patterns;
+  - invalid/missing pattern falls back in preview.
+- Renderer-level tests or focused component tests cover:
+  - solid fill;
+  - SVG pattern fill;
+  - missing pattern fallback.
+
+Likely code areas:
+
+- `app/tests/integration/test_project_api_workflows.py`
+- Frontend integration tests under `frontend/src/__tests__/integration/`
+- Renderer tests where practical
+
+Acceptance:
+
+- Pattern registry behavior is protected before `LITH-001`.
+- Old projects with existing lithology sets still open and display sane visual styles.
+
+---
+
+## 6. Lithology Curve Support
 
 ### LITH-001: Discrete log import and rendering
 
@@ -632,6 +953,13 @@ Dependencies:
 - `DICT-001`
 - `DICT-002`
 - `DICT-003`
+- `PAT-001`
+- `PAT-002`
+- `PAT-003`
+- `PAT-004`
+- `PAT-005`
+- `PAT-006`
+- `PAT-007`
 
 Likely code areas:
 
@@ -663,6 +991,7 @@ Dependencies:
 
 - `DICT-001`
 - `DICT-003`
+- `PAT-006`
 
 Likely code areas:
 
@@ -709,7 +1038,7 @@ Acceptance:
 
 ---
 
-## 6. Formation and Unconformity Settings
+## 7. Formation and Unconformity Settings
 
 ### TOP-001: Edit conformable/unconformity attributes in settings
 
@@ -739,7 +1068,7 @@ Acceptance:
 
 ---
 
-## 7. Subsidence Chart Stratigraphy
+## 8. Subsidence Chart Stratigraphy
 
 ### SUBS-001: Two-level stratigraphy in upper subsidence chart
 
@@ -785,15 +1114,16 @@ Acceptance:
 
 ---
 
-## 8. Contract Boundaries
+## 9. Contract Boundaries
 
 Import Wizard is now part of this contract as `WIZ-*`.
 
 Ownership split:
 
-- `DICT-*` owns dictionaries, templates, curve mnemonic aliases, lithologies, palettes, lithology sets, and compaction presets.
+- `DICT-*` owns dictionaries, templates, curve mnemonic aliases, lithologies, lithology sets, and compaction presets.
 - `UNIT-*` owns measurement dimensions, units, aliases, unit conversion rules, and engine-unit normalization.
 - `WIZ-*` owns import preview, parser settings, column mapping, target-well selection, validation, execution, logging, and import tests.
+- `PAT-*` owns lithology pattern palette registry, built-in/user SVG pattern storage, SVG validation, pattern previews, and renderer pattern resolution.
 - `LITH-*` owns discrete/percentage lithology data behavior after import.
 - `UX-*` owns viewer interactions and visual presentation.
 - `SUBS-*` owns subsidence chart presentation.
@@ -801,7 +1131,8 @@ Ownership split:
 Dependency rule:
 
 - Import Wizard can read dictionary/template data, but it must not duplicate dictionary definitions.
-- Lithology import behavior must not be implemented before dictionary/template and wizard foundations are stable.
+- Lithology pattern palettes must be implemented before discrete/percentage lithology rendering depends on pattern fills.
+- Lithology import behavior must not be implemented before dictionary/template, wizard, and pattern palette foundations are stable.
 
 ---
 
