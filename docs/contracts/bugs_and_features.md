@@ -107,7 +107,7 @@ Items:
 
 - `TOPS-001`: TopSet / Horizon / Pick data model. (done)
 - `TOPS-002`: TVD/TVDSS as stored calculated fields; interactive depth picking. (done)
-- `DEPTH-001`: Trusted depth reference on import, QC flags, TVD curve display.
+- `DEPTH-001`: Trusted depth reference on import, QC flags, TVD curve display. (done)
 - `ZONE-001`: Zone entity and lifecycle.
 - `ZONE-002`: Zone settings UI and manual lithology input.
 - `ZONE-003`: Auto-lithology aggregation from discrete log (depends `LITH-001`).
@@ -1285,6 +1285,17 @@ Acceptance:
 - `GET /api/wells/{id}/curves?depth_basis=TVD` with no deviation survey: returns native MD depths; `qc_flags` includes `DEPTH_TRANSFORM_UNAVAILABLE`.
 - Switching viewer to TVD mode: curves re-fetch from full endpoint with `?depth_basis=TVD`; log tracks and formation lines align on the same TVD axis.
 - All existing import and API tests pass.
+
+Implemented: commit `ce61e29` (2026-04-26).
+
+- Schema: SCHEMA_VERSION 8→9; `CurveMetadata` gains `trusted_depth_reference`, `sampling_kind`, `nominal_step_m`, `qc_status`, `qc_summary`; `FormationTopModel` gains `qc_status`, `qc_summary`.
+- `importers/common.py`: `compute_sampling_kind`, `run_curve_qc`, `run_top_qc` helpers.
+- LAS, CSV log, tops importers: `trusted_depth_reference` param; return `(result, qc_warnings)` tuple; QC metadata stored.
+- Tops importer: TVD/TVDSS `depth_ref` accepted (was `NotImplementedError`).
+- API: `trusted_depth_reference` on import requests; `qc_warnings` on import responses.
+- `GET /wells/{id}/curves/full?depth_basis=MD|TVD|TVDSS`: on-the-fly depth conversion via `deviation_transform`.
+- Frontend: `reloadCurvesForDepthBasis` in wellDataStore; depth-type toolbar buttons call it; LOD disabled in non-MD mode.
+- Import dialogs: depth reference selector and QC warnings panel.
 
 ---
 
