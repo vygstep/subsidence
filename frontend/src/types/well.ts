@@ -71,6 +71,7 @@ export interface FormationInventoryItem {
   depth_tvdss: number | null
   horizon_id: number | null
   active_strat_color: string | null
+  kind: string
 }
 
 export interface StratChartInfo {

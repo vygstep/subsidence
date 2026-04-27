@@ -346,6 +346,11 @@
   outline-offset: -1px;
 }
 
+.top-leaf--unconformity .tree-checkbox-leaf__label {
+  color: #ef4444;
+  font-weight: 700;
+}
+
 .top-leaf__button {
   border: 0;
   background: transparent;

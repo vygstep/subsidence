@@ -309,7 +309,7 @@ export function WellDataPanel({
                           item.formations.map((formation) => (
                             <div
                               key={formation.id}
-                              className={`top-leaf ${selectedFormationId === formation.id && isActive ? 'top-leaf--selected' : ''}`}
+                              className={`top-leaf ${selectedFormationId === formation.id && isActive ? 'top-leaf--selected' : ''} ${formation.kind === 'unconformity' ? 'top-leaf--unconformity' : ''}`}
                               style={{ ['--top-leaf-color' as string]: topBackgroundColor(formation) }}
                               onClick={() => onSelectFormation(item.well_id, formation.id)}
                               onContextMenu={(event) => {

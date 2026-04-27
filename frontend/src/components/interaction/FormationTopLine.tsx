@@ -132,11 +132,13 @@ export function FormationTopLine({
     }
   }, [popover, commitPopover])
 
-  const color = formation.active_strat_color ?? formation.color
+  const isUnconformity = formation.kind === 'unconformity'
+  const color = isUnconformity ? '#ef4444' : (formation.active_strat_color ?? formation.color)
   const displayY = localY !== null ? localY : yPosition
   const cursor = !editable ? 'default' : formation.is_locked ? 'not-allowed' : isActivePick ? 'crosshair' : 'ns-resize'
   const strokeOpacity = isDragging || isActivePick ? 1.0 : 0.75
-  const strokeWidth = isActivePick ? 2.5 : 1.5
+  const strokeWidth = isActivePick ? 2.5 : (isUnconformity ? 2.0 : 1.5)
+  const strokeDasharray = isUnconformity ? '4 2 1 2' : '6 3'
 
   return (
     <>
@@ -153,7 +155,7 @@ export function FormationTopLine({
           y2={displayY}
           stroke={color}
           strokeWidth={strokeWidth}
-          strokeDasharray="6 3"
+          strokeDasharray={strokeDasharray}
           strokeOpacity={strokeOpacity}
         />
         {isActivePick && (
