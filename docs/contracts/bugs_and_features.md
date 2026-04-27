@@ -134,7 +134,7 @@ Goal:
 Items:
 
 - `LITH-001`: Discrete log import and rendering. (done)
-- `LITH-002`: Percentage lithology curves and Lithology track.
+- `LITH-002`: Percentage lithology curves and Lithology track. (done)
 
 Exit criteria:
 

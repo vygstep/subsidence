@@ -1,6 +1,6 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 
-import { useWellDataStore } from '@/stores'
+import { useWellDataStore, useWorkspaceStore } from '@/stores'
 import type { TrackConfig } from '@/types'
 
 interface CurveMatchResult {
@@ -17,7 +17,17 @@ interface CurveSettingsProps {
 export function CurveSettings({ selectedCurveConfig, onCurveSettingUpdate }: CurveSettingsProps) {
   const curves = useWellDataStore((state) => state.curves)
   const well = useWellDataStore((state) => state.well)
+  const lithologyDictionaryEntries = useWellDataStore((state) => state.lithologyDictionaryEntries)
+  const wellViewStates = useWorkspaceStore((state) => state.wellViewStates)
+  const updateWellViewState = useWorkspaceStore((state) => state.updateWellViewState)
   const [dictMatch, setDictMatch] = useState<CurveMatchResult | null>(null)
+
+  const wellId = well?.well_id ?? ''
+  const viewState = wellViewStates[wellId]
+  const containingTrack = useMemo(
+    () => viewState?.tracks.find((t) => t.curves.some((c) => c.mnemonic === selectedCurveConfig.mnemonic)) ?? null,
+    [viewState, selectedCurveConfig.mnemonic],
+  )
 
   useEffect(() => {
     void fetch(`/api/dictionary/curves/match?mnemonic=${encodeURIComponent(selectedCurveConfig.mnemonic)}`)
@@ -27,6 +37,14 @@ export function CurveSettings({ selectedCurveConfig, onCurveSettingUpdate }: Cur
 
   const curveType = selectedCurveConfig.curve_type ?? 'continuous'
   const isDiscrete = curveType === 'discrete'
+  const isLithologyTrack = containingTrack?.track_type === 'lithology'
+
+  const lithologyWarning = useMemo(() => {
+    if (!isLithologyTrack || !containingTrack) return null
+    const missing = containingTrack.curves.filter((c) => !c.lithology_code).length
+    if (missing === 0) return null
+    return `${missing} curve${missing > 1 ? 's' : ''} in this track ${missing > 1 ? 'have' : 'has'} no lithology code`
+  }, [isLithologyTrack, containingTrack])
 
   function handleRenderingModeChange(nextType: 'continuous' | 'discrete') {
     if (!well) return
@@ -36,6 +54,18 @@ export function CurveSettings({ selectedCurveConfig, onCurveSettingUpdate }: Cur
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ curve_type: nextType }),
     })
+  }
+
+  function handleLithologyCodeChange(code: string) {
+    onCurveSettingUpdate(selectedCurveConfig.mnemonic, { lithology_code: code || undefined })
+    if (code && containingTrack && wellId) {
+      updateWellViewState(wellId, (state) => ({
+        ...state,
+        tracks: state.tracks.map((t) =>
+          t.id === containingTrack.id ? { ...t, track_type: 'lithology' as const } : t,
+        ),
+      }))
+    }
   }
 
   function applyDataDefaults() {
@@ -150,6 +180,25 @@ export function CurveSettings({ selectedCurveConfig, onCurveSettingUpdate }: Cur
             ))}
           </div>
         </div>
+      )}
+
+      <div className="template-panel__section-header">Lithology composition</div>
+      <label className="project-dialog__field">
+        <span>Lithology code</span>
+        <select
+          value={selectedCurveConfig.lithology_code ?? ''}
+          onChange={(e) => handleLithologyCodeChange(e.target.value)}
+        >
+          <option value="">None</option>
+          {lithologyDictionaryEntries.map((entry) => (
+            <option key={entry.lithology_code} value={entry.lithology_code}>
+              {entry.display_name}
+            </option>
+          ))}
+        </select>
+      </label>
+      {isLithologyTrack && lithologyWarning && (
+        <p className="project-dialog__warning">{lithologyWarning}</p>
       )}
     </div>
   )

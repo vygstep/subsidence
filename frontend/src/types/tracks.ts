@@ -6,6 +6,7 @@ export interface TrackConfig {
   scaleType: 'linear' | 'logarithmic'
   gridDivisions: number
   showGrid: boolean
+  track_type?: 'data' | 'lithology'
 }
 
 export interface CurveFillConfig {
@@ -28,4 +29,5 @@ export interface CurveConfig {
   scaleReversed: boolean
   fill?: CurveFillConfig
   curve_type?: 'continuous' | 'discrete'
+  lithology_code?: string
 }

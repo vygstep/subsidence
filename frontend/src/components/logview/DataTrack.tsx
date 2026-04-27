@@ -1,5 +1,5 @@
 import { scaleLinear, scaleLog, type ScaleLinear, type ScaleLogarithmic } from 'd3-scale'
-import { useMemo } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 
 import { useCanvasRenderer, useDepthScale } from '@/hooks'
 import {
@@ -11,8 +11,10 @@ import {
   drawLogarithmicGrid,
 } from '@/renderers'
 import { drawDiscreteBlocks } from '@/renderers/discreteBlockRenderer'
-import type { CurveConfig, CurveData, TrackConfig } from '@/types'
-import { useViewStore } from '@/stores'
+import { drawLithologyComposition, type CompositionBand } from '@/renderers/lithologyCompositionRenderer'
+import type { LithologyFillStyle } from '@/renderers/lithologyRenderer'
+import type { CurveConfig, CurveData, LithologyPatternEntry, TrackConfig } from '@/types'
+import { useViewStore, useWellDataStore } from '@/stores'
 
 interface DataTrackProps {
   config: TrackConfig
@@ -103,6 +105,36 @@ export function DataTrack({ config, curves, width, height }: DataTrackProps) {
   const selectElement = useViewStore((state) => state.selectElement)
   const clearSelection = useViewStore((state) => state.clearSelection)
 
+  const lithologyDictionaryEntries = useWellDataStore((state) => state.lithologyDictionaryEntries)
+  const patternPalettes = useWellDataStore((state) => state.lithologyPatternPalettes)
+  const fetchPatternPalette = useWellDataStore((state) => state.fetchLithologyPatternPalette)
+  const [patterns, setPatterns] = useState<LithologyPatternEntry[]>([])
+  const [patternRenderTick, setPatternRenderTick] = useState(0)
+
+  useEffect(() => {
+    let cancelled = false
+    void Promise.all(patternPalettes.map((p) => fetchPatternPalette(p.id))).then((details) => {
+      if (!cancelled) setPatterns(details.flatMap((d) => d?.patterns ?? []))
+    })
+    return () => { cancelled = true }
+  }, [fetchPatternPalette, patternPalettes])
+
+  const isLithologyTrack = config.track_type === 'lithology'
+
+  const lithologyFillStyles = useMemo<Map<string, LithologyFillStyle>>(() => {
+    const patternByCode = new Map(patterns.map((p) => [p.code, p]))
+    return new Map(
+      lithologyDictionaryEntries.map((e) => [
+        e.lithology_code,
+        {
+          color: e.color_hex,
+          patternCode: e.pattern_id ?? null,
+          patternSvg: e.pattern_id ? (patternByCode.get(e.pattern_id)?.svg_content ?? null) : null,
+        } satisfies LithologyFillStyle,
+      ]),
+    )
+  }, [lithologyDictionaryEntries, patterns])
+
   const visibleCurves = useMemo<VisibleCurve[]>(() => {
     const requestedMnemonics = new Map(config.curves.map((curve) => [curve.mnemonic, curve]))
 
@@ -151,10 +183,33 @@ export function DataTrack({ config, curves, width, height }: DataTrackProps) {
     )
   }, [config.curves, config.scaleType, width])
 
+  const compositionBands = useMemo<CompositionBand[]>(() => {
+    if (!isLithologyTrack) return []
+    return clippedCurves
+      .filter(({ style }) => !!style.lithology_code)
+      .map(({ curve, style }) => ({
+        depths: curve.depths,
+        values: curve.values,
+        nullValue: curve.null_value,
+        style: lithologyFillStyles.get(style.lithology_code!) ?? { color: '#cccccc' },
+      }))
+  }, [isLithologyTrack, clippedCurves, lithologyFillStyles])
+
   const canvasRef = useCanvasRenderer(
     (ctx, canvasWidth, canvasHeight) => {
       ctx.fillStyle = '#ffffff'
       ctx.fillRect(0, 0, canvasWidth, canvasHeight)
+
+      if (isLithologyTrack) {
+        drawDepthGridlines(ctx, depthScale, canvasWidth, 100, 10)
+        if (compositionBands.length > 0) {
+          drawLithologyComposition(
+            ctx, compositionBands, depthScale, canvasWidth, canvasHeight,
+            () => setPatternRenderTick((t) => t + 1),
+          )
+        }
+        return
+      }
 
       if (config.showGrid) {
         const primaryMnemonic = config.curves[0]?.mnemonic
@@ -258,18 +313,27 @@ export function DataTrack({ config, curves, width, height }: DataTrackProps) {
     [
       clippedCurveMap,
       clippedCurves,
+      compositionBands,
       config.curves,
       config.gridDivisions,
       config.scaleType,
       config.showGrid,
+      config.track_type,
       curveScales,
       depthScale,
+      isLithologyTrack,
+      patternRenderTick,
       selectedElementId,
       selectedElementType,
     ],
   )
 
   function handleClick(e: React.MouseEvent<HTMLCanvasElement>) {
+    if (isLithologyTrack) {
+      clearSelection()
+      return
+    }
+
     const rect = e.currentTarget.getBoundingClientRect()
     const clickX = e.clientX - rect.left
     const clickY = e.clientY - rect.top
