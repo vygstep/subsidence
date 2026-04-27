@@ -1,4 +1,4 @@
-export interface GeologicPeriod {
+export interface GeologicUnit {
   name: string
   abbreviation: string
   start_ma: number
@@ -6,7 +6,16 @@ export interface GeologicPeriod {
   color: string
 }
 
-export const GEOLOGIC_PERIODS: GeologicPeriod[] = [
+export type GeologicPeriod = GeologicUnit
+
+export const GEOLOGIC_ERAS: GeologicUnit[] = [
+  { name: 'Cenozoic',   abbreviation: 'Cz', start_ma: 66.0,   end_ma: 0,     color: '#F2F91D' },
+  { name: 'Mesozoic',   abbreviation: 'Mz', start_ma: 251.9,  end_ma: 66.0,  color: '#67C5CA' },
+  { name: 'Paleozoic',  abbreviation: 'Pz', start_ma: 538.8,  end_ma: 251.9, color: '#99C08D' },
+  { name: 'Precambrian',abbreviation: 'pC', start_ma: 4000,   end_ma: 538.8, color: '#F74370' },
+]
+
+export const GEOLOGIC_PERIODS: GeologicUnit[] = [
   { name: 'Quaternary',    abbreviation: 'Q',  start_ma: 2.58,  end_ma: 0,     color: '#f9f97f' },
   { name: 'Neogene',       abbreviation: 'N',  start_ma: 23.03, end_ma: 2.58,  color: '#ffff00' },
   { name: 'Paleogene',     abbreviation: 'Pg', start_ma: 66.0,  end_ma: 23.03, color: '#fd9a52' },

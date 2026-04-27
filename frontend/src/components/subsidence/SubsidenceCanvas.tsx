@@ -7,7 +7,7 @@ import { useWellDataStore } from '@/stores/wellDataStore'
 import type { SubsidenceResult } from '@/types/subsidence'
 import { GeologicalTimescale } from './GeologicalTimescale'
 
-const TIMESCALE_HEIGHT = 40
+const TIMESCALE_HEIGHT = 52
 const PADDING = { top: 12, right: 100, bottom: 48, left: 64 }
 
 function drawAxes(

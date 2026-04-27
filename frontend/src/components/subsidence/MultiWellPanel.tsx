@@ -3,8 +3,10 @@ import { useCallback, useEffect, useMemo, useRef } from 'react'
 import { useCanvasRenderer } from '@/hooks/useCanvasRenderer'
 import { useMultiWellStore } from '@/stores/multiWellStore'
 import { useWellDataStore } from '@/stores/wellDataStore'
+import { GeologicalTimescale } from './GeologicalTimescale'
 
 const PADDING = { top: 12, right: 120, bottom: 40, left: 64 }
+const TIMESCALE_HEIGHT = 52
 
 const WELL_COLORS = [
   '#2196f3', '#e63946', '#43a047', '#ff9800', '#9c27b0', '#00bcd4',
@@ -309,15 +311,23 @@ export function MultiWellPanel() {
   }, [wellResults])
 
   return (
-    <div
-      className="multi-well-panel"
-      onMouseMove={handleMouseMove}
-      onMouseLeave={handleMouseLeave}
-      onClick={handleClick}
-      style={{ cursor: 'pointer' }}
-    >
-      <canvas ref={canvasRef} className="subsidence-canvas" />
-      <canvas ref={crosshairRef} className="subsidence-canvas subsidence-canvas--crosshair" />
+    <div className="multi-well-panel">
+      <GeologicalTimescale
+        timeRange={{ min_ma: 0, max_ma: maxAge }}
+        height={TIMESCALE_HEIGHT}
+        paddingLeft={PADDING.left}
+        paddingRight={PADDING.right}
+      />
+      <div
+        className="multi-well-canvas-wrapper"
+        onMouseMove={handleMouseMove}
+        onMouseLeave={handleMouseLeave}
+        onClick={handleClick}
+        style={{ cursor: 'pointer' }}
+      >
+        <canvas ref={canvasRef} className="subsidence-canvas" />
+        <canvas ref={crosshairRef} className="subsidence-canvas subsidence-canvas--crosshair" />
+      </div>
     </div>
   )
 }
