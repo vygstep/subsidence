@@ -2,24 +2,24 @@
 
 .app-sidebar {
   /* typography */
-  --dm-font-xs:           0.68rem;
-  --dm-font-sm:           0.72rem;
-  --dm-font-md:           0.78rem;
-  --dm-font-body:         0.82rem;
-  --dm-font-lg:           0.86rem;
+  --dm-font-xs:           0.62rem;
+  --dm-font-sm:           0.65rem;
+  --dm-font-md:           0.70rem;
+  --dm-font-body:         0.74rem;
+  --dm-font-lg:           0.78rem;
   --dm-fw-normal:         500;
   --dm-fw-bold:           700;
   --dm-ls-label:          0.05em;
   --dm-ls-label-wide:     0.08em;
 
   /* geometry */
-  --dm-row-height:        24px;
-  --dm-control-size:      14px;
-  --dm-indent:            16px;
-  --dm-panel-px:          12px;
-  --dm-panel-py:          10px;
-  --dm-cell-px:           8px;
-  --dm-cell-py:           6px;
+  --dm-row-height:        20px;
+  --dm-control-size:      13px;
+  --dm-indent:            14px;
+  --dm-panel-px:          10px;
+  --dm-panel-py:          8px;
+  --dm-cell-px:           6px;
+  --dm-cell-py:           4px;
   --dm-row-gap:           2px;
 
   /* radii */
@@ -76,7 +76,7 @@
 }
 
 .sidebar-panel__header {
-  padding: 12px 14px;
+  padding: 8px 10px;
   border-bottom: 1px solid var(--dm-border-light);
   background: var(--dm-bg-panel);
 }

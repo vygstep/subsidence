@@ -21,8 +21,8 @@
   display: flex;
   align-items: flex-start;
   justify-content: space-between;
-  gap: 16px;
-  padding: 20px 24px 12px;
+  gap: 12px;
+  padding: 14px 18px 10px;
   border-bottom: 1px solid #e2e8f0;
 }
 
@@ -54,8 +54,8 @@
 .project-dialog__body {
   display: flex;
   flex-direction: column;
-  gap: 16px;
-  padding: 20px 24px 24px;
+  gap: 12px;
+  padding: 14px 18px 18px;
 }
 
 .project-dialog__field {
@@ -75,18 +75,18 @@
 
 .project-dialog__field input {
   width: 100%;
-  padding: 11px 12px;
+  padding: 7px 10px;
   border: 1px solid #cbd5e1;
-  border-radius: 10px;
+  border-radius: 8px;
   background: #ffffff;
   color: #17212b;
 }
 
 .project-dialog__field select {
   width: 100%;
-  padding: 11px 12px;
+  padding: 7px 10px;
   border: 1px solid #cbd5e1;
-  border-radius: 10px;
+  border-radius: 8px;
   background: #ffffff;
   color: #17212b;
 }
