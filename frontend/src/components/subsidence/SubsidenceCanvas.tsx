@@ -143,6 +143,7 @@ export function SubsidenceCanvas() {
   const showFormationFills = useComputedStore((s) => s.showFormationFills)
   const showBurialCurves = useComputedStore((s) => s.showBurialCurves)
 
+  const wellName = useWellDataStore((s) => s.well?.well_name ?? null)
   const tdMd = useWellDataStore((s) => s.well?.td_md ?? 0)
   const formations = useWellDataStore((s) => s.formations)
 
@@ -285,6 +286,11 @@ export function SubsidenceCanvas() {
 
   return (
     <div ref={containerRef} className="subsidence-canvas-container">
+      {wellName && (
+        <div className="subsidence-chart-title">
+          {wellName} — Total subsidence
+        </div>
+      )}
       <GeologicalTimescale
         timeRange={{ min_ma: 0, max_ma: maxAge }}
         height={TIMESCALE_HEIGHT}

@@ -312,6 +312,7 @@ export function MultiWellPanel() {
 
   return (
     <div className="multi-well-panel">
+      <div className="subsidence-chart-title">Multi-well subsidence chart</div>
       <GeologicalTimescale
         timeRange={{ min_ma: 0, max_ma: maxAge }}
         height={TIMESCALE_HEIGHT}

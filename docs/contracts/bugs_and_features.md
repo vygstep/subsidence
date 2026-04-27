@@ -154,7 +154,7 @@ Items:
 - `UX-003`: Toggle top labels per pick. (done)
 - `SUBS-001`: Two-level stratigraphy in upper subsidence chart. (done)
 - `SUBS-002`: Stratigraphy scale in lower multi-well subsidence chart. (done)
-- `UX-010`: Subsidence chart labels.
+- `UX-010`: Subsidence chart labels. (done)
 
 Exit criteria:
 
