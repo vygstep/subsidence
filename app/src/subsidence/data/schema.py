@@ -7,7 +7,7 @@ from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column, relationship
 from sqlalchemy import MetaData
 
 SUBSIDENCE_APP_ID = 0x53554253  # "SUBS" as 4-byte int
-SCHEMA_VERSION = 10
+SCHEMA_VERSION = 11
 
 _NAMING: dict[str, str] = {
     "ix": "ix_%(table_name)s_%(column_0_name)s",
@@ -127,6 +127,9 @@ class CurveMetadata(Base, AuditMixin):
     data_uri: Mapped[str] = mapped_column(Text)  # relative path to Parquet
     source_hash: Mapped[str] = mapped_column(String(64))  # sha256 of source file
     null_value: Mapped[float] = mapped_column(Float, default=-999.25)
+    discrete_code_map: Mapped[str | None] = mapped_column(Text, nullable=True)
+    # JSON object mapping integer code → display label, e.g. {"1": "Sandstone", "2": "Shale"}
+    # Only meaningful when curve_type = 'discrete'; NULL means codes have no labels yet.
     trusted_depth_reference: Mapped[str] = mapped_column(String(8), default="MD")
     # "MD" | "TVD" | "TVDSS" — depth type used in the source file
     sampling_kind: Mapped[str | None] = mapped_column(String(16), nullable=True)
@@ -696,7 +699,7 @@ class ZoneWellData(Base):
     thickness_tvd: Mapped[float | None] = mapped_column(Float, nullable=True)
     lithology_fractions: Mapped[str | None] = mapped_column(Text, nullable=True)
     # JSON {"sandstone": 0.6, "shale": 0.4}
-    lithology_source: Mapped[str] = mapped_column(String(8), default="manual")
+    lithology_source: Mapped[str] = mapped_column(String(8), default="auto")
     # "manual" | "auto"
 
     zone: Mapped["FormationZone"] = relationship(back_populates="well_data")

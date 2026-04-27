@@ -92,6 +92,10 @@ def migrate_schema(engine: Engine) -> None:
         if 'compaction_coeff' not in litho_cols:
             conn.execute(text("ALTER TABLE lithology_dict_entries ADD COLUMN compaction_coeff REAL NOT NULL DEFAULT 0.30"))
             conn.commit()
+        curve_cols = {row[1] for row in conn.execute(text("PRAGMA table_info(curve_metadata)"))}
+        if 'discrete_code_map' not in curve_cols:
+            conn.execute(text("ALTER TABLE curve_metadata ADD COLUMN discrete_code_map TEXT"))
+            conn.commit()
 
 
 def validate_project_db(db_path: Path | str) -> tuple[int, int]:

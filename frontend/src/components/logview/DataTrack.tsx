@@ -10,6 +10,7 @@ import {
   drawLinearGrid,
   drawLogarithmicGrid,
 } from '@/renderers'
+import { drawDiscreteBlocks } from '@/renderers/discreteBlockRenderer'
 import type { CurveConfig, CurveData, TrackConfig } from '@/types'
 import { useViewStore } from '@/stores'
 
@@ -231,6 +232,20 @@ export function DataTrack({ config, curves, width, height }: DataTrackProps) {
       })
 
       clippedCurves.forEach(({ curve, style }) => {
+        if (style.curve_type === 'discrete') {
+          drawDiscreteBlocks(
+            ctx,
+            curve.depths,
+            curve.values,
+            depthScale,
+            canvasWidth,
+            canvasHeight,
+            curve.discrete_code_map,
+            curve.null_value,
+          )
+          return
+        }
+
         const valueScale = curveScales.get(style.mnemonic)
         if (!valueScale) {
           return

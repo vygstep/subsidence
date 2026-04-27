@@ -141,6 +141,7 @@ export function buildCurveDefaults(
       scaleMin: safeScaleMin,
       scaleMax: safeScaleMax,
       scaleReversed: preset?.scaleReversed ?? false,
+      curve_type: curve.curve_type ?? 'continuous',
     },
     scaleType: preset?.scaleType ?? 'linear',
   }

@@ -27,6 +27,14 @@ class CurveInventoryItem(BaseModel):
     mnemonic: str
     unit: str
     trusted_depth_reference: str = 'MD'
+    curve_type: str = 'continuous'
+    discrete_code_map: str | None = None
+
+
+class CurvePatchRequest(BaseModel):
+    curve_type: str | None = None
+    discrete_code_map: str | None = None
+    family_code: str | None = None
 
 
 class FormationInventoryItem(BaseModel):
@@ -45,6 +53,8 @@ class CurveResponse(BaseModel):
     depths: list[float]
     values: list[float]
     null_value: float
+    curve_type: str = 'continuous'
+    discrete_code_map: str | None = None
 
 
 class FormationResponse(BaseModel):
@@ -329,6 +339,8 @@ def list_well_inventories(request: Request) -> list[WellInventoryResponse]:
                             mnemonic=row.mnemonic,
                             unit=row.unit,
                             trusted_depth_reference=row.trusted_depth_reference,
+                            curve_type=row.curve_type,
+                            discrete_code_map=row.discrete_code_map,
                         )
                         for row in curve_rows
                     ],
@@ -379,6 +391,8 @@ def get_well(well_id: str, request: Request) -> WellResponse:
                         depths=depths.tolist(),
                         values=curve_values.tolist(),
                         null_value=row.null_value,
+                        curve_type=row.curve_type,
+                        discrete_code_map=row.discrete_code_map,
                     )
                 )
 
@@ -488,6 +502,8 @@ def get_curves_lod(
                     depths=d_clip[idx].tolist(),
                     values=v_clip[idx].tolist(),
                     null_value=row.null_value,
+                    curve_type=row.curve_type,
+                    discrete_code_map=row.discrete_code_map,
                 )
             )
         return results
@@ -552,6 +568,8 @@ def get_curves_full(
                         depths=converted_depths,
                         values=values_arr.tolist(),
                         null_value=row.null_value,
+                        curve_type=row.curve_type,
+                        discrete_code_map=row.discrete_code_map,
                     )
                 )
             else:
@@ -563,9 +581,60 @@ def get_curves_full(
                         depths=depths_arr.tolist(),
                         values=values_arr.tolist(),
                         null_value=row.null_value,
+                        curve_type=row.curve_type,
+                        discrete_code_map=row.discrete_code_map,
                     )
                 )
         return results
+
+
+@router.patch('/wells/{well_id}/curves/{mnemonic}', response_model=CurveInventoryItem)
+def patch_curve_metadata(
+    well_id: str,
+    mnemonic: str,
+    body: CurvePatchRequest,
+    request: Request,
+) -> CurveInventoryItem:
+    manager = _require_open_project(request)
+    with manager.get_session() as session:
+        well = session.get(WellModel, well_id)
+        if well is None:
+            raise HTTPException(status_code=404, detail=f'Well not found: {well_id}')
+        row = session.scalar(
+            select(CurveMetadata)
+            .where(CurveMetadata.well_id == well_id, CurveMetadata.mnemonic == mnemonic)
+        )
+        if row is None:
+            raise HTTPException(status_code=404, detail=f'Curve not found: {mnemonic}')
+        if body.curve_type is not None:
+            if body.curve_type not in ('continuous', 'discrete'):
+                raise HTTPException(status_code=422, detail="curve_type must be 'continuous' or 'discrete'")
+            row.curve_type = body.curve_type
+        if body.discrete_code_map is not None:
+            row.discrete_code_map = body.discrete_code_map
+        if body.family_code is not None:
+            row.family_code = body.family_code
+        session.commit()
+        return CurveInventoryItem(
+            mnemonic=row.mnemonic,
+            unit=row.unit,
+            trusted_depth_reference=row.trusted_depth_reference,
+            curve_type=row.curve_type,
+            discrete_code_map=row.discrete_code_map,
+        )
+
+
+@router.post('/wells/{well_id}/zones/recalculate-lithology')
+def recalculate_zone_lithology(well_id: str, request: Request) -> dict[str, int]:
+    manager = _require_open_project(request)
+    with manager.get_session() as session:
+        well = session.get(WellModel, well_id)
+        if well is None:
+            raise HTTPException(status_code=404, detail=f'Well not found: {well_id}')
+        from subsidence.data.zone_service import aggregate_zone_lithology_from_curve
+        updated = aggregate_zone_lithology_from_curve(session, manager.project_path, well_id)
+        session.commit()
+    return {'zones_updated': updated}
 
 
 @router.get('/wells/{well_id}/zones', response_model=list[ZoneInventoryItem])

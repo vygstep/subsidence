@@ -32,6 +32,8 @@ interface CurveResponse {
   depths: number[]
   values: number[]
   null_value: number
+  curve_type?: 'continuous' | 'discrete'
+  discrete_code_map?: Record<string, string> | null
 }
 
 interface WellResponse extends Well {
@@ -323,6 +325,8 @@ export const useWellDataStore = create<WellDataStore>((set, get) => ({
           depths: toFloat32Array(curve.depths),
           values: toFloat32Array(curve.values),
           null_value: curve.null_value,
+          curve_type: curve.curve_type ?? 'continuous',
+          discrete_code_map: curve.discrete_code_map ?? null,
         })),
         formations: sortFormations(formationPayload.map(mapFormation)),
         tvdTable: null,
@@ -1045,6 +1049,8 @@ export const useWellDataStore = create<WellDataStore>((set, get) => ({
         depths: toFloat32Array(curve.depths),
         values: toFloat32Array(curve.values),
         null_value: curve.null_value,
+        curve_type: curve.curve_type ?? 'continuous',
+        discrete_code_map: curve.discrete_code_map ?? null,
       })),
     })
   },

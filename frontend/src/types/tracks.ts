@@ -27,4 +27,5 @@ export interface CurveConfig {
   scaleMax: number
   scaleReversed: boolean
   fill?: CurveFillConfig
+  curve_type?: 'continuous' | 'discrete'
 }
