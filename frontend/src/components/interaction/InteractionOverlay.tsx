@@ -79,7 +79,7 @@ export function InteractionOverlay({
             style={{ pointerEvents: 'none' }}
           />
         )}
-        {cursorDepth !== null && <DepthCursor yPosition={depthToPixel(cursorDepth)} />}
+        {cursorDepth !== null && <DepthCursor yPosition={depthToPixel(cursorDepth)} depth={cursorDepth} />}
         {/* Not-picked formation tap targets near the top */}
         {topsEditable && notPickedFormations.map((formation, i) => {
           const color = formation.active_strat_color ?? formation.color
