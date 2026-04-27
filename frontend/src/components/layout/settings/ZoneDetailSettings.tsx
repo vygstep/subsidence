@@ -3,6 +3,11 @@ import { useState, useEffect } from 'react'
 import type { FormationZone, LithologyDictionaryEntry } from '@/types'
 import { useWellDataStore } from '@/stores'
 
+function parseFiniteFloat(s: string): number | null {
+  const v = parseFloat(s)
+  return isFinite(v) ? v : null
+}
+
 interface FracRow {
   code: string
   percent: number
@@ -34,6 +39,27 @@ export function ZoneDetailSettings({ zone }: ZoneDetailSettingsProps) {
   const lithologyEntries = useWellDataStore((state) => state.lithologyDictionaryEntries)
   const updateZoneLithology = useWellDataStore((state) => state.updateZoneLithology)
   const wellId = useWellDataStore((state) => state.well?.well_id ?? '')
+  const formations = useWellDataStore((state) => state.formations)
+  const updateFormation = useWellDataStore((state) => state.updateFormation)
+
+  const upperPick = formations.find((f) => f.horizon_id === zone.upper_horizon.id) ?? null
+  const [waterDepth, setWaterDepth] = useState(zone.water_depth_m.toFixed(1))
+  const [isSavingWd, setIsSavingWd] = useState(false)
+
+  useEffect(() => {
+    setWaterDepth(zone.water_depth_m.toFixed(1))
+  }, [zone.zone_id, zone.water_depth_m])
+
+  async function handleWaterDepthSave() {
+    const val = parseFiniteFloat(waterDepth)
+    if (val === null || upperPick === null || !wellId) return
+    setIsSavingWd(true)
+    try {
+      await updateFormation(upperPick.id, { water_depth_m: val })
+    } finally {
+      setIsSavingWd(false)
+    }
+  }
 
   const [showEditor, setShowEditor] = useState(zone.lithology_fractions !== null)
   const [rows, setRows] = useState<FracRow[]>(() => fractionsFromJson(zone.lithology_fractions))
@@ -117,6 +143,23 @@ export function ZoneDetailSettings({ zone }: ZoneDetailSettingsProps) {
           <span className="tree-leaf__grey">{hiatus}</span>
         </div>
       ) : null}
+
+      <div className="template-panel__section-header">Paleobathymetry</div>
+      <div className="project-dialog__field">
+        <label>
+          <span>Water depth at deposition (m)</span>
+          <input
+            type="number"
+            step="1"
+            value={waterDepth}
+            onChange={(e) => setWaterDepth(e.target.value)}
+            onBlur={() => void handleWaterDepthSave()}
+            disabled={isSavingWd || upperPick === null}
+            className="zone-detail__wd-input"
+          />
+        </label>
+        <span className="zone-detail__wd-hint">negative = emerged / non-marine</span>
+      </div>
 
       <div className="template-panel__section-header">Lithology</div>
 

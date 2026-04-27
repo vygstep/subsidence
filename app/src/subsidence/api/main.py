@@ -9,6 +9,7 @@ from subsidence.data import ProjectManager
 from subsidence.observability import configure_logging, log_event, reset_request_id, set_request_id
 
 from .compaction import router as compaction_router
+from .sea_level import router as sea_level_router
 from .formations import router as formations_router
 from .import_preview import router as import_preview_router
 from .lithology_patterns import router as lithology_patterns_router
@@ -98,6 +99,7 @@ app.include_router(strat_chart_router, prefix="/api")
 app.include_router(compaction_router, prefix="/api")
 app.include_router(lithology_patterns_router, prefix="/api")
 app.include_router(subsidence_router, prefix="/api")
+app.include_router(sea_level_router, prefix="/api")
 app.include_router(import_preview_router, prefix="/api/import-preview")
 app.include_router(projects_router, prefix="/api/projects")
 app.include_router(projects_imports_router, prefix="/api/projects")

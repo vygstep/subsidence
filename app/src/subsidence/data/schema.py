@@ -7,7 +7,7 @@ from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column, relationship
 from sqlalchemy import MetaData
 
 SUBSIDENCE_APP_ID = 0x53554253  # "SUBS" as 4-byte int
-SCHEMA_VERSION = 11
+SCHEMA_VERSION = 12
 
 _NAMING: dict[str, str] = {
     "ix": "ix_%(table_name)s_%(column_0_name)s",
@@ -703,3 +703,40 @@ class ZoneWellData(Base):
     # "manual" | "auto"
 
     zone: Mapped["FormationZone"] = relationship(back_populates="well_data")
+
+
+class SeaLevelCurve(Base, AuditMixin):
+    __tablename__ = "sea_level_curves"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    name: Mapped[str] = mapped_column(String(256), nullable=False)
+    source: Mapped[str | None] = mapped_column(String(256), nullable=True)
+    is_builtin: Mapped[bool] = mapped_column(Boolean, default=False)
+
+    points: Mapped[list["SeaLevelPoint"]] = relationship(
+        back_populates="curve", cascade="all, delete-orphan"
+    )
+
+
+class SeaLevelPoint(Base):
+    __tablename__ = "sea_level_points"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    curve_id: Mapped[int] = mapped_column(
+        Integer, ForeignKey("sea_level_curves.id", ondelete="CASCADE"), nullable=False
+    )
+    age_ma: Mapped[float] = mapped_column(Float, nullable=False)
+    sea_level_m: Mapped[float] = mapped_column(Float, nullable=False)
+
+    curve: Mapped["SeaLevelCurve"] = relationship(back_populates="points")
+
+
+class WellActiveSeaLevelCurve(Base):
+    __tablename__ = "well_active_sea_level_curves"
+
+    well_id: Mapped[str] = mapped_column(
+        String(36), ForeignKey("wells.id", ondelete="CASCADE"), primary_key=True
+    )
+    curve_id: Mapped[int] = mapped_column(
+        Integer, ForeignKey("sea_level_curves.id", ondelete="RESTRICT"), nullable=False
+    )

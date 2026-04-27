@@ -11,7 +11,7 @@ from sqlalchemy.orm import selectinload
 
 from subsidence.data import UpdateWell, load_curves_from_parquet
 from subsidence.data.lttb import lttb
-from subsidence.data.schema import CurveMetadata, DeviationSurveyModel, FormationStratLink, FormationTopModel, FormationZone, WellActiveTopSet, WellModel, ZoneWellData
+from subsidence.data.schema import CurveMetadata, DeviationSurveyModel, FormationStratLink, FormationTopModel, FormationZone, WellActiveSeaLevelCurve, WellActiveTopSet, WellModel, ZoneWellData
 from subsidence.data.zone_service import recalculate_zone_thickness
 
 router = APIRouter(tags=['wells'])
@@ -115,6 +115,7 @@ class ZoneInventoryItem(BaseModel):
     hiatus_ma: float | None
     lithology_fractions: str | None
     lithology_source: str
+    water_depth_m: float = 0.0
 
 
 class ZonePatch(BaseModel):
@@ -135,6 +136,7 @@ class WellInventoryResponse(BaseModel):
     source_las_path: str | None = None
     active_top_set_id: int | None = None
     active_top_set_name: str | None = None
+    active_sea_level_curve_id: int | None = None
     deviation: DeviationSummaryResponse | None = None
     curves: list[CurveInventoryItem]
     formations: list[FormationInventoryItem]
@@ -190,7 +192,7 @@ def _active_link(row: FormationTopModel) -> FormationStratLink | None:
     return next((link for link in row.strat_links if link.chart.is_active), None)
 
 
-def _zone_to_item(zone: FormationZone, zwd: ZoneWellData) -> ZoneInventoryItem:
+def _zone_to_item(zone: FormationZone, zwd: ZoneWellData, water_depth_m: float = 0.0) -> ZoneInventoryItem:
     upper = zone.upper_horizon
     lower = zone.lower_horizon
     age_span = (
@@ -211,6 +213,7 @@ def _zone_to_item(zone: FormationZone, zwd: ZoneWellData) -> ZoneInventoryItem:
         hiatus_ma=hiatus,
         lithology_fractions=zwd.lithology_fractions,
         lithology_source=zwd.lithology_source,
+        water_depth_m=water_depth_m,
     )
 
 
@@ -249,6 +252,7 @@ def list_well_inventories(request: Request) -> list[WellInventoryResponse]:
         deviation_by_well: dict[str, DeviationSurveyModel] = {}
         active_top_set_by_well: dict[str, WellActiveTopSet] = {}
         zones_by_well: dict[str, list[ZoneInventoryItem]] = {well_id: [] for well_id in well_ids}
+        sea_level_curve_by_well: dict[str, int] = {}
 
         if well_ids:
             curve_rows = session.scalars(
@@ -280,6 +284,11 @@ def list_well_inventories(request: Request) -> list[WellInventoryResponse]:
             ).all()
             active_top_set_by_well = {row.well_id: row for row in active_top_sets}
 
+            sea_level_links = session.scalars(
+                select(WellActiveSeaLevelCurve).where(WellActiveSeaLevelCurve.well_id.in_(well_ids))
+            ).all()
+            sea_level_curve_by_well = {link.well_id: link.curve_id for link in sea_level_links}
+
             active_top_set_ids = [row.top_set_id for row in active_top_sets]
             if active_top_set_ids:
                 zone_rows = session.scalars(
@@ -298,6 +307,17 @@ def list_well_inventories(request: Request) -> list[WellInventoryResponse]:
                         ZoneWellData.well_id.in_(well_ids),
                     )
                 ).all()
+                # Fetch picks keyed by (well_id, horizon_id) for water_depth_m lookup
+                horizon_ids = {z.upper_horizon_id for z in zone_rows}
+                pick_rows = session.scalars(
+                    select(FormationTopModel).where(
+                        FormationTopModel.well_id.in_(well_ids),
+                        FormationTopModel.horizon_id.in_(horizon_ids),
+                    )
+                ).all()
+                pick_by_well_horizon: dict[tuple[str, int], FormationTopModel] = {
+                    (p.well_id, p.horizon_id): p for p in pick_rows if p.horizon_id is not None
+                }
                 top_set_id_by_well = {row.well_id: row.top_set_id for row in active_top_sets}
                 for zwd in zone_well_data_rows:
                     zone = zone_by_id.get(zwd.zone_id)
@@ -307,7 +327,9 @@ def list_well_inventories(request: Request) -> list[WellInventoryResponse]:
                     # Only include if this zone belongs to the well's active top set
                     if top_set_id_by_well.get(well_id) != zone.top_set_id:
                         continue
-                    zones_by_well.setdefault(well_id, []).append(_zone_to_item(zone, zwd))
+                    upper_pick = pick_by_well_horizon.get((well_id, zone.upper_horizon_id))
+                    wd = upper_pick.water_depth_m if upper_pick is not None else 0.0
+                    zones_by_well.setdefault(well_id, []).append(_zone_to_item(zone, zwd, wd))
 
         payload: list[WellInventoryResponse] = []
         for well in wells:
@@ -329,6 +351,7 @@ def list_well_inventories(request: Request) -> list[WellInventoryResponse]:
                     source_las_path=well.source_las_path,
                     active_top_set_id=active_top_set.top_set_id if active_top_set else None,
                     active_top_set_name=active_top_set.top_set.name if active_top_set else None,
+                    active_sea_level_curve_id=sea_level_curve_by_well.get(well.id),
                     deviation=DeviationSummaryResponse(
                         reference=deviation.reference,
                         mode=deviation.mode,

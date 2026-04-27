@@ -303,6 +303,8 @@ def build_zone_layer_inputs(
             age_base_ma=lower.age_ma,
             current_top_m=upper_pick.depth_md,
             current_base_m=lower_pick.depth_md,
+            water_depth_m=upper_pick.water_depth_m,
+            eroded_thickness_m=upper_pick.eroded_thickness_m,
         ))
 
     return result

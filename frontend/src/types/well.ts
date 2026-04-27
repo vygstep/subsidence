@@ -107,6 +107,15 @@ export interface FormationZone {
   hiatus_ma: number | null
   lithology_fractions: string | null
   lithology_source: 'manual' | 'auto'
+  water_depth_m: number
+}
+
+export interface SeaLevelCurve {
+  id: number
+  name: string
+  source: string | null
+  is_builtin: boolean
+  point_count: number
 }
 
 export interface WellInventory {
@@ -122,6 +131,7 @@ export interface WellInventory {
   source_las_path?: string | null
   active_top_set_id: number | null
   active_top_set_name: string | null
+  active_sea_level_curve_id: number | null
   deviation?: {
     reference: string
     mode: string

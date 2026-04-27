@@ -112,7 +112,7 @@ Items:
 - `ZONE-002`: Zone settings UI and manual lithology input. (done)
 - `ZONE-003`: Auto-lithology aggregation from discrete log (depends `LITH-001`). (done)
 - `ZONE-004`: Zone attributes as subsidence calculation inputs (supersedes `LITH-003`). (done)
-- `BSTRIP-001`: Per-zone paleobathymetry and eustatic sea level correction.
+- `BSTRIP-001`: Per-zone paleobathymetry and eustatic sea level correction. (done)
 
 Exit criteria:
 

@@ -17,6 +17,7 @@ import type {
   LithologySetDetail,
   LithologySetSummary,
   LithologyParam,
+  SeaLevelCurve,
   StratChartInfo,
   UnitDimensionDetail,
   UnitDimensionSummary,
@@ -196,6 +197,8 @@ export interface WellDataStore {
   fetchCurvesLOD: (depthMin: number, depthMax: number, resolution: number) => Promise<void>
   reloadCurvesForDepthBasis: (depthBasis: 'MD' | 'TVD' | 'TVDSS') => Promise<void>
   updateZoneLithology: (zoneId: number, lithologyFractions: string | null, lithologySource: 'manual' | 'auto') => Promise<void>
+  loadSeaLevelCurves: () => Promise<SeaLevelCurve[]>
+  setWellActiveSeaLevelCurve: (wellId: string, curveId: number | null) => Promise<void>
 }
 
 function toFloat32Array(values: number[]): Float32Array {
@@ -1089,6 +1092,20 @@ export const useWellDataStore = create<WellDataStore>((set, get) => ({
     set((state) => ({
       zones: state.zones.map((z) => (z.zone_id === zoneId ? updated : z)),
     }))
+    await get().loadWellInventories()
+  },
+  async loadSeaLevelCurves() {
+    const response = await fetch('/api/sea-level-curves')
+    if (!response.ok) throw new Error(`Failed to load sea level curves (${response.status})`)
+    return (await response.json()) as SeaLevelCurve[]
+  },
+  async setWellActiveSeaLevelCurve(wellId, curveId) {
+    const response = await fetch(`/api/wells/${wellId}/active-sea-level-curve`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ curve_id: curveId }),
+    })
+    if (!response.ok) throw new Error(await readError(response, `Failed to set sea level curve (${response.status})`))
     await get().loadWellInventories()
   },
 }))

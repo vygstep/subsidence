@@ -25,6 +25,8 @@ from subsidence.data.schema import (
     CompactionPreset,
     FormationTopModel,
     LithologyDictEntry,
+    SeaLevelPoint,
+    WellActiveSeaLevelCurve,
     WellModel,
 )
 from subsidence.observability import operation_log, reset_request_id, set_request_id
@@ -77,7 +79,7 @@ def _engine_lithology_param(session, density: float, porosity_surface: float, co
     )
 
 
-def _compute_subsidence(manager, well_id: str, water_depth_m: float = 0.0) -> list[SubsidenceResultResponse]:
+def _compute_subsidence(manager, well_id: str) -> list[SubsidenceResultResponse]:
     with manager.get_session() as session:
         well = session.get(WellModel, well_id)
         if well is None:
@@ -121,10 +123,23 @@ def _compute_subsidence(manager, well_id: str, water_depth_m: float = 0.0) -> li
                     for r in litho_rows
                 }
 
+        # Fetch active sea level curve for this well
+        sea_level_link = session.scalar(
+            select(WellActiveSeaLevelCurve).where(WellActiveSeaLevelCurve.well_id == well_id)
+        )
+        sea_level_curve: list[tuple[float, float]] | None = None
+        if sea_level_link is not None:
+            pts = session.scalars(
+                select(SeaLevelPoint)
+                .where(SeaLevelPoint.curve_id == sea_level_link.curve_id)
+                .order_by(SeaLevelPoint.age_ma.desc())
+            ).all()
+            sea_level_curve = [(p.age_ma, p.sea_level_m) for p in pts] or None
+
         top_set_id = get_well_active_top_set_id(session, well_id)
         if top_set_id is not None:
             zone_inputs = build_zone_layer_inputs(session, well_id, litho_params)
-            results = backstrip(zone_inputs, litho_params, water_depth_m=water_depth_m)
+            results = backstrip(zone_inputs, litho_params, sea_level_curve=sea_level_curve)
         else:
             td_m = well.td_md if well.td_md is not None else 0.0
             formations = session.scalars(
@@ -169,9 +184,10 @@ def _compute_subsidence(manager, well_id: str, water_depth_m: float = 0.0) -> li
                     age_base_ma=age_base,
                     current_top_m=f.depth_md,
                     current_base_m=base_m,
+                    water_depth_m=f.water_depth_m,
                 ))
 
-            results = backstrip(inputs, litho_params, water_depth_m=water_depth_m)
+            results = backstrip(inputs, litho_params, sea_level_curve=sea_level_curve)
 
     return [
         SubsidenceResultResponse(
@@ -187,7 +203,7 @@ def _compute_subsidence(manager, well_id: str, water_depth_m: float = 0.0) -> li
     ]
 
 
-def _store_results(manager, well_id: str, results: list[SubsidenceResultResponse], water_depth_m: float) -> None:
+def _store_results(manager, well_id: str, results: list[SubsidenceResultResponse]) -> None:
     if not manager.project_path:
         return
     results_dir = Path(manager.project_path) / 'results'
@@ -198,9 +214,7 @@ def _store_results(manager, well_id: str, results: list[SubsidenceResultResponse
     fpath = Path(manager.project_path) / data_uri
     fpath.write_text(json.dumps([r.model_dump() for r in results]))
 
-    inputs_hash = hashlib.sha256(
-        json.dumps({'well_id': well_id, 'water_depth_m': water_depth_m}).encode()
-    ).hexdigest()[:32]
+    inputs_hash = hashlib.sha256(well_id.encode()).hexdigest()[:32]
 
     with manager.get_session() as session:
         existing = session.scalar(
@@ -213,13 +227,13 @@ def _store_results(manager, well_id: str, results: list[SubsidenceResultResponse
             existing.data_uri = data_uri
             existing.inputs_hash = inputs_hash
             existing.is_stale = False
-            existing.params_json = json.dumps({'water_depth_m': water_depth_m})
+            existing.params_json = json.dumps({})
         else:
             session.add(CalculationResult(
                 well_id=well_id,
                 kind='burial_history',
                 algorithm='airy_backstrip',
-                params_json=json.dumps({'water_depth_m': water_depth_m}),
+                params_json=json.dumps({}),
                 inputs_hash=inputs_hash,
                 data_uri=data_uri,
                 is_stale=False,
@@ -264,10 +278,7 @@ def calculate_subsidence(well_id: str, request: Request) -> list[SubsidenceResul
     with operation_log('subsidence.calculate', project_path=_manager_project_path(manager), well_id=well_id):
         results = _compute_subsidence(manager, well_id)
         if not results:
-            raise HTTPException(
-                status_code=400,
-                detail='Fewer than 2 formations have both ages assigned',
-            )
+            raise HTTPException(status_code=400, detail='Fewer than 2 formations have both ages assigned')
         return results
 
 
@@ -289,12 +300,11 @@ async def ws_recalculate(websocket: WebSocket) -> None:
                 await websocket.send_json({'status': 'error', 'message': 'No project is open'})
                 continue
 
-            water_depth_m = float(data.get('water_depth_m', 0.0))
             await websocket.send_json({'status': 'computing', 'progress': 0.0})
             try:
-                with operation_log('subsidence.recalculate', project_path=_manager_project_path(manager), well_id=well_id, water_depth_m=water_depth_m):
-                    results = await asyncio.to_thread(_compute_subsidence, manager, well_id, water_depth_m)
-                    await asyncio.to_thread(_store_results, manager, well_id, results, water_depth_m)
+                with operation_log('subsidence.recalculate', project_path=_manager_project_path(manager), well_id=well_id):
+                    results = await asyncio.to_thread(_compute_subsidence, manager, well_id)
+                    await asyncio.to_thread(_store_results, manager, well_id, results)
                 await websocket.send_json({
                     'status': 'complete',
                     'results': [r.model_dump() for r in results],

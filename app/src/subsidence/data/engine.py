@@ -96,6 +96,30 @@ def migrate_schema(engine: Engine) -> None:
         if 'discrete_code_map' not in curve_cols:
             conn.execute(text("ALTER TABLE curve_metadata ADD COLUMN discrete_code_map TEXT"))
             conn.commit()
+        table_names = {row[0] for row in conn.execute(text("SELECT name FROM sqlite_master WHERE type='table'"))}
+        if 'sea_level_curves' not in table_names:
+            conn.execute(text(
+                "CREATE TABLE sea_level_curves ("
+                "id INTEGER PRIMARY KEY AUTOINCREMENT, "
+                "name VARCHAR(256) NOT NULL, "
+                "source VARCHAR(256), "
+                "is_builtin BOOLEAN NOT NULL DEFAULT 0, "
+                "created_at DATETIME, "
+                "modified_at DATETIME)"
+            ))
+            conn.execute(text(
+                "CREATE TABLE sea_level_points ("
+                "id INTEGER PRIMARY KEY AUTOINCREMENT, "
+                "curve_id INTEGER NOT NULL REFERENCES sea_level_curves(id) ON DELETE CASCADE, "
+                "age_ma REAL NOT NULL, "
+                "sea_level_m REAL NOT NULL)"
+            ))
+            conn.execute(text(
+                "CREATE TABLE well_active_sea_level_curves ("
+                "well_id VARCHAR(36) PRIMARY KEY REFERENCES wells(id) ON DELETE CASCADE, "
+                "curve_id INTEGER NOT NULL REFERENCES sea_level_curves(id) ON DELETE RESTRICT)"
+            ))
+            conn.commit()
 
 
 def validate_project_db(db_path: Path | str) -> tuple[int, int]:

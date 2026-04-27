@@ -1724,3 +1724,129 @@ def test_zone003_no_curve_returns_zero_updates(api_client: TestClient, tmp_path:
     resp = api_client.post(f'/api/wells/{well_id}/zones/recalculate-lithology')
     assert resp.status_code == 200, resp.text
     assert resp.json()['zones_updated'] == 0
+
+
+# ---------------------------------------------------------------------------
+# BSTRIP-001 tests
+# ---------------------------------------------------------------------------
+
+def test_bstrip001_water_depth_shifts_burial_deeper(api_client: TestClient, tmp_path: Path):
+    """Per-zone water_depth_m = 50 shifts all burial depths 50 m deeper than water_depth_m = 0."""
+    well_id, _ = _create_well_with_zone_subsidence(api_client, tmp_path)
+
+    # Base calculation with default water_depth_m = 0
+    resp = api_client.post(f'/api/wells/{well_id}/subsidence')
+    assert resp.status_code == 200, resp.text
+    base_results = {r['formation_name']: r['burial_path'] for r in resp.json()}
+
+    # Set water_depth_m = 50 on both upper picks (A and B)
+    formations = api_client.get(f'/api/wells/{well_id}/formations').json()
+    for f in formations:
+        if f['name'] in ('A', 'B'):
+            api_client.patch(f'/api/wells/{well_id}/formations/{f["id"]}', json={'water_depth_m': 50.0})
+
+    resp = api_client.post(f'/api/wells/{well_id}/subsidence')
+    assert resp.status_code == 200, resp.text
+    shifted = {r['formation_name']: r['burial_path'] for r in resp.json()}
+
+    for name in base_results:
+        for bp_base, bp_shifted in zip(base_results[name], shifted[name]):
+            assert bp_shifted['depth_m'] == pytest.approx(bp_base['depth_m'] + 50.0, abs=0.1)
+
+
+def test_bstrip001_sea_level_curve_shifts_burial(api_client: TestClient, tmp_path: Path):
+    """Assigning a sea level curve with constant +30 m shifts burial depths by +30 m."""
+    well_id, _ = _create_well_with_zone_subsidence(api_client, tmp_path)
+
+    resp = api_client.post(f'/api/wells/{well_id}/subsidence')
+    assert resp.status_code == 200, resp.text
+    base_results = {r['formation_name']: r['burial_path'] for r in resp.json()}
+
+    # Create a sea level curve with constant 30 m at all relevant ages
+    resp = api_client.post('/api/sea-level-curves', json={'name': 'Test Curve'})
+    assert resp.status_code == 201, resp.text
+    curve_id = resp.json()['id']
+
+    api_client.post(f'/api/sea-level-curves/{curve_id}/points', json=[
+        {'age_ma': 200.0, 'sea_level_m': 30.0},
+        {'age_ma': 0.0, 'sea_level_m': 30.0},
+    ])
+
+    resp = api_client.put(f'/api/wells/{well_id}/active-sea-level-curve', json={'curve_id': curve_id})
+    assert resp.status_code == 200, resp.text
+
+    resp = api_client.post(f'/api/wells/{well_id}/subsidence')
+    assert resp.status_code == 200, resp.text
+    shifted = {r['formation_name']: r['burial_path'] for r in resp.json()}
+
+    for name in base_results:
+        for bp_base, bp_shifted in zip(base_results[name], shifted[name]):
+            assert bp_shifted['depth_m'] == pytest.approx(bp_base['depth_m'] + 30.0, abs=0.1)
+
+    # Removing the curve restores original depths
+    api_client.put(f'/api/wells/{well_id}/active-sea-level-curve', json={'curve_id': None})
+    resp = api_client.post(f'/api/wells/{well_id}/subsidence')
+    assert resp.status_code == 200, resp.text
+    restored = {r['formation_name']: r['burial_path'] for r in resp.json()}
+    for name in base_results:
+        for bp_base, bp_restored in zip(base_results[name], restored[name]):
+            assert bp_restored['depth_m'] == pytest.approx(bp_base['depth_m'], abs=0.1)
+
+
+def test_bstrip001_eroded_thickness_increases_column_height(api_client: TestClient, tmp_path: Path):
+    """eroded_thickness_m = 100 on a zone upper pick increases decompacted column vs 0."""
+    well_id, _ = _create_well_with_zone_subsidence(api_client, tmp_path)
+
+    resp = api_client.post(f'/api/wells/{well_id}/subsidence')
+    assert resp.status_code == 200, resp.text
+    base_paths = {r['formation_name']: r['burial_path'] for r in resp.json()}
+
+    # Add eroded_thickness_m = 100 to pick A (upper boundary of A→B zone)
+    formations = api_client.get(f'/api/wells/{well_id}/formations').json()
+    pick_a = next(f for f in formations if f['name'] == 'A')
+    api_client.patch(f'/api/wells/{well_id}/formations/{pick_a["id"]}', json={'eroded_thickness_m': 100.0})
+
+    resp = api_client.post(f'/api/wells/{well_id}/subsidence')
+    assert resp.status_code == 200, resp.text
+    eroded_paths = {r['formation_name']: r['burial_path'] for r in resp.json()}
+
+    # A→B is thicker with eroded section → B→C is buried deeper at t=10 (pushed down by thicker A→B above it)
+    bc_base = next(p['depth_m'] for p in base_paths['B → C'] if p['age_ma'] == pytest.approx(10.0))
+    bc_eroded = next(p['depth_m'] for p in eroded_paths['B → C'] if p['age_ma'] == pytest.approx(10.0))
+    assert bc_eroded > bc_base
+
+
+def test_bstrip001_sea_level_crud(api_client: TestClient, tmp_path: Path):
+    """CRUD operations for sea level curves work correctly."""
+    _create_project(api_client, tmp_path, 'sl-crud')
+
+    # Create
+    resp = api_client.post('/api/sea-level-curves', json={'name': 'Haq 1987', 'source': 'Haq et al.'})
+    assert resp.status_code == 201, resp.text
+    curve_id = resp.json()['id']
+
+    # Upload points
+    points = [{'age_ma': float(a), 'sea_level_m': float(a * 0.1)} for a in range(0, 201, 10)]
+    resp = api_client.post(f'/api/sea-level-curves/{curve_id}/points', json=points)
+    assert resp.status_code == 201, resp.text
+    assert resp.json()['count'] == len(points)
+
+    # List
+    resp = api_client.get('/api/sea-level-curves')
+    assert resp.status_code == 200, resp.text
+    curves = resp.json()
+    assert any(c['id'] == curve_id and c['point_count'] == len(points) for c in curves)
+
+    # Cannot delete while in use
+    resp2 = api_client.post('/api/projects/wells', json={
+        'name': 'W', 'x': 0.0, 'y': 0.0, 'kb': 0.0, 'td': 100.0, 'crs': 'local',
+    })
+    well_id = resp2.json()['well_id']
+    api_client.put(f'/api/wells/{well_id}/active-sea-level-curve', json={'curve_id': curve_id})
+    resp = api_client.delete(f'/api/sea-level-curves/{curve_id}')
+    assert resp.status_code == 409
+
+    # After clearing, can delete
+    api_client.put(f'/api/wells/{well_id}/active-sea-level-curve', json={'curve_id': None})
+    resp = api_client.delete(f'/api/sea-level-curves/{curve_id}')
+    assert resp.status_code == 204

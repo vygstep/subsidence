@@ -83,6 +83,7 @@ class FormationInput:
     age_base_ma: float   # age at formation base (older boundary, Ma)
     current_top_m: float
     current_base_m: float
+    water_depth_m: float = 0.0
 
 
 @dataclass
@@ -95,6 +96,8 @@ class ZoneLayerInput:
     age_base_ma: float | None
     current_top_m: float
     current_base_m: float
+    water_depth_m: float = 0.0
+    eroded_thickness_m: float = 0.0
 
 
 @dataclass
@@ -112,13 +115,34 @@ class SubsidenceResult:
 
 
 # ---------------------------------------------------------------------------
+# Sea level interpolation
+# ---------------------------------------------------------------------------
+
+def _sea_level_at(age_ma: float, curve: list[tuple[float, float]]) -> float:
+    """Linear interpolation on a sea level curve sorted descending by age_ma."""
+    if not curve:
+        return 0.0
+    if age_ma >= curve[0][0]:
+        return curve[0][1]
+    if age_ma <= curve[-1][0]:
+        return curve[-1][1]
+    for i in range(len(curve) - 1):
+        a1, v1 = curve[i]
+        a2, v2 = curve[i + 1]
+        if a2 <= age_ma <= a1:
+            t = (age_ma - a2) / (a1 - a2)
+            return v2 + t * (v1 - v2)
+    return 0.0
+
+
+# ---------------------------------------------------------------------------
 # Backstripping
 # ---------------------------------------------------------------------------
 
 def backstrip(
     formations: list[FormationInput | ZoneLayerInput],
     litho_params: dict[str, LithologyParam],
-    water_depth_m: float = 0.0,
+    sea_level_curve: list[tuple[float, float]] | None = None,
 ) -> list[SubsidenceResult]:
     """
     Airy backstripping with Athy decompaction (Stratya2D algorithm pattern).
@@ -126,11 +150,14 @@ def backstrip(
     Accepts FormationInput (looks up litho_params by lithology code) or
     ZoneLayerInput (uses its pre-computed litho_param directly).
 
-    Formations without both age_top_ma and age_base_ma are silently skipped.
-    Returns one SubsidenceResult per valid formation with a burial_path point
-    at each unique formation age step plus the present (age=0).
+    Per-layer water_depth_m: at each time step the shallowest active layer's
+    water_depth_m is used to offset the whole paleo column.
 
-    Simplified: no sea-level correction (Phase 5).
+    ZoneLayerInput.eroded_thickness_m: ghost solid matrix added to the layer's
+    conserved solid volume to represent material removed by erosion.
+
+    sea_level_curve: [(age_ma, sea_level_m), ...] sorted descending by age_ma.
+    Interpolated and added to the depth offset at each time step.
     """
     # Filter and sort oldest-base first (deepest in the column)
     valid = [
@@ -148,12 +175,14 @@ def backstrip(
             return f.litho_param
         return litho_params.get(f.lithology, DEFAULT_LITHO_PARAM)
 
-    # Pre-compute solid matrix thickness for each formation (conserved quantity)
+    # Pre-compute solid matrix thickness (conserved quantity); include eroded ghost section
     solid_m: dict[int, float] = {}
     for i, f in enumerate(valid):
         lp = _litho(f)
         c_m = lp.compaction_coeff / 1000.0
-        solid_m[i] = _matrix_thickness(lp.porosity_surface, c_m, f.current_top_m, f.current_base_m)
+        eroded = f.eroded_thickness_m if isinstance(f, ZoneLayerInput) else 0.0
+        effective_base = f.current_base_m + eroded
+        solid_m[i] = _matrix_thickness(lp.porosity_surface, c_m, f.current_top_m, effective_base)
 
     # Time steps: all formation top ages + 0 (present), oldest first
     time_steps = sorted(
@@ -191,9 +220,14 @@ def backstrip(
             paleo_tops[i] = z_top
             z_top += thickness
 
-        # Record burial depths (water_depth_m shifts the whole column downward)
+        # Depth offset: water depth of shallowest active layer + eustatic sea level
+        shallowest = valid[active_indices[-1]]
+        wd = shallowest.water_depth_m
+        sl = _sea_level_at(t_ma, sea_level_curve) if sea_level_curve else 0.0
+        offset = wd + sl
+
         for i in active_indices:
-            results[i].burial_path.append(BurialPoint(age_ma=t_ma, depth_m=paleo_tops[i] + water_depth_m))
+            results[i].burial_path.append(BurialPoint(age_ma=t_ma, depth_m=paleo_tops[i] + offset))
 
     # Sort burial paths chronologically (oldest → present)
     for r in results:
