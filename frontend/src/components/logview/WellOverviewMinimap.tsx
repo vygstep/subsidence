@@ -1,17 +1,19 @@
 import { useCallback, useEffect, useRef } from 'react'
 
 import { useViewStore, useWellDataStore } from '@/stores'
+import type { CurveData } from '@/types'
+
+const WIDTH = 48
 
 interface WellOverviewMinimapProps {
-  width?: number
   height: number
+  curves: CurveData[]
 }
 
-export function WellOverviewMinimap({ width = 80, height }: WellOverviewMinimapProps) {
+export function WellOverviewMinimap({ height, curves }: WellOverviewMinimapProps) {
   const canvasRef = useRef<HTMLCanvasElement | null>(null)
   const isDraggingRef = useRef(false)
 
-  const curves = useWellDataStore((s) => s.curves)
   const formations = useWellDataStore((s) => s.formations)
   const scrollDepth = useViewStore((s) => s.scrollDepth)
   const depthPerPixel = useViewStore((s) => s.depthPerPixel)
@@ -42,7 +44,7 @@ export function WellOverviewMinimap({ width = 80, height }: WellOverviewMinimapP
     if (!ctx) return
 
     const dpr = window.devicePixelRatio || 1
-    canvas.width = width * dpr
+    canvas.width = WIDTH * dpr
     canvas.height = height * dpr
     ctx.scale(dpr, dpr)
 
@@ -54,16 +56,12 @@ export function WellOverviewMinimap({ width = 80, height }: WellOverviewMinimapP
       return ((depth - lo) / depthRange) * height
     }
 
-    ctx.fillStyle = '#1e293b'
-    ctx.fillRect(0, 0, width, height)
+    ctx.fillStyle = 'rgba(248,250,252,0.94)'
+    ctx.fillRect(0, 0, WIDTH, height)
 
     for (const curve of curves) {
       const { depths, values, null_value } = curve
       if (depths.length < 2) continue
-
-      ctx.beginPath()
-      ctx.strokeStyle = 'rgba(148,163,184,0.6)'
-      ctx.lineWidth = 1
 
       let vMin = Number.POSITIVE_INFINITY
       let vMax = Number.NEGATIVE_INFINITY
@@ -75,11 +73,15 @@ export function WellOverviewMinimap({ width = 80, height }: WellOverviewMinimapP
       }
       const vRange = vMax - vMin || 1
 
+      ctx.beginPath()
+      ctx.strokeStyle = 'rgba(71,85,105,0.45)'
+      ctx.lineWidth = 0.75
+
       let inPath = false
       for (let i = 0; i < depths.length; i++) {
         const v = values[i]
         if (!Number.isFinite(v) || v === null_value) { inPath = false; continue }
-        const x = ((v - vMin) / vRange) * (width - 2) + 1
+        const x = ((v - vMin) / vRange) * (WIDTH - 2) + 1
         const y = depthToY(depths[i])
         if (!inPath) { ctx.moveTo(x, y); inPath = true }
         else ctx.lineTo(x, y)
@@ -92,20 +94,20 @@ export function WellOverviewMinimap({ width = 80, height }: WellOverviewMinimapP
       const y = depthToY(f.depth_md)
       ctx.beginPath()
       ctx.strokeStyle = f.active_strat_color ?? f.color
-      ctx.lineWidth = 1
+      ctx.lineWidth = 0.75
       ctx.moveTo(0, y)
-      ctx.lineTo(width, y)
+      ctx.lineTo(WIDTH, y)
       ctx.stroke()
     }
 
     const viewTop = depthToY(scrollDepth)
     const viewBottom = depthToY(scrollDepth + depthPerPixel * viewportHeight)
-    ctx.fillStyle = 'rgba(59,130,246,0.20)'
-    ctx.fillRect(0, viewTop, width, viewBottom - viewTop)
-    ctx.strokeStyle = '#3b82f6'
+    ctx.fillStyle = 'rgba(59,130,246,0.12)'
+    ctx.fillRect(0, viewTop, WIDTH, viewBottom - viewTop)
+    ctx.strokeStyle = 'rgba(59,130,246,0.6)'
     ctx.lineWidth = 1
-    ctx.strokeRect(0.5, viewTop + 0.5, width - 1, viewBottom - viewTop - 1)
-  }, [curves, formations, scrollDepth, depthPerPixel, viewportHeight, width, height])
+    ctx.strokeRect(0.5, viewTop + 0.5, WIDTH - 1, viewBottom - viewTop - 1)
+  }, [curves, formations, scrollDepth, depthPerPixel, viewportHeight, height])
 
   const scrollToOffsetY = useCallback((offsetY: number) => {
     const lo = minDepth.current
@@ -140,11 +142,12 @@ export function WellOverviewMinimap({ width = 80, height }: WellOverviewMinimapP
         position: 'absolute',
         right: 0,
         top: 0,
-        width,
+        width: WIDTH,
         height,
         zIndex: 5,
         cursor: 'ns-resize',
         display: 'block',
+        borderLeft: '1px solid #c4d0dc',
       }}
       onPointerDown={handlePointerDown}
       onPointerMove={handlePointerMove}

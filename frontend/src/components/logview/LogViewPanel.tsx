@@ -117,6 +117,13 @@ export function LogViewPanel({ tracks, trackOrder, curves, formations, minDepth,
     return curves.filter((c) => mnemonics.has(c.mnemonic))
   }, [hoveredTrackId, tracksById, curves])
 
+  const minimapCurves = useMemo(() => {
+    const configuredMnemonics = new Set(
+      tracks.flatMap((track) => track.curves.map((c) => c.mnemonic)),
+    )
+    return curves.filter((c) => configuredMnemonics.has(c.mnemonic))
+  }, [tracks, curves])
+
   const visibleDepthRange = useViewStore((state) => state.visibleDepthRange)
   const fetchCurvesLOD = useWellDataStore((state) => state.fetchCurvesLOD)
 
@@ -207,7 +214,7 @@ export function LogViewPanel({ tracks, trackOrder, curves, formations, minDepth,
               tooltipVisible={curveTooltipVisible}
               topsEditable={interactionMode === 'edit-tops'}
             />
-            {overviewVisible ? <WellOverviewMinimap height={trackHeight} /> : null}
+            {overviewVisible ? <WellOverviewMinimap height={trackHeight} curves={minimapCurves} /> : null}
           </div>
         </div>
       </div>

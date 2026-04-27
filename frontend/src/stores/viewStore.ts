@@ -116,7 +116,7 @@ export const useViewStore = create<ViewStore>((set) => ({
   depthPerPixel: initialDepthPerPixel,
   visibleDepthRange: deriveVisibleDepthRange(initialScrollDepth, initialDepthPerPixel, initialViewportHeight),
   cursorDepth: null,
-  overviewVisible: true,
+  overviewVisible: false,
   curveTooltipVisible: true,
   interactionMode: 'view',
   depthTrackConfig: initialDepthTrackConfig,
