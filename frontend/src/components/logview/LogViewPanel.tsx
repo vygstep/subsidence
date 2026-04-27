@@ -56,20 +56,45 @@ export function LogViewPanel({ tracks, trackOrder, curves, formations, minDepth,
   )
 
   const [mouseClient, setMouseClient] = useState<{ x: number; y: number } | null>(null)
+  const [hoveredTrackId, setHoveredTrackId] = useState<string | null>(null)
 
   const handleMouseMove = useCallback(
     (e: React.MouseEvent<HTMLDivElement>) => {
       const rect = e.currentTarget.getBoundingClientRect()
       const y = e.clientY - rect.top
+      const x = e.clientX - rect.left
       setCursorDepth(scrollDepth + y * depthPerPixel)
       setMouseClient({ x: e.clientX, y: e.clientY })
+
+      // Determine which data track is under the cursor
+      const HANDLE_W = 2
+      let offsetX = 0
+      let nextHovered: string | null = null
+      for (const trackId of trackOrder) {
+        let w: number
+        if (trackId === DEPTH_TRACK_ID) {
+          w = depthWidth
+        } else if (trackId === FORMATION_TRACK_ID) {
+          w = formationWidth
+        } else {
+          const track = tracksById.get(trackId)
+          w = track ? (trackWidths[track.id] ?? track.width) : 0
+          if (x >= offsetX && x < offsetX + w) {
+            nextHovered = trackId
+            break
+          }
+        }
+        offsetX += w + HANDLE_W
+      }
+      setHoveredTrackId(nextHovered)
     },
-    [scrollDepth, depthPerPixel, setCursorDepth],
+    [scrollDepth, depthPerPixel, setCursorDepth, trackOrder, depthWidth, formationWidth, tracksById, trackWidths],
   )
 
   const handleMouseLeave = useCallback(() => {
     setCursorDepth(null)
     setMouseClient(null)
+    setHoveredTrackId(null)
   }, [setCursorDepth])
 
   const handleTracksClick = useCallback(
@@ -83,6 +108,14 @@ export function LogViewPanel({ tracks, trackOrder, curves, formations, minDepth,
     },
     [interactionMode, activePickId, scrollDepth, depthPerPixel, updateFormationDepth, setActivePickId],
   )
+
+  const tooltipCurves = useMemo(() => {
+    if (!hoveredTrackId) return []
+    const track = tracksById.get(hoveredTrackId)
+    if (!track) return []
+    const mnemonics = new Set(track.curves.map((c) => c.mnemonic))
+    return curves.filter((c) => mnemonics.has(c.mnemonic))
+  }, [hoveredTrackId, tracksById, curves])
 
   const visibleDepthRange = useViewStore((state) => state.visibleDepthRange)
   const fetchCurvesLOD = useWellDataStore((state) => state.fetchCurvesLOD)
@@ -167,7 +200,7 @@ export function LogViewPanel({ tracks, trackOrder, curves, formations, minDepth,
             <InteractionOverlay
               height={trackHeight}
               formations={formations}
-              curves={curves}
+              curves={tooltipCurves}
               depthToPixel={depthToPixel}
               cursorDepth={cursorDepth}
               mouseClient={mouseClient}

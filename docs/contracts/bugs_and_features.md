@@ -172,7 +172,7 @@ Items:
 - `UX-001`: Break log curves across missing intervals. (done)
 - `UX-004`: Align vertical toolbar labels. (done)
 - `UX-005`: Logs overview/minimap behavior.
-- `UX-006`: Track-local tooltip.
+- `UX-006`: Track-local tooltip. (done)
 - `UX-007`: Cursor depth label on depth scale.
 - `UX-008`: Delete track from track header context menu.
 - `UX-009`: Compact application typography and spacing.
