@@ -1,6 +1,8 @@
 # Bugs and Feature Backlog Contract
 
-**Status:** Active backlog contract  
+**Status:** Implemented  
+**Created:** 2026-02-01  
+**Completed:** 2026-04-27  
 **Scope:** Dictionary/template foundation, configurable import wizard, lithology pattern palettes, lithology curve support, viewer UX fixes, and subsidence chart presentation improvements.  
 **Rule:** This is the single active contract for the next data-import and viewer backlog. The former future Import Wizard Contract is merged here as `WIZ-*`.
 
