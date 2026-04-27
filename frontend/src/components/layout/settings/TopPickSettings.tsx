@@ -7,6 +7,7 @@ interface TopPickSettingsProps {
     patch: {
       name?: string
       age_ma?: number
+      age_base_ma?: number
       kind?: string
       color?: string
       water_depth_m?: number
@@ -17,6 +18,8 @@ interface TopPickSettingsProps {
 }
 
 export function TopPickSettings({ selectedFormation, onFormationUpdate, onFormationMove }: TopPickSettingsProps) {
+  const isUnconformity = selectedFormation.kind === 'unconformity'
+
   return (
     <div className="template-panel">
       <div className="template-panel__group">
@@ -32,29 +35,22 @@ export function TopPickSettings({ selectedFormation, onFormationUpdate, onFormat
       </label>
       <div className="project-dialog__grid">
         <label className="project-dialog__field">
-          <span>Depth</span>
+          <span>Depth (MD)</span>
           <input
+            type="number"
+            step="0.1"
             value={selectedFormation.depth_md ?? ''}
             onChange={(event) => onFormationMove(selectedFormation.id, Number(event.target.value))}
           />
         </label>
         <label className="project-dialog__field">
-          <span>Age</span>
-          <input
-            value={selectedFormation.age_ma ?? ''}
-            onChange={(event) => void onFormationUpdate(selectedFormation.id, {
-              age_ma: event.target.value ? Number(event.target.value) : undefined,
-            })}
-          />
-        </label>
-        <label className="project-dialog__field">
-          <span>Type</span>
+          <span>Kind</span>
           <select
             value={selectedFormation.kind}
             onChange={(event) => void onFormationUpdate(selectedFormation.id, { kind: event.target.value })}
           >
-            <option value="strat">strat</option>
-            <option value="unconformity">unconformity</option>
+            <option value="strat">Conformable</option>
+            <option value="unconformity">Unconformity</option>
           </select>
         </label>
         <label className="project-dialog__field">
@@ -66,16 +62,39 @@ export function TopPickSettings({ selectedFormation, onFormationUpdate, onFormat
           />
         </label>
         <label className="project-dialog__field">
-          <span>Water depth (m)</span>
+          <span>{isUnconformity ? 'Top age (Ma)' : 'Age (Ma)'}</span>
           <input
             type="number"
-            min="0"
+            step="0.01"
+            value={selectedFormation.age_ma ?? ''}
+            onChange={(event) => void onFormationUpdate(selectedFormation.id, {
+              age_ma: event.target.value ? Number(event.target.value) : undefined,
+            })}
+          />
+        </label>
+        {isUnconformity && (
+          <label className="project-dialog__field">
+            <span>Base age (Ma)</span>
+            <input
+              type="number"
+              step="0.01"
+              value={selectedFormation.age_base_ma ?? ''}
+              onChange={(event) => void onFormationUpdate(selectedFormation.id, {
+                age_base_ma: event.target.value ? Number(event.target.value) : undefined,
+              })}
+            />
+          </label>
+        )}
+        <label className="project-dialog__field">
+          <span>Paleobathymetry (m)</span>
+          <input
+            type="number"
             step="1"
             value={selectedFormation.water_depth_m}
             onChange={(event) => void onFormationUpdate(selectedFormation.id, { water_depth_m: Number(event.target.value) })}
           />
         </label>
-        {selectedFormation.kind === 'unconformity' && (
+        {isUnconformity && (
           <label className="project-dialog__field">
             <span>Eroded thickness (m)</span>
             <input

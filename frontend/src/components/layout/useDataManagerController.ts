@@ -309,7 +309,7 @@ export function useDataManagerController() {
     setFormationMove: (formationId: string, depth: number) => {
       if (Number.isFinite(depth)) void updateFormationDepth(formationId, depth)
     },
-    setFormationUpdate: (formationId: string, patch: { name?: string; age_ma?: number; kind?: string; color?: string; water_depth_m?: number; eroded_thickness_m?: number }) => void updateFormation(formationId, patch),
+    setFormationUpdate: (formationId: string, patch: { name?: string; age_ma?: number; age_base_ma?: number; kind?: string; color?: string; water_depth_m?: number; eroded_thickness_m?: number }) => void updateFormation(formationId, patch),
     sidebarTopRatio,
     sidebarWidth,
     stratCharts,

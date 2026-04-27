@@ -149,7 +149,7 @@ Goal:
 
 Items:
 
-- `TOP-001`: Edit conformable/unconformity attributes in settings.
+- `TOP-001`: Edit conformable/unconformity attributes in settings. (done)
 - `UX-002`: Unconformity visual style.
 - `UX-003`: Toggle top labels per pick.
 - `SUBS-001`: Two-level stratigraphy in upper subsidence chart.

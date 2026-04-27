@@ -50,6 +50,7 @@ interface FormationResponse {
   depth_tvdss: number | null
   horizon_id: number | null
   age_ma?: number
+  age_base_ma?: number | null
   color: string
   kind: string
   is_locked: boolean
@@ -80,6 +81,7 @@ interface FormationPatchPayload {
   kind?: string
   lithology?: FormationTop['lithology']
   age_ma?: number
+  age_base_ma?: number
   is_locked?: boolean
   water_depth_m?: number
   eroded_thickness_m?: number
@@ -230,6 +232,7 @@ function mapFormation(row: FormationResponse): FormationTop {
     depth_tvdss: row.depth_tvdss ?? null,
     horizon_id: row.horizon_id ?? null,
     age_ma: row.age_ma,
+    age_base_ma: row.age_base_ma ?? null,
     color: row.color,
     kind: row.kind,
     is_locked: row.is_locked,

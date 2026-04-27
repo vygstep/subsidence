@@ -43,6 +43,7 @@ class FormationTopPatch(BaseModel):
     kind: str | None = None
     lithology: str | None = None
     age_ma: float | None = None
+    age_base_ma: float | None = None
     is_locked: bool | None = None
     water_depth_m: float | None = None
     eroded_thickness_m: float | None = None
@@ -67,6 +68,7 @@ class FormationTopResponse(BaseModel):
     kind: str
     lithology: str | None
     age_ma: float | None
+    age_base_ma: float | None
     is_locked: bool
     water_depth_m: float
     eroded_thickness_m: float
@@ -145,6 +147,7 @@ def _to_response(row: FormationTopModel) -> FormationTopResponse:
         kind=row.kind,
         lithology=row.lithology,
         age_ma=row.age_top_ma,
+        age_base_ma=row.age_base_ma,
         is_locked=row.is_locked,
         water_depth_m=row.water_depth_m,
         eroded_thickness_m=row.eroded_thickness_m,
@@ -258,6 +261,7 @@ def update_formation(well_id: str, formation_id: int, body: FormationTopPatch, r
             'kind': ('kind', body.kind),
             'lithology': ('lithology', body.lithology),
             'age_top_ma': ('age_top_ma', body.age_ma),
+            'age_base_ma': ('age_base_ma', body.age_base_ma),
             'is_locked': ('is_locked', body.is_locked),
             'water_depth_m': ('water_depth_m', body.water_depth_m),
             'eroded_thickness_m': ('eroded_thickness_m', body.eroded_thickness_m),

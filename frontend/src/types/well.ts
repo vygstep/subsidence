@@ -51,6 +51,7 @@ export interface FormationTop {
   depth_tvdss: number | null
   horizon_id: number | null
   age_ma?: number
+  age_base_ma?: number | null
   color: string
   kind: string
   is_locked: boolean
