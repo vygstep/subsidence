@@ -2,6 +2,7 @@
 
 **Status:** Current navigation map  
 **Created:** 2026-04-23  
+**Updated:** 2026-04-27  
 **Purpose:** Help contributors locate code by workflow before reading the whole repository.
 
 For the full documentation entry point, see [Documentation](documentation-index.md).
@@ -169,6 +170,80 @@ Typical bugs:
 - Stale formations after edit.
 - Missing or wrong water depth input.
 
+### Import preview API
+
+File:
+
+- `app/src/subsidence/api/import_preview.py`
+
+Responsibilities:
+
+- LAS and tabular (CSV/TSV) file preview before committing an import.
+- Returns column names, sample rows, detected delimiter, total row count, and warnings.
+- Delegates to `data/importers/preview.py`.
+
+Main endpoint groups:
+
+- `POST /api/import-preview/tabular`
+- `POST /api/import-preview/las`
+
+### Lithology patterns API
+
+File:
+
+- `app/src/subsidence/api/lithology_patterns.py`
+
+Responsibilities:
+
+- Palette CRUD and built-in seed seeding.
+- User SVG upload with validation and sanitization.
+- Pattern-to-palette assignment and ordering.
+
+Main endpoint groups:
+
+- `GET/POST/DELETE /api/lithology-patterns/palettes...`
+- `POST /api/lithology-patterns/palettes/{id}/patterns`
+- `GET /api/lithology-patterns/patterns/{code}/svg`
+
+Risk:
+
+- SVG sanitization must run before storing user-uploaded content.
+
+### Sea level API
+
+File:
+
+- `app/src/subsidence/api/sea_level.py`
+
+Responsibilities:
+
+- Sea level curve CRUD (named curves with point arrays).
+- Per-well active sea level curve assignment.
+
+Main endpoint groups:
+
+- `GET/POST/DELETE /api/sea-level/curves...`
+- `GET/PUT /api/wells/{well_id}/sea-level`
+
+### Top sets API
+
+File:
+
+- `app/src/subsidence/api/top_sets.py`
+
+Responsibilities:
+
+- Top set and horizon CRUD.
+- Per-well active top set assignment.
+- TVD recalculation triggers via `deviation_transform.py`.
+- Zone aggregation via `zone_service.py`.
+
+Main endpoint groups:
+
+- `GET/POST/PATCH/DELETE /api/top-sets...`
+- `GET/POST/PATCH/DELETE /api/top-sets/{id}/horizons...`
+- `GET/PUT /api/wells/{well_id}/active-top-set`
+
 ---
 
 ## 3. Backend Data Layer
@@ -316,6 +391,67 @@ Rule:
 - Calculation changes need backend unit tests.
 - LOD changes need frontend rendering/performance checks and API tests around `/api/wells/{well_id}/curves`.
 
+### Zone service
+
+File:
+
+- `app/src/subsidence/data/zone_service.py`
+
+Responsibilities:
+
+- Aggregate zone lithology fractions from discrete curve data.
+- Build and rebuild `FormationZone` records for a top set.
+- Merge zones when a horizon is deleted.
+- Ensure per-well zone data exists before recalculation.
+
+### Unit registry
+
+File:
+
+- `app/src/subsidence/data/unit_registry.py`
+
+Responsibilities:
+
+- Load and query `MeasurementUnit` and `MeasurementUnitAlias` records from SQLite.
+- Normalize unit strings (strip whitespace, superscripts, Greek chars) before lookup.
+
+### Deviation transform
+
+File:
+
+- `app/src/subsidence/data/deviation_transform.py`
+
+Responsibilities:
+
+- Convert MD formation picks to TVD using a well's deviation survey.
+- Min-curvature method; supports INCL_AZIM survey mode.
+- Called from `top_sets.py` when a survey is updated.
+
+### Lithology patterns data
+
+File:
+
+- `app/src/subsidence/data/lithology_patterns.py`
+
+Responsibilities:
+
+- SVG content sanitization and validation before storage.
+- Pattern code normalization.
+- Runtime support for the built-in equinor seed and user-uploaded patterns.
+
+See `docs/lithology-pattern-palettes.md` for seed source details.
+
+### Import preview
+
+File:
+
+- `app/src/subsidence/data/importers/preview.py`
+
+Responsibilities:
+
+- Parse LAS and tabular files without committing data.
+- Return column list, sample rows, detected delimiter, and warnings for the Import Wizard UI.
+
 ---
 
 ## 4. Frontend Map
@@ -405,6 +541,9 @@ Files:
 
 - `frontend/src/components/layout/SettingsInspector.tsx` — dispatcher by selected object type
 - `frontend/src/components/layout/SettingsPaneShell.tsx`
+
+Well viewer settings:
+
 - `frontend/src/components/layout/settings/WellSettings.tsx`
 - `frontend/src/components/layout/settings/DepthTrackSettings.tsx`
 - `frontend/src/components/layout/settings/FormationsTrackSettings.tsx`
@@ -414,6 +553,27 @@ Files:
 - `frontend/src/components/layout/settings/TopPickSettings.tsx`
 - `frontend/src/components/layout/settings/StratChartSettings.tsx`
 - `frontend/src/components/layout/settings/ModelSettings.tsx`
+
+Dictionary and template settings:
+
+- `frontend/src/components/layout/settings/CurveMnemonicSetsRootSettings.tsx`
+- `frontend/src/components/layout/settings/CurveMnemonicSetSettings.tsx`
+- `frontend/src/components/layout/settings/LithologyDictionarySettings.tsx`
+- `frontend/src/components/layout/settings/LithologySetsRootSettings.tsx`
+- `frontend/src/components/layout/settings/LithologySetSettings.tsx`
+- `frontend/src/components/layout/settings/LithologyPatternPalettesRootSettings.tsx`
+- `frontend/src/components/layout/settings/LithologyPatternPaletteSettings.tsx`
+- `frontend/src/components/layout/settings/LithologyPatternPreview.tsx`
+- `frontend/src/components/layout/settings/CompactionPresetsRootSettings.tsx`
+- `frontend/src/components/layout/settings/CompactionPresetSettings.tsx`
+- `frontend/src/components/layout/settings/CompactionPresetDraftSettings.tsx`
+- `frontend/src/components/layout/settings/MeasurementUnitsRootSettings.tsx`
+- `frontend/src/components/layout/settings/UnitDimensionSettings.tsx`
+
+Zone settings:
+
+- `frontend/src/components/layout/settings/ZoneSettings.tsx`
+- `frontend/src/components/layout/settings/ZoneDetailSettings.tsx`
 
 Responsibilities:
 
@@ -429,8 +589,10 @@ Files:
 - `frontend/src/components/layout/CreateWellDialog.tsx`
 - `frontend/src/components/layout/ImportLasDialog.tsx`
 - `frontend/src/components/layout/ImportTopsDialog.tsx`
+- `frontend/src/components/layout/ImportUnconformitiesDialog.tsx`
 - `frontend/src/components/layout/ImportDeviationDialog.tsx`
 - `frontend/src/components/layout/LoadStratChartDialog.tsx`
+- `frontend/src/components/layout/LinkStratChartDialog.tsx`
 - `frontend/src/components/layout/FileOpenDialog.tsx`
 
 Responsibilities:
@@ -447,6 +609,38 @@ Typical bugs:
 - Dialog writes to path field but action uses stale value.
 - Active well target not used when source data has no well name.
 
+### Import Wizard
+
+Files:
+
+- `frontend/src/components/layout/importWizard/ImportWizardShell.tsx` — multi-step shell, step routing
+- `frontend/src/components/layout/importWizard/LasPreviewPane.tsx` — LAS file preview step
+- `frontend/src/components/layout/importWizard/TabularPreviewPane.tsx` — CSV/TSV preview step
+- `frontend/src/components/layout/importWizard/MappingPane.tsx` — column-to-field mapping step
+- `frontend/src/components/layout/importWizard/ImportWizardTargetWellFields.tsx` — target well selector
+- `frontend/src/components/layout/importWizard/importWizardPresets.ts` — built-in column mapping presets
+- `frontend/src/components/layout/importWizard/importWizardUtils.ts` — shared parsing helpers
+- `frontend/src/components/layout/importWizard/mapping.ts` — column mapping logic
+- `frontend/src/components/layout/importWizard/types.ts` — wizard state types
+- `frontend/src/components/layout/importWizard/useImportPreview.ts` — hook calling preview API
+- `frontend/src/components/layout/importWizard/index.ts` — re-exports
+
+Responsibilities:
+
+- Show a file before committing an import.
+- Let the user map source columns to target fields.
+- Apply presets for known formats (LAS standard, common tops CSV shapes).
+
+### Layout infrastructure
+
+Files:
+
+- `frontend/src/components/layout/SplitView.tsx` — resizable left/right split container
+- `frontend/src/components/layout/StatusBar.tsx` — bottom status bar
+- `frontend/src/components/layout/TemplatesTab.tsx` — Templates tab in Data Manager
+- `frontend/src/components/layout/ViewerWorkspace.tsx` — log viewer + subsidence panel workspace shell
+- `frontend/src/components/layout/ZoomControl.tsx` — depth zoom stepper control
+
 ### Well viewer
 
 Files:
@@ -458,6 +652,9 @@ Files:
 - `frontend/src/components/logview/TrackHeaderRow.tsx`
 - `frontend/src/components/logview/TrackHeader.tsx`
 - `frontend/src/components/logview/WellOverviewMinimap.tsx`
+- `frontend/src/components/logview/WellViewerToolbar.tsx` — per-well viewer toolbar (zoom, scale, mode)
+- `frontend/src/components/logview/CurveScaleBar.tsx` — per-track scale bar overlay
+- `frontend/src/components/logview/CurveBrowser.tsx` — curve browser for adding curves to tracks
 - `frontend/src/components/interaction/InteractionOverlay.tsx`
 - `frontend/src/components/interaction/FormationTopLine.tsx`
 - `frontend/src/components/interaction/DepthCursor.tsx`
@@ -617,6 +814,12 @@ Implementation files:
 | Subsidence panel blank/wrong | `computedStore.ts`, `api/subsidenceSocket.ts`, `MultiWellPanel.tsx`, `SubsidenceCanvas.tsx`, `api/subsidence.py` |
 | Export wrong | `utils/exportPng.ts`, `api/projects.py`, `SubsidenceControls.tsx` |
 | Layout scroll/resizer bug | `styles/app-layout.css`, `styles/subsidence-panel.css`, `SplitView.tsx`, `DataManagerPane.tsx`, `MultiWellPanel.tsx` |
+| Import Wizard wrong column mapping | `importWizard/MappingPane.tsx`, `importWizard/mapping.ts`, `importWizard/importWizardPresets.ts` |
+| Import preview fails or wrong | `api/import_preview.py`, `data/importers/preview.py`, `importWizard/useImportPreview.ts` |
+| Lithology pattern missing/wrong SVG | `api/lithology_patterns.py`, `data/lithology_patterns.py`, `settings/LithologyPatternPaletteSettings.tsx` |
+| Zone lithology aggregation wrong | `data/zone_service.py`, `api/top_sets.py`, `settings/ZoneDetailSettings.tsx` |
+| TVD picks wrong after survey import | `data/deviation_transform.py`, `api/top_sets.py`, `api/projects_imports.py` |
+| Measurement unit lookup wrong | `data/unit_registry.py`, `data/unit_conversion.py`, `settings/MeasurementUnitsRootSettings.tsx` |
 
 ---
 
@@ -632,6 +835,10 @@ These files are allowed to change, but not casually. Add tests/logging first whe
 | `frontend/src/stores/projectStore.ts` | project lifecycle and visual config serialization | save/reopen/hydration tests |
 | `frontend/src/stores/wellDataStore.ts` | active well data, optimistic top updates | well switching + formation CRUD tests |
 | `frontend/src/components/subsidence/*` | two rendering paths and WebSocket-fed data | recalculation + stored-results tests |
+| `app/src/subsidence/data/zone_service.py` | lithology aggregation depends on curve arrays and top set structure | zone rebuild + lithology aggregation tests |
+| `app/src/subsidence/data/deviation_transform.py` | TVD conversion affects all pick depths | deviation import + TVD recalc tests |
+| `app/src/subsidence/data/lithology_patterns.py` | SVG sanitization is a security boundary for user uploads | SVG injection + round-trip tests |
+| `frontend/src/components/layout/importWizard/*` | mapping logic drives what gets imported; preset mismatches cause silent wrong data | preview + mapping + commit integration tests |
 
 ---
 

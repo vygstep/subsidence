@@ -18,8 +18,12 @@ The current implementation is built around:
 - Canvas/SVG hybrid rendering for logs and stratigraphy
 - SQLite + Parquet project bundles on disk
 - WebSocket recalculation path for subsidence results
+- Import Wizard with tabular/LAS preview and column mapping
+- Lithology pattern palettes (built-in equinor SVG set + user uploads)
+- Stratigraphic zone system with lithology aggregation from curves
+- Measurement unit registry and normalization engine
 
-Phase 5 and the post-Phase 5 maintenance/refactor cycle are complete. Current future work is tracked in `todo.md`.
+All contracts through bugs-and-features (Phases A–F) are complete. Current future work is tracked in `todo.md`.
 
 ---
 
@@ -52,14 +56,15 @@ Quality:
 - [Regression Test Matrix](regression-test-matrix.md): workflow-level test worklist.
 - [Logging](modules/logging.md): planned backend/frontend process logging contract.
 
+Reference:
+
+- [Lithology Pattern Palettes](lithology-pattern-palettes.md): built-in equinor SVG pattern source, seed snapshot location, and runtime vs checkout separation.
+
 ---
 
 ## Active Contracts
 
-Active contracts describe work that still matters for future development:
-
-- [1D Well Model Architecture](contracts/well_1d_model_architecture.md)
-- [1D Well Model Summary](contracts/well_1d_model_summary.md)
+No active contracts. Start a new contract file in `docs/contracts/` to continue development.
 
 ---
 
@@ -67,15 +72,18 @@ Active contracts describe work that still matters for future development:
 
 Implemented or superseded contracts are archived in `contracts/implemented/`. They are useful for understanding why features exist, but they are not the primary current architecture map:
 
-- [Phase 1 Contract](contracts/implemented/phase1-contract.md)
-- [Phase 2 Contract](contracts/implemented/phase2-contract.md)
-- [Phase 2.5 Data Contract](contracts/implemented/phase2.5-data_contract.md)
-- [Phase 3 Contract](contracts/implemented/phase3-contract.md)
-- [Phase 3 Cleanup Contract](contracts/implemented/phase3-cleanup-contract.md)
-- [Phase 3 Cleanup 2 Contract](contracts/implemented/phase3-cleanup2-contract.md)
-- [Phase 4 Contract](contracts/implemented/phase4-contract.md)
-- [Phase 5 Contract](contracts/implemented/phase5-contract.md)
+- [Bugs and Features (Phases A–F)](contracts/implemented/bugs_and_features.md)
+- [1D Well Model Architecture](contracts/implemented/well_1d_model_architecture.md)
+- [1D Well Model Summary](contracts/implemented/well_1d_model_summary.md)
 - [Engineering Maintenance Contract](contracts/implemented/engineering-maintenance-contract.md)
+- [Phase 5 Contract](contracts/implemented/phase5-contract.md)
+- [Phase 4 Contract](contracts/implemented/phase4-contract.md)
+- [Phase 3 Cleanup 2 Contract](contracts/implemented/phase3-cleanup2-contract.md)
+- [Phase 3 Cleanup Contract](contracts/implemented/phase3-cleanup-contract.md)
+- [Phase 3 Contract](contracts/implemented/phase3-contract.md)
+- [Phase 2.5 Data Contract](contracts/implemented/phase2.5-data_contract.md)
+- [Phase 2 Contract](contracts/implemented/phase2-contract.md)
+- [Phase 1 Contract](contracts/implemented/phase1-contract.md)
 
 ---
 
