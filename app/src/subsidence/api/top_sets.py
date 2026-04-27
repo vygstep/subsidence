@@ -14,6 +14,7 @@ from subsidence.data.schema import (
     WellModel,
 )
 from subsidence.data.zone_service import (
+    aggregate_zone_lithology_from_curve,
     ensure_zone_well_data,
     merge_zones_on_horizon_delete,
     rebuild_zones_for_top_set,
@@ -321,6 +322,7 @@ def add_horizon(top_set_id: int, body: HorizonCreate, request: Request) -> Horiz
         for wid in well_ids:
             ensure_zone_well_data(session, top_set_id, wid)
             recalculate_zone_thickness(session, top_set_id, wid)
+            aggregate_zone_lithology_from_curve(session, manager.project_path, wid)
         session.commit()
         session.refresh(horizon)
         return _horizon_to_response(horizon)
@@ -361,6 +363,7 @@ def delete_horizon(top_set_id: int, horizon_id: int, request: Request) -> None:
         session.flush()
         for wid in well_ids:
             recalculate_zone_thickness(session, top_set_id, wid)
+            aggregate_zone_lithology_from_curve(session, manager.project_path, wid)
         session.commit()
 
 
@@ -420,6 +423,7 @@ def set_active_top_set(well_id: str, body: ActiveTopSetRequest, request: Request
         _create_ghost_picks(session, well_id, body.top_set_id)
         ensure_zone_well_data(session, body.top_set_id, well_id)
         recalculate_zone_thickness(session, body.top_set_id, well_id)
+        aggregate_zone_lithology_from_curve(session, manager.project_path, well_id)
         session.commit()
 
     return ActiveTopSetResponse(well_id=well_id, top_set_id=body.top_set_id)

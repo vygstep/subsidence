@@ -17,7 +17,7 @@ from subsidence.data.deviation_transform import compute_tvd_tvdss, tvd_to_md
 from subsidence.data.undo import _model_to_dict
 from subsidence.data.schema import FormationStratLink, FormationTopModel, StratChart, StratUnit, WellModel
 from subsidence.data.strat_link import auto_link_to_active_chart, find_strat_unit_by_name
-from subsidence.data.zone_service import get_well_active_top_set_id, recalculate_zone_thickness
+from subsidence.data.zone_service import aggregate_zone_lithology_from_curve, get_well_active_top_set_id, recalculate_zone_thickness
 
 router = APIRouter(tags=['formations'])
 
@@ -291,6 +291,7 @@ def update_formation(well_id: str, formation_id: int, body: FormationTopPatch, r
                     top_set_id = get_well_active_top_set_id(session, top.well_id)
                     if top_set_id is not None:
                         recalculate_zone_thickness(session, top_set_id, top.well_id)
+                        aggregate_zone_lithology_from_curve(session, manager.project_path, top.well_id)
                         session.commit()
 
     with manager.get_session() as session:

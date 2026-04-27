@@ -57,6 +57,10 @@ def import_las(payload: ImportLasRequest, request: Request) -> ImportLasResponse
                 session.commit()
             manager.execute_command(command)
             manager.save_project()
+            with manager.get_session() as session:
+                from subsidence.data.zone_service import aggregate_zone_lithology_from_curve
+                aggregate_zone_lithology_from_curve(session, manager.project_path, well_id)
+                session.commit()
         except (ValueError, FileNotFoundError) as error:
             raise HTTPException(status_code=400, detail=str(error)) from error
         return ImportLasResponse(well_id=well_id, well_name=well_name, curve_count=curve_count, qc_warnings=qc_warnings)
@@ -85,6 +89,10 @@ def import_logs_csv_route(payload: ImportLogsCsvRequest, request: Request) -> Im
                 session.commit()
             manager.execute_command(command)
             manager.save_project()
+            with manager.get_session() as session:
+                from subsidence.data.zone_service import aggregate_zone_lithology_from_curve
+                aggregate_zone_lithology_from_curve(session, manager.project_path, well_id)
+                session.commit()
         except (ValueError, FileNotFoundError) as error:
             raise HTTPException(status_code=400, detail=str(error)) from error
         return ImportLasResponse(well_id=well_id, well_name=well_name, curve_count=curve_count, qc_warnings=qc_warnings)

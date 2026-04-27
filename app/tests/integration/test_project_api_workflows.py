@@ -1576,3 +1576,151 @@ def test_zone004_zones_without_lithology_use_default(api_client: TestClient, tmp
     assert len(results) == 2
     for r in results:
         assert len(r['burial_path']) > 0
+
+
+# ---------------------------------------------------------------------------
+# ZONE-003 tests
+# ---------------------------------------------------------------------------
+
+def _insert_discrete_lithology_curve(
+    project_path: Path,
+    well_id: str,
+    depths: list[float],
+    codes: list[int],
+    code_map: dict[str, str] | None,
+    app_state,
+) -> None:
+    """Write a parquet file and insert a CurveMetadata row for a discrete lithology curve."""
+    import json as _json
+    import hashlib
+
+    curves_dir = project_path / 'curves'
+    curves_dir.mkdir(exist_ok=True)
+    data_uri = f'curves/{well_id}_FACIES.parquet'
+    parquet_path = project_path / data_uri
+
+    frame = pd.DataFrame({'DEPT': depths, 'FACIES': codes})
+    frame.to_parquet(parquet_path, index=False)
+
+    from subsidence.data.schema import CurveMetadata as _CM
+    from sqlalchemy import select as _sel
+    manager = app_state.project_manager
+    with manager.get_session() as session:
+        row = _CM(
+            well_id=well_id,
+            mnemonic='FACIES',
+            unit='',
+            curve_type='discrete',
+            family_code='lithology',
+            depth_min=min(depths),
+            depth_max=max(depths),
+            n_samples=len(depths),
+            data_uri=data_uri,
+            source_hash=hashlib.sha256(b'test').hexdigest(),
+            null_value=-999.25,
+            discrete_code_map=_json.dumps(code_map) if code_map else None,
+        )
+        session.add(row)
+        session.commit()
+
+
+def test_zone003_recalculate_lithology_sets_auto_fractions(api_client: TestClient, tmp_path: Path):
+    """Recalculate-lithology populates fractions from discrete curve for non-manual zones."""
+    project_path = _create_project(api_client, tmp_path, 'zone003-auto')
+
+    resp = api_client.post('/api/projects/wells', json={
+        'name': 'Z3 Well', 'x': 0.0, 'y': 0.0, 'kb': 0.0, 'td': 300.0, 'crs': 'local',
+    })
+    well_id = resp.json()['well_id']
+
+    for name, depth, age in [('A', 0.0, 10.0), ('B', 150.0, 50.0), ('C', 300.0, 100.0)]:
+        resp = api_client.post(f'/api/wells/{well_id}/formations', json={
+            'name': name, 'depth_md': depth, 'color': '#aaaaaa', 'age_ma': age,
+        })
+        assert resp.status_code == 201, resp.text
+
+    resp = api_client.post('/api/top-sets', json={'name': 'Z3 Set'})
+    top_set_id = resp.json()['id']
+    for name, age in [('A', 10.0), ('B', 50.0), ('C', 100.0)]:
+        api_client.post(f'/api/top-sets/{top_set_id}/horizons', json={'name': name, 'age_ma': age})
+    api_client.put(f'/api/wells/{well_id}/active-top-set', json={'top_set_id': top_set_id})
+
+    # Zone A→B: depth 0–150, codes 1 (sandstone). Zone B→C: depth 150–300, codes 2 (shale).
+    depths = list(range(0, 301, 10))
+    codes = [1 if d < 150 else 2 for d in depths]
+    _insert_discrete_lithology_curve(
+        project_path, well_id, depths, codes,
+        {'1': 'sandstone', '2': 'shale'},
+        api_client.app.state,
+    )
+
+    resp = api_client.post(f'/api/wells/{well_id}/zones/recalculate-lithology')
+    assert resp.status_code == 200, resp.text
+    assert resp.json()['zones_updated'] == 2
+
+    zones = api_client.get(f'/api/wells/{well_id}/zones').json()
+    fractions_by_name = {
+        f'{z["upper_horizon"]["name"]} → {z["lower_horizon"]["name"]}': z['lithology_fractions']
+        for z in zones
+    }
+    import json as _json
+    ab = _json.loads(fractions_by_name['A → B'])
+    bc = _json.loads(fractions_by_name['B → C'])
+    assert ab.get('sandstone', 0) == pytest.approx(1.0, abs=0.01)
+    assert bc.get('shale', 0) == pytest.approx(1.0, abs=0.01)
+
+
+def test_zone003_manual_zones_not_overwritten(api_client: TestClient, tmp_path: Path):
+    """Zones with lithology_source='manual' are skipped by recalculate-lithology."""
+    project_path = _create_project(api_client, tmp_path, 'zone003-manual')
+
+    resp = api_client.post('/api/projects/wells', json={
+        'name': 'Manual Well', 'x': 0.0, 'y': 0.0, 'kb': 0.0, 'td': 200.0, 'crs': 'local',
+    })
+    well_id = resp.json()['well_id']
+
+    for name, depth, age in [('A', 0.0, 10.0), ('B', 100.0, 50.0), ('C', 200.0, 100.0)]:
+        api_client.post(f'/api/wells/{well_id}/formations', json={
+            'name': name, 'depth_md': depth, 'color': '#aaaaaa', 'age_ma': age,
+        })
+
+    resp = api_client.post('/api/top-sets', json={'name': 'Manual Set'})
+    top_set_id = resp.json()['id']
+    for name, age in [('A', 10.0), ('B', 50.0), ('C', 100.0)]:
+        api_client.post(f'/api/top-sets/{top_set_id}/horizons', json={'name': name, 'age_ma': age})
+    api_client.put(f'/api/wells/{well_id}/active-top-set', json={'top_set_id': top_set_id})
+
+    # Manually set zone A→B
+    zones = api_client.get(f'/api/wells/{well_id}/zones').json()
+    ab_zone = next(z for z in zones if z['upper_horizon']['name'] == 'A')
+    api_client.patch(f'/api/wells/{well_id}/zones/{ab_zone["zone_id"]}', json={
+        'lithology_fractions': '{"limestone": 1.0}',
+        'lithology_source': 'manual',
+    })
+
+    # Discrete curve: all sandstone
+    depths = list(range(0, 201, 10))
+    codes = [1] * len(depths)
+    _insert_discrete_lithology_curve(
+        project_path, well_id, depths, codes,
+        {'1': 'sandstone'},
+        api_client.app.state,
+    )
+
+    resp = api_client.post(f'/api/wells/{well_id}/zones/recalculate-lithology')
+    assert resp.status_code == 200, resp.text
+    # Only B→C should be updated (A→B is manual)
+    assert resp.json()['zones_updated'] == 1
+
+    import json as _json
+    zones_after = api_client.get(f'/api/wells/{well_id}/zones').json()
+    ab_after = next(z for z in zones_after if z['upper_horizon']['name'] == 'A')
+    assert _json.loads(ab_after['lithology_fractions']).get('limestone') == pytest.approx(1.0)
+
+
+def test_zone003_no_curve_returns_zero_updates(api_client: TestClient, tmp_path: Path):
+    """Recalculate-lithology is a no-op when no discrete lithology curve exists."""
+    well_id, _ = _create_well_with_zone_subsidence(api_client, tmp_path)
+    resp = api_client.post(f'/api/wells/{well_id}/zones/recalculate-lithology')
+    assert resp.status_code == 200, resp.text
+    assert resp.json()['zones_updated'] == 0

@@ -1,12 +1,17 @@
 from __future__ import annotations
 
 import json
+from pathlib import Path
+
+import numpy as np
 
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from .backstrip import DEFAULT_LITHO_PARAM, LithologyParam, ZoneLayerInput
+from .loaders import load_curves_from_parquet
 from .schema import (
+    CurveMetadata,
     FormationTopModel,
     FormationZone,
     TopSetHorizon,
@@ -301,3 +306,116 @@ def build_zone_layer_inputs(
         ))
 
     return result
+
+
+def aggregate_zone_lithology_from_curve(
+    session: Session,
+    project_path: str | Path,
+    well_id: str,
+) -> int:
+    """Aggregate discrete lithology curve samples into zone lithology fractions.
+
+    For each zone whose ZoneWellData.lithology_source is not 'manual', the
+    depth slice of the well's primary discrete lithology curve is tallied by
+    integer code, converted to fractions, and stored in lithology_fractions.
+
+    Returns the number of zones updated.
+    """
+    curve_row = session.scalar(
+        select(CurveMetadata)
+        .where(
+            CurveMetadata.well_id == well_id,
+            CurveMetadata.curve_type == 'discrete',
+            CurveMetadata.family_code == 'lithology',
+        )
+        .order_by(CurveMetadata.id.asc())
+    )
+    if curve_row is None:
+        return 0
+
+    top_set_id = get_well_active_top_set_id(session, well_id)
+    if top_set_id is None:
+        return 0
+
+    curve_data = load_curves_from_parquet(project_path, curve_row.data_uri)
+    pair = curve_data.get(curve_row.mnemonic)
+    if pair is None:
+        return 0
+    depths_arr, values_arr = pair
+
+    code_map: dict[str, str] = {}
+    if curve_row.discrete_code_map:
+        try:
+            parsed = json.loads(curve_row.discrete_code_map)
+            if isinstance(parsed, dict):
+                code_map = {str(k): str(v) for k, v in parsed.items()}
+        except (ValueError, TypeError):
+            pass
+
+    zones = session.scalars(
+        select(FormationZone)
+        .where(FormationZone.top_set_id == top_set_id)
+        .order_by(FormationZone.sort_order.asc())
+    ).all()
+    if not zones:
+        return 0
+
+    horizon_ids = {z.upper_horizon_id for z in zones} | {z.lower_horizon_id for z in zones}
+    picks_by_horizon: dict[int, FormationTopModel] = {
+        pick.horizon_id: pick
+        for pick in session.scalars(
+            select(FormationTopModel).where(
+                FormationTopModel.well_id == well_id,
+                FormationTopModel.horizon_id.in_(horizon_ids),
+            )
+        ).all()
+        if pick.horizon_id is not None
+    }
+
+    zwd_by_zone: dict[int, ZoneWellData] = {
+        row.zone_id: row
+        for row in session.scalars(
+            select(ZoneWellData).where(
+                ZoneWellData.zone_id.in_([z.id for z in zones]),
+                ZoneWellData.well_id == well_id,
+            )
+        ).all()
+    }
+
+    updated = 0
+    null_val = curve_row.null_value
+    for zone in zones:
+        zwd = zwd_by_zone.get(zone.id)
+        if zwd is None or zwd.lithology_source == 'manual':
+            continue
+
+        upper_pick = picks_by_horizon.get(zone.upper_horizon_id)
+        lower_pick = picks_by_horizon.get(zone.lower_horizon_id)
+        if (
+            upper_pick is None or lower_pick is None
+            or upper_pick.depth_md is None or lower_pick.depth_md is None
+        ):
+            continue
+
+        mask = (depths_arr >= upper_pick.depth_md) & (depths_arr < lower_pick.depth_md)
+        slice_values = values_arr[mask]
+        valid = slice_values[
+            np.isfinite(slice_values) & (slice_values != null_val)
+        ]
+        if valid.size == 0:
+            continue
+
+        counts: dict[str, int] = {}
+        for raw in valid:
+            code_key = str(int(round(float(raw))))
+            litho_code = code_map.get(code_key, code_key)
+            counts[litho_code] = counts.get(litho_code, 0) + 1
+
+        total = sum(counts.values())
+        fractions = {k: v / total for k, v in counts.items()}
+        zwd.lithology_fractions = json.dumps(fractions)
+        zwd.lithology_source = 'auto'
+        updated += 1
+
+    session.flush()
+    return updated
