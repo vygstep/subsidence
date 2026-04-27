@@ -169,7 +169,7 @@ Goal:
 
 Items:
 
-- `UX-001`: Break log curves across missing intervals.
+- `UX-001`: Break log curves across missing intervals. (done)
 - `UX-004`: Align vertical toolbar labels.
 - `UX-005`: Logs overview/minimap behavior.
 - `UX-006`: Track-local tooltip.
