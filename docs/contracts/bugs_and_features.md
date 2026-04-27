@@ -174,7 +174,7 @@ Items:
 - `UX-005`: Logs overview/minimap behavior.
 - `UX-006`: Track-local tooltip. (done)
 - `UX-007`: Cursor depth label on depth scale. (done)
-- `UX-008`: Delete track from track header context menu.
+- `UX-008`: Delete track from track header context menu. (done)
 - `UX-009`: Compact application typography and spacing.
 
 Exit criteria:

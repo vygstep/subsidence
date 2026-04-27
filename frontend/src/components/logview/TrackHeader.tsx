@@ -8,6 +8,7 @@ interface TrackHeaderProps {
   isSelected?: boolean
   isDragOver?: boolean
   onSelect?: () => void
+  onContextMenu?: (event: React.MouseEvent<HTMLButtonElement>) => void
   onDragStart?: (event: React.DragEvent<HTMLButtonElement>) => void
   onDragEnd?: () => void
   onDragOver?: (event: React.DragEvent<HTMLButtonElement>) => void
@@ -20,6 +21,7 @@ export function TrackHeader({
   isSelected = false,
   isDragOver = false,
   onSelect,
+  onContextMenu,
   onDragStart,
   onDragEnd,
   onDragOver,
@@ -32,6 +34,7 @@ export function TrackHeader({
       className={`track-header ${isSelected ? 'track-header--selected' : ''} ${isDragOver ? 'track-header--drag-over' : ''}`}
       style={{ width }}
       onClick={onSelect}
+      onContextMenu={onContextMenu}
       onDragStart={onDragStart}
       onDragEnd={onDragEnd}
       onDragOver={onDragOver}

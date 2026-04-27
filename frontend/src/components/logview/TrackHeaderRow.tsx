@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 
 import { buildTrackOrder, useWellDataStore, useViewStore, useWorkspaceStore } from '@/stores'
 import { DEPTH_TRACK_ID, FORMATION_TRACK_ID } from '@/stores/workspaceStore'
@@ -26,6 +26,8 @@ export function TrackHeaderRow({ tracks, trackOrder }: TrackHeaderRowProps) {
   const formationWidth = trackWidths[FORMATION_TRACK_ID] ?? DEFAULT_FORMATION_COLUMN_WIDTH
   const [draggedTrackId, setDraggedTrackId] = useState<string | null>(null)
   const [dropTargetTrackId, setDropTargetTrackId] = useState<string | null>(null)
+  const [contextMenu, setContextMenu] = useState<{ x: number; y: number; trackId: string } | null>(null)
+  const contextMenuRef = useRef<HTMLDivElement>(null)
   const tracksById = new Map(tracks.map((track) => [track.id, track]))
 
   const handleDrop = (targetTrackId: string) => {
@@ -55,6 +57,34 @@ export function TrackHeaderRow({ tracks, trackOrder }: TrackHeaderRowProps) {
     setDraggedTrackId(null)
     setDropTargetTrackId(null)
   }
+
+  const handleDeleteTrack = (trackId: string) => {
+    if (!activeWellId) return
+    updateWellViewState(activeWellId, (state) => ({
+      ...state,
+      tracks: state.tracks.filter((t) => t.id !== trackId),
+      trackOrder: state.trackOrder.filter((id) => id !== trackId),
+    }))
+    setContextMenu(null)
+  }
+
+  useEffect(() => {
+    if (!contextMenu) return
+    function onDown(e: MouseEvent) {
+      if (contextMenuRef.current && !contextMenuRef.current.contains(e.target as Node)) {
+        setContextMenu(null)
+      }
+    }
+    function onKey(e: KeyboardEvent) {
+      if (e.key === 'Escape') setContextMenu(null)
+    }
+    document.addEventListener('mousedown', onDown)
+    document.addEventListener('keydown', onKey)
+    return () => {
+      document.removeEventListener('mousedown', onDown)
+      document.removeEventListener('keydown', onKey)
+    }
+  }, [contextMenu])
 
   return (
     <div className="track-header-row">
@@ -132,6 +162,10 @@ export function TrackHeaderRow({ tracks, trackOrder }: TrackHeaderRowProps) {
               isSelected={selectedTrackId === track.id}
               isDragOver={dropTargetTrackId === track.id && draggedTrackId !== track.id}
               onSelect={() => selectTrack(track.id)}
+              onContextMenu={(e) => {
+                e.preventDefault()
+                setContextMenu({ x: e.clientX, y: e.clientY, trackId: track.id })
+              }}
               {...sharedDragProps}
             />
             <div
@@ -142,6 +176,40 @@ export function TrackHeaderRow({ tracks, trackOrder }: TrackHeaderRowProps) {
           </div>
         )
       })}
+      {contextMenu && (
+        <div
+          ref={contextMenuRef}
+          style={{
+            position: 'fixed',
+            left: contextMenu.x,
+            top: contextMenu.y,
+            background: '#1e2631',
+            border: '1px solid #374151',
+            borderRadius: 5,
+            padding: '2px 0',
+            zIndex: 9999,
+            minWidth: 120,
+          }}
+        >
+          <button
+            type="button"
+            style={{
+              display: 'block',
+              width: '100%',
+              padding: '5px 12px',
+              background: 'none',
+              border: 'none',
+              color: '#ef4444',
+              fontSize: 12,
+              textAlign: 'left',
+              cursor: 'pointer',
+            }}
+            onClick={() => handleDeleteTrack(contextMenu.trackId)}
+          >
+            Delete track
+          </button>
+        </div>
+      )}
     </div>
   )
 }
