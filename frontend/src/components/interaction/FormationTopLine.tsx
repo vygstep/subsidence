@@ -132,6 +132,11 @@ export function FormationTopLine({
     }
   }, [popover, commitPopover])
 
+  const labelHidden = useWorkspaceStore((state) => {
+    const view = wellId ? state.wellViewStates[wellId] : null
+    return view?.hiddenTopLabelIds?.includes(formation.id) ?? false
+  })
+
   const isUnconformity = formation.kind === 'unconformity'
   const color = isUnconformity ? '#ef4444' : (formation.active_strat_color ?? formation.color)
   const displayY = localY !== null ? localY : yPosition
@@ -139,6 +144,7 @@ export function FormationTopLine({
   const strokeOpacity = isDragging || isActivePick ? 1.0 : 0.75
   const strokeWidth = isActivePick ? 2.5 : (isUnconformity ? 2.0 : 1.5)
   const strokeDasharray = isUnconformity ? '4 2 1 2' : '6 3'
+  const showLabel = !labelHidden || isActivePick
 
   return (
     <>
@@ -161,37 +167,41 @@ export function FormationTopLine({
         {isActivePick && (
           <circle cx={8} cy={displayY} r={5} fill={color} strokeWidth={0} />
         )}
-        <rect
-          x={2}
-          y={displayY - LABEL_HEIGHT}
-          width={120}
-          height={LABEL_HEIGHT}
-          fill={color}
-          opacity={isActivePick ? 1.0 : 0.85}
-          rx={2}
-        />
-        <text
-          x={LABEL_PADDING}
-          y={displayY - LABEL_HEIGHT / 2}
-          dominantBaseline="middle"
-          fill="#ffffff"
-          fontSize={11}
-          fontWeight={600}
-          style={{ userSelect: 'none' }}
-        >
-          {formation.name}
-        </text>
-        {formation.is_locked && (
-          <text
-            x={126}
-            y={displayY - LABEL_HEIGHT / 2}
-            dominantBaseline="middle"
-            fill={color}
-            fontSize={11}
-            style={{ userSelect: 'none' }}
-          >
-            🔒
-          </text>
+        {showLabel && (
+          <>
+            <rect
+              x={2}
+              y={displayY - LABEL_HEIGHT}
+              width={120}
+              height={LABEL_HEIGHT}
+              fill={color}
+              opacity={isActivePick ? 1.0 : 0.85}
+              rx={2}
+            />
+            <text
+              x={LABEL_PADDING}
+              y={displayY - LABEL_HEIGHT / 2}
+              dominantBaseline="middle"
+              fill="#ffffff"
+              fontSize={11}
+              fontWeight={600}
+              style={{ userSelect: 'none' }}
+            >
+              {formation.name}
+            </text>
+            {formation.is_locked && (
+              <text
+                x={126}
+                y={displayY - LABEL_HEIGHT / 2}
+                dominantBaseline="middle"
+                fill={color}
+                fontSize={11}
+                style={{ userSelect: 'none' }}
+              >
+                🔒
+              </text>
+            )}
+          </>
         )}
       </g>
       {popover && (

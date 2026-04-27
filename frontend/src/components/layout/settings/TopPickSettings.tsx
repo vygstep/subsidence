@@ -1,3 +1,4 @@
+import { useWellDataStore, useWorkspaceStore } from '@/stores'
 import type { FormationTop } from '@/types'
 
 interface TopPickSettingsProps {
@@ -18,6 +19,23 @@ interface TopPickSettingsProps {
 }
 
 export function TopPickSettings({ selectedFormation, onFormationUpdate, onFormationMove }: TopPickSettingsProps) {
+  const wellId = useWellDataStore((state) => state.well?.well_id)
+  const updateWellViewState = useWorkspaceStore((state) => state.updateWellViewState)
+  const labelHidden = useWorkspaceStore((state) => {
+    const view = wellId ? state.wellViewStates[wellId] : null
+    return view?.hiddenTopLabelIds?.includes(selectedFormation.id) ?? false
+  })
+
+  const handleToggleLabel = (show: boolean) => {
+    if (!wellId) return
+    updateWellViewState(wellId, (state) => ({
+      ...state,
+      hiddenTopLabelIds: show
+        ? state.hiddenTopLabelIds.filter((id) => id !== selectedFormation.id)
+        : [...state.hiddenTopLabelIds, selectedFormation.id],
+    }))
+  }
+
   const isUnconformity = selectedFormation.kind === 'unconformity'
 
   return (
@@ -107,6 +125,14 @@ export function TopPickSettings({ selectedFormation, onFormationUpdate, onFormat
           </label>
         )}
       </div>
+      <label className="project-dialog__field project-dialog__field--inline">
+        <input
+          type="checkbox"
+          checked={!labelHidden}
+          onChange={(event) => handleToggleLabel(event.target.checked)}
+        />
+        <span>Show label on track</span>
+      </label>
       <div className="tree-leaf">
         <span>Linked unit</span>
         <span>{selectedFormation.active_strat_unit_name ?? 'Unlinked'}</span>

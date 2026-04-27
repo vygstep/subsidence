@@ -151,7 +151,7 @@ Items:
 
 - `TOP-001`: Edit conformable/unconformity attributes in settings. (done)
 - `UX-002`: Unconformity visual style. (done)
-- `UX-003`: Toggle top labels per pick.
+- `UX-003`: Toggle top labels per pick. (done)
 - `SUBS-001`: Two-level stratigraphy in upper subsidence chart.
 - `SUBS-002`: Stratigraphy scale in lower multi-well subsidence chart.
 - `UX-010`: Subsidence chart labels.
