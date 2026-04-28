@@ -48,7 +48,7 @@ function TimescaleRow({
             width: `${widthPct}%`,
             height: '100%',
             background: unit.color,
-            borderRight: '1px solid rgba(0,0,0,0.2)',
+            borderRight: '1px solid #000',
             overflow: 'hidden',
             display: 'flex',
             alignItems: 'center',
