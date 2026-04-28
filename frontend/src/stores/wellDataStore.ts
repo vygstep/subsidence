@@ -104,6 +104,7 @@ export interface WellDataStore {
   lithologySets: LithologySetSummary[]
   lithologyPatternPalettes: LithologyPatternPaletteSummary[]
   tvdTable: TVDTable | null
+  depthBasis: 'MD' | 'TVD' | 'TVDSS'
   isLoading: boolean
   error: string | null
   reset: () => void
@@ -280,6 +281,7 @@ const emptyState = {
   lithologySets: [] as LithologySetSummary[],
   lithologyPatternPalettes: [] as LithologyPatternPaletteSummary[],
   tvdTable: null as TVDTable | null,
+  depthBasis: 'MD' as 'MD' | 'TVD' | 'TVDSS',
   isLoading: false,
   error: null as string | null,
 }
@@ -341,6 +343,7 @@ export const useWellDataStore = create<WellDataStore>((set, get) => ({
         fullCurves: mappedCurves,
         formations: sortFormations(formationPayload.map(mapFormation)),
         tvdTable: null,
+        depthBasis: 'MD',
         isLoading: false,
         error: null,
       })
@@ -1062,7 +1065,7 @@ export const useWellDataStore = create<WellDataStore>((set, get) => ({
       curve_type: curve.curve_type ?? 'continuous',
       discrete_code_map: curve.discrete_code_map ?? null,
     }))
-    set({ curves: mappedFull, fullCurves: mappedFull })
+    set({ curves: mappedFull, fullCurves: mappedFull, depthBasis })
   },
   async linkFormationToChart(formationId, chartId, stratUnitId) {
     const wellId = get().well?.well_id

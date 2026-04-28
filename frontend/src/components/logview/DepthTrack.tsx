@@ -17,6 +17,7 @@ export function DepthTrack({ height, width = 60, isSelected = false }: DepthTrac
   const depthType = useViewStore((state) => state.depthType)
   const tvdTable = useWellDataStore((state) => state.tvdTable)
   const kbElev = useWellDataStore((state) => state.well?.kb_elev ?? 0)
+  const depthBasis = useWellDataStore((state) => state.depthBasis)
   const { scale: depthScale } = useDepthScale(visibleDepthRange, height)
 
   const unitFactor = depthTrackConfig.unit === 'km' ? 1000 : depthTrackConfig.unit === 'ft' ? 0.3048 : 1
@@ -24,16 +25,19 @@ export function DepthTrack({ height, width = 60, isSelected = false }: DepthTrac
   const minorInterval = Math.max(depthTrackConfig.minorInterval * unitFactor, unitFactor / 10)
 
   const labelTransform = useMemo(() => {
+    // In full coordinate mode scroll and ticks are already in target space — no transform needed
+    if (depthBasis === depthType) return undefined
+    // Label-only fallback (DEPTH-001 behaviour)
     if (depthType === 'TVD') {
       if (tvdTable) return (md: number) => mdToTvd(md, tvdTable)
-      return undefined  // vertical well: TVD = MD, no change
+      return undefined  // vertical well: TVD = MD
     }
     if (depthType === 'TVDSS') {
       if (tvdTable) return (md: number) => mdToTvd(md, tvdTable) - kbElev
       return (md: number) => md - kbElev  // KB-only: TVDSS = MD - KB
     }
     return undefined
-  }, [depthType, tvdTable, kbElev])
+  }, [depthBasis, depthType, tvdTable, kbElev])
 
   const canvasRef = useCanvasRenderer(
     (ctx, canvasWidth, canvasHeight) => {

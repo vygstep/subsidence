@@ -65,6 +65,29 @@ export function tvdToMd(tvdValue: number, table: TVDTable): number {
   return md[lo] + t * (md[hi] - md[lo])
 }
 
+export function convertScrollDepth(
+  value: number,
+  from: 'MD' | 'TVD' | 'TVDSS',
+  to: 'MD' | 'TVD' | 'TVDSS',
+  table: TVDTable,
+  kbElev: number,
+): number {
+  if (from === to) return value
+  // Convert to MD first
+  let md: number
+  if (from === 'MD') {
+    md = value
+  } else if (from === 'TVD') {
+    md = tvdToMd(value, table)
+  } else {
+    md = tvdToMd(value + kbElev, table)
+  }
+  // Then to target
+  if (to === 'MD') return md
+  if (to === 'TVD') return mdToTvd(md, table)
+  return mdToTvd(md, table) - kbElev
+}
+
 export function mdToTvd(mdValue: number, table: TVDTable): number {
   const { md, tvd } = table
   if (md.length === 0) return mdValue

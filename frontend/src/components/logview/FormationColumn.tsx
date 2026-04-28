@@ -27,22 +27,27 @@ export function FormationColumn({ formations, height, maxDepth, width = 80, isSe
   const depthType = useViewStore((state) => state.depthType)
   const tvdTable = useWellDataStore((state) => state.tvdTable)
   const kbElev = useWellDataStore((state) => state.well?.kb_elev ?? 0)
+  const depthBasis = useWellDataStore((state) => state.depthBasis)
   const patternPalettes = useWellDataStore((state) => state.lithologyPatternPalettes)
   const fetchPatternPalette = useWellDataStore((state) => state.fetchLithologyPatternPalette)
   const [patterns, setPatterns] = useState<LithologyPatternEntry[]>([])
   const [patternRenderTick, setPatternRenderTick] = useState(0)
 
-  const toDisplayDepth = useMemo(() => {
+  const getFormationTopDepth = useMemo(() => (formation: FormationTop): number => {
+    const md = formation.depth_md!
     if (depthType === 'TVD') {
-      if (tvdTable) return (md: number) => mdToTvd(md, tvdTable)
-      return (md: number) => md  // vertical well: TVD = MD
+      // Full coordinate mode: prefer stored DB value
+      if (depthBasis === 'TVD' && formation.depth_tvd !== null) return formation.depth_tvd
+      if (tvdTable) return mdToTvd(md, tvdTable)
+      return md
     }
     if (depthType === 'TVDSS') {
-      if (tvdTable) return (md: number) => mdToTvd(md, tvdTable) - kbElev
-      return (md: number) => md - kbElev  // KB-only: TVDSS = MD - KB
+      if (depthBasis === 'TVDSS' && formation.depth_tvdss !== null) return formation.depth_tvdss
+      if (tvdTable) return mdToTvd(md, tvdTable) - kbElev
+      return md - kbElev
     }
-    return (md: number) => md
-  }, [depthType, tvdTable, kbElev])
+    return md
+  }, [depthBasis, depthType, tvdTable, kbElev])
 
   const orderedFormations = useMemo(
     () => [...formations].sort((left, right) => (left.depth_md ?? Infinity) - (right.depth_md ?? Infinity)),
@@ -97,8 +102,11 @@ export function FormationColumn({ formations, height, maxDepth, width = 80, isSe
 
       orderedFormations.forEach((formation, index) => {
         if (formation.depth_md === null) return
-        const nextDepth = toDisplayDepth(orderedFormations[index + 1]?.depth_md ?? maxDepth)
-        const blockTop = Math.max(toDisplayDepth(formation.depth_md), visibleDepthRange.min)
+        const nextFormation = orderedFormations[index + 1]
+        const nextDepth = (nextFormation && nextFormation.depth_md !== null)
+          ? getFormationTopDepth(nextFormation)
+          : maxDepth
+        const blockTop = Math.max(getFormationTopDepth(formation), visibleDepthRange.min)
         const blockBottom = Math.min(nextDepth, visibleDepthRange.max)
 
         if (blockBottom <= blockTop) {
@@ -149,7 +157,7 @@ export function FormationColumn({ formations, height, maxDepth, width = 80, isSe
       orderedFormations,
       patternByCode,
       patternRenderTick,
-      toDisplayDepth,
+      getFormationTopDepth,
       visibleDepthRange.max,
       visibleDepthRange.min,
     ],

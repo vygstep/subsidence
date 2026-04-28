@@ -1,9 +1,10 @@
-import { useMemo } from 'react'
+import { useEffect, useMemo } from 'react'
 
 import { LogViewPanel } from '../logview'
 import { SubsidencePanel } from '../subsidence'
 import { SplitView } from './SplitView'
 import { buildTrackOrder, createDefaultWellView, useViewStore, useWellDataStore, useWorkspaceStore } from '@/stores'
+import { convertScrollDepth } from '@/utils/depthTransform'
 
 export function ViewerWorkspace() {
   const well = useWellDataStore((state) => state.well)
@@ -14,8 +15,22 @@ export function ViewerWorkspace() {
   const error = useWellDataStore((state) => state.error)
   const wellViewStates = useWorkspaceStore((state) => state.wellViewStates)
   const lodEnabled = useViewStore((state) => state.lodEnabled)
+  const depthType = useViewStore((state) => state.depthType)
   const subsidenceWidth = useViewStore((state) => state.subsidenceWidth)
   const setSubsidenceWidth = useViewStore((state) => state.setSubsidenceWidth)
+  const tvdTable = useWellDataStore((state) => state.tvdTable)
+  const depthBasis = useWellDataStore((state) => state.depthBasis)
+  const reloadCurvesForDepthBasis = useWellDataStore((state) => state.reloadCurvesForDepthBasis)
+
+  useEffect(() => {
+    if (!tvdTable) return
+    if (depthBasis === depthType) return
+    const kbElev = useWellDataStore.getState().well?.kb_elev ?? 0
+    const currentScroll = useViewStore.getState().scrollDepth
+    const newScroll = convertScrollDepth(currentScroll, depthBasis, depthType, tvdTable, kbElev)
+    useViewStore.getState().setScroll(newScroll)
+    void reloadCurvesForDepthBasis(depthType)
+  }, [depthType, tvdTable, depthBasis, reloadCurvesForDepthBasis])
 
   const curves = lodEnabled ? lodCurves : fullCurves
 

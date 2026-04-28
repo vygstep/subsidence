@@ -67,7 +67,7 @@ Investigate: depth-type switching logic, where KB is stored and accessed, `depth
 
 ---
 
-### DEPTH-002: Full TVD/TVDSS coordinate system for the viewer
+### DEPTH-002: Full TVD/TVDSS coordinate system for the viewer (done)
 
 **Type:** Architectural refactoring  
 **Priority:** Critical
@@ -181,7 +181,7 @@ Fix location: `SubsidenceCanvas.tsx` title div, `styles/subsidence-panel.css`.
 2. LOD-002 — depends on LOD-001 being testable. (done)
 3. UX-011 — standalone, high user-impact. (done)
 4. DEPTH-001 — label-only fix, KB-only TVDSS. (done)
-5. **DEPTH-002 — full TVD/TVDSS coordinate system. Critical for correctness. Large scope — requires dedicated implementation session.**
+5. DEPTH-002 — full TVD/TVDSS coordinate system. (done)
 6. UX-013 — minimap layout rework, medium scope.
 7. UX-012 — depends on UX-013 (buttons may move to toolbar).
 8. UX-014, UX-015 — fit buttons, small scope.
