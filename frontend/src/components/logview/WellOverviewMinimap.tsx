@@ -98,11 +98,16 @@ export function WellOverviewMinimap({ height, curves }: WellOverviewMinimapProps
 
     const viewTop = depthToY(scrollDepth)
     const viewBottom = depthToY(scrollDepth + depthPerPixel * viewportHeight)
-    ctx.fillStyle = 'rgba(59,130,246,0.12)'
-    ctx.fillRect(0, viewTop, WIDTH, viewBottom - viewTop)
-    ctx.strokeStyle = 'rgba(59,130,246,0.6)'
-    ctx.lineWidth = 1
-    ctx.strokeRect(0.5, viewTop + 0.5, WIDTH - 1, viewBottom - viewTop - 1)
+    const top = Math.max(0, Math.min(height, viewTop))
+    const bottom = Math.max(0, Math.min(height, viewBottom))
+    const boxH = bottom - top
+    if (boxH > 0) {
+      ctx.fillStyle = 'rgba(59,130,246,0.12)'
+      ctx.fillRect(0, top, WIDTH, boxH)
+      ctx.strokeStyle = 'rgba(59,130,246,0.6)'
+      ctx.lineWidth = 1
+      ctx.strokeRect(0.5, top + 0.5, WIDTH - 1, Math.max(1, boxH - 1))
+    }
   }, [curves, formations, scrollDepth, depthPerPixel, viewportHeight, height])
 
   const scrollToOffsetY = useCallback((offsetY: number) => {

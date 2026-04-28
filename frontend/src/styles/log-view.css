@@ -50,6 +50,7 @@
   background: #f0f5fa;
   border-bottom: 2px solid #c4d0dc;
   flex-shrink: 0;
+  box-shadow: 0 6px 10px -4px rgba(100, 130, 160, 0.28);
 }
 
 .track-header-row__depth-header,
@@ -266,14 +267,3 @@
   overflow: hidden;
 }
 
-.log-view-panel__tracks::after {
-  content: '';
-  position: absolute;
-  top: 0;
-  left: 0;
-  right: 0;
-  height: 14px;
-  background: linear-gradient(to bottom, rgba(180, 200, 220, 0.22), transparent);
-  pointer-events: none;
-  z-index: 4;
-}
