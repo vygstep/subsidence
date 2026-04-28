@@ -15,15 +15,16 @@ export function FormationsTrackSettings({ visibleFormationIds }: FormationsTrack
         <div className="template-panel__value">FORMATIONS</div>
       </div>
       <div className="tree-leaf"><span>Visible tops</span><span>{visibleFormationIds.length}</span></div>
-      <label className="project-dialog__field">
+      <div className="sf-row">
         <span>Background color</span>
         <input
           type="color"
+          className="sf-swatch"
           value={formationsTrackConfig.backgroundColor}
           onChange={(event) => updateFormationsTrackConfig({ backgroundColor: event.target.value })}
         />
-      </label>
-      <label className="project-dialog__field">
+      </div>
+      <div className="sf-row">
         <span>Name source</span>
         <select
           value={formationsTrackConfig.nameSource}
@@ -34,7 +35,7 @@ export function FormationsTrackSettings({ visibleFormationIds }: FormationsTrack
           <option value="formation-name">Top name</option>
           <option value="linked-strat-unit">Linked strat unit</option>
         </select>
-      </label>
+      </div>
     </div>
   )
 }

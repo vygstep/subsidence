@@ -51,47 +51,45 @@ export function WellSettings({ well: _well, wellInspectorDraft, onWellInspectorD
         <div className="template-panel__label">Object</div>
         <div className="template-panel__value">Well settings</div>
       </div>
-      <label className="project-dialog__field">
+      <div className="sf-row">
         <span>Well name</span>
         <input
           value={wellInspectorDraft.well_name}
           onChange={(event) => onWellInspectorDraftChange('well_name', event.target.value)}
         />
-      </label>
-      <div className="project-dialog__grid">
-        <label className="project-dialog__field">
-          <span>Project X</span>
-          <input value={wellInspectorDraft.x} onChange={(event) => onWellInspectorDraftChange('x', event.target.value)} />
-        </label>
-        <label className="project-dialog__field">
-          <span>Project Y</span>
-          <input value={wellInspectorDraft.y} onChange={(event) => onWellInspectorDraftChange('y', event.target.value)} />
-        </label>
-        <label className="project-dialog__field">
-          <span>KB</span>
-          <input
-            value={wellInspectorDraft.kb_elev}
-            onChange={(event) => onWellInspectorDraftChange('kb_elev', event.target.value)}
-          />
-        </label>
-        <label className="project-dialog__field">
-          <span>GL</span>
-          <input
-            value={wellInspectorDraft.gl_elev}
-            onChange={(event) => onWellInspectorDraftChange('gl_elev', event.target.value)}
-          />
-        </label>
-        <label className="project-dialog__field">
-          <span>TD</span>
-          <input
-            value={wellInspectorDraft.td_md}
-            onChange={(event) => onWellInspectorDraftChange('td_md', event.target.value)}
-          />
-        </label>
-        <label className="project-dialog__field">
-          <span>CRS</span>
-          <input value={wellInspectorDraft.crs} onChange={(event) => onWellInspectorDraftChange('crs', event.target.value)} />
-        </label>
+      </div>
+      <div className="sf-row">
+        <span>Project X</span>
+        <input value={wellInspectorDraft.x} onChange={(event) => onWellInspectorDraftChange('x', event.target.value)} />
+      </div>
+      <div className="sf-row">
+        <span>Project Y</span>
+        <input value={wellInspectorDraft.y} onChange={(event) => onWellInspectorDraftChange('y', event.target.value)} />
+      </div>
+      <div className="sf-row">
+        <span>KB</span>
+        <input
+          value={wellInspectorDraft.kb_elev}
+          onChange={(event) => onWellInspectorDraftChange('kb_elev', event.target.value)}
+        />
+      </div>
+      <div className="sf-row">
+        <span>GL</span>
+        <input
+          value={wellInspectorDraft.gl_elev}
+          onChange={(event) => onWellInspectorDraftChange('gl_elev', event.target.value)}
+        />
+      </div>
+      <div className="sf-row">
+        <span>TD</span>
+        <input
+          value={wellInspectorDraft.td_md}
+          onChange={(event) => onWellInspectorDraftChange('td_md', event.target.value)}
+        />
+      </div>
+      <div className="sf-row">
+        <span>CRS</span>
+        <input value={wellInspectorDraft.crs} onChange={(event) => onWellInspectorDraftChange('crs', event.target.value)} />
       </div>
       <div className="project-dialog__actions">
         <button
@@ -104,8 +102,8 @@ export function WellSettings({ well: _well, wellInspectorDraft, onWellInspectorD
       </div>
 
       <div className="template-panel__section-header">Sea level correction</div>
-      <label className="project-dialog__field">
-        <span>Eustatic sea level curve</span>
+      <div className="sf-row">
+        <span>Eustatic curve</span>
         <select
           value={activeCurveId ?? ''}
           onChange={(e) => void handleSeaLevelChange(e.target.value)}
@@ -118,7 +116,7 @@ export function WellSettings({ well: _well, wellInspectorDraft, onWellInspectorD
             </option>
           ))}
         </select>
-      </label>
+      </div>
     </div>
   )
 }

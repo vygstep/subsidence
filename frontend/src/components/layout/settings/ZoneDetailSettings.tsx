@@ -145,21 +145,18 @@ export function ZoneDetailSettings({ zone }: ZoneDetailSettingsProps) {
       ) : null}
 
       <div className="template-panel__section-header">Paleobathymetry</div>
-      <div className="project-dialog__field">
-        <label>
-          <span>Water depth at deposition (m)</span>
-          <input
-            type="number"
-            step="1"
-            value={waterDepth}
-            onChange={(e) => setWaterDepth(e.target.value)}
-            onBlur={() => void handleWaterDepthSave()}
-            disabled={isSavingWd || upperPick === null}
-            className="zone-detail__wd-input"
-          />
-        </label>
-        <span className="zone-detail__wd-hint">negative = emerged / non-marine</span>
+      <div className="sf-row">
+        <span>Water depth (m)</span>
+        <input
+          type="number"
+          step="1"
+          value={waterDepth}
+          onChange={(e) => setWaterDepth(e.target.value)}
+          onBlur={() => void handleWaterDepthSave()}
+          disabled={isSavingWd || upperPick === null}
+        />
       </div>
+      <span className="zone-detail__wd-hint">negative = emerged / non-marine</span>
 
       <div className="template-panel__section-header">Lithology</div>
 

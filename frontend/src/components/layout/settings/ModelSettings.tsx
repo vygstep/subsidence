@@ -52,14 +52,14 @@ export function ModelSettings({ model }: { model: CompactionModel }) {
       {model.is_builtin ? (
         <div className="tree-leaf"><span>Kind</span><span>Built-in legacy model</span></div>
       ) : (
-        <label className="project-dialog__field">
+        <div className="sf-row">
           <span>Name</span>
           <input
             value={nameDraft}
             onChange={(e) => setNameDraft(e.target.value)}
             onBlur={() => void handleRenameBlur()}
           />
-        </label>
+        </div>
       )}
       <div className="template-panel__group" style={{ marginTop: 8 }}>
         <div className="template-panel__label">Legacy Runtime Parameters</div>

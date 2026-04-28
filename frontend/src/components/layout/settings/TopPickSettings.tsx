@@ -44,94 +44,93 @@ export function TopPickSettings({ selectedFormation, onFormationUpdate, onFormat
         <div className="template-panel__label">Top</div>
         <div className="template-panel__value">{selectedFormation.name}</div>
       </div>
-      <label className="project-dialog__field">
+      <div className="sf-row">
         <span>Name</span>
         <input
           value={selectedFormation.name}
           onChange={(event) => void onFormationUpdate(selectedFormation.id, { name: event.target.value })}
         />
-      </label>
-      <div className="project-dialog__grid">
-        <label className="project-dialog__field">
-          <span>Depth (MD)</span>
-          <input
-            type="number"
-            step="0.1"
-            value={selectedFormation.depth_md ?? ''}
-            onChange={(event) => onFormationMove(selectedFormation.id, Number(event.target.value))}
-          />
-        </label>
-        <label className="project-dialog__field">
-          <span>Kind</span>
-          <select
-            value={selectedFormation.kind}
-            onChange={(event) => void onFormationUpdate(selectedFormation.id, { kind: event.target.value })}
-          >
-            <option value="strat">Conformable</option>
-            <option value="unconformity">Unconformity</option>
-          </select>
-        </label>
-        <label className="project-dialog__field">
-          <span>Color</span>
-          <input
-            type="color"
-            value={selectedFormation.color}
-            onChange={(event) => void onFormationUpdate(selectedFormation.id, { color: event.target.value })}
-          />
-        </label>
-        <label className="project-dialog__field">
-          <span>{isUnconformity ? 'Top age (Ma)' : 'Age (Ma)'}</span>
+      </div>
+      <div className="sf-row">
+        <span>Depth (MD)</span>
+        <input
+          type="number"
+          step="0.1"
+          value={selectedFormation.depth_md ?? ''}
+          onChange={(event) => onFormationMove(selectedFormation.id, Number(event.target.value))}
+        />
+      </div>
+      <div className="sf-row">
+        <span>Kind</span>
+        <select
+          value={selectedFormation.kind}
+          onChange={(event) => void onFormationUpdate(selectedFormation.id, { kind: event.target.value })}
+        >
+          <option value="strat">Conformable</option>
+          <option value="unconformity">Unconformity</option>
+        </select>
+      </div>
+      <div className="sf-row">
+        <span>Color</span>
+        <input
+          type="color"
+          className="sf-swatch"
+          value={selectedFormation.color}
+          onChange={(event) => void onFormationUpdate(selectedFormation.id, { color: event.target.value })}
+        />
+      </div>
+      <div className="sf-row">
+        <span>{isUnconformity ? 'Top age (Ma)' : 'Age (Ma)'}</span>
+        <input
+          type="number"
+          step="0.01"
+          value={selectedFormation.age_ma ?? ''}
+          onChange={(event) => void onFormationUpdate(selectedFormation.id, {
+            age_ma: event.target.value ? Number(event.target.value) : undefined,
+          })}
+        />
+      </div>
+      {isUnconformity && (
+        <div className="sf-row">
+          <span>Base age (Ma)</span>
           <input
             type="number"
             step="0.01"
-            value={selectedFormation.age_ma ?? ''}
+            value={selectedFormation.age_base_ma ?? ''}
             onChange={(event) => void onFormationUpdate(selectedFormation.id, {
-              age_ma: event.target.value ? Number(event.target.value) : undefined,
+              age_base_ma: event.target.value ? Number(event.target.value) : undefined,
             })}
           />
-        </label>
-        {isUnconformity && (
-          <label className="project-dialog__field">
-            <span>Base age (Ma)</span>
-            <input
-              type="number"
-              step="0.01"
-              value={selectedFormation.age_base_ma ?? ''}
-              onChange={(event) => void onFormationUpdate(selectedFormation.id, {
-                age_base_ma: event.target.value ? Number(event.target.value) : undefined,
-              })}
-            />
-          </label>
-        )}
-        <label className="project-dialog__field">
-          <span>Paleobathymetry (m)</span>
+        </div>
+      )}
+      <div className="sf-row">
+        <span>Paleobathymetry (m)</span>
+        <input
+          type="number"
+          step="1"
+          value={selectedFormation.water_depth_m}
+          onChange={(event) => void onFormationUpdate(selectedFormation.id, { water_depth_m: Number(event.target.value) })}
+        />
+      </div>
+      {isUnconformity && (
+        <div className="sf-row">
+          <span>Eroded thickness (m)</span>
           <input
             type="number"
+            min="0"
             step="1"
-            value={selectedFormation.water_depth_m}
-            onChange={(event) => void onFormationUpdate(selectedFormation.id, { water_depth_m: Number(event.target.value) })}
+            value={selectedFormation.eroded_thickness_m}
+            onChange={(event) => void onFormationUpdate(selectedFormation.id, { eroded_thickness_m: Number(event.target.value) })}
           />
-        </label>
-        {isUnconformity && (
-          <label className="project-dialog__field">
-            <span>Eroded thickness (m)</span>
-            <input
-              type="number"
-              min="0"
-              step="1"
-              value={selectedFormation.eroded_thickness_m}
-              onChange={(event) => void onFormationUpdate(selectedFormation.id, { eroded_thickness_m: Number(event.target.value) })}
-            />
-          </label>
-        )}
-      </div>
-      <label className="project-dialog__field project-dialog__field--inline">
+        </div>
+      )}
+      <label className="sf-row">
+        <span>Show label on track</span>
         <input
           type="checkbox"
           checked={!labelHidden}
           onChange={(event) => handleToggleLabel(event.target.checked)}
         />
-        <span>Show label on track</span>
       </label>
       <div className="tree-leaf">
         <span>Linked unit</span>

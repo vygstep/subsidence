@@ -512,7 +512,92 @@
 .template-panel {
   display: flex;
   flex-direction: column;
-  gap: 10px;
+  gap: 4px;
+}
+
+.template-panel__section-header {
+  font-size: 0.72rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--dm-fg-3);
+  padding: 8px 0 2px;
+  border-bottom: 1px solid var(--dm-border-light);
+  margin-bottom: 2px;
+}
+
+/* ─── compact settings field rows ────────────────────────────────────────── */
+
+.sf-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 6px;
+  min-height: 22px;
+  font-size: 0.78rem;
+  color: #314155;
+  font-weight: 500;
+}
+
+.sf-row > span:first-child,
+.sf-row > label > span:first-child {
+  flex: 1;
+  min-width: 0;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.sf-row input,
+.sf-row select {
+  flex-shrink: 0;
+  width: 88px;
+  padding: 1px 5px;
+  border: 1px solid #cbd5e1;
+  border-radius: 4px;
+  background: #ffffff;
+  color: #17212b;
+  font-size: 0.78rem;
+  height: 20px;
+  box-sizing: border-box;
+}
+
+.sf-row input:focus,
+.sf-row select:focus {
+  outline: none;
+  border-color: #2563eb;
+}
+
+.sf-row input[type="checkbox"] {
+  width: 14px;
+  height: 14px;
+  cursor: pointer;
+}
+
+.sf-swatch {
+  flex-shrink: 0;
+  width: 20px;
+  height: 20px;
+  padding: 1px;
+  border: 1px solid #94a3b8;
+  border-radius: 3px;
+  cursor: pointer;
+  -webkit-appearance: none;
+  appearance: none;
+}
+
+.sf-swatch::-webkit-color-swatch-wrapper {
+  padding: 0;
+}
+
+.sf-swatch::-webkit-color-swatch {
+  border: none;
+  border-radius: 2px;
+}
+
+.sf-swatch::-moz-color-swatch {
+  border: none;
+  border-radius: 2px;
 }
 
 .template-panel--muted {

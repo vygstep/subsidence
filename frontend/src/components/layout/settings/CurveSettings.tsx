@@ -100,7 +100,7 @@ export function CurveSettings({ selectedCurveConfig, onCurveSettingUpdate }: Cur
       {dictMatch?.matched && (
         <div className="tree-leaf"><span>Family</span><span>{dictMatch.family_code ?? '-'}</span></div>
       )}
-      <label className="project-dialog__field">
+      <div className="sf-row">
         <span>Rendering</span>
         <select
           value={curveType}
@@ -109,52 +109,51 @@ export function CurveSettings({ selectedCurveConfig, onCurveSettingUpdate }: Cur
           <option value="continuous">Line</option>
           <option value="discrete">Blocks</option>
         </select>
-      </label>
+      </div>
       {!isDiscrete && (
         <>
-          <label className="project-dialog__field">
+          <div className="sf-row">
             <span>Color</span>
             <input
               type="color"
+              className="sf-swatch"
               value={selectedCurveConfig.color}
               onChange={(event) => onCurveSettingUpdate(selectedCurveConfig.mnemonic, { color: event.target.value })}
             />
-          </label>
-          <div className="project-dialog__grid">
-            <label className="project-dialog__field">
-              <span>Min</span>
-              <input
-                value={selectedCurveConfig.scaleMin}
-                onChange={(event) => onCurveSettingUpdate(selectedCurveConfig.mnemonic, { scaleMin: Number(event.target.value) })}
-              />
-            </label>
-            <label className="project-dialog__field">
-              <span>Max</span>
-              <input
-                value={selectedCurveConfig.scaleMax}
-                onChange={(event) => onCurveSettingUpdate(selectedCurveConfig.mnemonic, { scaleMax: Number(event.target.value) })}
-              />
-            </label>
-            <label className="project-dialog__field">
-              <span>Line width</span>
-              <input
-                value={selectedCurveConfig.lineWidth}
-                onChange={(event) => onCurveSettingUpdate(selectedCurveConfig.mnemonic, { lineWidth: Number(event.target.value) })}
-              />
-            </label>
-            <label className="project-dialog__field">
-              <span>Line style</span>
-              <select
-                value={selectedCurveConfig.lineStyle}
-                onChange={(event) => onCurveSettingUpdate(selectedCurveConfig.mnemonic, {
-                  lineStyle: event.target.value as TrackConfig['curves'][number]['lineStyle'],
-                })}
-              >
-                <option value="solid">Solid</option>
-                <option value="dashed">Dashed</option>
-                <option value="dotted">Dotted</option>
-              </select>
-            </label>
+          </div>
+          <div className="sf-row">
+            <span>Min</span>
+            <input
+              value={selectedCurveConfig.scaleMin}
+              onChange={(event) => onCurveSettingUpdate(selectedCurveConfig.mnemonic, { scaleMin: Number(event.target.value) })}
+            />
+          </div>
+          <div className="sf-row">
+            <span>Max</span>
+            <input
+              value={selectedCurveConfig.scaleMax}
+              onChange={(event) => onCurveSettingUpdate(selectedCurveConfig.mnemonic, { scaleMax: Number(event.target.value) })}
+            />
+          </div>
+          <div className="sf-row">
+            <span>Line width</span>
+            <input
+              value={selectedCurveConfig.lineWidth}
+              onChange={(event) => onCurveSettingUpdate(selectedCurveConfig.mnemonic, { lineWidth: Number(event.target.value) })}
+            />
+          </div>
+          <div className="sf-row">
+            <span>Line style</span>
+            <select
+              value={selectedCurveConfig.lineStyle}
+              onChange={(event) => onCurveSettingUpdate(selectedCurveConfig.mnemonic, {
+                lineStyle: event.target.value as TrackConfig['curves'][number]['lineStyle'],
+              })}
+            >
+              <option value="solid">Solid</option>
+              <option value="dashed">Dashed</option>
+              <option value="dotted">Dotted</option>
+            </select>
           </div>
           <div className="project-dialog__actions">
             <button
@@ -183,7 +182,7 @@ export function CurveSettings({ selectedCurveConfig, onCurveSettingUpdate }: Cur
       )}
 
       <div className="template-panel__section-header">Lithology composition</div>
-      <label className="project-dialog__field">
+      <div className="sf-row">
         <span>Lithology code</span>
         <select
           value={selectedCurveConfig.lithology_code ?? ''}
@@ -196,7 +195,7 @@ export function CurveSettings({ selectedCurveConfig, onCurveSettingUpdate }: Cur
             </option>
           ))}
         </select>
-      </label>
+      </div>
       {isLithologyTrack && lithologyWarning && (
         <p className="project-dialog__warning">{lithologyWarning}</p>
       )}

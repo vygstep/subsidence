@@ -1,19 +1,13 @@
 import { useViewStore, useWellDataStore } from '@/stores'
 
-const DEPTH_TYPES = ['MD', 'TVD', 'TVDSS'] as const
-
 export function WellViewerToolbar() {
   const overviewVisible = useViewStore((state) => state.overviewVisible)
   const curveTooltipVisible = useViewStore((state) => state.curveTooltipVisible)
   const interactionMode = useViewStore((state) => state.interactionMode)
-  const depthType = useViewStore((state) => state.depthType)
-  const tvdTable = useWellDataStore((state) => state.tvdTable)
-  const kbElev = useWellDataStore((state) => state.well?.kb_elev ?? 0)
   const hasWell = useWellDataStore((state) => state.well !== null)
   const setOverviewVisible = useViewStore((state) => state.setOverviewVisible)
   const setCurveTooltipVisible = useViewStore((state) => state.setCurveTooltipVisible)
   const setInteractionMode = useViewStore((state) => state.setInteractionMode)
-  const setDepthType = useViewStore((state) => state.setDepthType)
 
   function handleFitToWell() {
     const { viewportHeight, setScroll, setScale } = useViewStore.getState()
@@ -84,19 +78,6 @@ export function WellViewerToolbar() {
       >
         <span className="well-viewer-toolbar__button-label">Fit data</span>
       </button>
-      <div className="well-viewer-toolbar__depth-type" role="group" aria-label="Depth type">
-        {DEPTH_TYPES.map((t) => (
-          <button
-            key={t}
-            type="button"
-            className={`well-viewer-toolbar__button well-viewer-toolbar__button--compact ${depthType === t ? 'well-viewer-toolbar__button--active' : ''}`}
-            disabled={t === 'TVDSS' ? (!tvdTable && kbElev === 0) : false}
-            onClick={() => setDepthType(t)}
-          >
-            {t}
-          </button>
-        ))}
-      </div>
     </div>
   )
 }
