@@ -1,8 +1,8 @@
 ﻿# TODO
 
-No active contracts as of 2026-04-27. All phases A–F of `bugs_and_features.md` are complete.
+Active contract: `docs/contracts/bugs_and_features_2.md`
 
-Start a new contract file in `docs/contracts/` to continue development.
+Items: LOD-001, LOD-002, UX-011, UX-012, UX-013, UX-014, UX-015, DEPTH-001, SUBS-003, SUBS-004
 
 ## Implemented contracts
 

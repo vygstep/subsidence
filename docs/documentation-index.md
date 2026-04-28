@@ -64,7 +64,7 @@ Reference:
 
 ## Active Contracts
 
-No active contracts. Start a new contract file in `docs/contracts/` to continue development.
+- [Bugs and Features 2](contracts/bugs_and_features_2.md) — LOD fixes, minimap rework, depth-type switching, New Project flow, navigation controls, subsidence chart polish.
 
 ---
 
