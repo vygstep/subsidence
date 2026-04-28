@@ -95,9 +95,18 @@ export function GeologicalTimescale({
         { units: GEOLOGIC_ERAS, rowHeight: eraRowH, minPct: 3 },
         { units: GEOLOGIC_PERIODS, rowHeight: periodRowH, minPct: 4 },
       ] as const).map(({ units, rowHeight, minPct }, i) => (
-        <div key={i} style={{ display: 'flex', alignItems: 'stretch', height: rowHeight, flexShrink: 0, borderBottom: i === 0 ? '1px solid #000' : undefined }}>
+        <div key={i} style={{ display: 'flex', alignItems: 'stretch', height: rowHeight, flexShrink: 0 }}>
           {paddingLeft > 0 && <div style={{ width: paddingLeft, flexShrink: 0 }} />}
-          <div style={{ flex: 1, position: 'relative', overflow: 'hidden', marginRight: paddingRight }}>
+          <div style={{
+            flex: 1,
+            position: 'relative',
+            overflow: 'hidden',
+            marginRight: paddingRight,
+            borderLeft: '1px solid #000',
+            borderRight: '1px solid #000',
+            borderTop: i === 0 ? '1px solid #000' : undefined,
+            borderBottom: '1px solid #000',
+          }}>
             <TimescaleRow
               units={units}
               minMa={min_ma}
