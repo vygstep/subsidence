@@ -224,9 +224,14 @@ export function ProjectToolbar() {
     return () => window.removeEventListener('keydown', onKeyDown)
   }, [canRedo, canUndo, isProjectOpen, redoProject, saveProject, undoProject])
 
-  async function executePendingAction(action: 'new-project' | 'open-project' | 'close-project'): Promise<void> {
-    await closeProject()
-    setActiveDialog(action === 'new-project' ? 'project-new' : 'project-open')
+  async function executeAction(action: 'new-project' | 'open-project' | 'close-project'): Promise<void> {
+    if (action === 'close-project') {
+      await closeProject()
+      setActiveDialog('project-open')
+    } else {
+      // open/new: show the dialog — it has Cancel built in via onClose
+      setActiveDialog(action === 'new-project' ? 'project-new' : 'project-open')
+    }
   }
 
   function requestAction(action: 'new-project' | 'open-project' | 'close-project'): void {
@@ -235,7 +240,7 @@ export function ProjectToolbar() {
       setPendingAction(action)
       return
     }
-    void executePendingAction(action)
+    void executeAction(action)
   }
 
   async function handleCopyDiagnostics(): Promise<void> {
@@ -564,12 +569,12 @@ export function ProjectToolbar() {
             onDiscard={() => {
               const action = pendingAction
               setPendingAction(null)
-              void executePendingAction(action)
+              void executeAction(action)
             }}
             onSave={() => {
               const action = pendingAction
               setPendingAction(null)
-              void saveProject().then(() => executePendingAction(action))
+              void saveProject().then(() => executeAction(action))
             }}
           />
         </div>
