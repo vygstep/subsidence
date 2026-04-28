@@ -130,7 +130,7 @@ export const useViewStore = create<ViewStore>((set) => ({
   subsidenceBottomHeight: initialSubsidenceBottomHeight,
   depthType: 'MD',
   activePickId: null,
-  lodEnabled: true,
+  lodEnabled: false,
   setScroll(depth) {
     set((state) => ({
       scrollDepth: depth,

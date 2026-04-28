@@ -8,7 +8,7 @@
 
 ## 1. Items
 
-### LOD-001: LOD disabled by default
+### LOD-001: LOD disabled by default (done)
 
 **Type:** Bug / default value  
 **Priority:** High
