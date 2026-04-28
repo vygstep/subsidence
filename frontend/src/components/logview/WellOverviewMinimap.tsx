@@ -3,7 +3,7 @@ import { useCallback, useEffect, useRef } from 'react'
 import { useViewStore, useWellDataStore } from '@/stores'
 import type { CurveData } from '@/types'
 
-const WIDTH = 48
+const WIDTH = 24
 
 interface WellOverviewMinimapProps {
   height: number
