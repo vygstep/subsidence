@@ -7,13 +7,17 @@ import { buildTrackOrder, createDefaultWellView, useViewStore, useWellDataStore,
 
 export function ViewerWorkspace() {
   const well = useWellDataStore((state) => state.well)
-  const curves = useWellDataStore((state) => state.curves)
+  const lodCurves = useWellDataStore((state) => state.curves)
+  const fullCurves = useWellDataStore((state) => state.fullCurves)
   const formations = useWellDataStore((state) => state.formations)
   const colorOverrides = useWellDataStore((state) => state.colorOverrides)
   const error = useWellDataStore((state) => state.error)
   const wellViewStates = useWorkspaceStore((state) => state.wellViewStates)
+  const lodEnabled = useViewStore((state) => state.lodEnabled)
   const subsidenceWidth = useViewStore((state) => state.subsidenceWidth)
   const setSubsidenceWidth = useViewStore((state) => state.setSubsidenceWidth)
+
+  const curves = lodEnabled ? lodCurves : fullCurves
 
   const activeWellView = useMemo(() => {
     if (!well?.well_id) return createDefaultWellView()

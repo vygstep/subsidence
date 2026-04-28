@@ -19,7 +19,7 @@ Fix: change `lodEnabled: true` → `lodEnabled: false` in `viewStore.ts`.
 
 ---
 
-### LOD-002: Curves incomplete when LOD is off
+### LOD-002: Curves incomplete when LOD is off (done)
 
 **Type:** Bug  
 **Priority:** High

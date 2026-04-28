@@ -91,6 +91,7 @@ export interface WellDataStore {
   well: Well | null
   wellInventories: WellInventory[]
   curves: CurveData[]
+  fullCurves: CurveData[]
   formations: FormationTop[]
   zones: FormationZone[]
   colorOverrides: Record<string, string>
@@ -266,6 +267,7 @@ const emptyState = {
   well: null,
   wellInventories: [] as WellInventory[],
   curves: [] as CurveData[],
+  fullCurves: [] as CurveData[],
   formations: [] as FormationTop[],
   zones: [] as FormationZone[],
   colorOverrides: {} as Record<string, string>,
@@ -323,17 +325,20 @@ export const useWellDataStore = create<WellDataStore>((set, get) => ({
       const payload = (await wellResponse.json()) as WellResponse
       const { curves, ...well } = payload
 
+      const mappedCurves = curves.map((curve) => ({
+        mnemonic: curve.mnemonic,
+        unit: curve.unit,
+        depths: toFloat32Array(curve.depths),
+        values: toFloat32Array(curve.values),
+        null_value: curve.null_value,
+        curve_type: curve.curve_type ?? 'continuous',
+        discrete_code_map: curve.discrete_code_map ?? null,
+      }))
+
       set({
         well,
-        curves: curves.map((curve) => ({
-          mnemonic: curve.mnemonic,
-          unit: curve.unit,
-          depths: toFloat32Array(curve.depths),
-          values: toFloat32Array(curve.values),
-          null_value: curve.null_value,
-          curve_type: curve.curve_type ?? 'continuous',
-          discrete_code_map: curve.discrete_code_map ?? null,
-        })),
+        curves: mappedCurves,
+        fullCurves: mappedCurves,
         formations: sortFormations(formationPayload.map(mapFormation)),
         tvdTable: null,
         isLoading: false,
@@ -1047,18 +1052,17 @@ export const useWellDataStore = create<WellDataStore>((set, get) => ({
     const url = `/api/wells/${wellId}/curves/full?depth_basis=${depthBasis}`
     const response = await fetch(url)
     if (!response.ok) return
-    const fullCurves = (await response.json()) as WellResponse['curves']
-    set({
-      curves: fullCurves.map((curve) => ({
-        mnemonic: curve.mnemonic,
-        unit: curve.unit,
-        depths: toFloat32Array(curve.depths),
-        values: toFloat32Array(curve.values),
-        null_value: curve.null_value,
-        curve_type: curve.curve_type ?? 'continuous',
-        discrete_code_map: curve.discrete_code_map ?? null,
-      })),
-    })
+    const fullCurveData = (await response.json()) as WellResponse['curves']
+    const mappedFull = fullCurveData.map((curve) => ({
+      mnemonic: curve.mnemonic,
+      unit: curve.unit,
+      depths: toFloat32Array(curve.depths),
+      values: toFloat32Array(curve.values),
+      null_value: curve.null_value,
+      curve_type: curve.curve_type ?? 'continuous',
+      discrete_code_map: curve.discrete_code_map ?? null,
+    }))
+    set({ curves: mappedFull, fullCurves: mappedFull })
   },
   async linkFormationToChart(formationId, chartId, stratUnitId) {
     const wellId = get().well?.well_id
