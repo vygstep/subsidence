@@ -25,15 +25,11 @@ export function WellOverviewMinimap({ height, curves }: WellOverviewMinimapProps
 
   useEffect(() => {
     if (curves.length === 0) return
-    let lo = Number.POSITIVE_INFINITY
     let hi = Number.NEGATIVE_INFINITY
     for (const c of curves) {
-      if (c.depths.length > 0) {
-        lo = Math.min(lo, c.depths[0])
-        hi = Math.max(hi, c.depths[c.depths.length - 1])
-      }
+      if (c.depths.length > 0) hi = Math.max(hi, c.depths[c.depths.length - 1])
     }
-    if (Number.isFinite(lo)) minDepth.current = lo
+    minDepth.current = 0
     if (Number.isFinite(hi)) maxDepth.current = hi
   }, [curves])
 

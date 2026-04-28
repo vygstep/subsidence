@@ -24,17 +24,13 @@ export function ViewerWorkspace() {
     return wellViewStates[well.well_id] ?? createDefaultWellView()
   }, [well?.well_id, wellViewStates])
 
-  const { minDepth, maxDepth } = useMemo(() => {
-    if (curves.length === 0) return { minDepth: 0, maxDepth: 1000 }
-    let min = Infinity
+  const maxDepth = useMemo(() => {
+    if (curves.length === 0) return 1000
     let max = -Infinity
     for (const curve of curves) {
-      if (curve.depths.length > 0) {
-        min = Math.min(min, curve.depths[0])
-        max = Math.max(max, curve.depths[curve.depths.length - 1])
-      }
+      if (curve.depths.length > 0) max = Math.max(max, curve.depths[curve.depths.length - 1])
     }
-    return { minDepth: min, maxDepth: max }
+    return Number.isFinite(max) ? max : 1000
   }, [curves])
 
   const tracks = useMemo(() => (
@@ -78,7 +74,7 @@ export function ViewerWorkspace() {
                 trackOrder={trackOrder}
                 curves={curves}
                 formations={visibleFormations}
-                minDepth={minDepth}
+                minDepth={0}
                 maxDepth={maxDepth}
               />
             }
