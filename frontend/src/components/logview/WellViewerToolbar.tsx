@@ -43,7 +43,7 @@ export function WellViewerToolbar() {
             key={t}
             type="button"
             className={`well-viewer-toolbar__button well-viewer-toolbar__button--compact ${depthType === t ? 'well-viewer-toolbar__button--active' : ''}`}
-            disabled={t === 'TVD' ? !tvdTable : t === 'TVDSS' ? (!tvdTable && kbElev === 0) : false}
+            disabled={t === 'TVDSS' ? (!tvdTable && kbElev === 0) : false}
             onClick={() => setDepthType(t)}
           >
             {t}
