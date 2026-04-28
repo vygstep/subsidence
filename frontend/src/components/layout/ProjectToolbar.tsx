@@ -29,6 +29,33 @@ async function readError(response: Response, fallback: string): Promise<string> 
   return fallback
 }
 
+interface UnsavedChangesDialogProps {
+  projectName: string | null
+  onSave: () => void
+  onDiscard: () => void
+  onCancel: () => void
+}
+
+function UnsavedChangesDialog({ projectName, onSave, onDiscard, onCancel }: UnsavedChangesDialogProps) {
+  return (
+    <div className="project-dialog">
+      <header className="project-dialog__header">
+        <div>
+          <p className="project-dialog__eyebrow">Unsaved changes</p>
+          <h2 className="project-dialog__title">Save "{projectName ?? 'project'}"?</h2>
+        </div>
+      </header>
+      <div className="project-dialog__body">
+        <div className="project-dialog__actions" style={{ gap: 8 }}>
+          <button type="button" className="project-dialog__button" onClick={onCancel}>Cancel</button>
+          <button type="button" className="project-dialog__button" onClick={onDiscard}>{"Don't Save"}</button>
+          <button type="button" className="project-dialog__button project-dialog__button--primary" onClick={onSave}>Save</button>
+        </div>
+      </div>
+    </div>
+  )
+}
+
 interface SetFormationTypeDialogProps {
   formationName: string
   initialType: FormationTypeOption
@@ -83,6 +110,7 @@ export function ProjectToolbar() {
   const [activeDialog, setActiveDialog] = useState<DialogKind>('project-open')
   const [formationLinkTarget, setFormationLinkTarget] = useState<FormationTop | null>(null)
   const [projectMenuOpen, setProjectMenuOpen] = useState(false)
+  const [pendingAction, setPendingAction] = useState<'new-project' | 'open-project' | 'close-project' | null>(null)
   const projectMenuRef = useRef<HTMLDivElement | null>(null)
 
   const well = useWellDataStore((state) => state.well)
@@ -91,6 +119,7 @@ export function ProjectToolbar() {
   const stratCharts = useWellDataStore((state) => state.stratCharts)
   const wellInventories = useWellDataStore((state) => state.wellInventories)
   const isLoading = useWellDataStore((state) => state.isLoading)
+  const cancelLoading = useWellDataStore((state) => state.cancelLoading)
   const error = useWellDataStore((state) => state.error)
   const addFormation = useWellDataStore((state) => state.addFormation)
   const removeFormation = useWellDataStore((state) => state.removeFormation)
@@ -195,22 +224,18 @@ export function ProjectToolbar() {
     return () => window.removeEventListener('keydown', onKeyDown)
   }, [canRedo, canUndo, isProjectOpen, redoProject, saveProject, undoProject])
 
-  async function handleProjectClose(): Promise<void> {
-    setProjectMenuOpen(false)
+  async function executePendingAction(action: 'new-project' | 'open-project' | 'close-project'): Promise<void> {
     await closeProject()
-    setActiveDialog('project-open')
+    setActiveDialog(action === 'new-project' ? 'project-new' : 'project-open')
   }
 
-  async function handleNewProject(): Promise<void> {
+  function requestAction(action: 'new-project' | 'open-project' | 'close-project'): void {
     setProjectMenuOpen(false)
-    if (isProjectOpen) {
-      if (isDirty) {
-        const save = window.confirm(`Save changes to "${projectName ?? 'project'}" before creating a new project?`)
-        if (save) await saveProject()
-      }
-      await closeProject()
+    if (isProjectOpen && isDirty) {
+      setPendingAction(action)
+      return
     }
-    setActiveDialog('project-new')
+    void executePendingAction(action)
   }
 
   async function handleCopyDiagnostics(): Promise<void> {
@@ -416,9 +441,9 @@ export function ProjectToolbar() {
 
   const projectMenuActions = (
     <>
-      <button type="button" className="app-menu__item" onClick={() => void handleNewProject()}>New project</button>
-      <button type="button" className="app-menu__item" onClick={() => { setProjectMenuOpen(false); setActiveDialog('project-open') }}>Open project</button>
-      <button type="button" className="app-menu__item" onClick={() => void handleProjectClose()}>Close project</button>
+      <button type="button" className="app-menu__item" onClick={() => requestAction('new-project')}>New project</button>
+      <button type="button" className="app-menu__item" onClick={() => requestAction('open-project')}>Open project</button>
+      <button type="button" className="app-menu__item" onClick={() => requestAction('close-project')}>Close project</button>
       <button type="button" className="app-menu__item" onClick={() => { setProjectMenuOpen(false); void saveProject() }}>Save project</button>
       <button type="button" className="app-menu__item" onClick={() => { setProjectMenuOpen(false); void createCheckpoint() }}>Create checkpoint</button>
       <button type="button" className="app-menu__item" onClick={() => { setProjectMenuOpen(false); void handleCopyDiagnostics() }}>Copy diagnostics</button>
@@ -499,6 +524,9 @@ export function ProjectToolbar() {
             </div>
           )}
 
+          {isLoading && (
+            <button type="button" className="app-action-button" onClick={cancelLoading}>Cancel loading</button>
+          )}
           {curves.length > 0 && (
             <span className="app-topbar__meta">
               {curves.length} curves | {curves[0].depths.length.toLocaleString()} samples
@@ -526,6 +554,24 @@ export function ProjectToolbar() {
       {dialogContent && (
         <div className="project-dialog-overlay">
           {dialogContent}
+        </div>
+      )}
+      {pendingAction !== null && (
+        <div className="project-dialog-overlay">
+          <UnsavedChangesDialog
+            projectName={projectName}
+            onCancel={() => setPendingAction(null)}
+            onDiscard={() => {
+              const action = pendingAction
+              setPendingAction(null)
+              void executePendingAction(action)
+            }}
+            onSave={() => {
+              const action = pendingAction
+              setPendingAction(null)
+              void saveProject().then(() => executePendingAction(action))
+            }}
+          />
         </div>
       )}
     </>

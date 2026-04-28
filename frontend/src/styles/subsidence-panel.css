@@ -272,7 +272,7 @@
 
 .geological-timescale {
   background: #f0f5fa;
-  border-bottom: 1px solid #c4d0dc;
+  border: 1px solid #000;
   flex-shrink: 0;
 }
 

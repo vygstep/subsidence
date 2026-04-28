@@ -198,6 +198,7 @@ export interface WellDataStore {
   deleteLithologySetEntry: (setId: number, entryId: number) => Promise<void>
   fetchCompactionModelParams: (modelId: number) => Promise<LithologyParam[]>
   updateCompactionModelParam: (modelId: number, lithologyCode: string, patch: Partial<Pick<LithologyParam, 'density' | 'porosity_surface' | 'compaction_coeff'>>) => Promise<LithologyParam>
+  cancelLoading: () => void
   fetchCurvesLOD: (depthMin: number, depthMax: number, resolution: number) => Promise<void>
   reloadCurvesForDepthBasis: (depthBasis: 'MD' | 'TVD' | 'TVDSS') => Promise<void>
   updateZoneLithology: (zoneId: number, lithologyFractions: string | null, lithologySource: 'manual' | 'auto') => Promise<void>
@@ -247,13 +248,15 @@ function mapFormation(row: FormationResponse): FormationTop {
   }
 }
 
-async function fetchFormations(wellId: string): Promise<FormationResponse[]> {
-  const response = await fetch(`/api/wells/${wellId}/formations`)
+async function fetchFormations(wellId: string, signal?: AbortSignal): Promise<FormationResponse[]> {
+  const response = await fetch(`/api/wells/${wellId}/formations`, { signal })
   if (!response.ok) {
     throw new Error(await readError(response, `Failed to load formations for '${wellId}' (${response.status})`))
   }
   return (await response.json()) as FormationResponse[]
 }
+
+let currentLoadController: AbortController | null = null
 
 const pendingDepthPatches = new Map<string, number>()
 
@@ -311,14 +314,23 @@ export const useWellDataStore = create<WellDataStore>((set, get) => ({
       return false
     }
   },
+  cancelLoading() {
+    currentLoadController?.abort()
+    currentLoadController = null
+    const inventories = get().wellInventories
+    set({ ...emptyState, wellInventories: inventories })
+  },
   async loadWell(wellId: string) {
+    currentLoadController?.abort()
+    currentLoadController = new AbortController()
+    const { signal } = currentLoadController
     clearPendingDepthPatches()
     set({ isLoading: true, error: null })
 
     try {
       const [wellResponse, formationPayload] = await Promise.all([
-        fetch(`/api/wells/${wellId}`),
-        fetchFormations(wellId),
+        fetch(`/api/wells/${wellId}`, { signal }),
+        fetchFormations(wellId, signal),
       ])
       if (!wellResponse.ok) {
         throw new Error(await readError(wellResponse, `Failed to load well '${wellId}' (${wellResponse.status})`))
@@ -374,6 +386,7 @@ export const useWellDataStore = create<WellDataStore>((set, get) => ({
       const { useComputedStore } = await import('./computedStore')
       useComputedStore.getState().triggerRecalculation()
     } catch (error) {
+      if (error instanceof Error && error.name === 'AbortError') return
       const inventories = get().wellInventories
       set({
         ...emptyState,

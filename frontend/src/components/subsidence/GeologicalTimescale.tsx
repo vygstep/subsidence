@@ -95,7 +95,7 @@ export function GeologicalTimescale({
         { units: GEOLOGIC_ERAS, rowHeight: eraRowH, minPct: 3 },
         { units: GEOLOGIC_PERIODS, rowHeight: periodRowH, minPct: 4 },
       ] as const).map(({ units, rowHeight, minPct }, i) => (
-        <div key={i} style={{ display: 'flex', alignItems: 'stretch', height: rowHeight, flexShrink: 0 }}>
+        <div key={i} style={{ display: 'flex', alignItems: 'stretch', height: rowHeight, flexShrink: 0, borderBottom: i === 0 ? '1px solid #000' : undefined }}>
           {paddingLeft > 0 && <div style={{ width: paddingLeft, flexShrink: 0 }} />}
           <div style={{ flex: 1, position: 'relative', overflow: 'hidden', marginRight: paddingRight }}>
             <TimescaleRow
