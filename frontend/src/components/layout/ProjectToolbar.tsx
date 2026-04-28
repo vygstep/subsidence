@@ -112,7 +112,6 @@ export function ProjectToolbar() {
   const [projectMenuOpen, setProjectMenuOpen] = useState(false)
   const [pendingAction, setPendingAction] = useState<'new-project' | 'open-project' | 'close-project' | null>(null)
   const projectMenuRef = useRef<HTMLDivElement | null>(null)
-  const prevIsProjectOpenRef = useRef(isProjectOpen)
 
   const well = useWellDataStore((state) => state.well)
   const formations = useWellDataStore((state) => state.formations)
@@ -131,6 +130,7 @@ export function ProjectToolbar() {
   const refreshWell = useWellDataStore((state) => state.refreshWell)
 
   const isProjectOpen = useProjectStore((state) => state.isOpen)
+  const prevIsProjectOpenRef = useRef(isProjectOpen)
   const projectName = useProjectStore((state) => state.projectName)
   const projectPath = useProjectStore((state) => state.projectPath)
   const isDirty = useProjectStore((state) => state.isDirty)
