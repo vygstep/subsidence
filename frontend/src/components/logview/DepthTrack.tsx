@@ -24,8 +24,14 @@ export function DepthTrack({ height, width = 60, isSelected = false }: DepthTrac
   const minorInterval = Math.max(depthTrackConfig.minorInterval * unitFactor, unitFactor / 10)
 
   const labelTransform = useMemo(() => {
-    if (depthType === 'TVD' && tvdTable) return (md: number) => mdToTvd(md, tvdTable)
-    if (depthType === 'TVDSS' && tvdTable) return (md: number) => mdToTvd(md, tvdTable) - kbElev
+    if (depthType === 'TVD') {
+      if (tvdTable) return (md: number) => mdToTvd(md, tvdTable)
+      return undefined  // vertical well: TVD = MD, no change
+    }
+    if (depthType === 'TVDSS') {
+      if (tvdTable) return (md: number) => mdToTvd(md, tvdTable) - kbElev
+      return (md: number) => md - kbElev  // KB-only: TVDSS = MD - KB
+    }
     return undefined
   }, [depthType, tvdTable, kbElev])
 

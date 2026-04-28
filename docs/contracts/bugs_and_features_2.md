@@ -56,7 +56,7 @@ Fix: remove the buttons from the sidebar component. The depth-type control may m
 
 ---
 
-### DEPTH-001: Depth type change has no effect
+### DEPTH-001: Depth type change has no effect (done)
 
 **Type:** Bug  
 **Priority:** High

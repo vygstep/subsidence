@@ -33,8 +33,14 @@ export function FormationColumn({ formations, height, maxDepth, width = 80, isSe
   const [patternRenderTick, setPatternRenderTick] = useState(0)
 
   const toDisplayDepth = useMemo(() => {
-    if (depthType === 'TVD' && tvdTable) return (md: number) => mdToTvd(md, tvdTable)
-    if (depthType === 'TVDSS' && tvdTable) return (md: number) => mdToTvd(md, tvdTable) - kbElev
+    if (depthType === 'TVD') {
+      if (tvdTable) return (md: number) => mdToTvd(md, tvdTable)
+      return (md: number) => md  // vertical well: TVD = MD
+    }
+    if (depthType === 'TVDSS') {
+      if (tvdTable) return (md: number) => mdToTvd(md, tvdTable) - kbElev
+      return (md: number) => md - kbElev  // KB-only: TVDSS = MD - KB
+    }
     return (md: number) => md
   }, [depthType, tvdTable, kbElev])
 
