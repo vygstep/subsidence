@@ -116,7 +116,7 @@ Pre-condition: deviation survey and KB must be loaded. If neither is available, 
 
 ---
 
-### UX-013: Overview minimap — layout and depth range
+### UX-013: Overview minimap — layout and depth range (done)
 
 **Type:** Bug + UX rework  
 **Priority:** High
@@ -131,7 +131,7 @@ Fix location: `WellOverviewMinimap.tsx`, `LogViewPanel.tsx` layout.
 
 ---
 
-### UX-014: Add "Fit to well" button
+### UX-014: Add "Fit to well" button (done)
 
 **Type:** Feature  
 **Priority:** Medium
@@ -142,7 +142,7 @@ Location: `WellViewerToolbar.tsx`.
 
 ---
 
-### UX-015: Add "Fit to contents" button
+### UX-015: Add "Fit to contents" button (done)
 
 **Type:** Feature  
 **Priority:** Medium
@@ -153,7 +153,7 @@ Location: `WellViewerToolbar.tsx`.
 
 ---
 
-### SUBS-003: Timescale cell borders should be black
+### SUBS-003: Timescale cell borders should be black (done)
 
 **Type:** Visual bug  
 **Priority:** Low
@@ -164,7 +164,7 @@ Fix location: `GeologicalTimescale.tsx`, `styles/subsidence-panel.css`.
 
 ---
 
-### SUBS-004: Subsidence chart — title spacing and colour
+### SUBS-004: Subsidence chart — title spacing and colour (done)
 
 **Type:** Visual polish  
 **Priority:** Low
@@ -182,7 +182,7 @@ Fix location: `SubsidenceCanvas.tsx` title div, `styles/subsidence-panel.css`.
 3. UX-011 — standalone, high user-impact. (done)
 4. DEPTH-001 — label-only fix, KB-only TVDSS. (done)
 5. DEPTH-002 — full TVD/TVDSS coordinate system. (done)
-6. UX-013 — minimap layout rework, medium scope.
-7. UX-012 — depends on UX-013 (buttons may move to toolbar).
-8. UX-014, UX-015 — fit buttons, small scope.
-9. SUBS-003, SUBS-004 — CSS-level polish, trivial.
+6. UX-013 — minimap layout rework. (done)
+7. UX-012 — MD/TVD/TVDSS buttons removed from sidebar. (done)
+8. UX-014, UX-015 — fit buttons. (done)
+9. SUBS-003, SUBS-004 — CSS-level polish. (done)
