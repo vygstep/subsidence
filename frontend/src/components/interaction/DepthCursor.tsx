@@ -1,4 +1,7 @@
-import { useViewStore } from '@/stores'
+import { useMemo } from 'react'
+
+import { useViewStore, useWellDataStore } from '@/stores'
+import { mdToTvd } from '@/utils/depthTransform'
 
 interface DepthCursorProps {
   yPosition: number
@@ -7,10 +10,23 @@ interface DepthCursorProps {
 
 export function DepthCursor({ yPosition, depth }: DepthCursorProps) {
   const unit = useViewStore((s) => s.depthTrackConfig.unit)
+  const depthType = useViewStore((s) => s.depthType)
+  const depthBasis = useWellDataStore((s) => s.depthBasis)
+  const tvdTable = useWellDataStore((s) => s.tvdTable)
+  const kbElev = useWellDataStore((s) => s.well?.kb_elev ?? 0)
+
+  // In label-only mode (scroll still in MD) apply the same transform as DepthTrack
+  const displayDepth = useMemo(() => {
+    if (depth == null) return null
+    if (depthBasis === depthType) return depth  // full coordinate mode: already in target space
+    if (depthType === 'TVD' && tvdTable) return mdToTvd(depth, tvdTable)
+    if (depthType === 'TVDSS') return tvdTable ? mdToTvd(depth, tvdTable) - kbElev : depth - kbElev
+    return depth
+  }, [depth, depthBasis, depthType, tvdTable, kbElev])
 
   let label: string | null = null
-  if (depth != null) {
-    const value = unit === 'km' ? depth / 1000 : unit === 'ft' ? depth / 0.3048 : depth
+  if (displayDepth != null) {
+    const value = unit === 'km' ? displayDepth / 1000 : unit === 'ft' ? displayDepth / 0.3048 : displayDepth
     const decimals = unit === 'km' ? 3 : 1
     label = `${value.toFixed(decimals)}`
   }
