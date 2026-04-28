@@ -20,17 +20,23 @@ export function ViewerWorkspace() {
   const setSubsidenceWidth = useViewStore((state) => state.setSubsidenceWidth)
   const tvdTable = useWellDataStore((state) => state.tvdTable)
   const depthBasis = useWellDataStore((state) => state.depthBasis)
+  const kbElev = useWellDataStore((state) => state.well?.kb_elev ?? 0)
   const reloadCurvesForDepthBasis = useWellDataStore((state) => state.reloadCurvesForDepthBasis)
 
   useEffect(() => {
     if (!tvdTable) return
-    if (depthBasis === depthType) return
-    const kbElev = useWellDataStore.getState().well?.kb_elev ?? 0
+    if (depthBasis === depthType && depthType !== 'TVDSS') return
+    if (depthBasis === depthType) {
+      // TVDSS: kbElev changed — reload curves without scroll remap
+      void reloadCurvesForDepthBasis('TVDSS')
+      return
+    }
+    // Mode switch: remap scroll + reload
     const currentScroll = useViewStore.getState().scrollDepth
     const newScroll = convertScrollDepth(currentScroll, depthBasis, depthType, tvdTable, kbElev)
     useViewStore.getState().setScroll(newScroll)
     void reloadCurvesForDepthBasis(depthType)
-  }, [depthType, tvdTable, depthBasis, reloadCurvesForDepthBasis])
+  }, [depthType, tvdTable, depthBasis, kbElev, reloadCurvesForDepthBasis])
 
   const curves = lodEnabled ? lodCurves : fullCurves
 
