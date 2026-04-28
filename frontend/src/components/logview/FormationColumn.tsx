@@ -24,7 +24,6 @@ function toRenderableLithology(lithology: LithologyType | undefined) {
 export function FormationColumn({ formations, height, maxDepth, width = 80, isSelected = false }: FormationColumnProps) {
   const visibleDepthRange = useViewStore((state) => state.visibleDepthRange)
   const formationsTrackConfig = useViewStore((state) => state.formationsTrackConfig)
-  const depthType = useViewStore((state) => state.depthType)
   const tvdTable = useWellDataStore((state) => state.tvdTable)
   const kbElev = useWellDataStore((state) => state.well?.kb_elev ?? 0)
   const depthBasis = useWellDataStore((state) => state.depthBasis)
@@ -35,19 +34,20 @@ export function FormationColumn({ formations, height, maxDepth, width = 80, isSe
 
   const getFormationTopDepth = useMemo(() => (formation: FormationTop): number => {
     const md = formation.depth_md!
-    if (depthType === 'TVD') {
-      // Full coordinate mode: prefer stored DB value
-      if (depthBasis === 'TVD' && formation.depth_tvd !== null) return formation.depth_tvd
+    // Use depthBasis (the committed coordinate of loaded curves), not depthType
+    // (the requested mode), so formations and curves always switch together.
+    if (depthBasis === 'TVD') {
+      if (formation.depth_tvd !== null) return formation.depth_tvd
       if (tvdTable) return mdToTvd(md, tvdTable)
       return md
     }
-    if (depthType === 'TVDSS') {
-      if (depthBasis === 'TVDSS' && formation.depth_tvdss !== null) return formation.depth_tvdss
+    if (depthBasis === 'TVDSS') {
+      if (formation.depth_tvdss !== null) return formation.depth_tvdss
       if (tvdTable) return mdToTvd(md, tvdTable) - kbElev
       return md - kbElev
     }
     return md
-  }, [depthBasis, depthType, tvdTable, kbElev])
+  }, [depthBasis, tvdTable, kbElev])
 
   const orderedFormations = useMemo(
     () => [...formations].sort((left, right) => (left.depth_md ?? Infinity) - (right.depth_md ?? Infinity)),

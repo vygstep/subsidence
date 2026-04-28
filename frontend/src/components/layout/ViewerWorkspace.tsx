@@ -23,6 +23,8 @@ export function ViewerWorkspace() {
   const kbElev = useWellDataStore((state) => state.well?.kb_elev ?? 0)
   const reloadCurvesForDepthBasis = useWellDataStore((state) => state.reloadCurvesForDepthBasis)
   const prevKbElevRef = useRef(kbElev)
+  // Stores the scroll value to apply once the curve reload for a basis transition completes.
+  const pendingScrollRef = useRef<{ scroll: number; targetBasis: 'MD' | 'TVD' | 'TVDSS' } | null>(null)
 
   useEffect(() => {
     if (!tvdTable) return
@@ -30,18 +32,27 @@ export function ViewerWorkspace() {
     prevKbElevRef.current = kbElev
 
     if (depthBasis === depthType) {
-      // Already in the committed basis. Only reload if kbElev changed while in TVDSS mode.
       if (kbElevChanged && depthType === 'TVDSS') {
         void reloadCurvesForDepthBasis('TVDSS')
       }
       return
     }
-    // Transition: remap scroll to new coordinate space then reload curves.
+    // Basis transition: compute target scroll and start reload.
+    // Scroll is NOT applied yet — applied after reload so curves and formations
+    // switch coordinate systems atomically.
     const currentScroll = useViewStore.getState().scrollDepth
     const newScroll = convertScrollDepth(currentScroll, depthBasis, depthType, tvdTable, kbElev)
-    useViewStore.getState().setScroll(newScroll)
+    pendingScrollRef.current = { scroll: newScroll, targetBasis: depthType }
     void reloadCurvesForDepthBasis(depthType)
   }, [depthType, tvdTable, depthBasis, kbElev, reloadCurvesForDepthBasis])
+
+  // Once depthBasis reaches the target, apply the deferred scroll conversion.
+  useEffect(() => {
+    const pending = pendingScrollRef.current
+    if (!pending || pending.targetBasis !== depthBasis) return
+    pendingScrollRef.current = null
+    useViewStore.getState().setScroll(pending.scroll)
+  }, [depthBasis])
 
   const curves = lodEnabled ? lodCurves : fullCurves
 
