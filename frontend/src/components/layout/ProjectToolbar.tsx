@@ -112,6 +112,7 @@ export function ProjectToolbar() {
   const [projectMenuOpen, setProjectMenuOpen] = useState(false)
   const [pendingAction, setPendingAction] = useState<'new-project' | 'open-project' | 'close-project' | null>(null)
   const projectMenuRef = useRef<HTMLDivElement | null>(null)
+  const prevIsProjectOpenRef = useRef(isProjectOpen)
 
   const well = useWellDataStore((state) => state.well)
   const formations = useWellDataStore((state) => state.formations)
@@ -170,11 +171,14 @@ export function ProjectToolbar() {
         : (well?.well_name ?? 'No wells in project')
 
   useEffect(() => {
+    const wasOpen = prevIsProjectOpenRef.current
+    prevIsProjectOpenRef.current = isProjectOpen
     if (!isProjectOpen) {
       if (activeDialog === null) setActiveDialog('project-open')
       return
     }
-    if (activeDialog === 'project-open' || activeDialog === 'project-new') {
+    // Only auto-dismiss open/new dialogs on transition false → true (project just opened/created)
+    if (!wasOpen && (activeDialog === 'project-open' || activeDialog === 'project-new')) {
       setActiveDialog(null)
     }
   }, [activeDialog, isProjectOpen])
