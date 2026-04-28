@@ -67,6 +67,55 @@ Investigate: depth-type switching logic, where KB is stored and accessed, `depth
 
 ---
 
+### DEPTH-002: Full TVD/TVDSS coordinate system for the viewer
+
+**Type:** Architectural refactoring  
+**Priority:** Critical
+
+Background from DEPTH-001 investigation:
+
+The current implementation has two conflicting mechanisms:
+
+1. **Label-only transform** (`DepthTrack.labelTransform`): scroll and curves stay in MD, only the depth scale labels are converted to TVD/TVDSS using `mdToTvd`. Simple but misleading — the viewer says "TVD" but internally everything is still MD.
+
+2. **Curve reload** (`reloadCurvesForDepthBasis`): the backend returns curves with TVD/TVDSS depths on demand. But `scrollDepth` and `visibleDepthRange` stay in MD, causing a coordinate mismatch — `DataTrack` renders the wrong depth window.
+
+Neither mechanism alone is correct. The current DEPTH-001 fix kept approach 1 (labels only), which is better than nothing but still wrong for deviated wells — curves plot in MD space while labels say TVD.
+
+This matters because subsidence results depend on correct depth referencing. A deviated well with TVD-imported curves displayed in MD will show incorrect burial-history curves.
+
+Required design:
+
+When `depthType` is `TVD` or `TVDSS`:
+
+1. **Scroll coordinate space switches to TVD/TVDSS.** `scrollDepth`, `visibleDepthRange`, and all depth arithmetic in `useSynchronizedScroll`, `useDepthScale`, `DataTrack`, `FormationTopLine`, `InteractionOverlay`, and `DepthCursor` must operate in the active coordinate space.
+
+2. **Curves are fetched in the active coordinate space** via `reloadCurvesForDepthBasis`. `fullCurves` must also be reloaded (not just `curves`). When switching back to MD, MD arrays are restored.
+
+3. **`scrollDepth` is remapped on mode switch.** When switching MD → TVD, the current `scrollDepth` (e.g., 500 MD) must be converted to the equivalent TVD value (e.g., `mdToTvd(500, tvdTable)`) so the view stays on the same geological horizon.
+
+4. **`DepthTrack` shows raw values in TVD/TVDSS mode** — no `labelTransform` needed because curves and scroll are already in the target space.
+
+5. **Formation depths use `depth_tvd` / `depth_tvdss` fields** directly (already stored in DB) instead of converting from `depth_md`.
+
+6. **`minDepth` stays 0 in all modes.** `maxDepth` in `ViewerWorkspace` must be recomputed from the loaded curve arrays after mode switch.
+
+7. **`LOD` fetch passes `depth_basis`** so downsampled curves also use the active coordinate space.
+
+Key files to change:
+
+- `viewStore.ts` — `setDepthType` must trigger coordinate remapping
+- `wellDataStore.ts` — `reloadCurvesForDepthBasis` must update both `curves` and `fullCurves`; add a `depthBasis` field to track the current curve coordinate space
+- `LogViewPanel.tsx` — pass `depthBasis` to `useSynchronizedScroll` and `LOD` effect
+- `useSynchronizedScroll.ts` — accept `depthBasis` or use store directly
+- `DepthTrack.tsx` — remove `labelTransform` in full TVD/TVDSS mode
+- `FormationColumn.tsx` — use `depth_tvd`/`depth_tvdss` directly when in TVD/TVDSS mode
+- `WellViewerToolbar.tsx` — restore `reloadCurvesForDepthBasis` call after coord remapping is in place
+
+Pre-condition: deviation survey and KB must be loaded. If neither is available, TVD/TVDSS buttons should be disabled or show a warning.
+
+---
+
 ### UX-013: Overview minimap — layout and depth range
 
 **Type:** Bug + UX rework  
@@ -128,11 +177,12 @@ Fix location: `SubsidenceCanvas.tsx` title div, `styles/subsidence-panel.css`.
 
 ## 2. Implementation order (suggested)
 
-1. LOD-001 — one-line default fix, unblocks all LOD-related testing.
-2. LOD-002 — depends on LOD-001 being testable.
-3. UX-011 — standalone, high user-impact.
-4. DEPTH-001 — needs investigation before estimating.
-5. UX-013 — minimap layout rework, medium scope.
-6. UX-012 — depends on UX-013 (buttons may move to toolbar).
-7. UX-014, UX-015 — fit buttons, small scope.
-8. SUBS-003, SUBS-004 — CSS-level polish, trivial.
+1. LOD-001 — one-line default fix, unblocks all LOD-related testing. (done)
+2. LOD-002 — depends on LOD-001 being testable. (done)
+3. UX-011 — standalone, high user-impact. (done)
+4. DEPTH-001 — label-only fix, KB-only TVDSS. (done)
+5. **DEPTH-002 — full TVD/TVDSS coordinate system. Critical for correctness. Large scope — requires dedicated implementation session.**
+6. UX-013 — minimap layout rework, medium scope.
+7. UX-012 — depends on UX-013 (buttons may move to toolbar).
+8. UX-014, UX-015 — fit buttons, small scope.
+9. SUBS-003, SUBS-004 — CSS-level polish, trivial.
