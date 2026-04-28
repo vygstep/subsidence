@@ -157,12 +157,12 @@ export function LogViewPanel({ tracks, trackOrder, curves, formations, minDepth,
   }, [setViewportHeight])
 
   return (
-    <div ref={containerRef} className="log-view-panel">
+    <div className="log-view-panel">
       <div className="log-view-panel__workspace">
         <WellViewerToolbar />
         <div className="log-view-panel__content">
           <TrackHeaderRow tracks={tracks} trackOrder={trackOrder} />
-          <div className="log-view-panel__tracks" onMouseMove={handleMouseMove} onMouseLeave={handleMouseLeave} onClick={handleTracksClick}>
+          <div ref={containerRef} className="log-view-panel__tracks" onMouseMove={handleMouseMove} onMouseLeave={handleMouseLeave} onClick={handleTracksClick}>
             {trackOrder.map((trackId) => {
               if (trackId === DEPTH_TRACK_ID) {
                 return (
