@@ -201,6 +201,18 @@ export function ProjectToolbar() {
     setActiveDialog('project-open')
   }
 
+  async function handleNewProject(): Promise<void> {
+    setProjectMenuOpen(false)
+    if (isProjectOpen) {
+      if (isDirty) {
+        const save = window.confirm(`Save changes to "${projectName ?? 'project'}" before creating a new project?`)
+        if (save) await saveProject()
+      }
+      await closeProject()
+    }
+    setActiveDialog('project-new')
+  }
+
   async function handleCopyDiagnostics(): Promise<void> {
     const snapshot = buildDiagnosticSnapshot({
       projectName,
@@ -404,7 +416,7 @@ export function ProjectToolbar() {
 
   const projectMenuActions = (
     <>
-      <button type="button" className="app-menu__item" onClick={() => { setProjectMenuOpen(false); setActiveDialog('project-new') }}>New project</button>
+      <button type="button" className="app-menu__item" onClick={() => void handleNewProject()}>New project</button>
       <button type="button" className="app-menu__item" onClick={() => { setProjectMenuOpen(false); setActiveDialog('project-open') }}>Open project</button>
       <button type="button" className="app-menu__item" onClick={() => void handleProjectClose()}>Close project</button>
       <button type="button" className="app-menu__item" onClick={() => { setProjectMenuOpen(false); void saveProject() }}>Save project</button>

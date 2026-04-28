@@ -30,7 +30,7 @@ Investigate: `wellDataStore` LOD fetch state, `DataTrack.tsx` curve source selec
 
 ---
 
-### UX-011: New project button does not work with an open project
+### UX-011: New project button does not work with an open project (done)
 
 **Type:** Bug / UX  
 **Priority:** High
