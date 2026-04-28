@@ -1,4 +1,4 @@
-import { useEffect, useMemo } from 'react'
+import { useEffect, useMemo, useRef } from 'react'
 
 import { LogViewPanel } from '../logview'
 import { SubsidencePanel } from '../subsidence'
@@ -22,16 +22,21 @@ export function ViewerWorkspace() {
   const depthBasis = useWellDataStore((state) => state.depthBasis)
   const kbElev = useWellDataStore((state) => state.well?.kb_elev ?? 0)
   const reloadCurvesForDepthBasis = useWellDataStore((state) => state.reloadCurvesForDepthBasis)
+  const prevKbElevRef = useRef(kbElev)
 
   useEffect(() => {
     if (!tvdTable) return
-    if (depthBasis === depthType && depthType !== 'TVDSS') return
+    const kbElevChanged = kbElev !== prevKbElevRef.current
+    prevKbElevRef.current = kbElev
+
     if (depthBasis === depthType) {
-      // TVDSS: kbElev changed — reload curves without scroll remap
-      void reloadCurvesForDepthBasis('TVDSS')
+      // Already in the committed basis. Only reload if kbElev changed while in TVDSS mode.
+      if (kbElevChanged && depthType === 'TVDSS') {
+        void reloadCurvesForDepthBasis('TVDSS')
+      }
       return
     }
-    // Mode switch: remap scroll + reload
+    // Transition: remap scroll to new coordinate space then reload curves.
     const currentScroll = useViewStore.getState().scrollDepth
     const newScroll = convertScrollDepth(currentScroll, depthBasis, depthType, tvdTable, kbElev)
     useViewStore.getState().setScroll(newScroll)

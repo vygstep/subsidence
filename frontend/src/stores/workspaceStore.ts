@@ -12,6 +12,7 @@ export type SelectedObject =
   | { type: 'depth-track'; wellId: string }
   | { type: 'formations-track'; wellId: string }
   | { type: 'las-group'; wellId: string }
+  | { type: 'curve-track'; wellId: string; trackId: string }
   | { type: 'curve'; wellId: string; mnemonic: string }
   | { type: 'tops-group'; wellId: string }
   | { type: 'top-pick'; wellId: string; formationId: string }

@@ -332,6 +332,8 @@ export function DataManagerPane({ sidebarRef, onInternalSplitterMouseDown }: Dat
           onSaveWellInspector={controller.handleSaveWellInspector}
           selectedCurveConfig={controller.selectedCurveConfig}
           onCurveSettingUpdate={controller.handleCurveSettingUpdate}
+          selectedCurveTrack={controller.selectedCurveTrack}
+          onTrackSettingUpdate={controller.handleTrackSettingUpdate}
           formations={controller.formations}
           visibleFormationIds={controller.visibleFormationIds}
           selectedFormation={controller.selectedFormation}

@@ -27,6 +27,7 @@ import { MeasurementUnitsRootSettings } from './settings/MeasurementUnitsRootSet
 import { UnitDimensionSettings } from './settings/UnitDimensionSettings'
 
 import { CurveSettings } from './settings/CurveSettings'
+import { CurveTrackSettings } from './settings/CurveTrackSettings'
 import { DepthTrackSettings } from './settings/DepthTrackSettings'
 import { FormationsTrackSettings } from './settings/FormationsTrackSettings'
 import { LasSettings } from './settings/LasSettings'
@@ -52,6 +53,8 @@ interface SettingsInspectorProps {
     mnemonic: string,
     patch: Partial<TrackConfig['curves'][number]>,
   ) => void
+  selectedCurveTrack: TrackConfig | null
+  onTrackSettingUpdate: (trackId: string, patch: Partial<TrackConfig>) => void
   formations: FormationTop[]
   visibleFormationIds: string[]
   selectedFormation: FormationTop | null
@@ -102,6 +105,8 @@ export function SettingsInspector({
   onSaveWellInspector,
   selectedCurveConfig,
   onCurveSettingUpdate,
+  selectedCurveTrack,
+  onTrackSettingUpdate,
   formations,
   visibleFormationIds,
   selectedFormation,
@@ -173,6 +178,13 @@ export function SettingsInspector({
         maxDepth={maxDepth}
       />
     )
+  }
+
+  if (selectedObject.type === 'curve-track') {
+    if (!selectedCurveTrack || selectedCurveTrack.id !== selectedObject.trackId) {
+      return <EmptyInspector message="Selected track settings are not available yet." />
+    }
+    return <CurveTrackSettings track={selectedCurveTrack} onTrackSettingUpdate={onTrackSettingUpdate} />
   }
 
   if (selectedObject.type === 'curve') {

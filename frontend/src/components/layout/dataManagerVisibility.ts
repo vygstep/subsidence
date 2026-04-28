@@ -135,6 +135,14 @@ export function makeVisibilityHandlers(deps: VisibilityDeps) {
     }))
   }
 
+  function handleTrackSettingUpdate(trackId: string, patch: Partial<TrackConfig>): void {
+    if (!well?.well_id) return
+    updateWellViewState(well.well_id, (state) => ({
+      ...state,
+      tracks: state.tracks.map((track) => (track.id === trackId ? { ...track, ...patch } : track)),
+    }))
+  }
+
   return {
     handleSetDeviationVisible,
     handleToggleFormation,
@@ -142,5 +150,6 @@ export function makeVisibilityHandlers(deps: VisibilityDeps) {
     handleToggleCurve,
     handleToggleAllCurves,
     handleCurveSettingUpdate,
+    handleTrackSettingUpdate,
   }
 }

@@ -126,6 +126,11 @@ export function useDataManagerController() {
     return activeWellView.tracks.flatMap((t) => t.curves).find((c) => c.mnemonic === selectedObject.mnemonic) ?? null
   }, [activeWellView.tracks, selectedObject])
 
+  const selectedCurveTrack = useMemo(() => {
+    if (selectedObject?.type !== 'curve-track') return null
+    return activeWellView.tracks.find((t) => t.id === selectedObject.trackId) ?? null
+  }, [activeWellView.tracks, selectedObject])
+
   const selectedChart = useMemo(() => {
     if (selectedObject?.type !== 'strat-chart') return null
     return stratCharts.find((c) => c.id === selectedObject.chartId) ?? null
@@ -217,6 +222,7 @@ export function useDataManagerController() {
     mnemonicSets,
     unitDimensions,
     handleCurveSettingUpdate: visibility.handleCurveSettingUpdate,
+    handleTrackSettingUpdate: visibility.handleTrackSettingUpdate,
     handleFocusCurveObject: selection.handleFocusCurveObject,
     handleFocusFormationObject: selection.handleFocusFormationObject,
     handleFocusLasGroupObject: selection.handleFocusLasGroupObject,
@@ -288,6 +294,7 @@ export function useDataManagerController() {
     selectedCompactionPreset,
     selectedCompactionPresetId: selectedObject?.type === 'compaction-preset' ? selectedObject.presetId : null,
     selectedCurveConfig,
+    selectedCurveTrack,
     selectedFormation,
     selectedFormationId,
     selectedLithologySet,

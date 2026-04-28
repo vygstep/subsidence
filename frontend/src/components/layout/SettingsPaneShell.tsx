@@ -36,6 +36,8 @@ interface SettingsPaneShellProps {
     mnemonic: string,
     patch: Partial<TrackConfig['curves'][number]>,
   ) => void
+  selectedCurveTrack: TrackConfig | null
+  onTrackSettingUpdate: (trackId: string, patch: Partial<TrackConfig>) => void
   formations: FormationTop[]
   visibleFormationIds: string[]
   selectedFormation: FormationTop | null
