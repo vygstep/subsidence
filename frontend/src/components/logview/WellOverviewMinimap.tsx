@@ -140,12 +140,9 @@ export function WellOverviewMinimap({ height, curves }: WellOverviewMinimapProps
     <canvas
       ref={canvasRef}
       style={{
-        position: 'absolute',
-        right: 0,
-        top: 0,
         width: WIDTH,
         height,
-        zIndex: 5,
+        flexShrink: 0,
         cursor: 'ns-resize',
         display: 'block',
         borderLeft: '1px solid #c4d0dc',

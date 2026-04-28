@@ -259,6 +259,14 @@
   color: #1d4ed8;
 }
 
+.log-view-panel__body {
+  display: flex;
+  flex-direction: row;
+  flex: 1;
+  min-height: 0;
+  overflow: hidden;
+}
+
 .log-view-panel__tracks {
   position: relative;
   display: flex;

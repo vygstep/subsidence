@@ -162,6 +162,7 @@ export function LogViewPanel({ tracks, trackOrder, curves, formations, minDepth,
         <WellViewerToolbar />
         <div className="log-view-panel__content">
           <TrackHeaderRow tracks={tracks} trackOrder={trackOrder} />
+          <div className="log-view-panel__body">
           <div ref={containerRef} className="log-view-panel__tracks" onMouseMove={handleMouseMove} onMouseLeave={handleMouseLeave} onClick={handleTracksClick}>
             {trackOrder.map((trackId) => {
               if (trackId === DEPTH_TRACK_ID) {
@@ -214,7 +215,8 @@ export function LogViewPanel({ tracks, trackOrder, curves, formations, minDepth,
               tooltipVisible={curveTooltipVisible}
               topsEditable={interactionMode === 'edit-tops'}
             />
-            {overviewVisible ? <WellOverviewMinimap height={trackHeight} curves={minimapCurves} /> : null}
+          </div>
+          {overviewVisible ? <WellOverviewMinimap height={trackHeight} curves={minimapCurves} /> : null}
           </div>
         </div>
       </div>
