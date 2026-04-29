@@ -61,6 +61,7 @@ interface VisualConfigPayload {
   subsidenceMultiDepthMax?: number | null
   activeSubsidenceModelType?: string
   subsidenceModelConfigs?: Record<string, { zoneSetId?: number | null; seaLevelCurveId?: number | null }>
+  subsidenceSingleShowSeaLevel?: boolean
 }
 
 interface ProjectStatusResponse {
@@ -195,6 +196,7 @@ function applyVisualConfigPayload(config: Record<string, unknown>): void {
     subsidenceMultiDepthMax: payload.subsidenceMultiDepthMax,
     activeSubsidenceModelType: payload.activeSubsidenceModelType as SubsidenceModelType | undefined,
     subsidenceModelConfigs: payload.subsidenceModelConfigs as Partial<Record<SubsidenceModelType, SubsidenceModelConfig>> | undefined,
+    subsidenceSingleShowSeaLevel: payload.subsidenceSingleShowSeaLevel,
   })
   useWellDataStore.getState().setColorOverrides(payload.curveColors ?? {})
 }
@@ -229,6 +231,7 @@ export function collectProjectVisualConfig(): VisualConfigPayload {
     subsidenceMultiDepthMax: vs.subsidenceMultiDepthMax,
     activeSubsidenceModelType: vs.activeSubsidenceModelType,
     subsidenceModelConfigs: vs.subsidenceModelConfigs,
+    subsidenceSingleShowSeaLevel: vs.subsidenceSingleShowSeaLevel,
   }
 }
 

@@ -363,7 +363,7 @@ Implemented notes:
 - The Wells tree shows a well color swatch, and `MultiWellPanel` uses stored well colors with the old palette only as fallback.
 - Covered by backend lifecycle/backfill/patch persistence test plus frontend build and Data Manager / well-switching integration tests.
 
-#### BF3-006-H: Display sea-level curve on single-well subsidence chart
+#### BF3-006-H: Display sea-level curve on single-well subsidence chart (done)
 
 Add an optional sea-level curve overlay to the top single-well subsidence chart.
 
@@ -375,13 +375,13 @@ Purpose:
 Required behavior:
 
 - Single-well chart settings include a toggle: show/hide sea-level curve.
-- Single-well chart settings include a sea-level curve dropdown, reusing the seeded/user `SeaLevelCurve` list.
+- Single-well chart settings show the resolved sea-level curve, reusing the seeded/user `SeaLevelCurve` list.
+- Per-model sea-level curve selection remains in Model settings; the chart overlay resolves the active model override first, then falls back to the active well sea-level curve.
 - The plotted sea-level curve uses age on the same X axis as the subsidence chart.
 - The Y representation must be explicit in the UI/legend because sea level is a signed elevation/relative level series, not burial depth.
-- If using the existing depth axis, document and label the sign convention clearly.
-- Preferred display: draw sea level as a secondary/right-axis overlay or a clearly styled line with legend label and units.
+- Draw sea level as a secondary/right-axis overlay with `Sea level (m)` label and a distinct dashed line.
 - When no curve is selected, the overlay is hidden and the chart behaves as it does now.
-- The overlay must not change auto depth range unless the user explicitly enables "include sea level in range".
+- The overlay does not change auto depth range.
 
 Data/API requirements:
 
@@ -389,11 +389,21 @@ Data/API requirements:
 - Add or extend API support to fetch one curve with points if not already available.
 - Keep built-in curves read-only.
 
+Implemented notes:
+
+- Added persisted `subsidenceSingleShowSeaLevel` to the project visual config payload and dirty-state tracking.
+- Added the single-well chart overlay toggle and resolved-curve status in `SubsidenceChartSettings`.
+- The single-well subsidence canvas loads selected curve points through `/api/sea-level-curves/{id}/points`.
+- The overlay uses the active model's sea-level curve override when set, otherwise the active well default curve.
+- The sea-level curve is rendered on the same age X axis with an independent right-side sea-level axis and does not expand the depth range.
+- The overlay follows the active subsidence model type instead of being hard-wired to the total model.
+
 Tests:
 
-- Backend/API: fetch selected sea-level curve with ordered points.
-- Frontend: chart settings can toggle sea-level visibility and select a curve.
+- Backend/API: fetch selected sea-level curve with ordered points. Covered by BF3-007 API tests.
+- Frontend: chart settings can toggle sea-level visibility and report the selected/resolved curve.
 - Frontend: single-well chart draws a distinct sea-level overlay when enabled.
+- Verified with frontend build and Data Manager / well-switching integration tests.
 
 ---
 

@@ -40,6 +40,16 @@ function App() {
   const selectedElementId = useViewStore((state) => state.selectedElementId)
   const selectedElementType = useViewStore((state) => state.selectedElementType)
   const trackWidths = useViewStore((state) => state.trackWidths)
+  const subsidenceWidth = useViewStore((state) => state.subsidenceWidth)
+  const depthTrackConfig = useViewStore((state) => state.depthTrackConfig)
+  const formationsTrackConfig = useViewStore((state) => state.formationsTrackConfig)
+  const subsidenceSingleDepthMin = useViewStore((state) => state.subsidenceSingleDepthMin)
+  const subsidenceSingleDepthMax = useViewStore((state) => state.subsidenceSingleDepthMax)
+  const subsidenceMultiDepthMin = useViewStore((state) => state.subsidenceMultiDepthMin)
+  const subsidenceMultiDepthMax = useViewStore((state) => state.subsidenceMultiDepthMax)
+  const activeSubsidenceModelType = useViewStore((state) => state.activeSubsidenceModelType)
+  const subsidenceModelConfigs = useViewStore((state) => state.subsidenceModelConfigs)
+  const subsidenceSingleShowSeaLevel = useViewStore((state) => state.subsidenceSingleShowSeaLevel)
   const applyActiveWellTrackWidths = useViewStore((state) => state.applyActiveWellTrackWidths)
   const resetVisualConfig = useViewStore((state) => state.resetVisualConfig)
 
@@ -255,9 +265,19 @@ function App() {
     clearVisualConfigDirty,
     colorOverrides,
     configHydratedRef,
+    activeSubsidenceModelType,
+    depthTrackConfig,
     depthPerPixel,
+    formationsTrackConfig,
     isProjectOpen,
     markVisualConfigDirty,
+    subsidenceModelConfigs,
+    subsidenceMultiDepthMax,
+    subsidenceMultiDepthMin,
+    subsidenceSingleDepthMax,
+    subsidenceSingleDepthMin,
+    subsidenceSingleShowSeaLevel,
+    subsidenceWidth,
     trackWidths,
     wellViewStates,
   ])

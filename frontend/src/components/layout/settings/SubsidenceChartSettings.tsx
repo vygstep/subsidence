@@ -1,4 +1,4 @@
-import { useViewStore } from '@/stores'
+import { useViewStore, useWellDataStore } from '@/stores'
 
 interface SubsidenceChartSettingsProps {
   chartType: 'single' | 'multi'
@@ -11,6 +11,17 @@ export function SubsidenceChartSettings({ chartType }: SubsidenceChartSettingsPr
   const depthMax = useViewStore((s) => single ? s.subsidenceSingleDepthMax : s.subsidenceMultiDepthMax)
   const setDepthMin = useViewStore((s) => single ? s.setSubsidenceSingleDepthMin : s.setSubsidenceMultiDepthMin)
   const setDepthMax = useViewStore((s) => single ? s.setSubsidenceSingleDepthMax : s.setSubsidenceMultiDepthMax)
+  const showSeaLevel = useViewStore((s) => s.subsidenceSingleShowSeaLevel)
+  const setShowSeaLevel = useViewStore((s) => s.setSubsidenceSingleShowSeaLevel)
+  const activeModelType = useViewStore((s) => s.activeSubsidenceModelType)
+  const modelConfig = useViewStore((s) => s.subsidenceModelConfigs[s.activeSubsidenceModelType])
+  const seaLevelCurves = useWellDataStore((s) => s.seaLevelCurves)
+  const wellInventories = useWellDataStore((s) => s.wellInventories)
+  const activeWellId = useWellDataStore((s) => s.well?.well_id ?? null)
+  const activeWellCurveId = wellInventories.find((well) => well.well_id === activeWellId)?.active_sea_level_curve_id ?? null
+  const resolvedCurveId = modelConfig.seaLevelCurveId ?? activeWellCurveId
+  const resolvedCurve = seaLevelCurves.find((curve) => curve.id === resolvedCurveId)
+  const curveSource = modelConfig.seaLevelCurveId !== null ? 'model' : activeWellCurveId !== null ? 'well' : null
 
   return (
     <div className="template-panel">
@@ -42,6 +53,27 @@ export function SubsidenceChartSettings({ chartType }: SubsidenceChartSettingsPr
           onChange={(e) => setDepthMax(e.target.value === '' ? null : Number(e.target.value))}
         />
       </div>
+      {single && (
+        <>
+          <div className="template-panel__section-header">Overlay</div>
+          <label className="sf-row">
+            <span>Sea level curve</span>
+            <input
+              type="checkbox"
+              checked={showSeaLevel}
+              onChange={(e) => setShowSeaLevel(e.target.checked)}
+            />
+          </label>
+          <div className="tree-leaf">
+            <span>Curve</span>
+            <span>
+              {resolvedCurve
+                ? `${resolvedCurve.name} (${curveSource === 'model' ? activeModelType : 'well default'})`
+                : 'not selected'}
+            </span>
+          </div>
+        </>
+      )}
     </div>
   )
 }
