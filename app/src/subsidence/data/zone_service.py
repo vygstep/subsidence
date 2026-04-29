@@ -14,11 +14,155 @@ from .schema import (
     CurveMetadata,
     FormationTopModel,
     FormationZone,
+    TopSet,
     TopSetHorizon,
     WellActiveTopSet,
     WellModel,
     ZoneWellData,
 )
+
+
+def _top_name_key(name: str | None) -> str:
+    return (name or '').strip().lower()
+
+
+def extract_horizons_from_well_picks(
+    session: Session,
+    top_set_id: int,
+    well_id: str,
+) -> int:
+    """Create missing TopSet horizons from a well's unique picks and link picks by name."""
+    picks = session.scalars(
+        select(FormationTopModel)
+        .where(FormationTopModel.well_id == well_id)
+        .order_by(
+            FormationTopModel.depth_md.asc().nulls_last(),
+            FormationTopModel.id.asc(),
+        )
+    ).all()
+
+    existing_horizons = session.scalars(
+        select(TopSetHorizon).where(TopSetHorizon.top_set_id == top_set_id)
+    ).all()
+    horizon_by_name = {_top_name_key(h.name): h for h in existing_horizons}
+    base_sort = max((h.sort_order for h in existing_horizons), default=-1) + 1
+
+    created = 0
+    seen_names: set[str] = set()
+    for pick in picks:
+        key = _top_name_key(pick.name)
+        if not key or key in seen_names:
+            continue
+        seen_names.add(key)
+
+        if key in horizon_by_name:
+            continue
+        horizon = TopSetHorizon(
+            top_set_id=top_set_id,
+            name=pick.name.strip(),
+            kind=pick.kind or 'strat',
+            age_ma=pick.age_top_ma,
+            color=pick.color or '#90a4ae',
+            sort_order=base_sort + created,
+            note=None,
+        )
+        session.add(horizon)
+        session.flush()
+        horizon_by_name[key] = horizon
+        created += 1
+
+    for pick in picks:
+        horizon = horizon_by_name.get(_top_name_key(pick.name))
+        if horizon is not None:
+            pick.horizon_id = horizon.id
+
+    session.flush()
+    return created
+
+
+def link_picks_to_horizons(session: Session, well_id: str, top_set_id: int) -> int:
+    """Link a well's picks to TopSet horizons by normalized marker name."""
+    horizons = session.scalars(
+        select(TopSetHorizon).where(TopSetHorizon.top_set_id == top_set_id)
+    ).all()
+    horizon_by_name = {_top_name_key(h.name): h for h in horizons}
+    if not horizon_by_name:
+        return 0
+
+    linked = 0
+    for pick in session.scalars(
+        select(FormationTopModel).where(FormationTopModel.well_id == well_id)
+    ).all():
+        horizon = horizon_by_name.get(_top_name_key(pick.name))
+        if horizon is not None and pick.horizon_id != horizon.id:
+            pick.horizon_id = horizon.id
+            linked += 1
+
+    session.flush()
+    return linked
+
+
+def create_ghost_picks(session: Session, well_id: str, top_set_id: int) -> int:
+    """Create unset picks for TopSet horizons that are absent in a linked well."""
+    horizons = session.scalars(
+        select(TopSetHorizon).where(TopSetHorizon.top_set_id == top_set_id)
+    ).all()
+    existing_names = {
+        _top_name_key(pick.name)
+        for pick in session.scalars(
+            select(FormationTopModel).where(FormationTopModel.well_id == well_id)
+        ).all()
+    }
+
+    created = 0
+    for horizon in horizons:
+        if _top_name_key(horizon.name) in existing_names:
+            continue
+        session.add(FormationTopModel(
+            well_id=well_id,
+            horizon_id=horizon.id,
+            name=horizon.name,
+            kind=horizon.kind,
+            depth_md=None,
+            depth_tvd=None,
+            depth_tvdss=None,
+            color=horizon.color,
+            age_top_ma=horizon.age_ma,
+            is_locked=False,
+        ))
+        created += 1
+
+    session.flush()
+    return created
+
+
+def activate_top_set_for_well(
+    session: Session,
+    project_path: str | Path,
+    well_id: str,
+    top_set_id: int,
+) -> int:
+    """Make a TopSet active for a well and refresh linked zone data."""
+    if session.get(TopSet, top_set_id) is None:
+        raise ValueError(f'TopSet not found: {top_set_id}')
+    if session.get(WellModel, well_id) is None:
+        raise ValueError(f'Well not found: {well_id}')
+
+    link = session.scalar(
+        select(WellActiveTopSet).where(WellActiveTopSet.well_id == well_id)
+    )
+    if link is None:
+        session.add(WellActiveTopSet(well_id=well_id, top_set_id=top_set_id))
+    else:
+        link.top_set_id = top_set_id
+
+    session.flush()
+    linked = link_picks_to_horizons(session, well_id, top_set_id)
+    create_ghost_picks(session, well_id, top_set_id)
+    ensure_zone_well_data(session, top_set_id, well_id)
+    recalculate_zone_thickness(session, top_set_id, well_id)
+    aggregate_zone_lithology_from_curve(session, project_path, well_id)
+    return linked
 
 
 def rebuild_zones_for_top_set(session: Session, top_set_id: int) -> None:

@@ -15,7 +15,12 @@ from subsidence.data import (
     link_tops_to_unconformities,
 )
 from subsidence.data.deviation_transform import recalculate_picks_tvd
-from subsidence.data.schema import CurveMetadata, FormationTopModel, WellModel
+from subsidence.data.schema import CurveMetadata, FormationTopModel, FormationZone, TopSet, TopSetHorizon, WellModel
+from subsidence.data.zone_service import (
+    activate_top_set_for_well,
+    extract_horizons_from_well_picks,
+    rebuild_zones_for_top_set,
+)
 from subsidence.observability import operation_log
 
 from .projects import (
@@ -33,6 +38,67 @@ from .projects import (
 )
 
 router = APIRouter(tags=['projects'])
+
+
+def _top_name_key(name: str | None) -> str:
+    return (name or '').strip().lower()
+
+
+def _resolve_import_top_set(
+    session,
+    payload: ImportTopsRequest,
+    target_well_id: str,
+) -> int | None:
+    if payload.create_zone_set and payload.zone_set_id is not None:
+        raise HTTPException(status_code=400, detail='Choose either create_zone_set or zone_set_id, not both')
+    if not payload.create_zone_set and payload.zone_set_id is None:
+        return None
+
+    if payload.zone_set_id is not None:
+        if session.get(TopSet, payload.zone_set_id) is None:
+            raise HTTPException(status_code=404, detail=f'TopSet not found: {payload.zone_set_id}')
+        return payload.zone_set_id
+
+    well = session.get(WellModel, target_well_id)
+    name = (payload.zone_set_name or '').strip()
+    if not name:
+        name = f'{well.name if well else target_well_id} tops'
+
+    top_set = TopSet(name=name, description='Created during tops import')
+    session.add(top_set)
+    session.flush()
+    extract_horizons_from_well_picks(session, top_set.id, target_well_id)
+    rebuild_zones_for_top_set(session, top_set.id)
+    return top_set.id
+
+
+def _zone_set_qc_warnings(
+    session,
+    top_set_id: int,
+    imported: list[FormationTopModel],
+    target_well_id: str,
+) -> list[str]:
+    imported_names = {
+        _top_name_key(pick.name)
+        for pick in imported
+        if pick.well_id == target_well_id and _top_name_key(pick.name)
+    }
+    if not imported_names:
+        return []
+
+    horizon_names = {
+        _top_name_key(horizon.name)
+        for horizon in session.scalars(
+            select(TopSetHorizon).where(TopSetHorizon.top_set_id == top_set_id)
+        ).all()
+    }
+    unmatched = sorted(imported_names.difference(horizon_names))
+    if not unmatched:
+        return []
+
+    return [
+        f'{len(unmatched)} imported top(s) were not found in the selected ZoneSet horizons: {", ".join(unmatched[:8])}'
+    ]
 
 
 @router.post('/import-las', response_model=ImportLasResponse)
@@ -120,11 +186,27 @@ def import_tops(payload: ImportTopsRequest, request: Request) -> ImportTopsRespo
                 if well:
                     recalculate_picks_tvd(session, manager.project_path, well)
                 formation_count = len(list(session.scalars(select(FormationTopModel).where(FormationTopModel.well_id == target_well_id))))
+                zone_set_id = _resolve_import_top_set(session, payload, target_well_id)
+                horizon_count = 0
+                zone_count = 0
+                if zone_set_id is not None:
+                    qc_warnings.extend(_zone_set_qc_warnings(session, zone_set_id, imported, target_well_id))
+                    activate_top_set_for_well(session, manager.project_path, target_well_id, zone_set_id)
+                    horizon_count = len(list(session.scalars(select(TopSetHorizon).where(TopSetHorizon.top_set_id == zone_set_id))))
+                    zone_count = len(list(session.scalars(select(FormationZone).where(FormationZone.top_set_id == zone_set_id))))
                 session.commit()
             manager.save_project()
         except (ValueError, FileNotFoundError) as error:
             raise HTTPException(status_code=400, detail=str(error)) from error
-        return ImportTopsResponse(well_id=target_well_id, formation_count=formation_count, linked_count=len(linked), qc_warnings=qc_warnings)
+        return ImportTopsResponse(
+            well_id=target_well_id,
+            formation_count=formation_count,
+            linked_count=len(linked),
+            zone_set_id=zone_set_id,
+            horizon_count=horizon_count,
+            zone_count=zone_count,
+            qc_warnings=qc_warnings,
+        )
 
 
 @router.post('/import-unconformities', response_model=ImportUnconformitiesResponse)

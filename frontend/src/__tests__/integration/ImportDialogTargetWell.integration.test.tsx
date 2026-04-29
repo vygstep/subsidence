@@ -35,6 +35,18 @@ const LAS_PREVIEW_RESPONSE = {
 
 function mockFetch(lasResponse = LAS_PREVIEW_RESPONSE, tabularResponse = TABULAR_PREVIEW_RESPONSE) {
   vi.stubGlobal('fetch', vi.fn().mockImplementation((url: string) => {
+    if (url === '/api/top-sets') {
+      return Promise.resolve({
+        ok: true,
+        json: async () => [{ id: 7, name: 'Regional ZoneSet', description: null, horizon_count: 3 }],
+      })
+    }
+    if (url === '/api/projects/import-tops') {
+      return Promise.resolve({
+        ok: true,
+        json: async () => ({ well_id: 'well-b', zone_set_id: 8, qc_warnings: [] }),
+      })
+    }
     const body = url.includes('/las') ? lasResponse : tabularResponse
     return Promise.resolve({ ok: true, json: async () => body })
   }))
@@ -137,7 +149,7 @@ describe('Import dialogs target active well by default', () => {
     expect((screen.getByLabelText('Target well') as HTMLSelectElement).value).toBe('well-b')
   })
 
-  it('blocks the options step until a source path is present', () => {
+  it('blocks the options step until a source path is present', async () => {
     window.localStorage.removeItem('subsidence:last-import-root')
     render(
       <ImportTopsDialog
@@ -150,5 +162,37 @@ describe('Import dialogs target active well by default', () => {
 
     expect(screen.getByText('CSV path is required.')).toBeTruthy()
     expect((screen.getByRole('button', { name: 'Next' }) as HTMLButtonElement).disabled).toBe(true)
+    await waitFor(() => {
+      const fetchMock = fetch as unknown as ReturnType<typeof vi.fn>
+      expect(fetchMock.mock.calls.some(([url]) => url === '/api/top-sets')).toBe(true)
+    })
+  })
+
+  it('sends create ZoneSet selection by default for tops import', async () => {
+    const user = userEvent.setup()
+    const onSuccess = vi.fn()
+    render(
+      <ImportTopsDialog
+        wells={wells}
+        activeWellId="well-b"
+        onClose={vi.fn()}
+        onSuccess={onSuccess}
+      />,
+    )
+
+    await advancePastPreview(user)
+    await advancePastMapping(user)
+    expect((screen.getByRole('radio', { name: /Create new ZoneSet/i }) as HTMLInputElement).checked).toBe(true)
+
+    await user.click(screen.getByRole('button', { name: 'Next' }))
+    await user.click(screen.getByRole('button', { name: 'Load tops' }))
+
+    await waitFor(() => expect(onSuccess).toHaveBeenCalledWith('well-b'))
+    const fetchMock = fetch as unknown as ReturnType<typeof vi.fn>
+    const executeCall = fetchMock.mock.calls.find(([url]) => url === '/api/projects/import-tops')
+    expect(executeCall).toBeTruthy()
+    const body = JSON.parse(String(executeCall?.[1]?.body))
+    expect(body.create_zone_set).toBe(true)
+    expect(body.zone_set_id).toBeNull()
   })
 })

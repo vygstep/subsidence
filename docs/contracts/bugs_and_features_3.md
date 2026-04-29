@@ -169,7 +169,7 @@ ZoneSet settings must show, at minimum:
 If a marker is missing in a well, the zone row remains visible and shows an unresolved/missing state
 rather than disappearing silently.
 
-#### BF3-006-C: Tops import must ask for target ZoneSet
+#### BF3-006-C: Tops import must ask for target ZoneSet (done)
 
 When importing tops into a well, the import wizard must ask which ZoneSet should receive the
 imported marker set:
@@ -207,9 +207,18 @@ Affected backend areas:
 Affected frontend areas:
 
 - `frontend/src/components/layout/ImportTopsDialog.tsx`
-- `frontend/src/stores/wellDataStore.ts` top-set/zone-set loading actions
 - `frontend/src/components/layout/DataManagerTopPane.tsx`
 - `frontend/src/components/layout/WellDataPanel.tsx`
+
+Implemented notes:
+
+- `ImportTopsDialog` now asks whether to create a new ZoneSet, use an existing ZoneSet, or import without ZoneSet assignment.
+- The wizard defaults to the selected ZoneSet when one is selected in Data Manager; otherwise it defaults to creating a new ZoneSet.
+- `/api/projects/import-tops` accepts `zone_set_id`, `create_zone_set`, and `zone_set_name`.
+- On create-new, the backend creates `TopSet` horizons from imported picks, rebuilds zones, activates the ZoneSet for the importing well, and recalculates per-well zone data.
+- On existing ZoneSet, the backend matches imported picks to existing horizons by normalized marker name, creates ghost picks for missing horizons, recalculates thickness, and emits QC warnings for imported tops that do not match the selected ZoneSet.
+- Shared TopSet activation/linking logic now lives in `app/src/subsidence/data/zone_service.py` and is reused by manual TopSet assignment and tops import.
+- Covered by backend integration tests for create-new and existing ZoneSet import paths plus frontend import-wizard tests for target well and default ZoneSet payload.
 
 #### BF3-006-D: Zone settings for all wells in a ZoneSet (partial)
 

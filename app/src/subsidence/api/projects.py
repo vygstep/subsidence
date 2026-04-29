@@ -72,6 +72,9 @@ class ImportTopsRequest(BaseModel):
     depth_ref: str = 'MD'
     create_new_well: bool = False
     column_map: dict[str, str] | None = None
+    zone_set_id: int | None = None
+    create_zone_set: bool = False
+    zone_set_name: str | None = None
 
 
 class ImportUnconformitiesRequest(BaseModel):
@@ -187,6 +190,9 @@ class ImportTopsResponse(BaseModel):
     well_id: str
     formation_count: int
     linked_count: int
+    zone_set_id: int | None = None
+    horizon_count: int = 0
+    zone_count: int = 0
     qc_warnings: list[str] = []
 
 

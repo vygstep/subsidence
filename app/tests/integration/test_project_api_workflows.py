@@ -1147,6 +1147,98 @@ def test_tops_import_with_column_map(api_client: TestClient, tmp_path: Path) -> 
     assert 'Cretaceous Base' in top_names
 
 
+def test_tops_import_can_create_zone_set_from_imported_tops(api_client: TestClient, tmp_path: Path) -> None:
+    _create_project(api_client, tmp_path, 'tops-zone-set-create')
+    response = api_client.post('/api/projects/wells', json={
+        'name': 'Zone Import Well',
+        'x': 0.0,
+        'y': 0.0,
+        'kb': 10.0,
+        'td': 500.0,
+        'crs': 'local',
+    })
+    assert response.status_code == 200, response.text
+    well_id = response.json()['well_id']
+
+    csv_path = tmp_path / 'tops_zone_set.csv'
+    csv_path.write_text(
+        'well_name,top_name,depth_md,strat_age_ma,color\n'
+        'Zone Import Well,H1,100,10,#111111\n'
+        'Zone Import Well,H2,250,20,#222222\n'
+        'Zone Import Well,H3,400,30,#333333\n',
+        encoding='utf-8',
+    )
+
+    response = api_client.post('/api/projects/import-tops', json={
+        'csv_path': str(csv_path),
+        'well_id': well_id,
+        'create_zone_set': True,
+        'zone_set_name': 'Imported ZoneSet',
+    })
+    assert response.status_code == 200, response.text
+    payload = response.json()
+    assert payload['zone_set_id'] is not None
+    assert payload['horizon_count'] == 3
+    assert payload['zone_count'] == 2
+
+    response = api_client.get('/api/wells/inventory')
+    assert response.status_code == 200, response.text
+    well = next(w for w in response.json() if w['well_id'] == well_id)
+    assert well['active_top_set_id'] == payload['zone_set_id']
+    assert well['active_top_set_name'] == 'Imported ZoneSet'
+    assert [z['thickness_md'] for z in well['zones']] == [150.0, 150.0]
+
+
+def test_tops_import_can_attach_to_existing_zone_set_by_top_names(api_client: TestClient, tmp_path: Path) -> None:
+    _create_project(api_client, tmp_path, 'tops-zone-set-existing')
+    response = api_client.post('/api/projects/wells', json={
+        'name': 'Existing ZoneSet Well',
+        'x': 0.0,
+        'y': 0.0,
+        'kb': 10.0,
+        'td': 500.0,
+        'crs': 'local',
+    })
+    assert response.status_code == 200, response.text
+    well_id = response.json()['well_id']
+
+    response = api_client.post('/api/top-sets', json={'name': 'Regional ZoneSet'})
+    assert response.status_code == 201, response.text
+    top_set_id = response.json()['id']
+    for name in ['H1', 'H2', 'H3']:
+        response = api_client.post(f'/api/top-sets/{top_set_id}/horizons', json={'name': name})
+        assert response.status_code == 201, response.text
+
+    csv_path = tmp_path / 'tops_existing_zone_set.csv'
+    csv_path.write_text(
+        'well_name,top_name,depth_md\n'
+        'Existing ZoneSet Well,H1,100\n'
+        'Existing ZoneSet Well,H2,250\n'
+        'Existing ZoneSet Well,HX,300\n',
+        encoding='utf-8',
+    )
+
+    response = api_client.post('/api/projects/import-tops', json={
+        'csv_path': str(csv_path),
+        'well_id': well_id,
+        'zone_set_id': top_set_id,
+    })
+    assert response.status_code == 200, response.text
+    payload = response.json()
+    assert payload['zone_set_id'] == top_set_id
+    assert payload['horizon_count'] == 3
+    assert payload['zone_count'] == 2
+    assert any('not found in the selected ZoneSet horizons' in warning for warning in payload['qc_warnings'])
+
+    response = api_client.get('/api/wells/inventory')
+    assert response.status_code == 200, response.text
+    well = next(w for w in response.json() if w['well_id'] == well_id)
+    assert well['active_top_set_id'] == top_set_id
+    assert len(well['zones']) == 2
+    assert well['zones'][0]['thickness_md'] == 150.0
+    assert well['zones'][1]['thickness_md'] is None
+
+
 def test_deviation_import_with_column_map(api_client: TestClient, tmp_path: Path) -> None:
     _create_project(api_client, tmp_path, 'deviation-column-map')
     response = api_client.post('/api/projects/wells', json={

@@ -7,15 +7,15 @@ from sqlalchemy.orm import selectinload
 
 from subsidence.data.deviation_transform import recalculate_picks_tvd
 from subsidence.data.schema import (
-    FormationTopModel,
     TopSet,
     TopSetHorizon,
     WellActiveTopSet,
     WellModel,
 )
 from subsidence.data.zone_service import (
+    activate_top_set_for_well,
     aggregate_zone_lithology_from_curve,
-    ensure_zone_well_data,
+    extract_horizons_from_well_picks,
     merge_zones_on_horizon_delete,
     rebuild_zones_for_top_set,
     recalculate_zone_thickness,
@@ -154,60 +154,6 @@ def _require_well(session, well_id: str) -> WellModel:
     return well
 
 
-def _link_picks_to_horizons(session, well_id: str, top_set_id: int) -> int:
-    """For each horizon in the TopSet, find picks with matching name and set horizon_id."""
-    horizons = session.scalars(
-        select(TopSetHorizon).where(TopSetHorizon.top_set_id == top_set_id)
-    ).all()
-    horizon_by_name = {h.name.lower(): h for h in horizons}
-    if not horizon_by_name:
-        return 0
-
-    picks = session.scalars(
-        select(FormationTopModel).where(FormationTopModel.well_id == well_id)
-    ).all()
-    linked = 0
-    for pick in picks:
-        h = horizon_by_name.get(pick.name.lower())
-        if h is not None and pick.horizon_id != h.id:
-            pick.horizon_id = h.id
-            linked += 1
-    session.flush()
-    return linked
-
-
-def _create_ghost_picks(session, well_id: str, top_set_id: int) -> int:
-    """Create unset picks (depth_md=None) for horizons with no matching pick in the well."""
-    horizons = session.scalars(
-        select(TopSetHorizon).where(TopSetHorizon.top_set_id == top_set_id)
-    ).all()
-    existing_by_name = {
-        p.name.lower()
-        for p in session.scalars(
-            select(FormationTopModel).where(FormationTopModel.well_id == well_id)
-        ).all()
-    }
-    created = 0
-    for h in horizons:
-        if h.name.lower() not in existing_by_name:
-            pick = FormationTopModel(
-                well_id=well_id,
-                horizon_id=h.id,
-                name=h.name,
-                kind=h.kind,
-                depth_md=None,
-                depth_tvd=None,
-                depth_tvdss=None,
-                color=h.color,
-                age_top_ma=h.age_ma,
-                is_locked=False,
-            )
-            session.add(pick)
-            created += 1
-    session.flush()
-    return created
-
-
 # ---------------------------------------------------------------------------
 # TopSet CRUD
 # ---------------------------------------------------------------------------
@@ -320,9 +266,7 @@ def add_horizon(top_set_id: int, body: HorizonCreate, request: Request) -> Horiz
         rebuild_zones_for_top_set(session, top_set_id)
         well_ids = _linked_well_ids(session, top_set_id)
         for wid in well_ids:
-            ensure_zone_well_data(session, top_set_id, wid)
-            recalculate_zone_thickness(session, top_set_id, wid)
-            aggregate_zone_lithology_from_curve(session, manager.project_path, wid)
+            activate_top_set_for_well(session, manager.project_path, wid, top_set_id)
         session.commit()
         session.refresh(horizon)
         return _horizon_to_response(horizon)
@@ -409,21 +353,7 @@ def set_active_top_set(well_id: str, body: ActiveTopSetRequest, request: Request
         if session.get(TopSet, body.top_set_id) is None:
             raise HTTPException(status_code=404, detail=f'TopSet not found: {body.top_set_id}')
 
-        link = session.scalar(
-            select(WellActiveTopSet).where(WellActiveTopSet.well_id == well_id)
-        )
-        if link is None:
-            link = WellActiveTopSet(well_id=well_id, top_set_id=body.top_set_id)
-            session.add(link)
-        else:
-            link.top_set_id = body.top_set_id
-
-        session.flush()
-        _link_picks_to_horizons(session, well_id, body.top_set_id)
-        _create_ghost_picks(session, well_id, body.top_set_id)
-        ensure_zone_well_data(session, body.top_set_id, well_id)
-        recalculate_zone_thickness(session, body.top_set_id, well_id)
-        aggregate_zone_lithology_from_curve(session, manager.project_path, well_id)
+        activate_top_set_for_well(session, manager.project_path, well_id, body.top_set_id)
         session.commit()
 
     return ActiveTopSetResponse(well_id=well_id, top_set_id=body.top_set_id)
@@ -458,52 +388,9 @@ def extract_from_well(top_set_id: int, well_id: str, request: Request) -> TopSet
         _require_top_set(session, top_set_id)
         _require_well(session, well_id)
 
-        picks = session.scalars(
-            select(FormationTopModel)
-            .where(FormationTopModel.well_id == well_id)
-            .order_by(
-                FormationTopModel.depth_md.asc().nulls_last(),
-                FormationTopModel.id.asc(),
-            )
-        ).all()
-
-        existing_horizons = session.scalars(
-            select(TopSetHorizon).where(TopSetHorizon.top_set_id == top_set_id)
-        ).all()
-        horizon_by_name = {h.name.lower(): h for h in existing_horizons}
-        base_sort = max((h.sort_order for h in existing_horizons), default=-1) + 1
-
-        seen_names: set[str] = set()
-        sort_offset = 0
-        for pick in picks:
-            key = pick.name.lower()
-            if key in seen_names:
-                continue
-            seen_names.add(key)
-
-            if key in horizon_by_name:
-                h = horizon_by_name[key]
-            else:
-                h = TopSetHorizon(
-                    top_set_id=top_set_id,
-                    name=pick.name,
-                    kind=pick.kind or 'strat',
-                    age_ma=pick.age_top_ma,
-                    color=pick.color,
-                    sort_order=base_sort + sort_offset,
-                    note=None,
-                )
-                session.add(h)
-                session.flush()
-                horizon_by_name[key] = h
-                sort_offset += 1
-
-        # Link all picks with matching horizon names
-        for pick in picks:
-            h = horizon_by_name.get(pick.name.lower())
-            if h is not None:
-                pick.horizon_id = h.id
-
+        extract_horizons_from_well_picks(session, top_set_id, well_id)
+        rebuild_zones_for_top_set(session, top_set_id)
+        activate_top_set_for_well(session, manager.project_path, well_id, top_set_id)
         session.commit()
         loaded = _load_top_set(session, top_set_id)
         return _top_set_detail(loaded)
