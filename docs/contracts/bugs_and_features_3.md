@@ -698,10 +698,13 @@ User workflow must be clone/copy first, then edit the user copy.
 - Added project-open self-heal coverage for missing built-in strat chart and sea-level curve
   rows.
 
-Remaining BF3-009 work:
+#### Implemented step 3
 
-- Add explicit persisted metadata for visual pattern `group_name` / `base_lithology_code` if
-  the UI needs to filter or map variants by computational lithology.
+- Added `group_name` and `base_lithology_code` columns to `LithologyPattern` (schema v14).
+- Migration in `engine.py` adds both columns to existing databases via `ALTER TABLE`.
+- Seeder now maps CSV `group_name` and `base_lithology_code` columns on both insert and update.
+- API `LithologyPatternItem` exposes both fields; `_pattern_to_item` maps them.
+- Frontend `LithologyPatternEntry` type includes both fields.
 
 ---
 

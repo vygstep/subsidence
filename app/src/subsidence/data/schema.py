@@ -7,7 +7,7 @@ from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column, relationship
 from sqlalchemy import MetaData
 
 SUBSIDENCE_APP_ID = 0x53554253  # "SUBS" as 4-byte int
-SCHEMA_VERSION = 13
+SCHEMA_VERSION = 14
 
 _NAMING: dict[str, str] = {
     "ix": "ix_%(table_name)s_%(column_0_name)s",
@@ -464,6 +464,8 @@ class LithologyPattern(Base, AuditMixin):
     tile_height: Mapped[int] = mapped_column(Integer, default=64)
     description: Mapped[str | None] = mapped_column(Text, nullable=True)
     sort_order: Mapped[int] = mapped_column(Integer, default=0)
+    group_name: Mapped[str | None] = mapped_column(String(128), nullable=True)
+    base_lithology_code: Mapped[str | None] = mapped_column(String(64), nullable=True)
 
     palette: Mapped["LithologyPatternPalette"] = relationship(back_populates="patterns")
 

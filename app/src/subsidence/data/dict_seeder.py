@@ -493,6 +493,8 @@ def _seed_builtin_lithology_patterns(session: Session, palette_dir: Path) -> Non
                         tile_width=tile_width,
                         tile_height=tile_height,
                         sort_order=int(row.get('sort_order') or 0),
+                        group_name=row.get('group_name') or None,
+                        base_lithology_code=row.get('base_lithology_code') or None,
                     )
                 )
                 continue
@@ -504,6 +506,8 @@ def _seed_builtin_lithology_patterns(session: Session, palette_dir: Path) -> Non
             existing.tile_width = tile_width
             existing.tile_height = tile_height
             existing.sort_order = int(row.get('sort_order') or 0)
+            existing.group_name = row.get('group_name') or None
+            existing.base_lithology_code = row.get('base_lithology_code') or None
 
 
 def _seed_builtin_mnemonic_set(session: Session, csv_path: Path) -> None:

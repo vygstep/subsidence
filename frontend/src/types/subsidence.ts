@@ -166,6 +166,8 @@ export interface LithologyPatternEntry {
   tile_height: number
   description: string | null
   sort_order: number
+  group_name: string | null
+  base_lithology_code: string | null
 }
 
 export interface LithologyPatternPaletteDetail extends LithologyPatternPaletteSummary {

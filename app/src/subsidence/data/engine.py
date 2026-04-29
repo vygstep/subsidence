@@ -110,6 +110,13 @@ def migrate_schema(engine: Engine) -> None:
             conn.execute(text("ALTER TABLE curve_metadata ADD COLUMN discrete_code_map TEXT"))
             conn.commit()
         table_names = {row[0] for row in conn.execute(text("SELECT name FROM sqlite_master WHERE type='table'"))}
+        pattern_cols = {row[1] for row in conn.execute(text("PRAGMA table_info(lithology_patterns)"))}
+        if 'group_name' not in pattern_cols:
+            conn.execute(text("ALTER TABLE lithology_patterns ADD COLUMN group_name VARCHAR(128)"))
+            conn.commit()
+        if 'base_lithology_code' not in pattern_cols:
+            conn.execute(text("ALTER TABLE lithology_patterns ADD COLUMN base_lithology_code VARCHAR(64)"))
+            conn.commit()
         if 'sea_level_curves' not in table_names:
             conn.execute(text(
                 "CREATE TABLE sea_level_curves ("

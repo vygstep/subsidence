@@ -36,6 +36,8 @@ class LithologyPatternItem(BaseModel):
     tile_height: int
     description: str | None
     sort_order: int
+    group_name: str | None
+    base_lithology_code: str | None
 
 
 class LithologyPatternPaletteDetail(LithologyPatternPaletteSummary):
@@ -173,6 +175,8 @@ def _pattern_to_item(row: LithologyPattern) -> LithologyPatternItem:
         tile_height=row.tile_height,
         description=row.description,
         sort_order=row.sort_order,
+        group_name=row.group_name,
+        base_lithology_code=row.base_lithology_code,
     )
 
 
