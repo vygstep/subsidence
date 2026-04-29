@@ -107,7 +107,9 @@ function SetFormationTypeDialog({
 }
 
 export function ProjectToolbar() {
-  const [activeDialog, setActiveDialog] = useState<DialogKind>('project-open')
+  const [activeDialog, setActiveDialog] = useState<DialogKind>(() =>
+    useProjectStore.getState().isOpen ? null : 'project-open',
+  )
   const [formationLinkTarget, setFormationLinkTarget] = useState<FormationTop | null>(null)
   const [projectMenuOpen, setProjectMenuOpen] = useState(false)
   const [pendingAction, setPendingAction] = useState<'new-project' | 'open-project' | 'close-project' | null>(null)
