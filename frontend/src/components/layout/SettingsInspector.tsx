@@ -39,6 +39,7 @@ import { TopsSettings } from './settings/TopsSettings'
 import { WellSettings } from './settings/WellSettings'
 import { ZoneDetailSettings } from './settings/ZoneDetailSettings'
 import { ZoneSettings } from './settings/ZoneSettings'
+import { ZoneSetsRootSettings } from './settings/ZoneSetsRootSettings'
 import type { WellInspectorDraft } from './settings/WellSettings'
 
 export type { WellInspectorDraft }
@@ -203,7 +204,7 @@ export function SettingsInspector({
   }
 
   if (selectedObject.type === 'zone-sets-root') {
-    return <EmptyInspector message="Select a ZoneSet to inspect cross-well zone settings." />
+    return <ZoneSetsRootSettings />
   }
 
   if (selectedObject.type === 'zone-set') {
