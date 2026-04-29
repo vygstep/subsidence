@@ -1,0 +1,10 @@
+preset_code,source_lithology_code,name,density,porosity_surface,compaction_coeff,description,sort_order
+sandstone,sandstone,Sandstone,2650,0.49,0.27,,10
+shale,shale,Shale,2720,0.63,0.51,,20
+limestone,limestone,Limestone,2710,0.50,0.60,,30
+dolomite,dolomite,Dolomite,2870,0.40,0.50,,40
+evaporite,evaporite,Evaporite,2960,0.10,0.10,,50
+coal,coal,Coal,1400,0.55,0.40,,60
+igneous,igneous,Igneous,2900,0.01,0.01,,70
+conglomerate,conglomerate,Conglomerate,2650,0.45,0.25,,80
+metamorphic,metamorphic,Metamorphic,2800,0.01,0.01,,90

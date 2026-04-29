@@ -1,0 +1,10 @@
+lithology_code,display_name,color_hex,pattern_id,sort_order,compaction_preset_code
+sandstone,Sandstone,#F2C98A,sandstone,10,sandstone
+shale,Shale,#A8B8C8,shale,20,shale
+limestone,Limestone,#A8D5B0,limestone,30,limestone
+dolomite,Dolomite,#D0A8D8,dolomite,40,dolomite
+evaporite,Evaporite,#F7E6A0,,50,evaporite
+coal,Coal,#3A3A3A,,60,coal
+igneous,Igneous,#C87060,,70,igneous
+conglomerate,Conglomerate,#D4AA70,conglomerate,80,conglomerate
+metamorphic,Metamorphic,#9090A8,,90,metamorphic

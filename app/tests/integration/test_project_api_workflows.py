@@ -186,6 +186,36 @@ def test_new_project_seeds_builtin_reference_data(api_client: TestClient, tmp_pa
         assert pattern_count == 74
 
 
+def test_project_open_self_heals_missing_builtin_reference_data(api_client: TestClient, tmp_path: Path):
+    project_path = _create_project(api_client, tmp_path, 'builtin-reference-self-heal')
+
+    manager = api_client.app.state.project_manager
+    with manager.get_session() as session:
+        session.execute(SeaLevelPoint.__table__.delete())
+        session.execute(SeaLevelCurve.__table__.delete())
+        session.execute(StratUnit.__table__.delete())
+        session.execute(StratChart.__table__.delete())
+        session.commit()
+
+    response = api_client.post('/api/projects/save')
+    assert response.status_code == 200, response.text
+    response = api_client.post('/api/projects/close')
+    assert response.status_code == 200, response.text
+    response = api_client.post('/api/projects/open', json={'path': str(project_path)})
+    assert response.status_code == 200, response.text
+
+    response = api_client.get('/api/strat-charts')
+    assert response.status_code == 200, response.text
+    charts = response.json()
+    assert any(chart['name'] == 'ICS 2023' and chart['is_builtin'] for chart in charts)
+
+    response = api_client.get('/api/sea-level-curves')
+    assert response.status_code == 200, response.text
+    curves = response.json()
+    assert len([curve for curve in curves if curve['is_builtin']]) == 4
+    assert {curve['point_count'] for curve in curves if curve['is_builtin']} == {53}
+
+
 def test_well_color_defaults_patch_and_backfill_persist(api_client: TestClient, tmp_path: Path):
     project_path = _create_project(api_client, tmp_path, 'well-colors')
 

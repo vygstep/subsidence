@@ -668,13 +668,25 @@ User workflow must be clone/copy first, then edit the user copy.
 - Added frontend project-open loading for sea-level curves so projects without wells still
   expose built-in sea-level dictionaries.
 
+#### Implemented step 2
+
+- Split the legacy overloaded lithology defaults into explicit seed files:
+  - `lithology/lithology_core.csv`
+  - `compaction/compaction_presets.csv`
+  - `lithology_sets/default_lithologies.csv`
+- Updated the seeder so computational lithologies, built-in compaction presets, and the
+  built-in `Default Lithologies` set are loaded from their own files.
+- Kept `lithology_defaults.csv` as a legacy fallback path for compatibility.
+- Kept the current schema bridge: `LithologyDictEntry` still receives compaction values from
+  `compaction_presets.csv` until the schema no longer stores compaction parameters on the
+  flat lithology dictionary row.
+- Added project-open self-heal coverage for missing built-in strat chart and sea-level curve
+  rows.
+
 Remaining BF3-009 work:
 
-- Split `lithology_defaults.csv` into separate lithology core, compaction presets, and default
-  lithology set CSVs.
 - Add explicit persisted metadata for visual pattern `group_name` / `base_lithology_code` if
   the UI needs to filter or map variants by computational lithology.
-- Add project-open self-heal tests for legacy projects that are missing built-in rows.
 
 ---
 

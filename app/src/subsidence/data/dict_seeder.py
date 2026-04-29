@@ -160,27 +160,60 @@ def _seed_curve_entries(session: Session, csv_path: Path) -> None:
             )
 
 
-def _seed_lithology_entries(session: Session, csv_path: Path) -> None:
+def _compaction_preset_seed_rows(csv_path: Path) -> list[dict[str, str]]:
+    if not csv_path.exists():
+        return []
+    rows: list[dict[str, str]] = []
     with csv_path.open('r', encoding='utf-8', newline='') as handle:
         for row in csv.DictReader(handle):
+            source_code = (
+                row.get('source_lithology_code')
+                or row.get('lithology_code')
+                or row.get('preset_code')
+                or ''
+            ).strip()
+            if not source_code:
+                continue
+            rows.append({
+                'preset_code': (row.get('preset_code') or source_code).strip(),
+                'source_lithology_code': source_code,
+                'name': (row.get('name') or row.get('display_name') or source_code).strip(),
+                'density': row.get('density') or '2650.0',
+                'porosity_surface': row.get('porosity_surface') or '0.50',
+                'compaction_coeff': row.get('compaction_coeff') or '0.30',
+                'description': row.get('description') or '',
+                'sort_order': row.get('sort_order') or '0',
+            })
+    return sorted(rows, key=lambda item: (int(item['sort_order'] or 0), item['source_lithology_code']))
+
+
+def _compaction_defaults_by_lithology(csv_path: Path) -> dict[str, dict[str, str]]:
+    return {row['source_lithology_code']: row for row in _compaction_preset_seed_rows(csv_path)}
+
+
+def _seed_lithology_entries(session: Session, csv_path: Path, compaction_csv_path: Path) -> None:
+    compaction_defaults = _compaction_defaults_by_lithology(compaction_csv_path)
+    with csv_path.open('r', encoding='utf-8', newline='') as handle:
+        for row in csv.DictReader(handle):
+            compaction_row = compaction_defaults.get(row['lithology_code'], row)
             session.add(
                 LithologyDictEntry(
                     lithology_code=row['lithology_code'],
                     display_name=row['display_name'],
                     color_hex=row['color_hex'],
                     pattern_id=row['pattern_id'] or None,
+                    description=row.get('description') or None,
                     sort_order=int(row['sort_order']),
-                    density=float(row.get('density') or 2650.0),
-                    porosity_surface=float(row.get('porosity_surface') or 0.50),
-                    compaction_coeff=float(row.get('compaction_coeff') or 0.30),
+                    density=float(compaction_row.get('density') or 2650.0),
+                    porosity_surface=float(compaction_row.get('porosity_surface') or 0.50),
+                    compaction_coeff=float(compaction_row.get('compaction_coeff') or 0.30),
                 )
             )
 
 
 def _migrate_lithology_compaction_params(session: Session, csv_path: Path) -> None:
     """Back-fill compaction columns for rows seeded before Phase 4."""
-    with csv_path.open('r', encoding='utf-8', newline='') as handle:
-        defaults = {row['lithology_code']: row for row in csv.DictReader(handle)}
+    defaults = _compaction_defaults_by_lithology(csv_path)
 
     rows = session.scalars(select(LithologyDictEntry)).all()
     for entry in rows:
@@ -299,12 +332,10 @@ def _seed_builtin_compaction_model(session: Session) -> None:
         ))
 
 
-def _seed_builtin_compaction_presets(session: Session) -> None:
-    """Create one built-in compaction preset per lithology dictionary entry."""
-    litho_rows = session.scalars(
-        select(LithologyDictEntry).order_by(LithologyDictEntry.sort_order.asc(), LithologyDictEntry.id.asc())
-    ).all()
-    if not litho_rows:
+def _seed_builtin_compaction_presets(session: Session, csv_path: Path) -> None:
+    """Create one built-in compaction preset per computational lithology."""
+    seed_rows = _compaction_preset_seed_rows(csv_path)
+    if not seed_rows:
         return
 
     existing = {
@@ -315,26 +346,34 @@ def _seed_builtin_compaction_presets(session: Session) -> None:
         if row.source_lithology_code
     }
 
-    for row in litho_rows:
-        if row.lithology_code in existing:
-            existing[row.lithology_code].name = row.display_name
+    for row in seed_rows:
+        source_code = row['source_lithology_code']
+        density = float(row.get('density') or 2650.0)
+        porosity = float(row.get('porosity_surface') or 0.50)
+        coeff = float(row.get('compaction_coeff') or 0.30)
+        if source_code in existing:
+            existing[source_code].name = row['name']
+            existing[source_code].density = density
+            existing[source_code].porosity_surface = porosity
+            existing[source_code].compaction_coeff = coeff
+            existing[source_code].description = row.get('description') or None
             continue
         session.add(
             CompactionPreset(
-                name=row.display_name,
+                name=row['name'],
                 origin='builtin',
                 is_builtin=True,
-                source_lithology_code=row.lithology_code,
-                density=row.density,
-                porosity_surface=row.porosity_surface,
-                compaction_coeff=row.compaction_coeff,
-                description=row.description,
+                source_lithology_code=source_code,
+                density=density,
+                porosity_surface=porosity,
+                compaction_coeff=coeff,
+                description=row.get('description') or None,
             )
         )
 
 
-def _seed_builtin_lithology_set(session: Session) -> None:
-    """Create the built-in Default Lithologies set from the legacy flat dictionary."""
+def _seed_builtin_lithology_set(session: Session, csv_path: Path) -> None:
+    """Create the built-in Default Lithologies set from an explicit set seed file."""
     default_set = session.scalar(
         select(LithologySet).where(LithologySet.is_builtin.is_(True)).order_by(LithologySet.id.asc())
     )
@@ -362,29 +401,46 @@ def _seed_builtin_lithology_set(session: Session) -> None:
         if row.source_lithology_code
     }
 
-    dict_rows = session.scalars(
-        select(LithologyDictEntry).order_by(LithologyDictEntry.sort_order.asc(), LithologyDictEntry.id.asc())
-    ).all()
-    for row in dict_rows:
-        preset_id = preset_by_code.get(row.lithology_code)
-        existing = existing_by_code.get(row.lithology_code)
+    if csv_path.exists():
+        with csv_path.open('r', encoding='utf-8', newline='') as handle:
+            seed_rows = list(csv.DictReader(handle))
+    else:
+        seed_rows = [
+            {
+                'lithology_code': row.lithology_code,
+                'display_name': row.display_name,
+                'color_hex': row.color_hex,
+                'pattern_id': row.pattern_id or '',
+                'sort_order': str(row.sort_order),
+                'compaction_preset_code': row.lithology_code,
+            }
+            for row in session.scalars(
+                select(LithologyDictEntry).order_by(LithologyDictEntry.sort_order.asc(), LithologyDictEntry.id.asc())
+            ).all()
+        ]
+
+    for row in seed_rows:
+        lithology_code = row['lithology_code']
+        preset_code = row.get('compaction_preset_code') or lithology_code
+        preset_id = preset_by_code.get(preset_code)
+        existing = existing_by_code.get(lithology_code)
         if existing is None:
             session.add(
                 LithologySetEntry(
                     set_id=default_set.id,
-                    lithology_code=row.lithology_code,
-                    display_name=row.display_name,
-                    color_hex=row.color_hex,
-                    pattern_id=row.pattern_id,
-                    sort_order=row.sort_order,
+                    lithology_code=lithology_code,
+                    display_name=row['display_name'],
+                    color_hex=row['color_hex'],
+                    pattern_id=row.get('pattern_id') or None,
+                    sort_order=int(row.get('sort_order') or 0),
                     compaction_preset_id=preset_id,
                 )
             )
             continue
-        existing.display_name = row.display_name
-        existing.color_hex = row.color_hex
-        existing.pattern_id = row.pattern_id
-        existing.sort_order = row.sort_order
+        existing.display_name = row['display_name']
+        existing.color_hex = row['color_hex']
+        existing.pattern_id = row.get('pattern_id') or None
+        existing.sort_order = int(row.get('sort_order') or 0)
         existing.compaction_preset_id = preset_id
 
 
@@ -638,6 +694,18 @@ def seed_dictionaries(session: Session, db_path: Path) -> None:
     has_curve_rows = session.execute(select(CurveDictEntry.id).limit(1)).scalar_one_or_none() is not None
     has_lithology_rows = session.execute(select(LithologyDictEntry.id).limit(1)).scalar_one_or_none() is not None
     has_strat_rows = session.execute(select(StratUnit.id).limit(1)).scalar_one_or_none() is not None
+    lithology_core_path = _dictionary_or_fallback(
+        seed_dir / 'lithology' / 'lithology_core.csv',
+        seed_dir / 'lithology_defaults.csv',
+    )
+    compaction_presets_path = _dictionary_or_fallback(
+        seed_dir / 'compaction' / 'compaction_presets.csv',
+        seed_dir / 'lithology_defaults.csv',
+    )
+    default_lithologies_path = _dictionary_or_fallback(
+        seed_dir / 'lithology_sets' / 'default_lithologies.csv',
+        seed_dir / 'lithology_defaults.csv',
+    )
     builtin_chart_path = _dictionary_or_fallback(
         seed_dir / 'strat_charts' / 'ics_2023.csv',
         sample_dir / 'ics_chart2023.csv',
@@ -646,9 +714,9 @@ def seed_dictionaries(session: Session, db_path: Path) -> None:
     if not has_curve_rows:
         _seed_curve_entries(session, seed_dir / 'curve_families.csv')
     if not has_lithology_rows:
-        _seed_lithology_entries(session, seed_dir / 'lithology_defaults.csv')
+        _seed_lithology_entries(session, lithology_core_path, compaction_presets_path)
     else:
-        _migrate_lithology_compaction_params(session, seed_dir / 'lithology_defaults.csv')
+        _migrate_lithology_compaction_params(session, compaction_presets_path)
     if not has_strat_rows:
         if builtin_chart_path.exists():
             default_chart = StratChart(name='ICS 2023', source_path=str(builtin_chart_path), is_active=True)
@@ -662,9 +730,9 @@ def seed_dictionaries(session: Session, db_path: Path) -> None:
         _normalize_builtin_chart(session, builtin_chart_path)
 
     _seed_builtin_compaction_model(session)
-    _seed_builtin_compaction_presets(session)
+    _seed_builtin_compaction_presets(session, compaction_presets_path)
     _seed_builtin_lithology_patterns(session, seed_dir / 'lithology_patterns' / 'equinor')
-    _seed_builtin_lithology_set(session)
+    _seed_builtin_lithology_set(session, default_lithologies_path)
     _seed_builtin_mnemonic_set(session, seed_dir / 'curve_families.csv')
     _seed_measurement_units(session)
     _seed_builtin_sea_level_curves(
