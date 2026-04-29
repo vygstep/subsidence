@@ -417,7 +417,7 @@ Tests:
 
 4 curves from `repos/sea_level/1-s2.0-S1342937X22001563-mmc1_binned_models.csv`
 (Kocsis & Scotese 2022, PALAEO3 supplement), copied to
-`app/src/subsidence/data/dictionaries/sea_level_binned_models.csv`:
+`app/src/subsidence/data/dictionaries/sea_level/sea_level_binned_models.csv`:
 
 | Curve name | Points |
 |---|---|
@@ -655,7 +655,7 @@ User workflow must be clone/copy first, then edit the user copy.
 #### Implemented step 1
 
 - Added dictionary paths for `strat_charts/ics_2023.csv` and
-  `sea_level/sea_level_binned_models.csv`, with fallback to legacy locations.
+  `sea_level/sea_level_binned_models.csv`.
 - Expanded the built-in Equinor lithology pattern manifest/assets to the full current
   `repos/lithology-patterns/assets/svg` catalogue: 74 SVG patterns.
 - Kept legacy main pattern codes such as `sandstone`, `shale`, `limestone`, `dolomite`,
@@ -676,7 +676,7 @@ User workflow must be clone/copy first, then edit the user copy.
   - `lithology_sets/default_lithologies.csv`
 - Updated the seeder so computational lithologies, built-in compaction presets, and the
   built-in `Default Lithologies` set are loaded from their own files.
-- Kept `lithology_defaults.csv` as a legacy fallback path for compatibility.
+- Removed legacy seed fallbacks so the split dictionary files are the single source of truth.
 - Kept the current schema bridge: `LithologyDictEntry` still receives compaction values from
   `compaction_presets.csv` until the schema no longer stores compaction parameters on the
   flat lithology dictionary row.
