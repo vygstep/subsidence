@@ -54,6 +54,21 @@ Chart titles in `SubsidenceCanvas` and `MultiWellPanel` are clickable and toggle
 (empty = auto). Registered in `SettingsInspector.tsx`. Depth min/max removed from
 `SubsidenceControls.tsx`.
 
+**Design note — chart settings vs model settings:**  
+`subsidence-chart` is intentionally separate from `subsidence-model` (BF3-006-E).
+
+- **Chart settings** (`subsidence-chart`): display/axis properties of the canvas itself —
+  depth min/max, axis style. Each chart (single-well and multi-well) has its own independent
+  depth range; `null` = auto-fit from that chart's data. Single-well auto-fit is computed from
+  the active well's burial data; multi-well auto-fit from all loaded well results.
+- **Model settings** (`subsidence-model`): computation-model properties — ZoneSet choice,
+  sea-level curve choice, burial-curve/formation-fill toggles, model-specific parameters.
+
+**Migration required in BF3-006-E/F:** the current global `subsidenceDepthMinM` /
+`subsidenceDepthMaxM` in `viewStore` must be replaced by per-chart depth state. Each
+`subsidence-chart` object carries its own `depthMinM: number | null` and
+`depthMaxM: number | null`.
+
 ---
 
 ## Active backlog
@@ -274,9 +289,12 @@ Model settings must include, when applicable:
 
 - selected ZoneSet dropdown
 - selected sea-level curve dropdown
-- display toggles
-- Y-axis depth range
+- display toggles (burial curves, formation fills)
 - model-specific parameters
+
+**Note:** Y-axis depth range is a chart setting, not a model setting. It lives in
+`SubsidenceChartSettings` (per-chart, per `subsidence-chart` object) and is not duplicated in
+model settings.
 
 Initial implementation may render only already-computable outputs and show planned/disabled states
 for models whose engine is not implemented yet, but the tree and settings contract should already
@@ -292,11 +310,12 @@ Persist at least:
 - visible models for multi-well chart
 - per-model ZoneSet choice
 - per-model sea-level curve choice
-- per-model depth min/max when overridden
+- per-chart depth min/max (single-well chart and multi-well chart independently; replaces global
+  `subsidenceDepthMinM` / `subsidenceDepthMaxM` in `viewStore`)
 
 Persistence can initially use existing visual config plumbing if no new table is required.
 
-#### BF3-006-G: Well color setting and default well colors
+#### BF3-006-G: Well color setting and default well colors (done)
 
 Add a user-editable well color in Well settings.
 
@@ -334,6 +353,15 @@ Tests:
 - Backend: patching well color persists across save/reopen.
 - Frontend: Well settings displays and updates the color.
 - Frontend: multi-well chart uses stored well colors instead of index-only palette colors.
+
+Implemented notes:
+
+- Added nullable `wells.color_hex` with schema version 13 migration and backfill for missing colors.
+- New wells receive a persisted pseudo-random color from a categorical palette through `create_empty_well`.
+- Well list, inventory, detail, create, and patch API responses expose `color_hex`.
+- `WellSettings` exposes a color picker plus hex text field; Save Well sends `color_hex`.
+- The Wells tree shows a well color swatch, and `MultiWellPanel` uses stored well colors with the old palette only as fallback.
+- Covered by backend lifecycle/backfill/patch persistence test plus frontend build and Data Manager / well-switching integration tests.
 
 #### BF3-006-H: Display sea-level curve on single-well subsidence chart
 
