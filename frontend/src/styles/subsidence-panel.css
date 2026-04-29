@@ -271,6 +271,22 @@
   text-align: center;
 }
 
+.subsidence-chart-title--clickable {
+  cursor: pointer;
+  user-select: none;
+}
+
+.subsidence-chart-title--clickable:hover {
+  background: #eff6ff;
+  color: #1d4ed8;
+}
+
+.subsidence-chart-title--selected {
+  background: #dbeafe;
+  color: #1d4ed8;
+  border-bottom-color: #93c5fd;
+}
+
 .geological-timescale {
   background: #f0f5fa;
   flex-shrink: 0;

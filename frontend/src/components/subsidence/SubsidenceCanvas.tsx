@@ -3,6 +3,7 @@ import { useCallback, useMemo, useRef } from 'react'
 import { useCanvasRenderer } from '@/hooks/useCanvasRenderer'
 import { drawBurialCurves, drawFormationFills } from '@/renderers/subsidenceRenderer'
 import { useComputedStore, useViewStore } from '@/stores'
+import { useWorkspaceStore } from '@/stores/workspaceStore'
 import { useWellDataStore } from '@/stores/wellDataStore'
 import type { SubsidenceResult } from '@/types/subsidence'
 import { GeologicalTimescale } from './GeologicalTimescale'
@@ -152,6 +153,14 @@ export function SubsidenceCanvas() {
 
   const wellName = useWellDataStore((s) => s.well?.well_name ?? null)
   const formations = useWellDataStore((s) => s.formations)
+  const selectedObject = useWorkspaceStore((s) => s.selectedObject)
+  const setSelectedObject = useWorkspaceStore((s) => s.setSelectedObject)
+
+  const isSelected = selectedObject?.type === 'subsidence-chart' && selectedObject.chartType === 'single'
+
+  const handleTitleClick = useCallback(() => {
+    setSelectedObject(isSelected ? null : { type: 'subsidence-chart', chartType: 'single' })
+  }, [isSelected, setSelectedObject])
 
   // X axis: 0 (present, right) → oldest formation age (left)
   const maxAge = useMemo(() => {
@@ -299,7 +308,10 @@ export function SubsidenceCanvas() {
   return (
     <div ref={containerRef} className="subsidence-canvas-container">
       {wellName && (
-        <div className="subsidence-chart-title">
+        <div
+          className={`subsidence-chart-title subsidence-chart-title--clickable${isSelected ? ' subsidence-chart-title--selected' : ''}`}
+          onClick={handleTitleClick}
+        >
           {wellName} — Total subsidence
         </div>
       )}

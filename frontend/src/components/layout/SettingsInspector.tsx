@@ -27,6 +27,7 @@ import { MeasurementUnitsRootSettings } from './settings/MeasurementUnitsRootSet
 import { UnitDimensionSettings } from './settings/UnitDimensionSettings'
 
 import { CurveSettings } from './settings/CurveSettings'
+import { SubsidenceChartSettings } from './settings/SubsidenceChartSettings'
 import { CurveTrackSettings } from './settings/CurveTrackSettings'
 import { DepthTrackSettings } from './settings/DepthTrackSettings'
 import { FormationsTrackSettings } from './settings/FormationsTrackSettings'
@@ -310,6 +311,10 @@ export function SettingsInspector({
       return <EmptyInspector message="Selected lithology entry is not loaded yet." />
     }
     return <LithologyDictionarySettings entry={selectedLithologyDictionaryEntry} />
+  }
+
+  if (selectedObject.type === 'subsidence-chart') {
+    return <SubsidenceChartSettings chartType={selectedObject.chartType} />
   }
 
   return <EmptyInspector message="No editable settings are implemented for the selected object yet." />

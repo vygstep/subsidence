@@ -45,38 +45,14 @@ so the gap was never detected. Fix: export `computeGapThreshold`, compute it fro
 
 ---
 
-## Pending
-
-### BF3-005: Subsidence charts — selectable objects in Settings panel
+### BF3-005: Subsidence charts — selectable objects in Settings panel (done)
 
 **Type:** Feature  
-**Priority:** High  
-**Depends on:** BF3-003 (depth controls need to move here from SubsidenceControls)
-
-Currently `SubsidenceCanvas` (single-well total subsidence) and `MultiWellPanel` (multi-well
-comparison) are plain canvas elements with no selection mechanism. Settings for them do not
-appear in the Settings panel.
-
-**Plan:**
-
-1. Add `{ type: 'subsidence-chart'; chartType: 'single' | 'multi' }` to `SelectedObject` union
-   in `workspaceStore.ts`.
-
-2. Make chart titles clickable in `SubsidenceCanvas` and `MultiWellPanel`:
-   - `onClick` → `useWorkspaceStore.getState().setSelectedObject(...)`
-   - Visual feedback: highlight title / add `--selected` CSS class.
-
-3. Create `SubsidenceChartSettings.tsx`:
-   - Shows chart type (Single-well / Multi-well).
-   - **Depth min (m)** and **Depth max (m)** inputs (empty = auto-fit to data).
-   - Reads/writes `subsidenceDepthMinM` / `subsidenceDepthMaxM` from `viewStore`.
-
-4. Register in `SettingsInspector.tsx` — new `subsidence-chart` case.
-
-5. Remove depth min/max inputs from `SubsidenceControls.tsx` (they live in Settings now).
-
-**Files:** `workspaceStore.ts`, `SubsidenceCanvas.tsx`, `MultiWellPanel.tsx`,
-`SubsidenceControls.tsx`, `SettingsInspector.tsx`, new `SubsidenceChartSettings.tsx`.
+Added `{ type: 'subsidence-chart'; chartType: 'single' | 'multi' }` to `SelectedObject` union.
+Chart titles in `SubsidenceCanvas` and `MultiWellPanel` are clickable — toggle selection with
+`--selected` CSS highlight. `SubsidenceChartSettings.tsx` shows chart type + depth min/max inputs
+(empty = auto). Registered in `SettingsInspector.tsx`. Depth min/max removed from
+`SubsidenceControls.tsx`.
 
 ---
 
@@ -110,15 +86,16 @@ Dedicated tab listing all formation tops across all loaded wells in a flat or gr
 Dedicated tab listing all 5 computation model types. Each is a selectable node with its own
 Settings panel.
 
-| Model | Current location | Planned SelectedObject type |
-|---|---|---|
-| Total subsidence (single-well) | SubsidenceCanvas | `subsidence-chart` `single` |
-| Multi-well comparison | MultiWellPanel | `subsidence-chart` `multi` |
-| Decompaction | TBD | `decompaction-chart` |
-| Model 4 | TBD | TBD |
-| Model 5 | TBD | TBD |
+| # | Model | Current location | Planned SelectedObject type |
+|---|---|---|---|
+| 1 | Total burial / total subsidence | SubsidenceCanvas | `subsidence-chart` `single` |
+| 2 | Multi-well comparison | MultiWellPanel | `subsidence-chart` `multi` |
+| 3 | Decompaction | TBD | `decompaction-chart` |
+| 4 | Airy backstripping | TBD | `airy-backstripping-chart` |
+| 5 | Stepwise backstripping through time | TBD | `stepwise-backstripping-chart` |
+| 6 | Thermal subsidence fitting | TBD | `thermal-subsidence-chart` |
 
-Models 3–5 names/types TBD — to be confirmed with domain logic.
+Note: "Multi-well comparison" (row 2) is a display variant of model 1, not a separate computation model. The 5 distinct computation models are rows 1, 3–6.
 
 **Each model node shows in Settings:**
 - Display toggles (burial curves, formation fills, etc.)

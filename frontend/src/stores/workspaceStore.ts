@@ -32,6 +32,7 @@ export type SelectedObject =
   | { type: 'compaction-model'; modelId: number }
   | { type: 'curve-mnemonics-root' }
   | { type: 'mnemonic-set'; setId: number }
+  | { type: 'subsidence-chart'; chartType: 'single' | 'multi' }
 
 export interface WellViewState {
   tracks: TrackConfig[]

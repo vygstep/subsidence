@@ -4,6 +4,7 @@ import { useCanvasRenderer } from '@/hooks/useCanvasRenderer'
 import { useMultiWellStore } from '@/stores/multiWellStore'
 import { useViewStore } from '@/stores/viewStore'
 import { useWellDataStore } from '@/stores/wellDataStore'
+import { useWorkspaceStore } from '@/stores/workspaceStore'
 import { GeologicalTimescale } from './GeologicalTimescale'
 
 const PADDING = { top: 12, right: 120, bottom: 40, left: 64 }
@@ -31,6 +32,15 @@ export function MultiWellPanel() {
   const activeWellId = useWellDataStore((s) => s.well?.well_id ?? null)
   const subsidenceDepthMinM = useViewStore((s) => s.subsidenceDepthMinM)
   const subsidenceDepthMaxM = useViewStore((s) => s.subsidenceDepthMaxM)
+
+  const selectedObject = useWorkspaceStore((s) => s.selectedObject)
+  const setSelectedObject = useWorkspaceStore((s) => s.setSelectedObject)
+
+  const isSelected = selectedObject?.type === 'subsidence-chart' && selectedObject.chartType === 'multi'
+
+  const handleTitleClick = useCallback(() => {
+    setSelectedObject(isSelected ? null : { type: 'subsidence-chart', chartType: 'multi' })
+  }, [isSelected, setSelectedObject])
 
   const crosshairRef = useRef<HTMLCanvasElement>(null)
   const maxAgeRef = useRef(100)
@@ -323,7 +333,12 @@ export function MultiWellPanel() {
 
   return (
     <div className="multi-well-panel">
-      <div className="subsidence-chart-title">Multi-well subsidence chart</div>
+      <div
+        className={`subsidence-chart-title subsidence-chart-title--clickable${isSelected ? ' subsidence-chart-title--selected' : ''}`}
+        onClick={handleTitleClick}
+      >
+        Multi-well subsidence chart
+      </div>
       <GeologicalTimescale
         timeRange={{ min_ma: 0, max_ma: maxAge }}
         height={TIMESCALE_HEIGHT}
