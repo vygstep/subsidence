@@ -236,6 +236,9 @@ export function useDataManagerController() {
     handleSelectWell: selection.handleSelectWell,
     handleSelectZonesGroup: selection.handleSelectZonesGroup,
     handleSelectZone: selection.handleSelectZone,
+    handleSelectZoneSetsRoot: selection.handleSelectZoneSetsRoot,
+    handleSelectZoneSet: selection.handleSelectZoneSet,
+    handleSelectZoneInSet: selection.handleSelectZoneInSet,
     handleSetDeviationVisible: visibility.handleSetDeviationVisible,
     handleToggleAllCurves: visibility.handleToggleAllCurves,
     handleToggleAllFormations: visibility.handleToggleAllFormations,
@@ -329,5 +332,10 @@ export function useDataManagerController() {
     wellInventories,
     zones,
     selectedZoneId: selectedObject?.type === 'zone' ? selectedObject.zoneId : null,
+    selectedZoneSetId: selectedObject?.type === 'zone-set'
+      ? selectedObject.zoneSetId
+      : selectedObject?.type === 'zone'
+        ? selectedObject.zoneSetId ?? null
+        : null,
   }
 }

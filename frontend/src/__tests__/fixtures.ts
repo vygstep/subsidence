@@ -7,6 +7,8 @@ export function createMockCurveData(overrides?: Partial<CurveData>): CurveData {
     depths: new Float32Array([0, 100, 200, 300, 400, 500]),
     values: new Float32Array([20, 40, 50, 60, 70, 80]),
     null_value: -999.25,
+    curve_type: 'continuous',
+    discrete_code_map: null,
     ...overrides,
   }
 }
@@ -68,6 +70,8 @@ export function createMockTrackConfig(overrides?: Partial<TrackConfig>): TrackCo
     scaleType: 'linear',
     gridDivisions: 10,
     showGrid: true,
+    showHorizontalGrid: true,
+    gridColor: '#d5e1ec',
     ...overrides,
   }
 }

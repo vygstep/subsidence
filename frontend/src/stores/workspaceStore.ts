@@ -17,7 +17,9 @@ export type SelectedObject =
   | { type: 'tops-group'; wellId: string }
   | { type: 'top-pick'; wellId: string; formationId: string }
   | { type: 'zones-group'; wellId: string }
-  | { type: 'zone'; wellId: string; zoneId: number }
+  | { type: 'zone-sets-root' }
+  | { type: 'zone-set'; zoneSetId: number; wellId: string }
+  | { type: 'zone'; wellId: string; zoneId: number; zoneSetId?: number }
   | { type: 'strat-chart'; chartId: number }
   | { type: 'compaction-presets-root' }
   | { type: 'compaction-preset'; presetId: number }

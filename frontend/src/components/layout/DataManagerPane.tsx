@@ -309,9 +309,11 @@ export function DataManagerPane({ sidebarRef, onInternalSplitterMouseDown }: Dat
           visibleCurveMnemonicsByWellId={controller.visibleCurveMnemonicsByWellId}
           visibleFormationIdsByWellId={controller.visibleFormationIdsByWellId}
           wellInventories={controller.wellInventories}
-          onSelectZonesGroup={controller.handleSelectZonesGroup}
-          onSelectZone={controller.handleSelectZone}
+          onSelectZoneSetsRoot={controller.handleSelectZoneSetsRoot}
+          onSelectZoneSet={controller.handleSelectZoneSet}
+          onSelectZoneInSet={controller.handleSelectZoneInSet}
           selectedZoneId={controller.selectedZoneId}
+          selectedZoneSetId={controller.selectedZoneSetId}
         />
       </div>
 
@@ -358,7 +360,18 @@ export function DataManagerPane({ sidebarRef, onInternalSplitterMouseDown }: Dat
           maxDepth={controller.maxDepth}
           zones={controller.zones}
           selectedZoneId={controller.selectedZoneId}
-          onSelectZone={(zoneId) => controller.handleSelectZone(controller.activeWellId ?? '', zoneId)}
+          onSelectZone={(zoneId) => {
+            const selected = controller.selectedObject
+            if (selected?.type === 'zone-set') {
+              controller.handleSelectZoneInSet(selected.zoneSetId, selected.wellId, zoneId)
+              return
+            }
+            if (selected?.type === 'zone' && selected.zoneSetId) {
+              controller.handleSelectZoneInSet(selected.zoneSetId, selected.wellId, zoneId)
+              return
+            }
+            controller.handleSelectZone(controller.activeWellId ?? '', zoneId)
+          }}
         />
       </div>
 

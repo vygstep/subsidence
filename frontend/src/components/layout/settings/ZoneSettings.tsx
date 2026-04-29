@@ -1,25 +1,68 @@
 import { useWellDataStore } from '@/stores'
+import { useWorkspaceStore } from '@/stores/workspaceStore'
 
 interface ZoneSettingsProps {
   wellId: string
+  zoneSetId?: number
   onSelectZone: (zoneId: number) => void
   selectedZoneId: number | null
 }
 
-export function ZoneSettings({ wellId, onSelectZone, selectedZoneId }: ZoneSettingsProps) {
+export function ZoneSettings({ wellId, zoneSetId, onSelectZone, selectedZoneId }: ZoneSettingsProps) {
   const zones = useWellDataStore((state) => state.zones)
   const well = useWellDataStore((state) => state.well)
+  const wellInventories = useWellDataStore((state) => state.wellInventories)
+  const loadWell = useWellDataStore((state) => state.loadWell)
+  const setSelectedObject = useWorkspaceStore((state) => state.setSelectedObject)
+
+  const linkedWells = zoneSetId === undefined
+    ? []
+    : wellInventories.filter((item) => item.active_top_set_id === zoneSetId)
+
+  function handleWellChange(nextWellId: string): void {
+    if (zoneSetId === undefined || !nextWellId) return
+    setSelectedObject({ type: 'zone-set', zoneSetId, wellId: nextWellId })
+    void loadWell(nextWellId)
+  }
 
   if (well?.well_id !== wellId) {
-    return <p className="sidebar-panel__empty">Zone data not loaded yet.</p>
+    return (
+      <div className="template-panel">
+        {zoneSetId !== undefined && linkedWells.length > 0 ? (
+          <div className="sf-row">
+            <span>Well</span>
+            <select value={wellId} onChange={(event) => handleWellChange(event.target.value)}>
+              {linkedWells.map((item) => (
+                <option key={item.well_id} value={item.well_id}>
+                  {item.well_name}
+                </option>
+              ))}
+            </select>
+          </div>
+        ) : null}
+        <p className="sidebar-panel__empty">Zone data not loaded yet.</p>
+      </div>
+    )
   }
 
   return (
     <div className="template-panel">
       <div className="template-panel__group">
         <div className="template-panel__label">Object</div>
-        <div className="template-panel__value">ZONES</div>
+        <div className="template-panel__value">{zoneSetId === undefined ? 'ZONES' : 'ZoneSet'}</div>
       </div>
+      {zoneSetId !== undefined && linkedWells.length > 0 ? (
+        <div className="sf-row">
+          <span>Well</span>
+          <select value={wellId} onChange={(event) => handleWellChange(event.target.value)}>
+            {linkedWells.map((item) => (
+              <option key={item.well_id} value={item.well_id}>
+                {item.well_name}
+              </option>
+            ))}
+          </select>
+        </div>
+      ) : null}
       <div className="tree-leaf"><span>Total zones</span><span>{zones.length}</span></div>
 
       {zones.length === 0 ? (

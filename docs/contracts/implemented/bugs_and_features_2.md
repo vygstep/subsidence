@@ -1,6 +1,6 @@
 # Bugs and Features Contract 2
 
-**Status:** Active backlog contract  
+**Status:** Implemented  
 **Created:** 2026-04-28  
 **Scope:** Log viewer correctness fixes, minimap rework, depth-type switching, subsidence chart polish, and new navigation controls.
 

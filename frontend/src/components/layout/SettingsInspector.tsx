@@ -202,6 +202,21 @@ export function SettingsInspector({
     return <TopsSettings formations={formations} visibleFormationIds={visibleFormationIds} />
   }
 
+  if (selectedObject.type === 'zone-sets-root') {
+    return <EmptyInspector message="Select a ZoneSet to inspect cross-well zone settings." />
+  }
+
+  if (selectedObject.type === 'zone-set') {
+    return (
+      <ZoneSettings
+        wellId={selectedObject.wellId}
+        zoneSetId={selectedObject.zoneSetId}
+        onSelectZone={onSelectZone}
+        selectedZoneId={selectedZoneId}
+      />
+    )
+  }
+
   if (selectedObject.type === 'zones-group') {
     return (
       <ZoneSettings

@@ -79,9 +79,11 @@ interface DataManagerTopPaneProps {
   visibleCurveMnemonicsByWellId: Record<string, string[]>
   visibleFormationIdsByWellId: Record<string, string[]>
   wellInventories: WellInventory[]
-  onSelectZonesGroup: (wellId: string) => void
-  onSelectZone: (wellId: string, zoneId: number) => void
+  onSelectZoneSetsRoot: () => void
+  onSelectZoneSet: (zoneSetId: number, wellId: string) => void
+  onSelectZoneInSet: (zoneSetId: number, wellId: string, zoneId: number) => void
   selectedZoneId: number | null
+  selectedZoneSetId: number | null
 }
 
 export function DataManagerTopPane({
@@ -150,9 +152,11 @@ export function DataManagerTopPane({
   visibleCurveMnemonicsByWellId,
   visibleFormationIdsByWellId,
   wellInventories,
-  onSelectZonesGroup,
-  onSelectZone,
+  onSelectZoneSetsRoot,
+  onSelectZoneSet,
+  onSelectZoneInSet,
   selectedZoneId,
+  selectedZoneSetId,
 }: DataManagerTopPaneProps) {
   return (
     <section className="sidebar-panel app-sidebar__zone">
@@ -219,9 +223,11 @@ export function DataManagerTopPane({
           onContextMenuLasGroup={onContextMenuLasGroup}
           onContextMenuTopsGroup={onContextMenuTopsGroup}
           onContextMenuWell={onContextMenuWell}
-          onSelectZonesGroup={onSelectZonesGroup}
-          onSelectZone={onSelectZone}
+          onSelectZoneSetsRoot={onSelectZoneSetsRoot}
+          onSelectZoneSet={onSelectZoneSet}
+          onSelectZoneInSet={onSelectZoneInSet}
           selectedZoneId={selectedZoneId}
+          selectedZoneSetId={selectedZoneSetId}
         />
       ) : (
         <TemplatesTab

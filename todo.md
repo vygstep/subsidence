@@ -11,7 +11,9 @@ Active contract: `docs/contracts/bugs_and_features_3.md`
 | BF3-003 | Subsidence Y-axis depth range | done |
 | BF3-004 | Curve interpolation stick in null regions | done |
 | BF3-005 | Subsidence charts selectable in Settings panel | done |
-| BF3-006 | Data Manager restructuring: Wells / TOPS / Models | **next** |
+| BF3-006 | Wells tab restructuring: WELLS / ZONES / Models | in progress |
+| BF3-007 | Built-in sea-level curves in StratCharts | planned |
+| BF3-008 | Documentation synchronization for active contract 3 | done |
 
 ## Implemented contracts
 

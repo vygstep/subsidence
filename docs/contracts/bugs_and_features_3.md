@@ -98,7 +98,7 @@ Implementation note: the current database already has `TopSet`, `TopSetHorizon`,
 **ZoneSet** maps to the existing `TopSet` / horizon / zone structure unless implementation finds
 a hard blocker that requires a schema rename. Do not rename database tables only for UI wording.
 
-#### BF3-006-A: Add WELLS root inside the Wells tab
+#### BF3-006-A: Add WELLS root inside the Wells tab (done)
 
 Add a root node named **WELLS** inside the existing Wells tab. All current well nodes move under
 this root.
@@ -120,7 +120,7 @@ Affected frontend areas:
 - `frontend/src/components/layout/dataManagerSelection.ts`
 - `frontend/src/stores/workspaceStore.ts`
 
-#### BF3-006-B: Add top-level ZONES root and ZoneSet browser
+#### BF3-006-B: Add top-level ZONES root and ZoneSet browser (partial)
 
 Add a top-level **ZONES** root inside the Wells tab. It lists ZoneSets built from loaded tops.
 
@@ -211,7 +211,7 @@ Affected frontend areas:
 - `frontend/src/components/layout/DataManagerTopPane.tsx`
 - `frontend/src/components/layout/WellDataPanel.tsx`
 
-#### BF3-006-D: Zone settings for all wells in a ZoneSet
+#### BF3-006-D: Zone settings for all wells in a ZoneSet (partial)
 
 The current `ZoneSettings` and `ZoneDetailSettings` are scoped to the active well. Extend this to
 ZoneSet-level settings:
@@ -239,7 +239,7 @@ The exact union can differ if it better matches the code, but the selected objec
 - zone interval identity
 - chosen well context
 
-#### BF3-006-E: Add Models root inside the Wells tab
+#### BF3-006-E: Add Models root inside the Wells tab (partial)
 
 Add a top-level **Models** root inside the existing Wells tab. It lists the five computation models:
 
@@ -411,7 +411,7 @@ Tests:
 
 ---
 
-### BF3-008: Documentation synchronization for active contract 3
+### BF3-008: Documentation synchronization for active contract 3 (done)
 
 **Type:** Documentation  
 **Priority:** Low  

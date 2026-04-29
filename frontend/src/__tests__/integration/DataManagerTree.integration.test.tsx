@@ -26,9 +26,11 @@ function createWellInventory(overrides: Partial<WellInventory>): WellInventory {
     source_las_path: null,
     active_top_set_id: null,
     active_top_set_name: null,
+    active_sea_level_curve_id: null,
     deviation: null,
     curves: [],
     formations: [],
+    zones: [],
     ...overrides,
   }
 }
@@ -40,14 +42,14 @@ function renderPanel(overrides: Partial<React.ComponentProps<typeof WellDataPane
         well_id: 'well-a',
         well_name: 'Well A',
         curves: [{ mnemonic: 'GR', unit: 'API' }],
-        formations: [{ id: 'top-a', name: 'Top A', depth_md: 100, depth_tvd: null, depth_tvdss: null, horizon_id: null, active_strat_color: '#aaaaaa' }],
+        formations: [{ id: 'top-a', name: 'Top A', depth_md: 100, depth_tvd: null, depth_tvdss: null, horizon_id: null, active_strat_color: '#aaaaaa', kind: 'strat' }],
         deviation: { reference: 'MD', mode: 'INCL_AZIM', fields: ['MD', 'Inclination', 'Azimuth'] },
       }),
       createWellInventory({
         well_id: 'well-b',
         well_name: 'Well B',
         curves: [{ mnemonic: 'RT', unit: 'ohm.m' }],
-        formations: [{ id: 'top-b', name: 'Top B', depth_md: 200, depth_tvd: null, depth_tvdss: null, horizon_id: null, active_strat_color: null }],
+        formations: [{ id: 'top-b', name: 'Top B', depth_md: 200, depth_tvd: null, depth_tvdss: null, horizon_id: null, active_strat_color: null, kind: 'strat' }],
       }),
     ],
     activeWellId: 'well-a',

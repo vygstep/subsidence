@@ -19,11 +19,11 @@ The current implementation is built around:
 - SQLite + Parquet project bundles on disk
 - WebSocket recalculation path for subsidence results
 - Import Wizard with tabular/LAS preview and column mapping
-- Lithology pattern palettes (built-in equinor SVG set + user uploads)
+- Lithology pattern palettes (built-in Equinor SVG set + user uploads)
 - Stratigraphic zone system with lithology aggregation from curves
 - Measurement unit registry and normalization engine
 
-All contracts through bugs-and-features (Phases A–F) are complete. Current future work is tracked in `todo.md`.
+The active development contract is Bugs and Features 3. Current future work is tracked in `todo.md`.
 
 ---
 
@@ -58,13 +58,13 @@ Quality:
 
 Reference:
 
-- [Lithology Pattern Palettes](lithology-pattern-palettes.md): built-in equinor SVG pattern source, seed snapshot location, and runtime vs checkout separation.
+- [Lithology Pattern Palettes](lithology-pattern-palettes.md): built-in Equinor SVG pattern source, seed snapshot location, and runtime vs checkout separation.
 
 ---
 
 ## Active Contracts
 
-- [Bugs and Features 2](contracts/bugs_and_features_2.md) — LOD fixes, minimap rework, depth-type switching, New Project flow, navigation controls, subsidence chart polish.
+- [Bugs and Features 3](contracts/bugs_and_features_3.md) - Wells-tab restructuring, ZoneSets, model settings, well colors, and built-in sea-level curves.
 
 ---
 
@@ -72,7 +72,8 @@ Reference:
 
 Implemented or superseded contracts are archived in `contracts/implemented/`. They are useful for understanding why features exist, but they are not the primary current architecture map:
 
-- [Bugs and Features (Phases A–F)](contracts/implemented/bugs_and_features.md)
+- [Bugs and Features (Phases A-F)](contracts/implemented/bugs_and_features.md)
+- [Bugs and Features 2](contracts/implemented/bugs_and_features_2.md)
 - [1D Well Model Architecture](contracts/implemented/well_1d_model_architecture.md)
 - [1D Well Model Summary](contracts/implemented/well_1d_model_summary.md)
 - [Engineering Maintenance Contract](contracts/implemented/engineering-maintenance-contract.md)
