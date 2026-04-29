@@ -1,6 +1,6 @@
-import { useState, useEffect } from 'react'
+import { useState } from 'react'
 
-import type { SeaLevelCurve, Well } from '@/types'
+import type { Well } from '@/types'
 import { useWellDataStore } from '@/stores'
 
 export interface WellInspectorDraft {
@@ -23,21 +23,16 @@ interface WellSettingsProps {
 
 export function WellSettings({ well: _well, wellInspectorDraft, onWellInspectorDraftChange, onSaveWellInspector }: WellSettingsProps) {
   const wellInventories = useWellDataStore((state) => state.wellInventories)
-  const loadSeaLevelCurves = useWellDataStore((state) => state.loadSeaLevelCurves)
+  const seaLevelCurves = useWellDataStore((state) => state.seaLevelCurves)
   const setWellActiveSeaLevelCurve = useWellDataStore((state) => state.setWellActiveSeaLevelCurve)
 
   const inventory = wellInventories.find((w) => w.well_id === _well.well_id)
   const activeCurveId = inventory?.active_sea_level_curve_id ?? null
 
-  const [curves, setCurves] = useState<SeaLevelCurve[]>([])
   const [isSaving, setIsSaving] = useState(false)
   const colorPickerValue = /^#[0-9a-fA-F]{6}$/.test(wellInspectorDraft.color_hex)
     ? wellInspectorDraft.color_hex
     : _well.color_hex
-
-  useEffect(() => {
-    void loadSeaLevelCurves().then(setCurves)
-  }, [loadSeaLevelCurves])
 
   async function handleSeaLevelChange(value: string) {
     const curveId = value === '' ? null : parseInt(value, 10)
@@ -130,7 +125,7 @@ export function WellSettings({ well: _well, wellInspectorDraft, onWellInspectorD
           disabled={isSaving}
         >
           <option value="">None</option>
-          {curves.map((c) => (
+          {seaLevelCurves.map((c) => (
             <option key={c.id} value={c.id}>
               {c.name}{c.point_count > 0 ? ` (${c.point_count} pts)` : ''}
             </option>

@@ -407,7 +407,7 @@ Tests:
 
 ---
 
-### BF3-007: Built-in sea-level curves — seeding, UI, and formation integration
+### BF3-007: Built-in sea-level curves — seeding, UI, and formation integration (done)
 
 **Type:** Feature  
 **Priority:** Medium  
@@ -499,6 +499,21 @@ All points are 10 Myr bins from 0 to 520 Ma. Values in meters (relative sea leve
 - Frontend: StratCharts tab shows sea-level section; selecting curve opens settings.
 - Frontend: WellSettings sea-level dropdown saves and reloads correctly.
 - Frontend: TopPickSettings shows interpolated value when age_ma and active curve are set.
+
+#### Implemented notes
+
+- Seeded 4 built-in Kocsis & Scotese 2022 curves (53 points each, 0–520 Ma, 10 Myr bins) via
+  idempotent `_seed_builtin_sea_level_curves` in `dict_seeder.py`.
+- Added `GET /sea-level-curves/{id}/points` endpoint returning points ordered by `age_ma` asc.
+- Built-in curve deletion blocked with 409 at API level.
+- `SeaLevelPoint`, `SeaLevelCurve` types added to `types/well.ts`; `seaLevelCurves` state and
+  `loadSeaLevelPoints` method added to `WellDataStore`; curves loaded on `loadWellInventories`.
+- `StratChartTab` shows sea-level section with name, point count, built-in badge, and delete button.
+- `SeaLevelCurvesRootSettings` and `SeaLevelCurveSettings` panels added.
+- `WellSettings` — Eustatic curve dropdown reads `active_sea_level_curve_id` from inventory,
+  writes via `setWellActiveSeaLevelCurve`; uses store `seaLevelCurves` directly (no local fetch).
+- `TopPickSettings` — linear interpolation of sea level at `age_ma` from loaded curve points;
+  shown as read-only when formation has age and well has active curve.
 
 ---
 
@@ -697,7 +712,7 @@ Remaining BF3-009 work:
 3. BF3-006-B/D - add ZONES root and ZoneSet settings using existing TopSet/ZoneWellData APIs where possible. (done)
 4. BF3-006-C - extend tops import to assign imported tops to an existing/new ZoneSet. (done)
 5. BF3-006-G - add persisted well colors before model/multi-well chart styling depends on them. (done)
-6. BF3-007 - seed built-in sea-level curves and expose them in StratCharts. (partial; revisit under BF3-009)
+6. BF3-007 - seed built-in sea-level curves and expose them in StratCharts. (done)
 7. BF3-006-E/F - add Models root, model settings, chart display rules, and persisted model config. (done)
 8. BF3-006-H - add optional sea-level curve overlay to the single-well subsidence chart. (done)
 9. BF3-009 - normalize built-in dictionaries, full Equinor pattern catalogue, and seed reliability.
