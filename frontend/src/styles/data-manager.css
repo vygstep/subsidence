@@ -1174,4 +1174,143 @@
 .curve-browser__unit { color: var(--dm-fg-faint); font-size: 10px; }
 .curve-browser__add-btn { border: none; background: transparent; cursor: pointer; font-size: 13px; padding: 0 2px; color: var(--dm-accent); }
 .curve-browser__add-btn:disabled { cursor: default; color: var(--dm-fg-faint); }
+
+/* ─── tree-leaf value modifier ───────────────────────────────────────────── */
+
+.tree-leaf__grey { color: var(--dm-fg-muted); }
+
+/* ─── zone settings list ─────────────────────────────────────────────────── */
+
+.zone-settings__list {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  margin-top: 4px;
+  max-height: 280px;
+  overflow-y: auto;
+}
+
+.zone-settings__row {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  width: 100%;
+  border: 0;
+  background: transparent;
+  padding: 3px 6px;
+  border-radius: var(--dm-radius-sm);
+  cursor: pointer;
+  text-align: left;
+}
+
+.zone-settings__row:hover { background: var(--dm-bg-hover); }
+.zone-settings__row--selected { background: var(--dm-bg-selected); }
+
+.zone-settings__interval {
+  font-size: var(--dm-font-md);
+  font-weight: var(--dm-fw-bold);
+  color: var(--dm-fg);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.zone-settings__meta {
+  font-size: var(--dm-font-xs);
+  color: var(--dm-fg-muted);
+}
+
+.zone-settings__meta--missing { color: #d97706; }
+
+.zone-settings__lith-bar {
+  display: flex;
+  height: 4px;
+  border-radius: 2px;
+  overflow: hidden;
+  margin-top: 2px;
+}
+
+.zone-settings__lith-bar-segment { background: #cbd5e1; }
+.zone-settings__lith-bar-segment[data-code="sandstone"]   { background: #e8c84c; }
+.zone-settings__lith-bar-segment[data-code="shale"]       { background: #9ca3af; }
+.zone-settings__lith-bar-segment[data-code="limestone"]   { background: #7bb3d4; }
+.zone-settings__lith-bar-segment[data-code="dolomite"]    { background: #a0c4d8; }
+.zone-settings__lith-bar-segment[data-code="coal"]        { background: #475569; }
+.zone-settings__lith-bar-segment[data-code="evaporite"]   { background: #c4b5da; }
+.zone-settings__lith-bar-segment[data-code="conglomerate"]{ background: #e8a468; }
+.zone-settings__lith-bar-segment[data-code="igneous"]     { background: #e07060; }
+.zone-settings__lith-bar-segment[data-code="metamorphic"] { background: #60b8a4; }
+
+/* ─── zone detail settings ───────────────────────────────────────────────── */
+
+.zone-detail__missing {
+  font-size: var(--dm-font-xs);
+  color: #d97706;
+  font-style: italic;
+}
+
+.zone-detail__wd-hint {
+  font-size: var(--dm-font-xs);
+  color: var(--dm-fg-faint);
+  padding-left: 2px;
+  margin-top: -2px;
+}
+
+.zone-detail__lith-editor { display: flex; flex-direction: column; gap: 4px; margin-top: 2px; }
+
+.zone-detail__lith-row { display: flex; align-items: center; gap: 4px; }
+
+.zone-detail__lith-select {
+  flex: 1;
+  min-width: 0;
+  font-size: var(--dm-font-xs);
+  height: 20px;
+  padding: 1px 4px;
+  border: 1px solid var(--dm-border-medium);
+  border-radius: var(--dm-radius-sm);
+  background: #fff;
+  color: var(--dm-fg);
+}
+
+.zone-detail__lith-pct {
+  flex-shrink: 0;
+  width: 44px;
+  font-size: var(--dm-font-xs);
+  height: 20px;
+  padding: 1px 4px;
+  border: 1px solid var(--dm-border-medium);
+  border-radius: var(--dm-radius-sm);
+  background: #fff;
+  color: var(--dm-fg);
+  text-align: right;
+}
+
+.zone-detail__lith-pct-label { font-size: var(--dm-font-xs); color: var(--dm-fg-muted); flex-shrink: 0; }
+
+.zone-detail__lith-remove {
+  flex-shrink: 0;
+  border: 0;
+  background: transparent;
+  cursor: pointer;
+  color: var(--dm-fg-faint);
+  font-size: 13px;
+  padding: 0 2px;
+  line-height: 1;
+}
+
+.zone-detail__lith-remove:hover { color: var(--dm-danger-light); }
+
+.zone-detail__lith-total { font-size: var(--dm-font-xs); color: var(--dm-fg-muted); text-align: right; }
+.zone-detail__lith-total--error { color: var(--dm-danger); font-weight: var(--dm-fw-bold); }
+
+.zone-detail__lith-actions { display: flex; gap: 6px; }
+
+.zone-detail__source-badge {
+  font-size: var(--dm-font-xs);
+  color: #0891b2;
+  background: #e0f2fe;
+  border-radius: var(--dm-radius-pill);
+  padding: 0 6px;
+  font-style: italic;
+}
 .curve-browser__add-btn:not(:disabled):hover { color: var(--dm-accent-dark); }

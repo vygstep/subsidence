@@ -70,7 +70,8 @@ export function ZoneSettings({ wellId, zoneSetId, onSelectZone, selectedZoneId }
       ) : (
         <div className="zone-settings__list">
           {zones.map((zone) => {
-            const thickness = zone.thickness_md !== null ? `${zone.thickness_md.toFixed(1)} m` : '—'
+            const missingPick = zone.thickness_md === null
+            const thickness = missingPick ? 'missing pick' : `${zone.thickness_md!.toFixed(1)} m`
             const ageSpan = zone.age_span_ma !== null ? `${zone.age_span_ma.toFixed(1)} Ma` : ''
             const isSelected = selectedZoneId === zone.zone_id
             return (
@@ -83,9 +84,9 @@ export function ZoneSettings({ wellId, zoneSetId, onSelectZone, selectedZoneId }
                 <span className="zone-settings__interval">
                   {zone.upper_horizon.name} → {zone.lower_horizon.name}
                 </span>
-                <span className="zone-settings__meta">
+                <span className={`zone-settings__meta${missingPick ? ' zone-settings__meta--missing' : ''}`}>
                   {thickness}
-                  {ageSpan ? ` · ${ageSpan}` : ''}
+                  {!missingPick && ageSpan ? ` · ${ageSpan}` : ''}
                 </span>
                 {zone.lithology_fractions ? (
                   <LithologyBar fractionsJson={zone.lithology_fractions} />

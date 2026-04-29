@@ -135,7 +135,7 @@ Affected frontend areas:
 - `frontend/src/components/layout/dataManagerSelection.ts`
 - `frontend/src/stores/workspaceStore.ts`
 
-#### BF3-006-B: Add top-level ZONES root and ZoneSet browser (partial)
+#### BF3-006-B: Add top-level ZONES root and ZoneSet browser (done)
 
 Add a top-level **ZONES** root inside the Wells tab. It lists ZoneSets built from loaded tops.
 
@@ -235,7 +235,7 @@ Implemented notes:
 - Shared TopSet activation/linking logic now lives in `app/src/subsidence/data/zone_service.py` and is reused by manual TopSet assignment and tops import.
 - Covered by backend integration tests for create-new and existing ZoneSet import paths plus frontend import-wizard tests for target well and default ZoneSet payload.
 
-#### BF3-006-D: Zone settings for all wells in a ZoneSet (partial)
+#### BF3-006-D: Zone settings for all wells in a ZoneSet (done)
 
 The current `ZoneSettings` and `ZoneDetailSettings` are scoped to the active well. Extend this to
 ZoneSet-level settings:

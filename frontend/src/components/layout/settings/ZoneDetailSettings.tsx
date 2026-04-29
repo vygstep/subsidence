@@ -43,6 +43,7 @@ export function ZoneDetailSettings({ zone }: ZoneDetailSettingsProps) {
   const updateFormation = useWellDataStore((state) => state.updateFormation)
 
   const upperPick = formations.find((f) => f.horizon_id === zone.upper_horizon.id) ?? null
+  const lowerPick = formations.find((f) => f.horizon_id === zone.lower_horizon.id) ?? null
   const [waterDepth, setWaterDepth] = useState(zone.water_depth_m.toFixed(1))
   const [isSavingWd, setIsSavingWd] = useState(false)
 
@@ -123,6 +124,23 @@ export function ZoneDetailSettings({ zone }: ZoneDetailSettingsProps) {
         <div className="template-panel__value">{zone.upper_horizon.name} → {zone.lower_horizon.name}</div>
       </div>
 
+      <div className="template-panel__section-header">Marker picks</div>
+      <div className="tree-leaf">
+        <span>{zone.upper_horizon.name}</span>
+        {upperPick !== null
+          ? <span className="tree-leaf__grey">{upperPick.depth_md != null ? `${upperPick.depth_md.toFixed(1)} m` : 'matched'}</span>
+          : <span className="zone-detail__missing">no pick</span>
+        }
+      </div>
+      <div className="tree-leaf">
+        <span>{zone.lower_horizon.name}</span>
+        {lowerPick !== null
+          ? <span className="tree-leaf__grey">{lowerPick.depth_md != null ? `${lowerPick.depth_md.toFixed(1)} m` : 'matched'}</span>
+          : <span className="zone-detail__missing">no pick</span>
+        }
+      </div>
+
+      <div className="template-panel__section-header">Metrics</div>
       <div className="tree-leaf">
         <span>Thickness (MD)</span>
         <span className="tree-leaf__grey">{thickness}</span>
