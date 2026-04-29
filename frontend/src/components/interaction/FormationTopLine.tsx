@@ -132,9 +132,16 @@ export function FormationTopLine({
     }
   }, [popover, commitPopover])
 
+  const formationsTrackConfig = useViewStore((state) => state.formationsTrackConfig)
+
   const labelHidden = useWorkspaceStore((state) => {
     const view = wellId ? state.wellViewStates[wellId] : null
     return view?.hiddenTopLabelIds?.includes(formation.id) ?? false
+  })
+
+  const perFormationPosition = useWorkspaceStore((state) => {
+    const view = wellId ? state.wellViewStates[wellId] : null
+    return view?.topLabelPositions?.[formation.id] ?? null
   })
 
   const isUnconformity = formation.kind === 'unconformity'
@@ -144,7 +151,8 @@ export function FormationTopLine({
   const strokeOpacity = isDragging || isActivePick ? 1.0 : 0.75
   const strokeWidth = isActivePick ? 2.5 : (isUnconformity ? 2.0 : 1.5)
   const strokeDasharray = isUnconformity ? '4 2 1 2' : '6 3'
-  const showLabel = !labelHidden || isActivePick
+  const showLabel = (formationsTrackConfig.showMarkerLabels && !labelHidden) || isActivePick
+  const labelPosition = perFormationPosition ?? formationsTrackConfig.markerLabelPosition
 
   return (
     <>
@@ -169,37 +177,105 @@ export function FormationTopLine({
         )}
         {showLabel && (
           <>
-            <rect
-              x={2}
-              y={displayY - LABEL_HEIGHT}
-              width={120}
-              height={LABEL_HEIGHT}
-              fill={color}
-              opacity={isActivePick ? 1.0 : 0.85}
-              rx={2}
-            />
-            <text
-              x={LABEL_PADDING}
-              y={displayY - LABEL_HEIGHT / 2}
-              dominantBaseline="middle"
-              fill="#ffffff"
-              fontSize={11}
-              fontWeight={600}
-              style={{ userSelect: 'none' }}
-            >
-              {formation.name}
-            </text>
-            {formation.is_locked && (
-              <text
-                x={126}
-                y={displayY - LABEL_HEIGHT / 2}
-                dominantBaseline="middle"
-                fill={color}
-                fontSize={11}
-                style={{ userSelect: 'none' }}
-              >
-                🔒
-              </text>
+            {labelPosition === 'center' ? (
+              <>
+                <rect
+                  x="50%"
+                  y={displayY - LABEL_HEIGHT}
+                  width={120}
+                  height={LABEL_HEIGHT}
+                  fill={color}
+                  opacity={isActivePick ? 1.0 : 0.85}
+                  rx={2}
+                  transform="translate(-60, 0)"
+                />
+                <text
+                  x="50%"
+                  y={displayY - LABEL_HEIGHT / 2}
+                  dominantBaseline="middle"
+                  textAnchor="middle"
+                  fill="#ffffff"
+                  fontSize={11}
+                  fontWeight={600}
+                  style={{ userSelect: 'none' }}
+                >
+                  {formation.name}
+                </text>
+              </>
+            ) : labelPosition === 'right' ? (
+              <>
+                <rect
+                  x="100%"
+                  y={displayY - LABEL_HEIGHT}
+                  width={120}
+                  height={LABEL_HEIGHT}
+                  fill={color}
+                  opacity={isActivePick ? 1.0 : 0.85}
+                  rx={2}
+                  transform="translate(-122, 0)"
+                />
+                <text
+                  x="100%"
+                  y={displayY - LABEL_HEIGHT / 2}
+                  dominantBaseline="middle"
+                  textAnchor="end"
+                  dx={-4}
+                  fill="#ffffff"
+                  fontSize={11}
+                  fontWeight={600}
+                  style={{ userSelect: 'none' }}
+                >
+                  {formation.name}
+                </text>
+                {formation.is_locked && (
+                  <text
+                    x="100%"
+                    y={displayY - LABEL_HEIGHT / 2}
+                    dx={-126}
+                    dominantBaseline="middle"
+                    fill={color}
+                    fontSize={11}
+                    style={{ userSelect: 'none' }}
+                  >
+                    🔒
+                  </text>
+                )}
+              </>
+            ) : (
+              <>
+                <rect
+                  x={2}
+                  y={displayY - LABEL_HEIGHT}
+                  width={120}
+                  height={LABEL_HEIGHT}
+                  fill={color}
+                  opacity={isActivePick ? 1.0 : 0.85}
+                  rx={2}
+                />
+                <text
+                  x={LABEL_PADDING}
+                  y={displayY - LABEL_HEIGHT / 2}
+                  dominantBaseline="middle"
+                  fill="#ffffff"
+                  fontSize={11}
+                  fontWeight={600}
+                  style={{ userSelect: 'none' }}
+                >
+                  {formation.name}
+                </text>
+                {formation.is_locked && (
+                  <text
+                    x={126}
+                    y={displayY - LABEL_HEIGHT / 2}
+                    dominantBaseline="middle"
+                    fill={color}
+                    fontSize={11}
+                    style={{ userSelect: 'none' }}
+                  >
+                    🔒
+                  </text>
+                )}
+              </>
             )}
           </>
         )}

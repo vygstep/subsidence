@@ -137,19 +137,15 @@ export function FormationColumn({ formations, height, maxDepth, width = 80, isSe
           return
         }
 
-        const labelPos = formationsTrackConfig.labelPosition ?? 'center'
-        const labelX = labelPos === 'left' ? 5 : labelPos === 'right' ? canvasWidth - 5 : canvasWidth / 2
-        const labelAlign = labelPos === 'left' ? 'left' : labelPos === 'right' ? 'right' : 'center'
-
         ctx.save()
         ctx.fillStyle = '#17212b'
         ctx.font = '600 11px Segoe UI'
-        ctx.textAlign = labelAlign
+        ctx.textAlign = 'center'
         ctx.textBaseline = 'middle'
         const label = formationsTrackConfig.nameSource === 'linked-strat-unit'
           ? formation.active_strat_unit_name ?? formation.name
           : formation.name
-        ctx.fillText(label, labelX, yTop + blockHeight / 2, canvasWidth - 8)
+        ctx.fillText(label, canvasWidth / 2, yTop + blockHeight / 2, canvasWidth - 8)
         ctx.restore()
       })
     },
@@ -158,7 +154,6 @@ export function FormationColumn({ formations, height, maxDepth, width = 80, isSe
       formationsTrackConfig.backgroundColor,
       formationsTrackConfig.nameSource,
       formationsTrackConfig.showLabels,
-      formationsTrackConfig.labelPosition,
       maxDepth,
       orderedFormations,
       patternByCode,

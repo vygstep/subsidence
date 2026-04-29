@@ -24,18 +24,26 @@ export function TopsSettings({ formations, visibleFormationIds }: TopsSettingsPr
         <span>{formations.filter((f) => Boolean(f.active_strat_unit_name)).length}</span>
       </div>
       <label className="sf-row">
-        <span>Show labels on track</span>
+        <span>Zone labels</span>
         <input
           type="checkbox"
           checked={formationsTrackConfig.showLabels}
           onChange={(e) => updateFormationsTrackConfig({ showLabels: e.target.checked })}
         />
       </label>
+      <label className="sf-row">
+        <span>Marker labels</span>
+        <input
+          type="checkbox"
+          checked={formationsTrackConfig.showMarkerLabels}
+          onChange={(e) => updateFormationsTrackConfig({ showMarkerLabels: e.target.checked })}
+        />
+      </label>
       <div className="sf-row">
-        <span>Label position</span>
+        <span>Marker position</span>
         <select
-          value={formationsTrackConfig.labelPosition}
-          onChange={(e) => updateFormationsTrackConfig({ labelPosition: e.target.value as 'left' | 'center' | 'right' })}
+          value={formationsTrackConfig.markerLabelPosition}
+          onChange={(e) => updateFormationsTrackConfig({ markerLabelPosition: e.target.value as 'left' | 'center' | 'right' })}
         >
           <option value="left">Left</option>
           <option value="center">Center</option>

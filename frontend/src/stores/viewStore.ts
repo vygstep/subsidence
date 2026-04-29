@@ -31,7 +31,8 @@ export interface FormationsTrackConfig {
   backgroundColor: string
   nameSource: 'formation-name' | 'linked-strat-unit'
   showLabels: boolean
-  labelPosition: 'left' | 'center' | 'right'
+  showMarkerLabels: boolean
+  markerLabelPosition: 'left' | 'center' | 'right'
 }
 
 export interface ViewStore {
@@ -113,7 +114,8 @@ const initialFormationsTrackConfig: FormationsTrackConfig = {
   backgroundColor: '#ffffff',
   nameSource: 'formation-name',
   showLabels: true,
-  labelPosition: 'center',
+  showMarkerLabels: true,
+  markerLabelPosition: 'left',
 }
 
 function normalizeTrackWidths(trackWidths: Record<string, number> | undefined): Record<string, number> {

@@ -38,6 +38,7 @@ export interface WellViewState {
   trackOrder: string[]
   visibleFormationIds: string[]
   hiddenTopLabelIds: string[]
+  topLabelPositions: Record<string, 'left' | 'center' | 'right'>
   deviationVisible: boolean
   hiddenTrackIds: string[]
 }
@@ -74,6 +75,7 @@ export function createDefaultWellView(): WellViewState {
     trackOrder: buildTrackOrder([track.id]),
     visibleFormationIds: [],
     hiddenTopLabelIds: [],
+    topLabelPositions: {},
     deviationVisible: false,
     hiddenTrackIds: [],
   }
@@ -125,6 +127,14 @@ export function coerceWellViewState(raw: unknown): WellViewState {
   const hiddenTopLabelIds = Array.isArray(value.hiddenTopLabelIds)
     ? value.hiddenTopLabelIds.filter((id): id is string => typeof id === 'string')
     : fallback.hiddenTopLabelIds
+  const topLabelPositions: Record<string, 'left' | 'center' | 'right'> =
+    value.topLabelPositions && typeof value.topLabelPositions === 'object'
+      ? Object.fromEntries(
+          Object.entries(value.topLabelPositions as Record<string, unknown>).filter(
+            ([, v]) => v === 'left' || v === 'center' || v === 'right',
+          ) as [string, 'left' | 'center' | 'right'][],
+        )
+      : {}
   const hiddenTrackIds = Array.isArray(value.hiddenTrackIds)
     ? value.hiddenTrackIds.filter((id): id is string => typeof id === 'string')
     : fallback.hiddenTrackIds
@@ -137,6 +147,7 @@ export function coerceWellViewState(raw: unknown): WellViewState {
     trackOrder,
     visibleFormationIds,
     hiddenTopLabelIds,
+    topLabelPositions,
     deviationVisible,
     hiddenTrackIds,
   }
