@@ -397,54 +397,98 @@ Tests:
 
 ---
 
-### BF3-007: Built-in sea-level curves in StratCharts
+### BF3-007: Built-in sea-level curves — seeding, UI, and formation integration
 
 **Type:** Feature  
 **Priority:** Medium  
-**Scope:** Backend seeding + StratCharts UI
+**Scope:** Backend seeding + API + StratCharts UI + WellSettings + TopPickSettings
 
-The project already has `sea_level_curves`, `sea_level_points`, and `well_active_sea_level_curves`
-tables plus `/api/sea-level-curves` endpoints. Add a built-in sea-level dictionary based on:
+#### Source data
 
-```text
-repos/sea_level/1-s2.0-S1342937X22001563-mmc1_binned_models.csv
-```
+4 curves from `repos/sea_level/1-s2.0-S1342937X22001563-mmc1_binned_models.csv`
+(Kocsis & Scotese 2022, PALAEO3 supplement), copied to
+`app/src/subsidence/data/dictionaries/sea_level_binned_models.csv`:
 
-CSV shape observed in the source file:
+| Curve name | Points |
+|---|---|
+| Haq composite curve (binned 10 Myrs) | 53 |
+| Van der Meer et al. (2017) | 53 |
+| Kocsis & Scotese (2020) | 53 |
+| Verard (2015) | 53 |
 
-- row 1: column names
-- row 2: units
-- first data column: `Age` in `Ma`
-- remaining numeric columns: separate sea-level curve candidates in meters
+All points are 10 Myr bins from 0 to 520 Ma. Values in meters (relative sea level).
 
-Required behavior:
+#### Backend
 
-- Seed one built-in `SeaLevelCurve` per usable sea-level column.
-- Mark seeded curves `is_builtin=True`.
-- Store source metadata pointing to the source CSV / publication supplement.
-- Seed points as `(age_ma, sea_level_m)`.
-- Seed idempotently on project create/open, similar to other built-in dictionaries.
-- Built-in sea-level curves must be read-only/deletion-protected.
-- User-created sea-level curves remain supported by the existing API.
+- `_seed_builtin_sea_level_curves(session, csv_path)` in `dict_seeder.py`, called from
+  `seed_dictionaries()` (idempotent: upsert by name).
+- `is_builtin=True` on all 4 curves; `source` = publication reference string.
+- Add `GET /sea-level-curves/{curve_id}/points` endpoint returning
+  `[{age_ma, sea_level_m}]` ordered by `age_ma` descending (oldest first, consistent with
+  subsidence chart X axis).
+- Protect built-in curves in `DELETE /sea-level-curves/{curve_id}` — return 409 if
+  `is_builtin=True`.
 
-StratCharts tab UI:
+#### Frontend — types and store
 
-- Keep the **StratCharts** top-level Data Manager tab.
-- Add a sea-level curves section/tree inside the StratCharts tab.
-- Built-in curves should be visible with point counts.
-- Selecting a curve opens Settings with name, source, built-in flag, point count, and optionally a compact preview/table.
+- Add `SeaLevelPoint { age_ma: number; sea_level_m: number }` to `types/well.ts`.
+- Add `seaLevelCurves: SeaLevelCurve[]` to `WellDataStore` state and `emptyState`.
+- Modify `loadSeaLevelCurves()` to store result in `seaLevelCurves` state (currently returns
+  without storing).
+- Call `loadSeaLevelCurves()` from `loadWellInventories()` (so curves are always fresh when
+  wells load).
+- Add `loadSeaLevelPoints(curveId: number): Promise<SeaLevelPoint[]>` method (fetch-only, no
+  caching needed — only called on-demand from settings).
+- Add `SelectedObject` variants: `{ type: 'sea-level-curves-root' }` and
+  `{ type: 'sea-level-curve'; curveId: number }`.
 
-Model integration:
+#### Frontend — StratCharts tab
 
-- Model settings sea-level dropdown uses these seeded curves.
-- Existing per-well sea-level selection may remain in Well settings, but model settings should be able to override/choose the curve used for model computation when applicable.
+- Add a **Sea-level curves** section below the strat-chart list in `StratChartTab.tsx`.
+- Each curve shows name + point count + built-in badge.
+- User curves show a delete button (disabled if in use, blocked server-side if builtin).
+- Clicking a curve selects `{ type: 'sea-level-curve'; curveId }` → opens
+  `SeaLevelCurveSettings`.
 
-Tests:
+#### Frontend — SeaLevelCurveSettings (new)
 
-- Backend seed test: curves are present after project create/open and point counts match the CSV.
-- Backend protection test: built-in sea-level curve cannot be deleted or mutated.
-- API test: `/api/sea-level-curves` returns built-in curves with point counts.
-- Frontend test: StratCharts tab displays sea-level curves and selecting one routes to Settings.
+- Shows: name, source, built-in flag, point count.
+- For user curves: rename input and delete button.
+- No point editor (points are uploaded via API separately; not exposed in UI for now).
+
+#### Frontend — WellSettings
+
+- Add **Sea-level curve** dropdown listing all `seaLevelCurves`.
+- Reads `well.active_sea_level_curve_id` (via `wellInventories`); writes via
+  `setWellActiveSeaLevelCurve`.
+- Include a "— none —" option (sends `curve_id: null`).
+
+#### Frontend — TopPickSettings (sea-level reference)
+
+- When the formation has `age_ma != null` and the well has an active sea-level curve, show
+  a read-only line: **Sea level at age: X m** (linear interpolation from curve points at
+  `age_ma`).
+- Interpolation is purely client-side from the loaded points; no extra API call per
+  formation.
+- Points are loaded once when `TopPickSettings` mounts with a non-null `active_sea_level_curve_id`
+  and cached in component state (no store persistence needed).
+- If `age_ma` is outside the curve's range, show "— (out of range)".
+- If no active sea-level curve is assigned to the well, this line is hidden.
+
+#### Model sea-level integration
+
+- Covered by BF3-006-H (sea-level overlay on single-well chart with per-model curve
+  dropdown). BF3-007 is the prerequisite — curves must exist before BF3-006-H can reference
+  them.
+
+#### Tests
+
+- Backend seed test: 4 curves present after project create/open; point counts = 53 each.
+- Backend protection: built-in curve cannot be deleted (409).
+- API: `GET /sea-level-curves/{id}/points` returns ordered points.
+- Frontend: StratCharts tab shows sea-level section; selecting curve opens settings.
+- Frontend: WellSettings sea-level dropdown saves and reloads correctly.
+- Frontend: TopPickSettings shows interpolated value when age_ma and active curve are set.
 
 ---
 

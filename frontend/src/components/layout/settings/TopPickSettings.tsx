@@ -1,5 +1,21 @@
+import { useEffect, useMemo, useState } from 'react'
+
 import { useViewStore, useWellDataStore, useWorkspaceStore } from '@/stores'
-import type { FormationTop } from '@/types'
+import type { FormationTop, SeaLevelPoint } from '@/types'
+
+function interpolateSeaLevel(points: SeaLevelPoint[], ageMa: number): number | null {
+  if (points.length === 0) return null
+  const sorted = [...points].sort((a, b) => a.age_ma - b.age_ma)
+  if (ageMa <= sorted[0].age_ma) return sorted[0].sea_level_m
+  if (ageMa >= sorted[sorted.length - 1].age_ma) return sorted[sorted.length - 1].sea_level_m
+  for (let i = 0; i < sorted.length - 1; i++) {
+    if (ageMa >= sorted[i].age_ma && ageMa <= sorted[i + 1].age_ma) {
+      const t = (ageMa - sorted[i].age_ma) / (sorted[i + 1].age_ma - sorted[i].age_ma)
+      return sorted[i].sea_level_m + t * (sorted[i + 1].sea_level_m - sorted[i].sea_level_m)
+    }
+  }
+  return null
+}
 
 interface TopPickSettingsProps {
   selectedFormation: FormationTop
@@ -22,6 +38,27 @@ export function TopPickSettings({ selectedFormation, onFormationUpdate, onFormat
   const wellId = useWellDataStore((state) => state.well?.well_id)
   const updateWellViewState = useWorkspaceStore((state) => state.updateWellViewState)
   const globalMarkerPosition = useViewStore((state) => state.formationsTrackConfig.markerLabelPosition)
+  const wellInventories = useWellDataStore((state) => state.wellInventories)
+  const loadSeaLevelPoints = useWellDataStore((state) => state.loadSeaLevelPoints)
+  const seaLevelCurves = useWellDataStore((state) => state.seaLevelCurves)
+
+  const activeCurveId = wellInventories.find((w) => w.well_id === wellId)?.active_sea_level_curve_id ?? null
+  const activeCurveName = seaLevelCurves.find((c) => c.id === activeCurveId)?.name ?? null
+
+  const [seaLevelPoints, setSeaLevelPoints] = useState<SeaLevelPoint[]>([])
+
+  useEffect(() => {
+    if (!activeCurveId) {
+      setSeaLevelPoints([])
+      return
+    }
+    void loadSeaLevelPoints(activeCurveId).then(setSeaLevelPoints)
+  }, [activeCurveId, loadSeaLevelPoints])
+
+  const seaLevelAtAge = useMemo(() => {
+    if (selectedFormation.age_ma == null || !activeCurveId) return null
+    return interpolateSeaLevel(seaLevelPoints, selectedFormation.age_ma)
+  }, [seaLevelPoints, selectedFormation.age_ma, activeCurveId])
 
   const labelHidden = useWorkspaceStore((state) => {
     const view = wellId ? state.wellViewStates[wellId] : null
@@ -121,6 +158,12 @@ export function TopPickSettings({ selectedFormation, onFormationUpdate, onFormat
               age_base_ma: event.target.value ? Number(event.target.value) : undefined,
             })}
           />
+        </div>
+      )}
+      {activeCurveId !== null && (
+        <div className="sf-row">
+          <span title={activeCurveName ?? undefined}>Sea level (m)</span>
+          <span>{seaLevelAtAge != null ? seaLevelAtAge.toFixed(1) : '—'}</span>
         </div>
       )}
       <div className="sf-row">

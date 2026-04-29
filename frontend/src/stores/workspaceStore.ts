@@ -35,6 +35,8 @@ export type SelectedObject =
   | { type: 'curve-mnemonics-root' }
   | { type: 'mnemonic-set'; setId: number }
   | { type: 'subsidence-chart'; chartType: 'single' | 'multi' }
+  | { type: 'sea-level-curves-root' }
+  | { type: 'sea-level-curve'; curveId: number }
 
 export interface WellViewState {
   tracks: TrackConfig[]

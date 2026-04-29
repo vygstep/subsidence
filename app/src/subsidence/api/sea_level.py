@@ -27,6 +27,11 @@ class SeaLevelPointUpload(BaseModel):
     sea_level_m: float
 
 
+class SeaLevelPointResponse(BaseModel):
+    age_ma: float
+    sea_level_m: float
+
+
 class ActiveSeaLevelCurveRequest(BaseModel):
     curve_id: int | None
 
@@ -90,6 +95,20 @@ def upload_sea_level_points(curve_id: int, points: list[SeaLevelPointUpload], re
     return {'count': len(points)}
 
 
+@router.get('/sea-level-curves/{curve_id}/points', response_model=list[SeaLevelPointResponse])
+def get_sea_level_points(curve_id: int, request: Request) -> list[SeaLevelPointResponse]:
+    manager = _require_open_project(request)
+    with manager.get_session() as session:
+        if session.get(SeaLevelCurve, curve_id) is None:
+            raise HTTPException(status_code=404, detail=f'Sea level curve not found: {curve_id}')
+        points = session.scalars(
+            select(SeaLevelPoint)
+            .where(SeaLevelPoint.curve_id == curve_id)
+            .order_by(SeaLevelPoint.age_ma.desc())
+        ).all()
+        return [SeaLevelPointResponse(age_ma=p.age_ma, sea_level_m=p.sea_level_m) for p in points]
+
+
 @router.delete('/sea-level-curves/{curve_id}', status_code=204)
 def delete_sea_level_curve(curve_id: int, request: Request) -> None:
     manager = _require_open_project(request)
@@ -97,6 +116,8 @@ def delete_sea_level_curve(curve_id: int, request: Request) -> None:
         curve = session.get(SeaLevelCurve, curve_id)
         if curve is None:
             raise HTTPException(status_code=404, detail=f'Sea level curve not found: {curve_id}')
+        if curve.is_builtin:
+            raise HTTPException(status_code=409, detail='Built-in sea level curve cannot be deleted')
         if session.scalar(select(WellActiveSeaLevelCurve).where(WellActiveSeaLevelCurve.curve_id == curve_id)) is not None:
             raise HTTPException(status_code=409, detail='Sea level curve is in use by one or more wells')
         session.delete(curve)

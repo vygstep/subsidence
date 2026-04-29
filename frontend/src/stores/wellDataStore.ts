@@ -18,6 +18,7 @@ import type {
   LithologySetSummary,
   LithologyParam,
   SeaLevelCurve,
+  SeaLevelPoint,
   StratChartInfo,
   UnitDimensionDetail,
   UnitDimensionSummary,
@@ -95,6 +96,7 @@ export interface WellDataStore {
   formations: FormationTop[]
   zones: FormationZone[]
   colorOverrides: Record<string, string>
+  seaLevelCurves: SeaLevelCurve[]
   stratCharts: StratChartInfo[]
   compactionModels: CompactionModel[]
   compactionPresets: CompactionPresetSummary[]
@@ -203,6 +205,8 @@ export interface WellDataStore {
   reloadCurvesForDepthBasis: (depthBasis: 'MD' | 'TVD' | 'TVDSS') => Promise<void>
   updateZoneLithology: (zoneId: number, lithologyFractions: string | null, lithologySource: 'manual' | 'auto') => Promise<void>
   loadSeaLevelCurves: () => Promise<SeaLevelCurve[]>
+  loadSeaLevelPoints: (curveId: number) => Promise<SeaLevelPoint[]>
+  deleteSeaLevelCurve: (curveId: number) => Promise<void>
   setWellActiveSeaLevelCurve: (wellId: string, curveId: number | null) => Promise<void>
 }
 
@@ -275,6 +279,7 @@ const emptyState = {
   formations: [] as FormationTop[],
   zones: [] as FormationZone[],
   colorOverrides: {} as Record<string, string>,
+  seaLevelCurves: [] as SeaLevelCurve[],
   stratCharts: [] as StratChartInfo[],
   compactionModels: [] as CompactionModel[],
   compactionPresets: [] as CompactionPresetSummary[],
@@ -300,14 +305,18 @@ export const useWellDataStore = create<WellDataStore>((set, get) => ({
   },
   async loadWellInventories() {
     try {
-      const response = await fetch('/api/wells/inventory')
-      if (!response.ok) {
-        throw new Error(await readError(response, `Failed to load well inventories (${response.status})`))
+      const [invResponse, slResponse] = await Promise.all([
+        fetch('/api/wells/inventory'),
+        fetch('/api/sea-level-curves'),
+      ])
+      if (!invResponse.ok) {
+        throw new Error(await readError(invResponse, `Failed to load well inventories (${invResponse.status})`))
       }
-      const payload = (await response.json()) as WellInventory[]
+      const payload = (await invResponse.json()) as WellInventory[]
       const activeWellId = get().well?.well_id
       const activeInventory = activeWellId ? payload.find((w) => w.well_id === activeWellId) : null
-      set({ wellInventories: payload, zones: activeInventory?.zones ?? [], error: null })
+      const seaLevelCurves = slResponse.ok ? ((await slResponse.json()) as SeaLevelCurve[]) : get().seaLevelCurves
+      set({ wellInventories: payload, zones: activeInventory?.zones ?? [], seaLevelCurves, error: null })
       return true
     } catch (error) {
       set({ error: error instanceof Error ? error.message : 'Unknown error' })
@@ -1120,7 +1129,19 @@ export const useWellDataStore = create<WellDataStore>((set, get) => ({
   async loadSeaLevelCurves() {
     const response = await fetch('/api/sea-level-curves')
     if (!response.ok) throw new Error(`Failed to load sea level curves (${response.status})`)
-    return (await response.json()) as SeaLevelCurve[]
+    const curves = (await response.json()) as SeaLevelCurve[]
+    set({ seaLevelCurves: curves })
+    return curves
+  },
+  async loadSeaLevelPoints(curveId) {
+    const response = await fetch(`/api/sea-level-curves/${curveId}/points`)
+    if (!response.ok) throw new Error(`Failed to load sea level points (${response.status})`)
+    return (await response.json()) as SeaLevelPoint[]
+  },
+  async deleteSeaLevelCurve(curveId) {
+    const response = await fetch(`/api/sea-level-curves/${curveId}`, { method: 'DELETE' })
+    if (!response.ok) throw new Error(await readError(response, `Failed to delete sea level curve (${response.status})`))
+    set((state) => ({ seaLevelCurves: state.seaLevelCurves.filter((c) => c.id !== curveId) }))
   },
   async setWellActiveSeaLevelCurve(wellId, curveId) {
     const response = await fetch(`/api/wells/${wellId}/active-sea-level-curve`, {

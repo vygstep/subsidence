@@ -40,6 +40,8 @@ import { WellSettings } from './settings/WellSettings'
 import { ZoneDetailSettings } from './settings/ZoneDetailSettings'
 import { ZoneSettings } from './settings/ZoneSettings'
 import { ZoneSetsRootSettings } from './settings/ZoneSetsRootSettings'
+import { SeaLevelCurvesRootSettings } from './settings/SeaLevelCurvesRootSettings'
+import { SeaLevelCurveSettings } from './settings/SeaLevelCurveSettings'
 import type { WellInspectorDraft } from './settings/WellSettings'
 
 export type { WellInspectorDraft }
@@ -331,6 +333,14 @@ export function SettingsInspector({
 
   if (selectedObject.type === 'subsidence-chart') {
     return <SubsidenceChartSettings chartType={selectedObject.chartType} />
+  }
+
+  if (selectedObject.type === 'sea-level-curves-root') {
+    return <SeaLevelCurvesRootSettings />
+  }
+
+  if (selectedObject.type === 'sea-level-curve') {
+    return <SeaLevelCurveSettings curveId={selectedObject.curveId} />
   }
 
   return <EmptyInspector message="No editable settings are implemented for the selected object yet." />

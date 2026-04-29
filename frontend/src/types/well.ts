@@ -121,6 +121,11 @@ export interface SeaLevelCurve {
   point_count: number
 }
 
+export interface SeaLevelPoint {
+  age_ma: number
+  sea_level_m: number
+}
+
 export interface WellInventory {
   well_id: string
   well_name: string

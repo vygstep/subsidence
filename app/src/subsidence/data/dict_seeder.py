@@ -20,6 +20,8 @@ from .schema import (
     LithologySetEntry,
     MeasurementUnit,
     MeasurementUnitAlias,
+    SeaLevelCurve,
+    SeaLevelPoint,
     StratChart,
     StratUnit,
     UnitDimension,
@@ -583,6 +585,47 @@ def _seed_measurement_units(session: Session) -> None:
             existing.is_active = True
 
 
+_SEA_LEVEL_SOURCE = 'Kocsis & Scotese (2022), PALAEO3, doi:10.1016/j.palaeo.2022.111176, binned models supplement'
+
+
+def _seed_builtin_sea_level_curves(session: Session, csv_path: Path) -> None:
+    if not csv_path.exists():
+        return
+    by_name: dict[str, list[tuple[float, float]]] = {}
+    with csv_path.open(newline='', encoding='utf-8') as fh:
+        reader = csv.DictReader(fh)
+        for row in reader:
+            name = row['curve_name'].strip()
+            age = float(row['age_ma'])
+            level = float(row['sea_level_m'])
+            by_name.setdefault(name, []).append((age, level))
+
+    existing: dict[str, SeaLevelCurve] = {
+        c.name: c
+        for c in session.scalars(select(SeaLevelCurve).where(SeaLevelCurve.is_builtin.is_(True))).all()
+    }
+
+    for name, points in by_name.items():
+        curve = existing.get(name)
+        if curve is None:
+            curve = SeaLevelCurve(name=name, source=_SEA_LEVEL_SOURCE, is_builtin=True)
+            session.add(curve)
+            session.flush()
+        else:
+            curve.source = _SEA_LEVEL_SOURCE
+
+        existing_pt_count = session.scalar(
+            select(func.count()).select_from(SeaLevelPoint).where(SeaLevelPoint.curve_id == curve.id)
+        ) or 0
+        if existing_pt_count != len(points):
+            session.execute(
+                SeaLevelPoint.__table__.delete().where(SeaLevelPoint.curve_id == curve.id)
+            )
+            session.flush()
+            for age, level in points:
+                session.add(SeaLevelPoint(curve_id=curve.id, age_ma=age, sea_level_m=level))
+
+
 def seed_dictionaries(session: Session, db_path: Path) -> None:
     del db_path
     seed_dir = Path(__file__).parent / 'dictionaries'
@@ -617,3 +660,4 @@ def seed_dictionaries(session: Session, db_path: Path) -> None:
     _seed_builtin_lithology_set(session)
     _seed_builtin_mnemonic_set(session, seed_dir / 'curve_families.csv')
     _seed_measurement_units(session)
+    _seed_builtin_sea_level_curves(session, seed_dir / 'sea_level_binned_models.csv')
