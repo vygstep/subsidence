@@ -1,6 +1,8 @@
 import { useEffect, useLayoutEffect, useMemo, useRef } from 'react'
 
 import { useDataManager } from './dataManager/DataManagerContext'
+import { useWorkspaceStore } from '@/stores/workspaceStore'
+import type { SubsidenceModelType } from '@/stores/viewStore'
 import type { FormationInventoryItem, WellInventory } from '@/types'
 import type { FormationZone } from '@/types'
 
@@ -49,12 +51,12 @@ interface ZoneSetTreeItem {
   zones: FormationZone[]
 }
 
-const MODEL_NODES = [
-  'Total burial / total subsidence',
-  'Decompaction',
-  'Airy backstripping',
-  'Stepwise backstripping through time',
-  'Thermal subsidence fitting',
+const MODEL_NODES: Array<{ type: SubsidenceModelType; label: string; available: boolean }> = [
+  { type: 'total', label: 'Total burial / total subsidence', available: true },
+  { type: 'decompaction', label: 'Decompaction', available: false },
+  { type: 'airy', label: 'Airy backstripping', available: false },
+  { type: 'stepwise', label: 'Stepwise backstripping through time', available: false },
+  { type: 'thermal', label: 'Thermal subsidence fitting', available: false },
 ]
 
 function formatNumber(value: number | null | undefined): string {
@@ -143,6 +145,47 @@ function CheckboxLeaf({
   )
 }
 
+function ModelsRoot() {
+  const { isExpanded, toggleExpanded } = useDataManager()
+  const selectedObject = useWorkspaceStore((s) => s.selectedObject)
+  const setSelectedObject = useWorkspaceStore((s) => s.setSelectedObject)
+
+  const selectedModelType = selectedObject?.type === 'subsidence-model' ? selectedObject.modelType : null
+
+  return (
+    <div className="tree-node tree-node--root">
+      <div className="tree-node__row tree-node__row--root">
+        <button
+          type="button"
+          className={`tree-toggle ${isExpanded('models-root') ? 'tree-toggle--open' : ''}`}
+          onClick={(e) => { e.stopPropagation(); toggleExpanded('models-root') }}
+          aria-label={isExpanded('models-root') ? 'Collapse' : 'Expand'}
+        >
+          &gt;
+        </button>
+        <button type="button" className="tree-node__label-button">
+          Models
+        </button>
+        <span className="tree-node__count">{MODEL_NODES.length}</span>
+      </div>
+      {isExpanded('models-root') ? (
+        <div className="tree-node__children">
+          {MODEL_NODES.map((model) => (
+            <div
+              key={model.type}
+              className={`tree-leaf tree-leaf--clickable${selectedModelType === model.type ? ' tree-leaf--selected' : ''}${!model.available ? ' tree-leaf--muted' : ''}`}
+              onClick={() => setSelectedObject({ type: 'subsidence-model', modelType: model.type })}
+            >
+              <span>{model.label}</span>
+              {!model.available && <span className="tree-node__badge">planned</span>}
+            </div>
+          ))}
+        </div>
+      ) : null}
+    </div>
+  )
+}
+
 export function WellDataPanel({
   wells,
   activeWellId,
@@ -183,7 +226,6 @@ export function WellDataPanel({
   useEffect(() => {
     setExpanded('wells-root', true)
     setExpanded('zones-root', true)
-    setExpanded('models-root', true)
   }, [])
 
   function isOpen(nodeId: string): boolean {
@@ -496,25 +538,7 @@ export function WellDataPanel({
           ) : null}
         </div>
 
-        <div className="tree-node tree-node--root">
-          <div className="tree-node__row tree-node__row--root">
-            <TreeToggleButton isOpen={isOpen('models-root')} onToggle={() => toggleNode('models-root')} />
-            <button type="button" className="tree-node__label-button">
-              Models
-            </button>
-            <span className="tree-node__count">{MODEL_NODES.length}</span>
-          </div>
-          {isOpen('models-root') ? (
-            <div className="tree-node__children">
-              {MODEL_NODES.map((label) => (
-                <div key={label} className="tree-leaf">
-                  <span>{label}</span>
-                  <span>Planned</span>
-                </div>
-              ))}
-            </div>
-          ) : null}
-        </div>
+        <ModelsRoot />
       </div>
     </div>
   )

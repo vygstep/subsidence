@@ -245,6 +245,25 @@
   color: var(--dm-accent);
 }
 
+.tree-leaf--clickable {
+  cursor: pointer;
+}
+
+.tree-leaf--clickable:hover {
+  color: var(--dm-accent);
+}
+
+.tree-leaf--selected {
+  background: var(--dm-bg-selected);
+  border-radius: var(--dm-radius-md);
+  padding-left: 2px;
+  padding-right: 4px;
+}
+
+.tree-leaf--muted {
+  opacity: 0.55;
+}
+
 .tree-leaf span:last-child {
   color: var(--dm-fg-muted);
   text-align: right;

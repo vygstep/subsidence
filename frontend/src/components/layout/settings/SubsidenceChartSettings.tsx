@@ -5,17 +5,19 @@ interface SubsidenceChartSettingsProps {
 }
 
 export function SubsidenceChartSettings({ chartType }: SubsidenceChartSettingsProps) {
-  const subsidenceDepthMinM = useViewStore((s) => s.subsidenceDepthMinM)
-  const subsidenceDepthMaxM = useViewStore((s) => s.subsidenceDepthMaxM)
-  const setSubsidenceDepthMinM = useViewStore((s) => s.setSubsidenceDepthMinM)
-  const setSubsidenceDepthMaxM = useViewStore((s) => s.setSubsidenceDepthMaxM)
+  const single = chartType === 'single'
+
+  const depthMin = useViewStore((s) => single ? s.subsidenceSingleDepthMin : s.subsidenceMultiDepthMin)
+  const depthMax = useViewStore((s) => single ? s.subsidenceSingleDepthMax : s.subsidenceMultiDepthMax)
+  const setDepthMin = useViewStore((s) => single ? s.setSubsidenceSingleDepthMin : s.setSubsidenceMultiDepthMin)
+  const setDepthMax = useViewStore((s) => single ? s.setSubsidenceSingleDepthMax : s.setSubsidenceMultiDepthMax)
 
   return (
     <div className="template-panel">
       <div className="template-panel__group">
         <div className="template-panel__label">Object</div>
         <div className="template-panel__value">
-          {chartType === 'single' ? 'Total subsidence' : 'Multi-well comparison'}
+          {single ? 'Single-well chart' : 'Multi-well comparison chart'}
         </div>
       </div>
       <div className="sf-row">
@@ -25,8 +27,8 @@ export function SubsidenceChartSettings({ chartType }: SubsidenceChartSettingsPr
           step="100"
           min="0"
           placeholder="auto"
-          value={subsidenceDepthMinM ?? ''}
-          onChange={(e) => setSubsidenceDepthMinM(e.target.value === '' ? null : Number(e.target.value))}
+          value={depthMin ?? ''}
+          onChange={(e) => setDepthMin(e.target.value === '' ? null : Number(e.target.value))}
         />
       </div>
       <div className="sf-row">
@@ -36,8 +38,8 @@ export function SubsidenceChartSettings({ chartType }: SubsidenceChartSettingsPr
           step="100"
           min="0"
           placeholder="auto"
-          value={subsidenceDepthMaxM ?? ''}
-          onChange={(e) => setSubsidenceDepthMaxM(e.target.value === '' ? null : Number(e.target.value))}
+          value={depthMax ?? ''}
+          onChange={(e) => setDepthMax(e.target.value === '' ? null : Number(e.target.value))}
         />
       </div>
     </div>

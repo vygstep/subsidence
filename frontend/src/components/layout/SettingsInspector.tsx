@@ -28,6 +28,7 @@ import { UnitDimensionSettings } from './settings/UnitDimensionSettings'
 
 import { CurveSettings } from './settings/CurveSettings'
 import { SubsidenceChartSettings } from './settings/SubsidenceChartSettings'
+import { SubsidenceModelSettings } from './settings/SubsidenceModelSettings'
 import { CurveTrackSettings } from './settings/CurveTrackSettings'
 import { DepthTrackSettings } from './settings/DepthTrackSettings'
 import { FormationsTrackSettings } from './settings/FormationsTrackSettings'
@@ -333,6 +334,10 @@ export function SettingsInspector({
 
   if (selectedObject.type === 'subsidence-chart') {
     return <SubsidenceChartSettings chartType={selectedObject.chartType} />
+  }
+
+  if (selectedObject.type === 'subsidence-model') {
+    return <SubsidenceModelSettings modelType={selectedObject.modelType} />
   }
 
   if (selectedObject.type === 'sea-level-curves-root') {

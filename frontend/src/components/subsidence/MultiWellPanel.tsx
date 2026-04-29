@@ -31,8 +31,8 @@ export function MultiWellPanel() {
   const fetchResults = useMultiWellStore((s) => s.fetchResults)
   const activeWellId = useWellDataStore((s) => s.well?.well_id ?? null)
   const wellInventories = useWellDataStore((s) => s.wellInventories)
-  const subsidenceDepthMinM = useViewStore((s) => s.subsidenceDepthMinM)
-  const subsidenceDepthMaxM = useViewStore((s) => s.subsidenceDepthMaxM)
+  const subsidenceDepthMinM = useViewStore((s) => s.subsidenceMultiDepthMin)
+  const subsidenceDepthMaxM = useViewStore((s) => s.subsidenceMultiDepthMax)
 
   const selectedObject = useWorkspaceStore((s) => s.selectedObject)
   const setSelectedObject = useWorkspaceStore((s) => s.setSelectedObject)

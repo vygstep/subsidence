@@ -3,7 +3,7 @@ import { create } from 'zustand'
 import { rememberProjectBundlePath } from '@/components/layout/pathMemory'
 import { recordOperation } from '@/utils/diagnostics'
 
-import { useViewStore, type DepthTrackConfig, type FormationsTrackConfig } from './viewStore'
+import { useViewStore, type DepthTrackConfig, type FormationsTrackConfig, type SubsidenceModelType, type SubsidenceModelConfig } from './viewStore'
 import { useWellDataStore } from './wellDataStore'
 import { useWorkspaceStore } from './workspaceStore'
 
@@ -55,6 +55,12 @@ interface VisualConfigPayload {
   subsidenceWidth?: number
   depthTrackConfig?: Partial<DepthTrackConfig>
   formationsTrackConfig?: Partial<FormationsTrackConfig>
+  subsidenceSingleDepthMin?: number | null
+  subsidenceSingleDepthMax?: number | null
+  subsidenceMultiDepthMin?: number | null
+  subsidenceMultiDepthMax?: number | null
+  activeSubsidenceModelType?: string
+  subsidenceModelConfigs?: Record<string, { zoneSetId?: number | null; seaLevelCurveId?: number | null }>
 }
 
 interface ProjectStatusResponse {
@@ -183,6 +189,12 @@ function applyVisualConfigPayload(config: Record<string, unknown>): void {
     subsidenceWidth: payload.subsidenceWidth,
     depthTrackConfig: payload.depthTrackConfig,
     formationsTrackConfig: payload.formationsTrackConfig,
+    subsidenceSingleDepthMin: payload.subsidenceSingleDepthMin,
+    subsidenceSingleDepthMax: payload.subsidenceSingleDepthMax,
+    subsidenceMultiDepthMin: payload.subsidenceMultiDepthMin,
+    subsidenceMultiDepthMax: payload.subsidenceMultiDepthMax,
+    activeSubsidenceModelType: payload.activeSubsidenceModelType as SubsidenceModelType | undefined,
+    subsidenceModelConfigs: payload.subsidenceModelConfigs as Partial<Record<SubsidenceModelType, SubsidenceModelConfig>> | undefined,
   })
   useWellDataStore.getState().setColorOverrides(payload.curveColors ?? {})
 }
@@ -203,13 +215,20 @@ function projectTrackWidths(): Record<string, number> {
 }
 
 export function collectProjectVisualConfig(): VisualConfigPayload {
+  const vs = useViewStore.getState()
   return {
-    depthPerPixel: useViewStore.getState().depthPerPixel,
+    depthPerPixel: vs.depthPerPixel,
     trackWidths: projectTrackWidths(),
     curveColors: useWellDataStore.getState().colorOverrides,
-    subsidenceWidth: useViewStore.getState().subsidenceWidth,
-    depthTrackConfig: useViewStore.getState().depthTrackConfig,
-    formationsTrackConfig: useViewStore.getState().formationsTrackConfig,
+    subsidenceWidth: vs.subsidenceWidth,
+    depthTrackConfig: vs.depthTrackConfig,
+    formationsTrackConfig: vs.formationsTrackConfig,
+    subsidenceSingleDepthMin: vs.subsidenceSingleDepthMin,
+    subsidenceSingleDepthMax: vs.subsidenceSingleDepthMax,
+    subsidenceMultiDepthMin: vs.subsidenceMultiDepthMin,
+    subsidenceMultiDepthMax: vs.subsidenceMultiDepthMax,
+    activeSubsidenceModelType: vs.activeSubsidenceModelType,
+    subsidenceModelConfigs: vs.subsidenceModelConfigs,
   }
 }
 

@@ -148,8 +148,8 @@ export function SubsidenceCanvas() {
   const showFormationFills = useComputedStore((s) => s.showFormationFills)
   const showBurialCurves = useComputedStore((s) => s.showBurialCurves)
 
-  const subsidenceDepthMinM = useViewStore((s) => s.subsidenceDepthMinM)
-  const subsidenceDepthMaxM = useViewStore((s) => s.subsidenceDepthMaxM)
+  const subsidenceDepthMinM = useViewStore((s) => s.subsidenceSingleDepthMin)
+  const subsidenceDepthMaxM = useViewStore((s) => s.subsidenceSingleDepthMax)
 
   const wellName = useWellDataStore((s) => s.well?.well_name ?? null)
   const formations = useWellDataStore((s) => s.formations)

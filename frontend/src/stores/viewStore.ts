@@ -7,12 +7,33 @@ interface VisibleDepthRange {
   max: number
 }
 
+export type SubsidenceModelType = 'total' | 'decompaction' | 'airy' | 'stepwise' | 'thermal'
+
+export interface SubsidenceModelConfig {
+  zoneSetId: number | null
+  seaLevelCurveId: number | null
+}
+
+const DEFAULT_MODEL_CONFIG: SubsidenceModelConfig = { zoneSetId: null, seaLevelCurveId: null }
+
+const ALL_MODEL_TYPES: SubsidenceModelType[] = ['total', 'decompaction', 'airy', 'stepwise', 'thermal']
+
+function defaultModelConfigs(): Record<SubsidenceModelType, SubsidenceModelConfig> {
+  return Object.fromEntries(ALL_MODEL_TYPES.map((t) => [t, { ...DEFAULT_MODEL_CONFIG }])) as Record<SubsidenceModelType, SubsidenceModelConfig>
+}
+
 interface VisualConfigPayload {
   depthPerPixel?: number
   trackWidths?: Record<string, number>
   subsidenceWidth?: number
   depthTrackConfig?: Partial<DepthTrackConfig>
   formationsTrackConfig?: Partial<FormationsTrackConfig>
+  subsidenceSingleDepthMin?: number | null
+  subsidenceSingleDepthMax?: number | null
+  subsidenceMultiDepthMin?: number | null
+  subsidenceMultiDepthMax?: number | null
+  activeSubsidenceModelType?: SubsidenceModelType
+  subsidenceModelConfigs?: Partial<Record<SubsidenceModelType, SubsidenceModelConfig>>
 }
 
 export type SelectedElementType = 'curve' | 'track' | 'formation'
@@ -54,11 +75,14 @@ export interface ViewStore {
   subsidenceBottomHeight: number
   depthType: 'MD' | 'TVD' | 'TVDSS'
   activePickId: string | null
-  subsidenceDepthMinM: number | null
-  subsidenceDepthMaxM: number | null
+  subsidenceSingleDepthMin: number | null
+  subsidenceSingleDepthMax: number | null
+  subsidenceMultiDepthMin: number | null
+  subsidenceMultiDepthMax: number | null
+  activeSubsidenceModelType: SubsidenceModelType
+  subsidenceModelConfigs: Record<SubsidenceModelType, SubsidenceModelConfig>
   setScroll: (depth: number) => void
   setScale: (dpp: number) => void
-
   setCursorDepth: (depth: number | null) => void
   setOverviewVisible: (visible: boolean) => void
   setCurveTooltipVisible: (visible: boolean) => void
@@ -74,8 +98,12 @@ export interface ViewStore {
   setSubsidenceWidth: (width: number) => void
   setSubsidenceBottomHeight: (height: number) => void
   setDepthType: (t: 'MD' | 'TVD' | 'TVDSS') => void
-  setSubsidenceDepthMinM: (v: number | null) => void
-  setSubsidenceDepthMaxM: (v: number | null) => void
+  setSubsidenceSingleDepthMin: (v: number | null) => void
+  setSubsidenceSingleDepthMax: (v: number | null) => void
+  setSubsidenceMultiDepthMin: (v: number | null) => void
+  setSubsidenceMultiDepthMax: (v: number | null) => void
+  setActiveSubsidenceModelType: (t: SubsidenceModelType) => void
+  updateSubsidenceModelConfig: (modelType: SubsidenceModelType, patch: Partial<SubsidenceModelConfig>) => void
   lodEnabled: boolean
   setLodEnabled: (v: boolean) => void
   applyActiveWellTrackWidths: (trackWidths: Record<string, number>) => void
@@ -146,8 +174,12 @@ export const useViewStore = create<ViewStore>((set) => ({
   subsidenceBottomHeight: initialSubsidenceBottomHeight,
   depthType: 'MD',
   activePickId: null,
-  subsidenceDepthMinM: null,
-  subsidenceDepthMaxM: null,
+  subsidenceSingleDepthMin: null,
+  subsidenceSingleDepthMax: null,
+  subsidenceMultiDepthMin: null,
+  subsidenceMultiDepthMax: null,
+  activeSubsidenceModelType: 'total' as SubsidenceModelType,
+  subsidenceModelConfigs: defaultModelConfigs(),
   lodEnabled: false,
   setScroll(depth) {
     set((state) => ({
@@ -228,11 +260,18 @@ export const useViewStore = create<ViewStore>((set) => ({
   setDepthType(t) {
     set({ depthType: t })
   },
-  setSubsidenceDepthMinM(v) {
-    set({ subsidenceDepthMinM: v })
-  },
-  setSubsidenceDepthMaxM(v) {
-    set({ subsidenceDepthMaxM: v })
+  setSubsidenceSingleDepthMin(v) { set({ subsidenceSingleDepthMin: v }) },
+  setSubsidenceSingleDepthMax(v) { set({ subsidenceSingleDepthMax: v }) },
+  setSubsidenceMultiDepthMin(v) { set({ subsidenceMultiDepthMin: v }) },
+  setSubsidenceMultiDepthMax(v) { set({ subsidenceMultiDepthMax: v }) },
+  setActiveSubsidenceModelType(t) { set({ activeSubsidenceModelType: t }) },
+  updateSubsidenceModelConfig(modelType, patch) {
+    set((state) => ({
+      subsidenceModelConfigs: {
+        ...state.subsidenceModelConfigs,
+        [modelType]: { ...state.subsidenceModelConfigs[modelType], ...patch },
+      },
+    }))
   },
   setLodEnabled(v) {
     set({ lodEnabled: v })
@@ -258,6 +297,12 @@ export const useViewStore = create<ViewStore>((set) => ({
     set((state) => {
       const nextDepthPerPixel = config.depthPerPixel ?? state.depthPerPixel
       const rawWidth = config.subsidenceWidth ?? state.subsidenceWidth
+      const mergedModelConfigs = { ...state.subsidenceModelConfigs }
+      if (config.subsidenceModelConfigs) {
+        for (const [key, val] of Object.entries(config.subsidenceModelConfigs)) {
+          if (val) mergedModelConfigs[key as SubsidenceModelType] = { ...mergedModelConfigs[key as SubsidenceModelType], ...val }
+        }
+      }
       return {
         depthPerPixel: nextDepthPerPixel,
         trackWidths: normalizeTrackWidths(config.trackWidths),
@@ -272,6 +317,12 @@ export const useViewStore = create<ViewStore>((set) => ({
           ...state.formationsTrackConfig,
           ...(config.formationsTrackConfig ?? {}),
         },
+        subsidenceSingleDepthMin: 'subsidenceSingleDepthMin' in config ? config.subsidenceSingleDepthMin ?? null : state.subsidenceSingleDepthMin,
+        subsidenceSingleDepthMax: 'subsidenceSingleDepthMax' in config ? config.subsidenceSingleDepthMax ?? null : state.subsidenceSingleDepthMax,
+        subsidenceMultiDepthMin: 'subsidenceMultiDepthMin' in config ? config.subsidenceMultiDepthMin ?? null : state.subsidenceMultiDepthMin,
+        subsidenceMultiDepthMax: 'subsidenceMultiDepthMax' in config ? config.subsidenceMultiDepthMax ?? null : state.subsidenceMultiDepthMax,
+        activeSubsidenceModelType: config.activeSubsidenceModelType ?? state.activeSubsidenceModelType,
+        subsidenceModelConfigs: mergedModelConfigs,
         visibleDepthRange: deriveVisibleDepthRange(state.scrollDepth, nextDepthPerPixel, state.viewportHeight),
       }
     })
@@ -284,6 +335,12 @@ export const useViewStore = create<ViewStore>((set) => ({
       formationsTrackConfig: initialFormationsTrackConfig,
       depthType: 'MD',
       activePickId: null,
+      subsidenceSingleDepthMin: null,
+      subsidenceSingleDepthMax: null,
+      subsidenceMultiDepthMin: null,
+      subsidenceMultiDepthMax: null,
+      activeSubsidenceModelType: 'total',
+      subsidenceModelConfigs: defaultModelConfigs(),
       visibleDepthRange: deriveVisibleDepthRange(state.scrollDepth, initialDepthPerPixel, state.viewportHeight),
     }))
   },
