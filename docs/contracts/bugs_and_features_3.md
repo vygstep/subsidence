@@ -515,16 +515,156 @@ After BF3 planning is accepted, update navigation docs:
 
 ---
 
+### BF3-009: Normalize built-in dictionaries and full Equinor lithology pattern catalogue
+
+**Type:** Feature / Architecture cleanup  
+**Priority:** High  
+**Scope:** Built-in dictionary layout, seeding reliability, lithology visualization catalogue,
+compaction preset links, and read-only protection.
+
+#### Problem
+
+Built-in reference data is currently split across multiple implicit sources:
+
+- Most dictionaries live under `app/src/subsidence/data/dictionaries/`.
+- The built-in stratigraphic chart is loaded from top-level `sample_data/ics_chart2023.csv`,
+  not from the common dictionary tree.
+- Lithology defaults are overloaded: one CSV feeds the legacy lithology dictionary, built-in
+  compaction presets, the default lithology set, and the built-in compaction model.
+- The built-in Equinor lithology pattern palette currently contains only a subset of the
+  available SVG patterns, while `repos/lithology-patterns/assets/svg` contains the full visual
+  catalogue.
+- New project creation/open must reliably seed built-in strat charts, sea-level curves,
+  compaction presets, lithology sets, and lithology pattern palettes. A project with no wells
+  must still show the built-in dictionaries.
+
+#### Target dictionary layout
+
+Move all built-in reference inputs under `app/src/subsidence/data/dictionaries/`:
+
+- `strat_charts/ics_2023.csv`
+- `sea_level/sea_level_binned_models.csv`
+- `lithology/lithology_core.csv`
+- `lithology_sets/default_lithologies.csv`
+- `compaction/compaction_presets.csv`
+- `lithology_patterns/equinor/manifest.csv`
+- `lithology_patterns/equinor/svg/*.svg`
+- existing mnemonic and unit dictionaries remain in the dictionary tree.
+
+The old top-level `sample_data/ics_chart2023.csv` can remain as sample/demo data, but seeding
+must use the dictionary copy.
+
+#### Lithology model split
+
+Separate computational lithologies from visual lithology patterns:
+
+- **Computational lithologies**: the 9 core classes used by decompaction/backstripping:
+  `sandstone`, `shale`, `limestone`, `dolomite`, `evaporite`, `coal`, `igneous`,
+  `conglomerate`, `metamorphic`.
+- **Compaction presets**: one built-in preset per computational lithology, loaded from
+  `compaction/compaction_presets.csv` and linked by stable `source_lithology_code`.
+- **Default lithology set**: 9 entries loaded from `lithology_sets/default_lithologies.csv`,
+  each linked to a computational lithology and a built-in compaction preset.
+- **Visual lithology patterns**: the full Equinor SVG catalogue. These are display assets and
+  must not automatically become computational lithologies.
+
+Visual patterns may optionally carry a `base_lithology_code` such as:
+
+- Equinor sandstone variants -> `sandstone`
+- Equinor shale variants -> `shale`
+- Equinor limestone variants -> `limestone`
+
+This lets a lithology log or imported categorical code choose a rich visual pattern while the
+engine still maps decompaction parameters through one of the 9 computational lithologies.
+
+#### Full Equinor palette
+
+- Source: `repos/lithology-patterns/assets/svg`.
+- Expected current full catalogue: 74 SVG files.
+- Generate or maintain a manifest from `repos/lithology-patterns/patterns.md` with:
+  `code`, `display_name`, `group_name`, `base_lithology_code`, `source_code`,
+  `source_name`, `svg_path`, `tile_width`, `tile_height`, `sort_order`.
+- Seed all SVGs into the built-in `Equinor Lithology Patterns` palette.
+- Keep palette metadata:
+  `origin='equinor'`, `is_builtin=True`, source URL
+  `https://github.com/equinor/lithology-patterns`, license `MIT`.
+
+#### Seeding behavior
+
+Built-in seeding must be idempotent and must run on both project creation and project open.
+After seeding a new project, these objects must be present:
+
+- one built-in strat chart: `ICS 2023`;
+- four built-in sea-level curves, each with 53 points;
+- one built-in Equinor lithology pattern palette with the full SVG catalogue;
+- nine built-in compaction presets;
+- one built-in `Default Lithologies` set with nine entries;
+- the built-in compaction model populated from the nine computational lithologies;
+- built-in units and mnemonic set.
+
+Seeder files should be split into small functions/modules by domain:
+
+- `seed_strat_charts`
+- `seed_sea_level_curves`
+- `seed_lithologies`
+- `seed_lithology_sets`
+- `seed_lithology_patterns`
+- `seed_compaction_presets`
+- `seed_compaction_models`
+- `seed_units`
+- `seed_mnemonics`
+
+#### Frontend loading behavior
+
+- `App` must load sea-level curves explicitly when a project opens, not only through
+  `loadWellInventories()`, so a project without wells still shows built-in sea-level curves.
+- `App` must load strat charts, compaction presets, lithology dictionary, lithology sets,
+  and lithology pattern palettes on project open.
+- Data Manager should continue to keep top-level tabs unchanged, but built-in dictionaries
+  should be visible from their existing sections:
+  - StratCharts tab: strat charts and sea-level curves.
+  - Templates tab: compaction presets, lithology sets, lithology pattern palettes, mnemonic
+    sets, units.
+
+#### Read-only protection
+
+Built-in data must be read-only at API level:
+
+- built-in sea-level curves cannot be deleted;
+- built-in sea-level curve points cannot be overwritten;
+- built-in strat charts cannot be deleted or edited;
+- built-in lithology pattern palettes and patterns cannot be edited/deleted;
+- built-in compaction presets cannot be edited/deleted;
+- built-in compaction model parameters cannot be edited;
+- built-in lithology sets cannot be edited directly.
+
+User workflow must be clone/copy first, then edit the user copy.
+
+#### Tests
+
+- Backend project-create test: new project contains all required built-in objects.
+- Backend project-open migration/seed test: old project missing built-ins gets them on open.
+- Backend full Equinor test: built-in Equinor palette contains all expected SVG patterns.
+- Backend read-only tests for sea-level point upload, strat chart delete, pattern palette edit,
+  compaction preset edit/delete, lithology set edit.
+- Frontend integration test: project with zero wells still shows sea-level curves and
+  strat-chart built-ins after open.
+- Frontend integration test: Templates tab shows compaction presets and full lithology pattern
+  palette metadata.
+
+---
+
 ## Implementation order
 
-1. BF3-008 - synchronize navigation docs after this contract is accepted.
-2. BF3-006-A - add WELLS root without changing backend behavior.
-3. BF3-006-B/D - add ZONES root and ZoneSet settings using existing TopSet/ZoneWellData APIs where possible.
-4. BF3-006-C - extend tops import to assign imported tops to an existing/new ZoneSet.
-5. BF3-006-G - add persisted well colors before model/multi-well chart styling depends on them.
-6. BF3-007 - seed built-in sea-level curves and expose them in StratCharts.
-7. BF3-006-E/F - add Models root, model settings, chart display rules, and persisted model config.
-8. BF3-006-H - add optional sea-level curve overlay to the single-well subsidence chart.
+1. BF3-008 - synchronize navigation docs after this contract is accepted. (done)
+2. BF3-006-A - add WELLS root without changing backend behavior. (done)
+3. BF3-006-B/D - add ZONES root and ZoneSet settings using existing TopSet/ZoneWellData APIs where possible. (done)
+4. BF3-006-C - extend tops import to assign imported tops to an existing/new ZoneSet. (done)
+5. BF3-006-G - add persisted well colors before model/multi-well chart styling depends on them. (done)
+6. BF3-007 - seed built-in sea-level curves and expose them in StratCharts. (partial; revisit under BF3-009)
+7. BF3-006-E/F - add Models root, model settings, chart display rules, and persisted model config. (done)
+8. BF3-006-H - add optional sea-level curve overlay to the single-well subsidence chart. (done)
+9. BF3-009 - normalize built-in dictionaries, full Equinor pattern catalogue, and seed reliability.
 
 ---
 
