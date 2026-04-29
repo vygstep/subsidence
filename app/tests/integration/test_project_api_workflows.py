@@ -9,15 +9,23 @@ from sqlalchemy import select as sa_select
 
 from subsidence.api.main import app
 from subsidence.data.schema import (
+    CompactionModel,
+    CompactionModelParam,
+    CompactionPreset,
     CurveMetadata,
     CurveMnemonicEntry,
     CurveMnemonicSet,
+    LithologyDictEntry,
     LithologyPattern,
     LithologyPatternPalette,
     LithologySet,
     LithologySetEntry,
     MeasurementUnit,
     MeasurementUnitAlias,
+    SeaLevelCurve,
+    SeaLevelPoint,
+    StratChart,
+    StratUnit,
     UnitDimension,
     WellModel,
 )
@@ -104,6 +112,78 @@ def test_project_lifecycle_save_close_reopen_preserves_wells(api_client: TestCli
     response = api_client.get('/api/projects/recent')
     assert response.status_code == 200, response.text
     assert any(item['path'] == str(project_path) for item in response.json())
+
+
+def test_new_project_seeds_builtin_reference_data(api_client: TestClient, tmp_path: Path):
+    _create_project(api_client, tmp_path, 'builtin-reference-data')
+
+    manager = api_client.app.state.project_manager
+    with manager.get_session() as session:
+        builtin_chart = session.scalar(sa_select(StratChart).where(StratChart.name == 'ICS 2023'))
+        assert builtin_chart is not None
+        assert len(session.scalars(sa_select(StratUnit).where(StratUnit.chart_id == builtin_chart.id)).all()) > 0
+
+        sea_level_curves = session.scalars(
+            sa_select(SeaLevelCurve).where(SeaLevelCurve.is_builtin.is_(True))
+        ).all()
+        assert {curve.name for curve in sea_level_curves} == {
+            'Haq composite curve (binned 10 Myrs)',
+            'Van der Meer et al. (2017)',
+            'Kocsis & Scotese (2020)',
+            'Verard (2015)',
+        }
+        for curve in sea_level_curves:
+            point_count = len(session.scalars(sa_select(SeaLevelPoint).where(SeaLevelPoint.curve_id == curve.id)).all())
+            assert point_count == 53
+
+        lithology_codes = {
+            row.lithology_code
+            for row in session.scalars(sa_select(LithologyDictEntry)).all()
+        }
+        assert lithology_codes == {
+            'sandstone',
+            'shale',
+            'limestone',
+            'dolomite',
+            'evaporite',
+            'coal',
+            'igneous',
+            'conglomerate',
+            'metamorphic',
+        }
+
+        builtin_presets = session.scalars(
+            sa_select(CompactionPreset).where(CompactionPreset.is_builtin.is_(True))
+        ).all()
+        assert {preset.source_lithology_code for preset in builtin_presets} == lithology_codes
+
+        default_set = session.scalar(
+            sa_select(LithologySet).where(LithologySet.is_builtin.is_(True), LithologySet.name == 'Default Lithologies')
+        )
+        assert default_set is not None
+        default_set_count = len(
+            session.scalars(sa_select(LithologySetEntry).where(LithologySetEntry.set_id == default_set.id)).all()
+        )
+        assert default_set_count == 9
+
+        builtin_model = session.scalar(sa_select(CompactionModel).where(CompactionModel.is_builtin.is_(True)))
+        assert builtin_model is not None
+        model_param_count = len(
+            session.scalars(sa_select(CompactionModelParam).where(CompactionModelParam.model_id == builtin_model.id)).all()
+        )
+        assert model_param_count == 9
+
+        palette = session.scalar(
+            sa_select(LithologyPatternPalette).where(
+                LithologyPatternPalette.is_builtin.is_(True),
+                LithologyPatternPalette.origin == 'equinor',
+            )
+        )
+        assert palette is not None
+        pattern_count = len(
+            session.scalars(sa_select(LithologyPattern).where(LithologyPattern.palette_id == palette.id)).all()
+        )
+        assert pattern_count == 74
 
 
 def test_well_color_defaults_patch_and_backfill_persist(api_client: TestClient, tmp_path: Path):
@@ -651,13 +731,14 @@ def test_lithology_pattern_palettes_seeded(api_client: TestClient, tmp_path: Pat
     assert builtin['name'] == 'Equinor Lithology Patterns'
     assert builtin['origin'] == 'equinor'
     assert builtin['license_name'] == 'MIT'
-    assert builtin['entry_count'] >= 10
+    assert builtin['entry_count'] == 74
 
     response = api_client.get(f"/api/lithology-pattern-palettes/{builtin['id']}")
     assert response.status_code == 200, response.text
     detail = response.json()
     codes = {row['code'] for row in detail['patterns']}
     assert {'sandstone', 'shale', 'limestone', 'dolomite', 'conglomerate'} <= codes
+    assert '30017' in codes
     sandstone = next(row for row in detail['patterns'] if row['code'] == 'sandstone')
     assert sandstone['svg_content'].startswith('<svg')
     assert sandstone['source_code'] == '30000'
@@ -1997,3 +2078,21 @@ def test_bstrip001_sea_level_crud(api_client: TestClient, tmp_path: Path):
     api_client.put(f'/api/wells/{well_id}/active-sea-level-curve', json={'curve_id': None})
     resp = api_client.delete(f'/api/sea-level-curves/{curve_id}')
     assert resp.status_code == 204
+
+
+def test_builtin_sea_level_curve_points_are_read_only(api_client: TestClient, tmp_path: Path):
+    _create_project(api_client, tmp_path, 'sl-builtin-readonly')
+
+    resp = api_client.get('/api/sea-level-curves')
+    assert resp.status_code == 200, resp.text
+    builtin = next(curve for curve in resp.json() if curve['is_builtin'])
+
+    resp = api_client.post(
+        f"/api/sea-level-curves/{builtin['id']}/points",
+        json=[{'age_ma': 0.0, 'sea_level_m': 0.0}],
+    )
+    assert resp.status_code == 409, resp.text
+
+    resp = api_client.get(f"/api/sea-level-curves/{builtin['id']}/points")
+    assert resp.status_code == 200, resp.text
+    assert len(resp.json()) == 53

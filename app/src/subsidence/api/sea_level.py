@@ -84,8 +84,11 @@ def create_sea_level_curve(body: SeaLevelCurveCreate, request: Request) -> SeaLe
 def upload_sea_level_points(curve_id: int, points: list[SeaLevelPointUpload], request: Request) -> dict[str, int]:
     manager = _require_open_project(request)
     with manager.get_session() as session:
-        if session.get(SeaLevelCurve, curve_id) is None:
+        curve = session.get(SeaLevelCurve, curve_id)
+        if curve is None:
             raise HTTPException(status_code=404, detail=f'Sea level curve not found: {curve_id}')
+        if curve.is_builtin:
+            raise HTTPException(status_code=409, detail='Built-in sea level curve points cannot be overwritten')
         for p in session.scalars(select(SeaLevelPoint).where(SeaLevelPoint.curve_id == curve_id)).all():
             session.delete(p)
         session.flush()

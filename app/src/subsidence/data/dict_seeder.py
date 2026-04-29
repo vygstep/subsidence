@@ -198,6 +198,10 @@ def _repo_sample_data_dir() -> Path:
     return Path(__file__).resolve().parents[4] / 'sample_data'
 
 
+def _dictionary_or_fallback(primary: Path, fallback: Path) -> Path:
+    return primary if primary.exists() else fallback
+
+
 def _seed_strat_units(session: Session, csv_path: Path, chart: StratChart) -> None:
     pending: dict[int, dict[str, str]] = {}
     with csv_path.open('r', encoding='utf-8-sig', newline='') as handle:
@@ -634,7 +638,10 @@ def seed_dictionaries(session: Session, db_path: Path) -> None:
     has_curve_rows = session.execute(select(CurveDictEntry.id).limit(1)).scalar_one_or_none() is not None
     has_lithology_rows = session.execute(select(LithologyDictEntry.id).limit(1)).scalar_one_or_none() is not None
     has_strat_rows = session.execute(select(StratUnit.id).limit(1)).scalar_one_or_none() is not None
-    builtin_chart_path = sample_dir / 'ics_chart2023.csv'
+    builtin_chart_path = _dictionary_or_fallback(
+        seed_dir / 'strat_charts' / 'ics_2023.csv',
+        sample_dir / 'ics_chart2023.csv',
+    )
 
     if not has_curve_rows:
         _seed_curve_entries(session, seed_dir / 'curve_families.csv')
@@ -660,4 +667,10 @@ def seed_dictionaries(session: Session, db_path: Path) -> None:
     _seed_builtin_lithology_set(session)
     _seed_builtin_mnemonic_set(session, seed_dir / 'curve_families.csv')
     _seed_measurement_units(session)
-    _seed_builtin_sea_level_curves(session, seed_dir / 'sea_level_binned_models.csv')
+    _seed_builtin_sea_level_curves(
+        session,
+        _dictionary_or_fallback(
+            seed_dir / 'sea_level' / 'sea_level_binned_models.csv',
+            seed_dir / 'sea_level_binned_models.csv',
+        ),
+    )

@@ -24,6 +24,7 @@ function App() {
   const loadLithologyDictionary = useWellDataStore((state) => state.loadLithologyDictionary)
   const loadLithologySets = useWellDataStore((state) => state.loadLithologySets)
   const loadLithologyPatternPalettes = useWellDataStore((state) => state.loadLithologyPatternPalettes)
+  const loadSeaLevelCurves = useWellDataStore((state) => state.loadSeaLevelCurves)
   const colorOverrides = useWellDataStore((state) => state.colorOverrides)
   const well = useWellDataStore((state) => state.well)
 
@@ -148,7 +149,8 @@ function App() {
     void loadLithologyDictionary()
     void loadLithologySets()
     void loadLithologyPatternPalettes()
-  }, [isProjectOpen, loadMnemonicSets, loadUnitDimensions, loadLithologyDictionary, loadLithologySets, loadLithologyPatternPalettes])
+    void loadSeaLevelCurves()
+  }, [isProjectOpen, loadMnemonicSets, loadUnitDimensions, loadLithologyDictionary, loadLithologySets, loadLithologyPatternPalettes, loadSeaLevelCurves])
 
   useEffect(() => {
     if (!isProjectOpen) {
@@ -172,6 +174,7 @@ function App() {
           wellViewsHydratedRef.current = true
           lastSerializedWellViewsRef.current = {}
           resetWell()
+          await loadSeaLevelCurves()
           return
         }
 
@@ -207,7 +210,7 @@ function App() {
     }
     void loadCurrentProject()
     return () => { cancelled = true }
-  }, [isProjectOpen, projectPath, loadScopedVisualConfig, loadWell, loadWellInventories, replaceWellViewStates, resetWell, selectTrack, setSelectedFormationId])
+  }, [isProjectOpen, projectPath, loadScopedVisualConfig, loadSeaLevelCurves, loadWell, loadWellInventories, replaceWellViewStates, resetWell, selectTrack, setSelectedFormationId])
 
   useEffect(() => {
     if (selectedFormationId && !formations.some((f) => f.id === selectedFormationId)) {

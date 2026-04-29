@@ -50,7 +50,7 @@ class StratChartInfo(BaseModel):
 
 def _is_builtin_chart(chart: StratChart) -> bool:
     source_name = Path(chart.source_path).name.lower() if chart.source_path else ''
-    return chart.name == 'ICS 2023' and source_name in {'', 'ics_chart2023.csv', 'ics_chart2023_units.csv'}
+    return chart.name == 'ICS 2023' and source_name in {'', 'ics_2023.csv', 'ics_chart2023.csv', 'ics_chart2023_units.csv'}
 
 
 def _import_ics_csv(session, csv_path: Path) -> tuple[StratChart, int]:

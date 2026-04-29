@@ -1,11 +1,75 @@
-code,display_name,source_code,source_name,svg_path,tile_width,tile_height,sort_order
-sandstone,Sandstone,30000,Sandstone,svg/30000.svg,64,64,10
-siltstone,Siltstone,40000,Siltstone,svg/40000.svg,64,64,20
-mudstone,Mudstone,50000,Mudstone,svg/50000.svg,64,64,30
-claystone,Claystone,60000,Claystone,svg/60000.svg,64,64,40
-shale,Shale,65000,Shale,svg/65000.svg,64,64,50
-limestone,Limestone,70000,Limestone,svg/70000.svg,64,64,60
-marl,Marl,80000,Marl,svg/80000.svg,64,64,70
-gypsum,Gypsum,85000,Gypsum,svg/85000.svg,64,64,80
-dolomite,Dolomite,74000,Dolostone,svg/74000.svg,64,64,90
-conglomerate,Conglomerate,10000,Conglomerate,svg/10000.svg,64,64,100
+code,display_name,group_name,base_lithology_code,source_code,source_name,svg_path,tile_width,tile_height,sort_order
+sandstone,Sandstone,Sandstone,sandstone,30000,Sandstone,svg/30000.svg,64,64,1
+30017,Sandstone - Glauconite,Sandstone,sandstone,30017,Glauconite,svg/30017.svg,64,64,2
+30019,Sandstone - Pyrite,Sandstone,sandstone,30019,Pyrite,svg/30019.svg,64,64,3
+30021,Sandstone - Mica,Sandstone,sandstone,30021,Mica,svg/30021.svg,64,64,4
+30031,Sandstone - Bioclastic,Sandstone,sandstone,30031,Bioclastic,svg/30031.svg,64,64,5
+30066,Sandstone - Uranium Rich,Sandstone,sandstone,30066,Uranium Rich,svg/30066.svg,64,64,6
+30100,Sandstone - Calcite Cement,Sandstone,sandstone,30100,Calcite Cement,svg/30100.svg,64,64,7
+30166,Sandstone - Calcite Cement Uranium,Sandstone,sandstone,30166,Calcite Cement Uranium,svg/30166.svg,64,64,8
+30300,Sandstone - Siderite Cement,Sandstone,sandstone,30300,Siderite Cement,svg/30300.svg,64,64,9
+30400,Sandstone - Quartz Cement,Sandstone,sandstone,30400,Quartz Cement,svg/30400.svg,64,64,10
+30500,Sandstone - Kaolinite Cement,Sandstone,sandstone,30500,Kaolinite Cement,svg/30500.svg,64,64,11
+31000,Sandstone - Clayey,Sandstone,sandstone,31000,Clayey,svg/31000.svg,64,64,12
+32000,Sandstone - Muddy,Sandstone,sandstone,32000,Muddy,svg/32000.svg,64,64,13
+32021,Sandstone - Muddy Mica,Sandstone,sandstone,32021,Muddy Mica,svg/32021.svg,64,64,14
+32100,Sandstone - Clayey Calcite Cement,Sandstone,sandstone,32100,Clayey Calcite Cement,svg/32100.svg,64,64,15
+33000,Sandstone - Silty,Sandstone,sandstone,33000,Silty,svg/33000.svg,64,64,16
+33121,Sandstone - Silty Calcite Cement Mica,Sandstone,sandstone,33121,Silty Calcite Cement Mica,svg/33121.svg,64,64,17
+33021,Sandstone - Silty Mica,Sandstone,sandstone,33021,Silty Mica,svg/33021.svg,64,64,18
+33022,Sandstone - Silty Kaolinite,Sandstone,sandstone,33022,Silty Kaolinite,svg/33022.svg,64,64,19
+33500,Sandstone - Silty Kaolinite Cement,Sandstone,sandstone,33500,Silty Kaolinite Cement,svg/33500.svg,64,64,20
+30023,Sandstone - Carbonaceous,Sandstone,sandstone,30023,Carbonaceous,svg/30023.svg,64,64,21
+siltstone,Siltstone,Siltstone,sandstone,40000,Siltstone,svg/40000.svg,64,64,22
+40017,Siltstone - Glauconite,Siltstone,sandstone,40017,Glauconite,svg/40017.svg,64,64,23
+40019,Siltstone - Pyrite,Siltstone,sandstone,40019,Pyrite,svg/40019.svg,64,64,24
+40100,Siltstone - Calcite Cement,Siltstone,sandstone,40100,Calcite Cement,svg/40100.svg,64,64,25
+41000,Siltstone - Sandy,Siltstone,sandstone,41000,Sandy,svg/41000.svg,64,64,26
+40121,Siltstone - Calcite Cement Mica,Siltstone,sandstone,40121,Calcite Cement Mica,svg/40121.svg,64,64,27
+40023,Siltstone - Carbonaceous,Siltstone,sandstone,40023,Carbonaceous,svg/40023.svg,64,64,28
+40015,Siltstone - Tuff,Siltstone,sandstone,40015,Tuff,svg/40015.svg,64,64,29
+mudstone,Mudstone,Mudstone,shale,50000,Mudstone,svg/50000.svg,64,64,30
+50090,Mudstone - Paleosol,Mudstone,shale,50090,Paleosol,svg/50090.svg,64,64,31
+claystone,Claystone,Claystone,shale,60000,Claystone,svg/60000.svg,64,64,32
+60014,Claystone - Ooze Rich,Claystone,shale,60014,Ooze Rich,svg/60014.svg,64,64,33
+60017,Claystone - Glauconite,Claystone,shale,60017,Glauconite,svg/60017.svg,64,64,34
+60019,Claystone - Pyrite,Claystone,shale,60019,Pyrite,svg/60019.svg,64,64,35
+60023,Claystone - Organic Rich,Claystone,shale,60023,Organic Rich,svg/60023.svg,64,64,36
+60100,Claystone - Calcareous,Claystone,shale,60100,Calcareous,svg/60100.svg,64,64,37
+60200,Claystone - Dolomitic,Claystone,shale,60200,Dolomitic,svg/60200.svg,64,64,38
+60500,Claystone - Kaolinite,Claystone,shale,60500,Kaolinite,svg/60500.svg,64,64,39
+60600,Claystone - Illite,Claystone,shale,60600,Illite,svg/60600.svg,64,64,40
+60700,Claystone - Smectite,Claystone,shale,60700,Smectite,svg/60700.svg,64,64,41
+61000,Claystone - Sandy,Claystone,shale,61000,Sandy,svg/61000.svg,64,64,42
+62000,Claystone - Silty,Claystone,shale,62000,Silty,svg/62000.svg,64,64,43
+62015,Claystone - Silty Tuff,Claystone,shale,62015,Silty Tuff,svg/62015.svg,64,64,44
+60738,Claystone - Smectite Cement Fissile,Claystone,shale,60738,Smectite Cement Fissile,svg/60738.svg,64,64,45
+60038,Claystone - Fissile,Claystone,shale,60038,Fissile,svg/60038.svg,64,64,46
+60015,Claystone - Tuff,Claystone,shale,60015,Tuff,svg/60015.svg,64,64,47
+shale,Shale,Shale,shale,65000,Shale,svg/65000.svg,64,64,48
+65019,Shale - Pyrite,Shale,shale,65019,Pyrite,svg/65019.svg,64,64,49
+65023,Shale - Organic Rich,Shale,shale,65023,Organic Rich,svg/65023.svg,64,64,50
+65030,Shale - Arenaceous,Shale,shale,65030,Arenaceous,svg/65030.svg,64,64,51
+65100,Shale - Calcareous,Shale,shale,65100,Calcareous,svg/65100.svg,64,64,52
+66000,Shale - Silty,Shale,shale,66000,Silty,svg/66000.svg,64,64,53
+65121,Shale - Silty Calcite Cemented Mica,Shale,shale,65121,Silty Calcite Cemented Mica,svg/65121.svg,64,64,54
+limestone,Limestone,Limestone,limestone,70000,Limestone,svg/70000.svg,64,64,55
+70026,Limestone - Agrillaceous,Limestone,limestone,70026,Agrillaceous,svg/70026.svg,64,64,56
+72000,Limestone - Dolomitic,Limestone,limestone,72000,Dolomitic,svg/72000.svg,64,64,57
+78000,Limestone - Chalk,Limestone,limestone,78000,Chalk,svg/78000.svg,64,64,58
+marl,Marl,Marl,limestone,80000,Marl,svg/80000.svg,64,64,59
+80026,Marl - Agrillaceous,Marl,limestone,80026,Agrillaceous,svg/80026.svg,64,64,60
+80100,Marl - Calcareous,Marl,limestone,80100,Calcareous,svg/80100.svg,64,64,61
+80200,Marl - Dolomitic,Marl,limestone,80200,Dolomitic,svg/80200.svg,64,64,62
+gypsum,Gypsum,Gypsum,evaporite,85000,Gypsum,svg/85000.svg,64,64,63
+86000,Gypsum - Anhydrite,Gypsum,evaporite,86000,Anhydrite,svg/86000.svg,64,64,64
+88000,Gypsum - Halite,Gypsum,evaporite,88000,Halite,svg/88000.svg,64,64,65
+dolomite,Dolostone,Dolostone,,74000,Dolostone,svg/74000.svg,64,64,66
+92000,Tuff - Tuff,Tuff,,92000,Tuff,svg/92000.svg,64,64,67
+92015,Tuff - Tuff,Tuff,,92015,Tuff,svg/92015.svg,64,64,68
+conglomerate,Conglomerate,Conglomerate,conglomerate,10000,Conglomerate,svg/10000.svg,64,64,69
+11030,Conglomerate - Sandy Matrix,Conglomerate,conglomerate,11030,Sandy Matrix,svg/11030.svg,64,64,70
+11026,Conglomerate - Muddy Matrix,Conglomerate,conglomerate,11026,Muddy Matrix,svg/11026.svg,64,64,71
+21000,Equinor Pattern 21000,Unclassified,,21000,Pattern 21000,svg/21000.svg,64,64,72
+25000,Equinor Pattern 25000,Unclassified,,25000,Pattern 25000,svg/25000.svg,64,64,73
+96000,Equinor Pattern 96000,Unclassified,,96000,Pattern 96000,svg/96000.svg,64,64,74

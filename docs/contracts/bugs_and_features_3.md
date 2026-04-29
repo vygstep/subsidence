@@ -652,6 +652,30 @@ User workflow must be clone/copy first, then edit the user copy.
 - Frontend integration test: Templates tab shows compaction presets and full lithology pattern
   palette metadata.
 
+#### Implemented step 1
+
+- Added dictionary paths for `strat_charts/ics_2023.csv` and
+  `sea_level/sea_level_binned_models.csv`, with fallback to legacy locations.
+- Expanded the built-in Equinor lithology pattern manifest/assets to the full current
+  `repos/lithology-patterns/assets/svg` catalogue: 74 SVG patterns.
+- Kept legacy main pattern codes such as `sandstone`, `shale`, `limestone`, `dolomite`,
+  and `conglomerate` for existing lithology dictionary compatibility; variant patterns use
+  their Equinor numeric codes.
+- Added API protection so built-in sea-level curve points cannot be overwritten.
+- Added backend seed coverage for new projects: built-in strat chart, sea-level curves,
+  computational lithologies, compaction presets, default lithology set, compaction model, and
+  full Equinor palette.
+- Added frontend project-open loading for sea-level curves so projects without wells still
+  expose built-in sea-level dictionaries.
+
+Remaining BF3-009 work:
+
+- Split `lithology_defaults.csv` into separate lithology core, compaction presets, and default
+  lithology set CSVs.
+- Add explicit persisted metadata for visual pattern `group_name` / `base_lithology_code` if
+  the UI needs to filter or map variants by computational lithology.
+- Add project-open self-heal tests for legacy projects that are missing built-in rows.
+
 ---
 
 ## Implementation order
