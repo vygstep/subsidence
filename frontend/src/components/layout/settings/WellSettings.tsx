@@ -5,6 +5,7 @@ import { useWellDataStore } from '@/stores'
 
 export interface WellInspectorDraft {
   well_name: string
+  color_hex: string
   x: string
   y: string
   kb_elev: string
@@ -30,6 +31,9 @@ export function WellSettings({ well: _well, wellInspectorDraft, onWellInspectorD
 
   const [curves, setCurves] = useState<SeaLevelCurve[]>([])
   const [isSaving, setIsSaving] = useState(false)
+  const colorPickerValue = /^#[0-9a-fA-F]{6}$/.test(wellInspectorDraft.color_hex)
+    ? wellInspectorDraft.color_hex
+    : _well.color_hex
 
   useEffect(() => {
     void loadSeaLevelCurves().then(setCurves)
@@ -57,6 +61,22 @@ export function WellSettings({ well: _well, wellInspectorDraft, onWellInspectorD
           value={wellInspectorDraft.well_name}
           onChange={(event) => onWellInspectorDraftChange('well_name', event.target.value)}
         />
+      </div>
+      <div className="sf-row">
+        <span>Color</span>
+        <div className="sf-color-field">
+          <input
+            type="color"
+            value={colorPickerValue}
+            onChange={(event) => onWellInspectorDraftChange('color_hex', event.target.value)}
+            aria-label="Well color"
+          />
+          <input
+            type="text"
+            value={wellInspectorDraft.color_hex}
+            onChange={(event) => onWellInspectorDraftChange('color_hex', event.target.value)}
+          />
+        </div>
       </div>
       <div className="sf-row">
         <span>Project X</span>

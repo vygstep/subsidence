@@ -14,6 +14,7 @@ export async function readError(response: Response, fallback: string): Promise<s
 
 type WellInspectorDraft = {
   well_name: string
+  color_hex: string
   x: string
   y: string
   kb_elev: string
@@ -67,6 +68,7 @@ export function makeActionHandlers(deps: ActionDeps) {
     if (!well?.well_id) return
     const payload = {
       well_name: wellInspectorDraft.well_name.trim(),
+      color_hex: wellInspectorDraft.color_hex.trim(),
       x: Number(wellInspectorDraft.x),
       y: Number(wellInspectorDraft.y),
       kb_elev: Number(wellInspectorDraft.kb_elev),

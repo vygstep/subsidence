@@ -8,6 +8,7 @@ import { makeVisibilityHandlers } from './dataManagerVisibility'
 export function useDataManagerController() {
   const [wellInspectorDraft, setWellInspectorDraft] = useState({
     well_name: '',
+    color_hex: '#2563eb',
     x: '',
     y: '',
     kb_elev: '',
@@ -61,6 +62,7 @@ export function useDataManagerController() {
     if (!well) return
     setWellInspectorDraft({
       well_name: well.well_name,
+      color_hex: well.color_hex,
       x: String(well.x ?? 0),
       y: String(well.y ?? 0),
       kb_elev: String(well.kb_elev ?? 0),

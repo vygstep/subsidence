@@ -11,6 +11,7 @@ interface CreateWellDialogProps {
 interface CreateWellResponse {
   well_id: string
   well_name: string
+  color_hex: string
 }
 
 async function readError(response: Response, fallback: string): Promise<string> {

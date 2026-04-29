@@ -30,6 +30,7 @@ export function MultiWellPanel() {
   const wellResults = useMultiWellStore((s) => s.wellResults)
   const fetchResults = useMultiWellStore((s) => s.fetchResults)
   const activeWellId = useWellDataStore((s) => s.well?.well_id ?? null)
+  const wellInventories = useWellDataStore((s) => s.wellInventories)
   const subsidenceDepthMinM = useViewStore((s) => s.subsidenceDepthMinM)
   const subsidenceDepthMaxM = useViewStore((s) => s.subsidenceDepthMaxM)
 
@@ -37,6 +38,9 @@ export function MultiWellPanel() {
   const setSelectedObject = useWorkspaceStore((s) => s.setSelectedObject)
 
   const isSelected = selectedObject?.type === 'subsidence-chart' && selectedObject.chartType === 'multi'
+  const wellColorById = useMemo(() => (
+    new Map(wellInventories.map((well) => [well.well_id, well.color_hex]))
+  ), [wellInventories])
 
   const handleTitleClick = useCallback(() => {
     setSelectedObject(isSelected ? null : { type: 'subsidence-chart', chartType: 'multi' })
@@ -261,7 +265,7 @@ export function MultiWellPanel() {
     for (let i = 0; i < wellResults.length; i++) {
       const wr = wellResults[i]
       if (wr.curves.length === 0) continue
-      const color = WELL_COLORS[i % WELL_COLORS.length]
+      const color = wellColorById.get(wr.wellId) ?? WELL_COLORS[i % WELL_COLORS.length]
       const isActive = wr.wellId === activeWellId
 
       // pick the formation with the greatest burial depth
@@ -296,7 +300,7 @@ export function MultiWellPanel() {
 
     for (let i = 0; i < wellResults.length; i++) {
       const wr = wellResults[i]
-      const color = WELL_COLORS[i % WELL_COLORS.length]
+      const color = wellColorById.get(wr.wellId) ?? WELL_COLORS[i % WELL_COLORS.length]
       const isActive = wr.wellId === activeWellId
       const y = PADDING.top + 10 + i * 18
 
@@ -309,7 +313,7 @@ export function MultiWellPanel() {
       ctx.font = isActive ? 'bold 10px system-ui, sans-serif' : '10px system-ui, sans-serif'
       ctx.fillText(wr.wellName, legendX + 16, y)
     }
-  }, [wellResults, activeWellId, maxAge, effectiveMinDepthM, effectiveMaxDepthM])
+  }, [wellResults, activeWellId, maxAge, effectiveMinDepthM, effectiveMaxDepthM, wellColorById])
 
   const canvasRef = useCanvasRenderer(draw, [draw])
 

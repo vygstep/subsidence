@@ -215,6 +215,14 @@
   text-align: left;
 }
 
+.tree-node__color-swatch {
+  width: 10px;
+  height: 10px;
+  flex-shrink: 0;
+  border: 1px solid rgba(15, 23, 42, 0.22);
+  border-radius: 50%;
+}
+
 /* ─── tree leaf rows ─────────────────────────────────────────────────────── */
 
 .tree-leaf {
@@ -572,6 +580,24 @@
   width: 14px;
   height: 14px;
   cursor: pointer;
+}
+
+.sf-color-field {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  flex-shrink: 0;
+}
+
+.sf-row .sf-color-field input[type="color"] {
+  width: 24px;
+  padding: 1px;
+  cursor: pointer;
+}
+
+.sf-row .sf-color-field input[type="text"],
+.sf-row .sf-color-field input:not([type]) {
+  width: 72px;
 }
 
 .sf-swatch {

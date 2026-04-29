@@ -1,6 +1,7 @@
 export interface Well {
   well_id: string
   well_name: string
+  color_hex: string
   kb_elev: number
   gl_elev: number
   td_md: number
@@ -123,6 +124,7 @@ export interface SeaLevelCurve {
 export interface WellInventory {
   well_id: string
   well_name: string
+  color_hex: string
   kb_elev: number
   gl_elev: number
   td_md: number

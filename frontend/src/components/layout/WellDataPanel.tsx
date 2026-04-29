@@ -279,6 +279,7 @@ export function WellDataPanel({
                         checked={isActive}
                         onChange={() => onSelectWell(item.well_id)}
                       />
+                      <span className="tree-node__color-swatch" style={{ backgroundColor: item.color_hex }} />
                       <button
                         type="button"
                         className="tree-node__label-button"

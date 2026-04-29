@@ -8,6 +8,7 @@ from sqlalchemy import Engine, create_engine, event, text
 from sqlalchemy.orm import Session, sessionmaker
 
 from .schema import Base, SCHEMA_VERSION, SUBSIDENCE_APP_ID
+from .well_colors import default_well_color
 
 _HEADER_USER_VERSION_OFFSET = 60
 _HEADER_APPLICATION_ID_OFFSET = 68
@@ -65,6 +66,18 @@ def get_session() -> Generator[Session, None, None]:
 
 def migrate_schema(engine: Engine) -> None:
     with engine.connect() as conn:
+        well_cols = {row[1] for row in conn.execute(text("PRAGMA table_info(wells)"))}
+        if 'color_hex' not in well_cols:
+            conn.execute(text("ALTER TABLE wells ADD COLUMN color_hex VARCHAR(9)"))
+            conn.commit()
+        rows = conn.execute(text("SELECT id FROM wells WHERE color_hex IS NULL OR color_hex = '' ORDER BY name, id")).fetchall()
+        for index, row in enumerate(rows):
+            conn.execute(
+                text("UPDATE wells SET color_hex = :color_hex WHERE id = :id"),
+                {'color_hex': default_well_color(str(row[0]), index), 'id': row[0]},
+            )
+        if rows:
+            conn.commit()
         strat_unit_cols = {row[1] for row in conn.execute(text("PRAGMA table_info(strat_units)"))}
         if 'chart_id' not in strat_unit_cols:
             conn.execute(text("ALTER TABLE strat_units ADD COLUMN chart_id INTEGER REFERENCES strat_charts(id)"))

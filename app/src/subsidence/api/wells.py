@@ -12,6 +12,7 @@ from sqlalchemy.orm import selectinload
 from subsidence.data import UpdateWell, load_curves_from_parquet
 from subsidence.data.lttb import lttb
 from subsidence.data.schema import CurveMetadata, DeviationSurveyModel, FormationStratLink, FormationTopModel, FormationZone, WellActiveSeaLevelCurve, WellActiveTopSet, WellModel, ZoneWellData
+from subsidence.data.well_colors import DEFAULT_WELL_COLOR, normalize_hex_color
 from subsidence.data.zone_service import recalculate_zone_thickness
 
 router = APIRouter(tags=['wells'])
@@ -21,6 +22,7 @@ class WellListItem(BaseModel):
     well_id: str
     well_name: str
     td_md: float
+    color_hex: str
 
 
 class CurveInventoryItem(BaseModel):
@@ -84,6 +86,7 @@ class DeviationSummaryResponse(BaseModel):
 class WellResponse(BaseModel):
     well_id: str
     well_name: str
+    color_hex: str
     kb_elev: float
     gl_elev: float
     td_md: float
@@ -127,6 +130,7 @@ class ZonePatch(BaseModel):
 class WellInventoryResponse(BaseModel):
     well_id: str
     well_name: str
+    color_hex: str
     kb_elev: float
     gl_elev: float
     td_md: float
@@ -146,6 +150,7 @@ class WellInventoryResponse(BaseModel):
 
 class WellPatchRequest(BaseModel):
     well_name: str | None = None
+    color_hex: str | None = None
     kb_elev: float | None = None
     gl_elev: float | None = None
     td_md: float | None = None
@@ -239,7 +244,15 @@ def list_wells(request: Request) -> list[WellListItem]:
     manager = _require_open_project(request)
     with manager.get_session() as session:
         rows = session.scalars(select(WellModel).order_by(WellModel.name.asc(), WellModel.id.asc())).all()
-        return [WellListItem(well_id=row.id, well_name=row.name, td_md=row.td_md or 0.0) for row in rows]
+        return [
+            WellListItem(
+                well_id=row.id,
+                well_name=row.name,
+                td_md=row.td_md or 0.0,
+                color_hex=row.color_hex or DEFAULT_WELL_COLOR,
+            )
+            for row in rows
+        ]
 
 
 @router.get('/wells/inventory', response_model=list[WellInventoryResponse])
@@ -342,6 +355,7 @@ def list_well_inventories(request: Request) -> list[WellInventoryResponse]:
                 WellInventoryResponse(
                     well_id=well.id,
                     well_name=well.name,
+                    color_hex=well.color_hex or DEFAULT_WELL_COLOR,
                     kb_elev=well.kb_elev,
                     gl_elev=well.gl_elev,
                     td_md=well.td_md or 0.0,
@@ -457,6 +471,7 @@ def get_well(well_id: str, request: Request) -> WellResponse:
         return WellResponse(
             well_id=well.id,
             well_name=well.name,
+            color_hex=well.color_hex or DEFAULT_WELL_COLOR,
             kb_elev=well.kb_elev,
             gl_elev=well.gl_elev,
             td_md=td_md,
@@ -777,6 +792,14 @@ def patch_well(well_id: str, payload: WellPatchRequest, request: Request) -> Wel
             if well.name != next_name:
                 old_values['name'] = well.name
                 new_values['name'] = next_name
+        if payload.color_hex is not None:
+            try:
+                next_color = normalize_hex_color(payload.color_hex)
+            except ValueError as error:
+                raise HTTPException(status_code=400, detail=str(error)) from error
+            if (well.color_hex or DEFAULT_WELL_COLOR).lower() != next_color:
+                old_values['color_hex'] = well.color_hex
+                new_values['color_hex'] = next_color
         if payload.kb_elev is not None:
             next_kb = _require_non_negative_number(payload.kb_elev, 'KB')
             if well.kb_elev != next_kb:

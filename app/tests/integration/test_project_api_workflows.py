@@ -19,6 +19,7 @@ from subsidence.data.schema import (
     MeasurementUnit,
     MeasurementUnitAlias,
     UnitDimension,
+    WellModel,
 )
 from subsidence.data.unit_registry import convert_values, convert_values_to_engine, resolve_unit
 
@@ -103,6 +104,60 @@ def test_project_lifecycle_save_close_reopen_preserves_wells(api_client: TestCli
     response = api_client.get('/api/projects/recent')
     assert response.status_code == 200, response.text
     assert any(item['path'] == str(project_path) for item in response.json())
+
+
+def test_well_color_defaults_patch_and_backfill_persist(api_client: TestClient, tmp_path: Path):
+    project_path = _create_project(api_client, tmp_path, 'well-colors')
+
+    response = api_client.post('/api/projects/wells', json={
+        'name': 'Color Well',
+        'x': 0.0,
+        'y': 0.0,
+        'kb': 10.0,
+        'td': 1000.0,
+        'crs': 'local',
+    })
+    assert response.status_code == 200, response.text
+    well_id = response.json()['well_id']
+    assert response.json()['color_hex'].startswith('#')
+
+    response = api_client.get(f'/api/wells/{well_id}')
+    assert response.status_code == 200, response.text
+    assert response.json()['color_hex'].startswith('#')
+
+    response = api_client.patch(f'/api/wells/{well_id}', json={'color_hex': '#123abc'})
+    assert response.status_code == 200, response.text
+    assert response.json()['color_hex'] == '#123abc'
+
+    response = api_client.post('/api/projects/save')
+    assert response.status_code == 200, response.text
+    response = api_client.post('/api/projects/close')
+    assert response.status_code == 200, response.text
+    response = api_client.post('/api/projects/open', json={'path': str(project_path)})
+    assert response.status_code == 200, response.text
+
+    response = api_client.get(f'/api/wells/{well_id}')
+    assert response.status_code == 200, response.text
+    assert response.json()['color_hex'] == '#123abc'
+
+    manager = app.state.project_manager
+    with manager.get_session() as session:
+        well = session.get(WellModel, well_id)
+        assert well is not None
+        well.color_hex = None
+        session.commit()
+
+    response = api_client.post('/api/projects/save')
+    assert response.status_code == 200, response.text
+    response = api_client.post('/api/projects/close')
+    assert response.status_code == 200, response.text
+    response = api_client.post('/api/projects/open', json={'path': str(project_path)})
+    assert response.status_code == 200, response.text
+
+    response = api_client.get(f'/api/wells/{well_id}')
+    assert response.status_code == 200, response.text
+    assert response.json()['color_hex'].startswith('#')
+    assert len(response.json()['color_hex']) == 7
 
 
 def test_logs_csv_import_supports_comma_and_tab_delimiters(api_client: TestClient, tmp_path: Path):

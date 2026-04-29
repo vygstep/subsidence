@@ -7,7 +7,7 @@ from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column, relationship
 from sqlalchemy import MetaData
 
 SUBSIDENCE_APP_ID = 0x53554253  # "SUBS" as 4-byte int
-SCHEMA_VERSION = 12
+SCHEMA_VERSION = 13
 
 _NAMING: dict[str, str] = {
     "ix": "ix_%(table_name)s_%(column_0_name)s",
@@ -82,6 +82,7 @@ class WellModel(Base, AuditMixin):
     lat: Mapped[float | None] = mapped_column(Float, nullable=True)
     lon: Mapped[float | None] = mapped_column(Float, nullable=True)
     crs: Mapped[str] = mapped_column(String(64), default="unset")
+    color_hex: Mapped[str | None] = mapped_column(String(9), nullable=True)
     source_las_path: Mapped[str | None] = mapped_column(Text, nullable=True)
     extra: Mapped[str | None] = mapped_column(Text, nullable=True)  # JSON blob
 

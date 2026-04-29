@@ -39,6 +39,7 @@ export function createMockWell(overrides?: Partial<Well>): Well {
   return {
     well_id: 'well-1',
     well_name: 'Test Well A',
+    color_hex: '#2563eb',
     kb_elev: 100,
     gl_elev: 95,
     td_md: 3000,

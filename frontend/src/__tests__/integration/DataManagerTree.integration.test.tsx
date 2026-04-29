@@ -17,6 +17,7 @@ function createWellInventory(overrides: Partial<WellInventory>): WellInventory {
   return {
     well_id: 'well-a',
     well_name: 'Well A',
+    color_hex: '#2563eb',
     kb_elev: 10,
     gl_elev: 0,
     td_md: 1000,

@@ -17,6 +17,7 @@ import type {
 
 interface WellInspectorDraft {
   well_name: string
+  color_hex: string
   x: string
   y: string
   kb_elev: string

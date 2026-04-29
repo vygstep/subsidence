@@ -225,6 +225,7 @@ class CreateWellRequest(BaseModel):
 class CreateWellResponse(BaseModel):
     well_id: str
     well_name: str
+    color_hex: str
 
 
 class OpenProjectResponse(BaseModel):
@@ -396,7 +397,7 @@ def create_well(payload: CreateWellRequest, request: Request) -> CreateWellRespo
             session.refresh(row)
 
         manager.execute_command(command)
-        return CreateWellResponse(well_id=row.id, well_name=row.name)
+        return CreateWellResponse(well_id=row.id, well_name=row.name, color_hex=row.color_hex or '#2563eb')
 
 
 @router.delete('/wells/{well_id}', response_model=DictionaryUpdateResponse)

@@ -14,6 +14,7 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from ..schema import CurveMetadata, WellModel
+from ..well_colors import select_available_well_color
 
 _DEPTH_MNEMONICS = {'DEPT', 'DEPTH', 'MD', 'TVD', 'TVDSS'}
 _DEFAULT_TOP_COLOR = '#4b5563'
@@ -100,8 +101,14 @@ def create_empty_well(
     source_las_path: str | None = None,
     extra: dict[str, object] | None = None,
 ) -> WellModel:
+    well_id = str(uuid4())
+    used_colors = {
+        color.lower()
+        for color in session.scalars(select(WellModel.color_hex)).all()
+        if color
+    }
     well = WellModel(
-        id=str(uuid4()),
+        id=well_id,
         uwi=(uwi or '').strip() or None,
         name=_normalize_well_name(name),
         kb_elev=kb if kb is not None else DEFAULT_WELL_KB,
@@ -110,6 +117,7 @@ def create_empty_well(
         lat=y if y is not None else DEFAULT_WELL_Y,
         lon=x if x is not None else DEFAULT_WELL_X,
         crs=_normalized_crs(crs),
+        color_hex=select_available_well_color(used_colors, f'{well_id}:{name or ""}'),
         source_las_path=source_las_path,
         extra=json.dumps(extra, ensure_ascii=True) if extra else None,
     )
