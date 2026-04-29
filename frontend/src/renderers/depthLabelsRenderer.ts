@@ -7,12 +7,13 @@ export function drawDepthLabels(
   majorInterval: number,
   unit: 'm' | 'km' | 'ft' = 'm',
   labelTransform?: (md: number) => number,
+  color = '#516273',
 ): void {
   const [depthStart, depthEnd] = depthScale.domain()
   const firstLabel = Math.ceil(depthStart / majorInterval) * majorInterval
 
   ctx.save()
-  ctx.fillStyle = '#516273'
+  ctx.fillStyle = color
   ctx.font = '12px Segoe UI'
   ctx.textAlign = 'right'
   ctx.textBaseline = 'middle'

@@ -3,6 +3,7 @@ import { useEffect, useMemo, useState } from 'react'
 
 import { useCanvasRenderer, useDepthScale } from '@/hooks'
 import {
+  computeGapThreshold,
   drawCurve,
   drawDepthGridlines,
   drawFillBetweenCurves,
@@ -167,6 +168,11 @@ export function DataTrack({ config, curves, width, height }: DataTrackProps) {
     [clippedCurves],
   )
 
+  const curveGapThresholds = useMemo(
+    () => new Map(visibleCurves.map(({ curve, style }) => [style.mnemonic, computeGapThreshold(curve.depths, 5)])),
+    [visibleCurves],
+  )
+
   const { scale: depthScale } = useDepthScale(visibleDepthRange, height)
 
   const curveScales = useMemo(() => {
@@ -238,7 +244,9 @@ export function DataTrack({ config, curves, width, height }: DataTrackProps) {
         }
       }
 
-      drawDepthGridlines(ctx, depthScale, canvasWidth, 100, 10)
+      if (config.showHorizontalGrid ?? true) {
+        drawDepthGridlines(ctx, depthScale, canvasWidth, 100, 10, config.gridColor)
+      }
 
       clippedCurves.forEach(({ curve, style }) => {
         if (!style.fill) {
@@ -307,7 +315,7 @@ export function DataTrack({ config, curves, width, height }: DataTrackProps) {
         }
 
         const isSelected = selectedElementType === 'curve' && selectedElementId === style.mnemonic
-        drawCurve(ctx, curve.depths, curve.values, depthScale, valueScale, style, curve.null_value, isSelected)
+        drawCurve(ctx, curve.depths, curve.values, depthScale, valueScale, style, curve.null_value, isSelected, 5, curveGapThresholds.get(style.mnemonic))
       })
     },
     [
@@ -316,9 +324,12 @@ export function DataTrack({ config, curves, width, height }: DataTrackProps) {
       compositionBands,
       config.curves,
       config.gridDivisions,
+      config.gridColor,
       config.scaleType,
       config.showGrid,
+      config.showHorizontalGrid,
       config.track_type,
+      curveGapThresholds,
       curveScales,
       depthScale,
       isLithologyTrack,

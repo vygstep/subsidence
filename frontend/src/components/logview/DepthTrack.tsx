@@ -40,13 +40,15 @@ export function DepthTrack({ height, width = 60, isSelected = false }: DepthTrac
   }, [depthBasis, depthType, tvdTable, kbElev])
 
   const canvasRef = useCanvasRenderer(
-    (ctx, canvasWidth, canvasHeight) => {
+    (ctx, canvasWidth, _canvasHeight) => {
       ctx.fillStyle = depthTrackConfig.backgroundColor
-      ctx.fillRect(0, 0, canvasWidth, canvasHeight)
-      drawDepthGridlines(ctx, depthScale, canvasWidth, majorInterval, minorInterval)
-      drawDepthLabels(ctx, depthScale, canvasWidth, majorInterval, depthTrackConfig.unit, labelTransform)
+      ctx.fillRect(0, 0, canvasWidth, _canvasHeight)
+      if (depthTrackConfig.showHorizontalGrid) {
+        drawDepthGridlines(ctx, depthScale, canvasWidth, majorInterval, minorInterval, depthTrackConfig.gridColor)
+      }
+      drawDepthLabels(ctx, depthScale, canvasWidth, majorInterval, depthTrackConfig.unit, labelTransform, depthTrackConfig.labelColor)
     },
-    [depthScale, depthTrackConfig.backgroundColor, depthTrackConfig.unit, majorInterval, minorInterval, labelTransform],
+    [depthScale, depthTrackConfig, majorInterval, minorInterval, labelTransform],
   )
 
   return <canvas ref={canvasRef} className={`depth-track ${isSelected ? 'depth-track--selected' : ''}`} style={{ width, height }} />

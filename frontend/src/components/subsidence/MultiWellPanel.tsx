@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useRef } from 'react'
 
 import { useCanvasRenderer } from '@/hooks/useCanvasRenderer'
 import { useMultiWellStore } from '@/stores/multiWellStore'
+import { useViewStore } from '@/stores/viewStore'
 import { useWellDataStore } from '@/stores/wellDataStore'
 import { GeologicalTimescale } from './GeologicalTimescale'
 
@@ -28,9 +29,12 @@ export function MultiWellPanel() {
   const wellResults = useMultiWellStore((s) => s.wellResults)
   const fetchResults = useMultiWellStore((s) => s.fetchResults)
   const activeWellId = useWellDataStore((s) => s.well?.well_id ?? null)
+  const subsidenceDepthMinM = useViewStore((s) => s.subsidenceDepthMinM)
+  const subsidenceDepthMaxM = useViewStore((s) => s.subsidenceDepthMaxM)
 
   const crosshairRef = useRef<HTMLCanvasElement>(null)
   const maxAgeRef = useRef(100)
+  const minDepthMRef = useRef(0)
   const maxDepthMRef = useRef(3000)
 
   useEffect(() => {
@@ -49,10 +53,9 @@ export function MultiWellPanel() {
     return max > 0 ? max : 100
   }, [wellResults])
 
-  const maxDepthM = useMemo(() => {
+  const autoMaxDepthM = useMemo(() => {
     let max = 0
     for (const wr of wellResults) {
-      if (wr.tdMd > max) max = wr.tdMd
       for (const curve of wr.curves) {
         for (const pt of curve.burial_path) {
           if (pt.depth_m > max) max = pt.depth_m
@@ -62,8 +65,12 @@ export function MultiWellPanel() {
     return max > 0 ? max : 3000
   }, [wellResults])
 
+  const effectiveMinDepthM = subsidenceDepthMinM ?? 0
+  const effectiveMaxDepthM = subsidenceDepthMaxM ?? autoMaxDepthM
+
   maxAgeRef.current = maxAge
-  maxDepthMRef.current = maxDepthM
+  minDepthMRef.current = effectiveMinDepthM
+  maxDepthMRef.current = effectiveMaxDepthM
 
   const drawCrosshair = useCallback((cssX: number | null, cssY: number | null) => {
     const canvas = crosshairRef.current
@@ -84,6 +91,7 @@ export function MultiWellPanel() {
     if (cssX === null || cssY === null) return
 
     const currentMaxAge = maxAgeRef.current
+    const currentMinDepthM = minDepthMRef.current
     const currentMaxDepthM = maxDepthMRef.current
     const plotW = w - PADDING.left - PADDING.right
     const plotH = h - PADDING.top - PADDING.bottom
@@ -92,7 +100,7 @@ export function MultiWellPanel() {
     if (cssY < PADDING.top || cssY > PADDING.top + plotH) return
 
     const age = currentMaxAge * (1 - (cssX - PADDING.left) / plotW)
-    const depthM = currentMaxDepthM * (cssY - PADDING.top) / plotH
+    const depthM = currentMinDepthM + (currentMaxDepthM - currentMinDepthM) * (cssY - PADDING.top) / plotH
 
     ctx.save()
     ctx.scale(ratio, ratio)
@@ -164,8 +172,9 @@ export function MultiWellPanel() {
     const timeToX = (age: number) =>
       PADDING.left + ((maxAge - age) / (maxAge || 1)) * plotW
 
+    const depthRange = effectiveMaxDepthM - effectiveMinDepthM || 1
     const depthToY = (depthM: number) =>
-      PADDING.top + (depthM / (maxDepthM || 1)) * plotH
+      PADDING.top + ((depthM - effectiveMinDepthM) / depthRange) * plotH
 
     // Axes
     ctx.save()
@@ -186,11 +195,13 @@ export function MultiWellPanel() {
     ctx.font = '10px system-ui, sans-serif'
 
     // Y ticks (depth in km)
-    const maxDepthKm = maxDepthM / 1000
-    const depthStep = niceStep(maxDepthKm, 4)
+    const minDepthKm = effectiveMinDepthM / 1000
+    const maxDepthKm = effectiveMaxDepthM / 1000
+    const depthStep = niceStep(maxDepthKm - minDepthKm, 4)
+    const firstTickKm = Math.ceil(minDepthKm / depthStep) * depthStep
     ctx.textAlign = 'right'
     ctx.textBaseline = 'middle'
-    for (let dKm = 0; dKm <= maxDepthKm + depthStep * 0.01; dKm += depthStep) {
+    for (let dKm = firstTickKm; dKm <= maxDepthKm + depthStep * 0.01; dKm += depthStep) {
       const y = depthToY(dKm * 1000)
       ctx.beginPath()
       ctx.moveTo(PADDING.left - 4, y)
@@ -288,7 +299,7 @@ export function MultiWellPanel() {
       ctx.font = isActive ? 'bold 10px system-ui, sans-serif' : '10px system-ui, sans-serif'
       ctx.fillText(wr.wellName, legendX + 16, y)
     }
-  }, [wellResults, activeWellId, maxAge, maxDepthM])
+  }, [wellResults, activeWellId, maxAge, effectiveMinDepthM, effectiveMaxDepthM])
 
   const canvasRef = useCanvasRenderer(draw, [draw])
 

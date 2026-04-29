@@ -17,7 +17,7 @@ function lineDash(style: CurveStyle['lineStyle']): number[] {
   }
 }
 
-function computeGapThreshold(depths: Float32Array, multiplier: number): number {
+export function computeGapThreshold(depths: Float32Array, multiplier: number): number {
   if (depths.length < 2) return Infinity
   const n = depths.length - 1
   const stride = Math.max(1, Math.floor(n / 500))
@@ -41,12 +41,13 @@ export function drawCurve(
   nullValue: number | null = null,
   isSelected = false,
   gapMultiplier = 5,
+  gapThresholdOverride?: number,
 ): void {
   if (depths.length === 0 || values.length === 0) {
     return
   }
 
-  const gapThreshold = computeGapThreshold(depths, gapMultiplier)
+  const gapThreshold = gapThresholdOverride !== undefined ? gapThresholdOverride : computeGapThreshold(depths, gapMultiplier)
 
   ctx.save()
   ctx.strokeStyle = style.color

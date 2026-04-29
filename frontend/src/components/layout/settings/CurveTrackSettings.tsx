@@ -51,13 +51,30 @@ export function CurveTrackSettings({ track, onTrackSettingUpdate }: CurveTrackSe
         />
       </div>
       <label className="sf-row">
-        <span>Show grid</span>
+        <span>Show vertical grid</span>
         <input
           type="checkbox"
           checked={track.showGrid}
           onChange={(e) => onTrackSettingUpdate(track.id, { showGrid: e.target.checked })}
         />
       </label>
+      <label className="sf-row">
+        <span>Show horizontal grid</span>
+        <input
+          type="checkbox"
+          checked={track.showHorizontalGrid ?? true}
+          onChange={(e) => onTrackSettingUpdate(track.id, { showHorizontalGrid: e.target.checked })}
+        />
+      </label>
+      <div className="sf-row">
+        <span>Grid color</span>
+        <input
+          type="color"
+          className="sf-swatch"
+          value={track.gridColor ?? '#d5e1ec'}
+          onChange={(e) => onTrackSettingUpdate(track.id, { gridColor: e.target.value })}
+        />
+      </div>
     </div>
   )
 }

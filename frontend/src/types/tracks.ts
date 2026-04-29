@@ -6,6 +6,8 @@ export interface TrackConfig {
   scaleType: 'linear' | 'logarithmic'
   gridDivisions: number
   showGrid: boolean
+  showHorizontalGrid?: boolean
+  gridColor?: string
   track_type?: 'data' | 'lithology'
 }
 

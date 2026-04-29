@@ -65,6 +65,32 @@ export function DepthTrackSettings() {
           onChange={(event) => updateDepthTrackConfig({ minorInterval: Number(event.target.value) })}
         />
       </div>
+      <label className="sf-row">
+        <span>Show H. grid</span>
+        <input
+          type="checkbox"
+          checked={depthTrackConfig.showHorizontalGrid}
+          onChange={(e) => updateDepthTrackConfig({ showHorizontalGrid: e.target.checked })}
+        />
+      </label>
+      <div className="sf-row">
+        <span>Grid color</span>
+        <input
+          type="color"
+          className="sf-swatch"
+          value={depthTrackConfig.gridColor}
+          onChange={(e) => updateDepthTrackConfig({ gridColor: e.target.value })}
+        />
+      </div>
+      <div className="sf-row">
+        <span>Label color</span>
+        <input
+          type="color"
+          className="sf-swatch"
+          value={depthTrackConfig.labelColor}
+          onChange={(e) => updateDepthTrackConfig({ labelColor: e.target.value })}
+        />
+      </div>
     </div>
   )
 }

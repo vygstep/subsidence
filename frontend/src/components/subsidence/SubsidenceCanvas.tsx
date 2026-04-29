@@ -2,7 +2,7 @@ import { useCallback, useMemo, useRef } from 'react'
 
 import { useCanvasRenderer } from '@/hooks/useCanvasRenderer'
 import { drawBurialCurves, drawFormationFills } from '@/renderers/subsidenceRenderer'
-import { useComputedStore } from '@/stores'
+import { useComputedStore, useViewStore } from '@/stores'
 import { useWellDataStore } from '@/stores/wellDataStore'
 import type { SubsidenceResult } from '@/types/subsidence'
 import { GeologicalTimescale } from './GeologicalTimescale'
@@ -15,6 +15,7 @@ function drawAxes(
   width: number,
   height: number,
   maxAge: number,
+  minDepthM: number,
   maxDepthM: number,
   timeToX: (age: number) => number,
   depthToY: (depthM: number) => number,
@@ -44,9 +45,11 @@ function drawAxes(
   ctx.textBaseline = 'middle'
 
   // Y tick marks — depth in km
+  const minDepthKm = minDepthM / 1000
   const maxDepthKm = maxDepthM / 1000
-  const depthStepKm = niceStep(maxDepthKm, 5)
-  for (let dKm = 0; dKm <= maxDepthKm + depthStepKm * 0.01; dKm += depthStepKm) {
+  const depthStepKm = niceStep(maxDepthKm - minDepthKm, 5)
+  const firstTickKm = Math.ceil(minDepthKm / depthStepKm) * depthStepKm
+  for (let dKm = firstTickKm; dKm <= maxDepthKm + depthStepKm * 0.01; dKm += depthStepKm) {
     const y = depthToY(dKm * 1000)
     ctx.beginPath()
     ctx.moveTo(PADDING.left - 4, y)
@@ -137,14 +140,17 @@ export function SubsidenceCanvas() {
   const containerRef = useRef<HTMLDivElement>(null)
   const crosshairRef = useRef<HTMLCanvasElement>(null)
   const maxAgeRef = useRef(100)
+  const minDepthMRef = useRef(0)
   const maxDepthMRef = useRef(3000)
 
   const subsidenceCurves = useComputedStore((s) => s.subsidenceCurves)
   const showFormationFills = useComputedStore((s) => s.showFormationFills)
   const showBurialCurves = useComputedStore((s) => s.showBurialCurves)
 
+  const subsidenceDepthMinM = useViewStore((s) => s.subsidenceDepthMinM)
+  const subsidenceDepthMaxM = useViewStore((s) => s.subsidenceDepthMaxM)
+
   const wellName = useWellDataStore((s) => s.well?.well_name ?? null)
-  const tdMd = useWellDataStore((s) => s.well?.td_md ?? 0)
   const formations = useWellDataStore((s) => s.formations)
 
   // X axis: 0 (present, right) → oldest formation age (left)
@@ -156,20 +162,24 @@ export function SubsidenceCanvas() {
     return max > 0 ? max : 100
   }, [formations])
 
-  // Y axis: max of well TD and deepest burial depth in results
-  const maxDepthM = useMemo(() => {
-    let max = tdMd > 0 ? tdMd : 0
+  // Y axis auto range: fit to burial data (no tdMd padding)
+  const autoMaxDepthM = useMemo(() => {
+    let max = 0
     for (const c of subsidenceCurves) {
       for (const pt of c.burial_path) {
         if (pt.depth_m > max) max = pt.depth_m
       }
     }
     return max > 0 ? max : 3000
-  }, [tdMd, subsidenceCurves])
+  }, [subsidenceCurves])
+
+  const effectiveMinDepthM = subsidenceDepthMinM ?? 0
+  const effectiveMaxDepthM = subsidenceDepthMaxM ?? autoMaxDepthM
 
   // Keep refs in sync so crosshair handler always has latest values without re-binding
   maxAgeRef.current = maxAge
-  maxDepthMRef.current = maxDepthM
+  minDepthMRef.current = effectiveMinDepthM
+  maxDepthMRef.current = effectiveMaxDepthM
 
   const drawCrosshair = useCallback((cssX: number | null, cssY: number | null) => {
     const canvas = crosshairRef.current
@@ -190,6 +200,7 @@ export function SubsidenceCanvas() {
     if (cssX === null || cssY === null) return
 
     const currentMaxAge = maxAgeRef.current
+    const currentMinDepthM = minDepthMRef.current
     const currentMaxDepthM = maxDepthMRef.current
     const plotW = w - PADDING.left - PADDING.right
     const plotH = h - PADDING.top - PADDING.bottom
@@ -198,7 +209,7 @@ export function SubsidenceCanvas() {
     if (cssY < PADDING.top || cssY > PADDING.top + plotH) return
 
     const age = currentMaxAge * (1 - (cssX - PADDING.left) / plotW)
-    const depthM = currentMaxDepthM * (cssY - PADDING.top) / plotH
+    const depthM = currentMinDepthM + (currentMaxDepthM - currentMinDepthM) * (cssY - PADDING.top) / plotH
 
     ctx.save()
     ctx.scale(ratio, ratio)
@@ -264,10 +275,11 @@ export function SubsidenceCanvas() {
     const timeToX = (age: number) =>
       PADDING.left + ((maxAge - age) / (maxAge || 1)) * plotW
 
+    const depthRange = effectiveMaxDepthM - effectiveMinDepthM || 1
     const depthToY = (depthM: number) =>
-      PADDING.top + (depthM / (maxDepthM || 1)) * plotH
+      PADDING.top + ((depthM - effectiveMinDepthM) / depthRange) * plotH
 
-    drawAxes(ctx, width, height, maxAge, maxDepthM, timeToX, depthToY)
+    drawAxes(ctx, width, height, maxAge, effectiveMinDepthM, effectiveMaxDepthM, timeToX, depthToY)
 
     ctx.save()
     ctx.beginPath()
@@ -280,7 +292,7 @@ export function SubsidenceCanvas() {
     ctx.restore()
 
     drawFormationLabels(ctx, subsidenceCurves, PADDING.left + plotW, depthToY)
-  }, [subsidenceCurves, maxAge, maxDepthM, showFormationFills, showBurialCurves])
+  }, [subsidenceCurves, maxAge, effectiveMinDepthM, effectiveMaxDepthM, showFormationFills, showBurialCurves])
 
   const canvasRef = useCanvasRenderer(draw, [draw])
 

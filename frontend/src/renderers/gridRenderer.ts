@@ -107,6 +107,7 @@ export function drawDepthGridlines(
   width: number,
   majorInterval: number,
   minorInterval: number,
+  colorOverride?: string,
 ): void {
   const [depthStart, depthEnd] = depthScale.domain()
   const firstMinor = Math.ceil(depthStart / minorInterval) * minorInterval
@@ -117,7 +118,7 @@ export function drawDepthGridlines(
     const y = depthScale(depth)
     const isMajor = depth % majorInterval === 0
     ctx.beginPath()
-    ctx.strokeStyle = isMajor ? '#c4d0dc' : '#e2e8f0'
+    ctx.strokeStyle = colorOverride ?? (isMajor ? '#c4d0dc' : '#e2e8f0')
     ctx.lineWidth = isMajor ? 1.1 : 0.8
     ctx.moveTo(0, y)
     ctx.lineTo(width, y)

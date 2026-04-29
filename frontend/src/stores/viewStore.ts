@@ -22,11 +22,16 @@ export interface DepthTrackConfig {
   majorInterval: number
   minorInterval: number
   unit: 'm' | 'km' | 'ft'
+  showHorizontalGrid: boolean
+  gridColor: string
+  labelColor: string
 }
 
 export interface FormationsTrackConfig {
   backgroundColor: string
   nameSource: 'formation-name' | 'linked-strat-unit'
+  showLabels: boolean
+  labelPosition: 'left' | 'center' | 'right'
 }
 
 export interface ViewStore {
@@ -48,6 +53,8 @@ export interface ViewStore {
   subsidenceBottomHeight: number
   depthType: 'MD' | 'TVD' | 'TVDSS'
   activePickId: string | null
+  subsidenceDepthMinM: number | null
+  subsidenceDepthMaxM: number | null
   setScroll: (depth: number) => void
   setScale: (dpp: number) => void
 
@@ -66,6 +73,8 @@ export interface ViewStore {
   setSubsidenceWidth: (width: number) => void
   setSubsidenceBottomHeight: (height: number) => void
   setDepthType: (t: 'MD' | 'TVD' | 'TVDSS') => void
+  setSubsidenceDepthMinM: (v: number | null) => void
+  setSubsidenceDepthMaxM: (v: number | null) => void
   lodEnabled: boolean
   setLodEnabled: (v: boolean) => void
   applyActiveWellTrackWidths: (trackWidths: Record<string, number>) => void
@@ -96,10 +105,15 @@ const initialDepthTrackConfig: DepthTrackConfig = {
   majorInterval: 100,
   minorInterval: 10,
   unit: 'm',
+  showHorizontalGrid: true,
+  gridColor: '#c4d0dc',
+  labelColor: '#516273',
 }
 const initialFormationsTrackConfig: FormationsTrackConfig = {
   backgroundColor: '#ffffff',
   nameSource: 'formation-name',
+  showLabels: true,
+  labelPosition: 'center',
 }
 
 function normalizeTrackWidths(trackWidths: Record<string, number> | undefined): Record<string, number> {
@@ -130,6 +144,8 @@ export const useViewStore = create<ViewStore>((set) => ({
   subsidenceBottomHeight: initialSubsidenceBottomHeight,
   depthType: 'MD',
   activePickId: null,
+  subsidenceDepthMinM: null,
+  subsidenceDepthMaxM: null,
   lodEnabled: false,
   setScroll(depth) {
     set((state) => ({
@@ -209,6 +225,12 @@ export const useViewStore = create<ViewStore>((set) => ({
   },
   setDepthType(t) {
     set({ depthType: t })
+  },
+  setSubsidenceDepthMinM(v) {
+    set({ subsidenceDepthMinM: v })
+  },
+  setSubsidenceDepthMaxM(v) {
+    set({ subsidenceDepthMaxM: v })
   },
   setLodEnabled(v) {
     set({ lodEnabled: v })

@@ -61,6 +61,8 @@ export function createEmptyTrack(trackId = 'track-1', title = 'Track 1'): TrackC
     scaleType: 'linear',
     gridDivisions: 3,
     showGrid: true,
+    showHorizontalGrid: true,
+    gridColor: '#d5e1ec',
     curves: [],
   }
 }
