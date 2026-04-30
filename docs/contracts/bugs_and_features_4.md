@@ -1567,7 +1567,7 @@ Frontend fallback if backend cannot own it cleanly:
 
 ---
 
-## BF4-016: Simplified LAS/CSV import — options on preview step, direct Load (todo)
+## BF4-016: Simplified LAS/CSV import — options on preview step, direct Load (done)
 
 **Summary**: The LAS and CSV log import dialogs have too many wizard steps. Both should collapse to
 two steps: File → Preview (with options inline) + Load button. The separate Options and
@@ -1864,6 +1864,16 @@ endpoint to accept and apply the override map.
 - `app/src/subsidence/api/wells.py` or the LAS/CSV import endpoint (sub-item H — backend)
 
 **Complexity**: S — frontend only for A–G; sub-item H adds a small backend touch.
+
+**Implemented** (commit `c30c805`):
+- A: `ImportLasDialog` uses `['File', 'Preview']` step labels; options block rendered inline after preview.
+- B: `detectLasDepthRef()` on `lasPreview.curves[0].mnemonic` pre-fills depth reference.
+- C: `lasPreview.well_name` matched case-insensitively against wells list; auto-selects well or falls back to `wellPolicy='file'`. Replaces old `fileWellSource` effect.
+- D: CSV path uses same 2-step flow; `MappingPane` block removed; `mapping['depth']` taken from auto-map.
+- E: `detectCsvDepthRef()` on `mapping['depth']` change pre-fills depth reference.
+- F: `TabularPreviewPane` gains `depthColumn` prop; depth column header and cells get `.import-preview__col--depth` highlight.
+- G: `ImportWizardShell` header Close button removed; Cancel in footer is sufficient.
+- H: `LasPreviewPane` gains `curveTypes` / `onCurveTypeChange` props; Type column with `<select>` per data curve (depth curve at index 0 shows "depth" label). CSV curve types auto-detected from preview rows (all-integer → discrete). `curve_types` passed in POST body; backend applies to `curve_metadata` after import.
 
 ---
 
