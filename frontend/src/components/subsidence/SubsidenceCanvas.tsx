@@ -106,6 +106,12 @@ function drawFormationLabels(
   plotRight: number,
   depthToY: (depth: number) => number,
 ) {
+  function displayLabel(fullName: string): string {
+    const arrowIdx = fullName.indexOf(' -> ')
+    const name = arrowIdx !== -1 ? fullName.slice(0, arrowIdx) : fullName
+    return name.length > 18 ? `${name.slice(0, 17)}…` : name
+  }
+
   ctx.save()
   ctx.font = '10px system-ui, sans-serif'
   ctx.textAlign = 'left'
@@ -125,7 +131,7 @@ function drawFormationLabels(
     ctx.fill()
 
     ctx.fillStyle = '#334155'
-    ctx.fillText(curve.formation_name, x + 10, y)
+    ctx.fillText(displayLabel(curve.formation_name), x + 10, y)
   }
 
   ctx.restore()

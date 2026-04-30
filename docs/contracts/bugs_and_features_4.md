@@ -724,7 +724,7 @@ the chart — this is geologically correct and expected.
 
 ---
 
-## BF4-013: Use marker names (not zone names) on burial chart labels (todo)
+## BF4-013: Use marker names (not zone names) on burial chart labels (done)
 
 **Problem**: In `SubsidenceCanvas.tsx` `drawFormationLabels()` (line 129), labels are drawn as
 `curve.formation_name`. When subsidence is computed using zone intervals, the name can be a
@@ -752,6 +752,15 @@ This:
 
 **Affected files**:
 - `frontend/src/components/subsidence/SubsidenceCanvas.tsx` (`drawFormationLabels` function)
+
+**Implemented**:
+- Single-well burial chart labels now display only the name before ` -> `.
+- Labels longer than 18 characters are truncated with an ellipsis.
+
+**Manual check**:
+- Compute/show a chart from zone-based intervals and verify labels display the upper marker name
+  only, e.g. `Permian` instead of `Permian -> Jurassic`.
+- Verify long marker names are shortened and do not run deep into the right margin.
 
 ---
 

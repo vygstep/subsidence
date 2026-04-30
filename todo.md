@@ -6,7 +6,6 @@ Active contract: `docs/contracts/bugs_and_features_4.md`
 
 | Item | Title | Status |
 |---|---|---|
-| BF4-013 | Use marker names not zone names on burial chart labels | todo |
 | BF4-014 | Horizontal km gridlines on subsidence chart | todo |
 | BF4-003 | StratCharts tab restructure (rename + collapsible roots) | todo |
 | BF4-008 | Move sea level selector to ModelSettings | todo |
