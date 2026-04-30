@@ -6,7 +6,6 @@ Active contract: `docs/contracts/bugs_and_features_4.md`
 
 | Item | Title | Status |
 |---|---|---|
-| BF4-008 | Move sea level selector to ModelSettings | todo |
 | BF4-009 | Models tree computed state + radio indicator | todo |
 | BF4-004 | Curve settings accessible when log is disabled | todo |
 | BF4-016 | Simplified LAS/CSV import — options on preview, direct Load | todo |

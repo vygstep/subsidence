@@ -436,7 +436,7 @@ ability to override this per-formation, with a reset button to return to the cur
 
 ---
 
-## BF4-008: Sea level curve selector — move to Models only (todo)
+## BF4-008: Sea level curve selector — move to Models only (done)
 
 **Problem**: The eustatic curve selector currently lives in `WellSettings.tsx`. Per user decision,
 it should only appear in the Models settings panel, not in well settings.
@@ -513,6 +513,25 @@ and looked up in `seaLevelCurves`. This is read-only — user must go to Models 
 - `frontend/src/components/layout/settings/ZoneSettings.tsx` (add read-only display)
 - `frontend/src/components/subsidence/SubsidenceCanvas.tsx` (resolve well-wide curve only)
 - `frontend/src/stores/viewStore.ts` and `frontend/src/stores/projectStore.ts` (remove/ignore per-model sea level config)
+
+**Implemented**:
+- Removed the sea-level correction selector from Well settings.
+- Added the eustatic curve selector to `SubsidenceModelSettings` for the implemented `total`
+  model; it writes the well-wide active curve through `setWellActiveSeaLevelCurve`.
+- `SubsidenceCanvas` and chart settings now resolve the sea-level curve only from the active well
+  inventory.
+- `SubsidenceModelConfig` now stores only `zoneSetId`; legacy visual config `seaLevelCurveId`
+  values are ignored during hydration.
+- `ZoneSettings` shows the active eustatic curve as a read-only well-wide value.
+
+**Manual check**:
+- Select a well: Well settings should no longer show "Sea level correction".
+- Select `Models -> Total burial / total subsidence`: choose an eustatic curve and verify the
+  selected curve persists as the well-wide active curve.
+- Open Single Well chart settings and Zone settings; both should display the same curve selected
+  from Models.
+- Toggle sea-level overlay on the Single Well chart and verify it uses the model-selected well-wide
+  curve.
 
 ---
 

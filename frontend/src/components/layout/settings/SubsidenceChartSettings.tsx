@@ -13,15 +13,11 @@ export function SubsidenceChartSettings({ chartType }: SubsidenceChartSettingsPr
   const setDepthMax = useViewStore((s) => single ? s.setSubsidenceSingleDepthMax : s.setSubsidenceMultiDepthMax)
   const showSeaLevel = useViewStore((s) => s.subsidenceSingleShowSeaLevel)
   const setShowSeaLevel = useViewStore((s) => s.setSubsidenceSingleShowSeaLevel)
-  const activeModelType = useViewStore((s) => s.activeSubsidenceModelType)
-  const modelConfig = useViewStore((s) => s.subsidenceModelConfigs[s.activeSubsidenceModelType])
   const seaLevelCurves = useWellDataStore((s) => s.seaLevelCurves)
   const wellInventories = useWellDataStore((s) => s.wellInventories)
   const activeWellId = useWellDataStore((s) => s.well?.well_id ?? null)
   const activeWellCurveId = wellInventories.find((well) => well.well_id === activeWellId)?.active_sea_level_curve_id ?? null
-  const resolvedCurveId = modelConfig.seaLevelCurveId ?? activeWellCurveId
-  const resolvedCurve = seaLevelCurves.find((curve) => curve.id === resolvedCurveId)
-  const curveSource = modelConfig.seaLevelCurveId !== null ? 'model' : activeWellCurveId !== null ? 'well' : null
+  const resolvedCurve = seaLevelCurves.find((curve) => curve.id === activeWellCurveId)
 
   return (
     <div className="template-panel">
@@ -68,7 +64,7 @@ export function SubsidenceChartSettings({ chartType }: SubsidenceChartSettingsPr
             <span>Curve</span>
             <span>
               {resolvedCurve
-                ? `${resolvedCurve.name} (${curveSource === 'model' ? activeModelType : 'well default'})`
+                ? `${resolvedCurve.name} (Models)`
                 : 'not selected'}
             </span>
           </div>

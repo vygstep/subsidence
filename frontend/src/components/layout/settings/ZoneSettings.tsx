@@ -12,12 +12,15 @@ export function ZoneSettings({ wellId, zoneSetId, onSelectZone, selectedZoneId }
   const zones = useWellDataStore((state) => state.zones)
   const well = useWellDataStore((state) => state.well)
   const wellInventories = useWellDataStore((state) => state.wellInventories)
+  const seaLevelCurves = useWellDataStore((state) => state.seaLevelCurves)
   const loadWell = useWellDataStore((state) => state.loadWell)
   const setSelectedObject = useWorkspaceStore((state) => state.setSelectedObject)
 
   const linkedWells = zoneSetId === undefined
     ? []
     : wellInventories.filter((item) => item.active_top_set_id === zoneSetId)
+  const activeCurveId = wellInventories.find((item) => item.well_id === wellId)?.active_sea_level_curve_id ?? null
+  const activeCurveName = seaLevelCurves.find((curve) => curve.id === activeCurveId)?.name ?? null
 
   function handleWellChange(nextWellId: string): void {
     if (zoneSetId === undefined || !nextWellId) return
@@ -40,6 +43,10 @@ export function ZoneSettings({ wellId, zoneSetId, onSelectZone, selectedZoneId }
             </select>
           </div>
         ) : null}
+        <div className="sf-row">
+          <span>Eustatic curve</span>
+          <span>{activeCurveName ?? 'None'}</span>
+        </div>
         <p className="sidebar-panel__empty">Zone data not loaded yet.</p>
       </div>
     )
@@ -63,6 +70,10 @@ export function ZoneSettings({ wellId, zoneSetId, onSelectZone, selectedZoneId }
           </select>
         </div>
       ) : null}
+      <div className="sf-row">
+        <span>Eustatic curve</span>
+        <span>{activeCurveName ?? 'None'}</span>
+      </div>
       <div className="tree-leaf"><span>Total zones</span><span>{zones.length}</span></div>
 
       {zones.length === 0 ? (

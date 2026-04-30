@@ -1,7 +1,4 @@
-import { useState } from 'react'
-
 import type { Well } from '@/types'
-import { useWellDataStore } from '@/stores'
 
 export interface WellInspectorDraft {
   well_name: string
@@ -22,27 +19,9 @@ interface WellSettingsProps {
 }
 
 export function WellSettings({ well: _well, wellInspectorDraft, onWellInspectorDraftChange, onSaveWellInspector }: WellSettingsProps) {
-  const wellInventories = useWellDataStore((state) => state.wellInventories)
-  const seaLevelCurves = useWellDataStore((state) => state.seaLevelCurves)
-  const setWellActiveSeaLevelCurve = useWellDataStore((state) => state.setWellActiveSeaLevelCurve)
-
-  const inventory = wellInventories.find((w) => w.well_id === _well.well_id)
-  const activeCurveId = inventory?.active_sea_level_curve_id ?? null
-
-  const [isSaving, setIsSaving] = useState(false)
   const colorPickerValue = /^#[0-9a-fA-F]{6}$/.test(wellInspectorDraft.color_hex)
     ? wellInspectorDraft.color_hex
     : _well.color_hex
-
-  async function handleSeaLevelChange(value: string) {
-    const curveId = value === '' ? null : parseInt(value, 10)
-    setIsSaving(true)
-    try {
-      await setWellActiveSeaLevelCurve(_well.well_id, curveId)
-    } finally {
-      setIsSaving(false)
-    }
-  }
 
   return (
     <div className="template-panel">
@@ -111,22 +90,6 @@ export function WellSettings({ well: _well, wellInspectorDraft, onWellInspectorD
         </button>
       </div>
 
-      <div className="template-panel__section-header">Sea level correction</div>
-      <div className="sf-row">
-        <span>Eustatic curve</span>
-        <select
-          value={activeCurveId ?? ''}
-          onChange={(e) => void handleSeaLevelChange(e.target.value)}
-          disabled={isSaving}
-        >
-          <option value="">None</option>
-          {seaLevelCurves.map((c) => (
-            <option key={c.id} value={c.id}>
-              {c.name}{c.point_count > 0 ? ` (${c.point_count} pts)` : ''}
-            </option>
-          ))}
-        </select>
-      </div>
     </div>
   )
 }

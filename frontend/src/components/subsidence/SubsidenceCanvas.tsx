@@ -187,7 +187,6 @@ export function SubsidenceCanvas() {
   const subsidenceDepthMaxM = useViewStore((s) => s.subsidenceSingleDepthMax)
   const showSeaLevel = useViewStore((s) => s.subsidenceSingleShowSeaLevel)
   const activeModelType = useViewStore((s) => s.activeSubsidenceModelType)
-  const modelConfig = useViewStore((s) => s.subsidenceModelConfigs[s.activeSubsidenceModelType])
 
   const wellName = useWellDataStore((s) => s.well?.well_name ?? null)
   const formations = useWellDataStore((s) => s.formations)
@@ -204,24 +203,36 @@ export function SubsidenceCanvas() {
     setSelectedObject(isSelected ? null : { type: 'subsidence-chart', chartType: 'single' })
   }, [isSelected, setSelectedObject])
 
-  // Resolve sea-level curve ID: model config override → well's active curve
   const seaLevelCurveId = useMemo(() => {
-    if (modelConfig.seaLevelCurveId !== null) return modelConfig.seaLevelCurveId
     const inv = wellInventories.find((w) => w.well_id === well?.well_id)
     return inv?.active_sea_level_curve_id ?? null
-  }, [modelConfig.seaLevelCurveId, wellInventories, well?.well_id])
+  }, [wellInventories, well?.well_id])
 
-  const [seaLevelPoints, setSeaLevelPoints] = useState<SeaLevelPoint[]>([])
+  const [loadedSeaLevelPoints, setLoadedSeaLevelPoints] = useState<{ curveId: number | null; points: SeaLevelPoint[] }>({
+    curveId: null,
+    points: [],
+  })
+  const seaLevelPoints = useMemo(
+    () => (
+      showSeaLevel && seaLevelCurveId !== null && loadedSeaLevelPoints.curveId === seaLevelCurveId
+        ? loadedSeaLevelPoints.points
+        : []
+    ),
+    [loadedSeaLevelPoints, seaLevelCurveId, showSeaLevel],
+  )
 
   useEffect(() => {
     if (!showSeaLevel || seaLevelCurveId === null) {
-      setSeaLevelPoints([])
       return
     }
     let cancelled = false
     loadSeaLevelPoints(seaLevelCurveId)
-      .then((pts) => { if (!cancelled) setSeaLevelPoints(pts) })
-      .catch(() => { if (!cancelled) setSeaLevelPoints([]) })
+      .then((points) => {
+        if (!cancelled) setLoadedSeaLevelPoints({ curveId: seaLevelCurveId, points })
+      })
+      .catch(() => {
+        if (!cancelled) setLoadedSeaLevelPoints({ curveId: seaLevelCurveId, points: [] })
+      })
     return () => { cancelled = true }
   }, [showSeaLevel, seaLevelCurveId, loadSeaLevelPoints])
 
@@ -248,11 +259,12 @@ export function SubsidenceCanvas() {
   const effectiveMinDepthM = subsidenceDepthMinM ?? 0
   const effectiveMaxDepthM = subsidenceDepthMaxM ?? autoMaxDepthM
 
-  // Keep refs in sync so crosshair handler always has latest values without re-binding
-  maxAgeRef.current = maxAge
-  minDepthMRef.current = effectiveMinDepthM
-  maxDepthMRef.current = effectiveMaxDepthM
-  paddingRightRef.current = PADDING_BASE.right
+  useEffect(() => {
+    maxAgeRef.current = maxAge
+    minDepthMRef.current = effectiveMinDepthM
+    maxDepthMRef.current = effectiveMaxDepthM
+    paddingRightRef.current = PADDING_BASE.right
+  }, [maxAge, effectiveMinDepthM, effectiveMaxDepthM])
 
   const drawCrosshair = useCallback((cssX: number | null, cssY: number | null) => {
     const canvas = crosshairRef.current

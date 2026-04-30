@@ -11,10 +11,9 @@ export type SubsidenceModelType = 'total' | 'decompaction' | 'airy' | 'stepwise'
 
 export interface SubsidenceModelConfig {
   zoneSetId: number | null
-  seaLevelCurveId: number | null
 }
 
-const DEFAULT_MODEL_CONFIG: SubsidenceModelConfig = { zoneSetId: null, seaLevelCurveId: null }
+const DEFAULT_MODEL_CONFIG: SubsidenceModelConfig = { zoneSetId: null }
 
 const ALL_MODEL_TYPES: SubsidenceModelType[] = ['total', 'decompaction', 'airy', 'stepwise', 'thermal']
 
@@ -33,7 +32,7 @@ interface VisualConfigPayload {
   subsidenceMultiDepthMin?: number | null
   subsidenceMultiDepthMax?: number | null
   activeSubsidenceModelType?: SubsidenceModelType
-  subsidenceModelConfigs?: Partial<Record<SubsidenceModelType, SubsidenceModelConfig>>
+  subsidenceModelConfigs?: Partial<Record<SubsidenceModelType, Partial<SubsidenceModelConfig> & { seaLevelCurveId?: number | null }>>
   subsidenceSingleShowSeaLevel?: boolean
 }
 
@@ -305,7 +304,13 @@ export const useViewStore = create<ViewStore>((set) => ({
       const mergedModelConfigs = { ...state.subsidenceModelConfigs }
       if (config.subsidenceModelConfigs) {
         for (const [key, val] of Object.entries(config.subsidenceModelConfigs)) {
-          if (val) mergedModelConfigs[key as SubsidenceModelType] = { ...mergedModelConfigs[key as SubsidenceModelType], ...val }
+          if (val && key in mergedModelConfigs) {
+            const modelType = key as SubsidenceModelType
+            mergedModelConfigs[modelType] = {
+              ...mergedModelConfigs[modelType],
+              zoneSetId: val.zoneSetId ?? mergedModelConfigs[modelType].zoneSetId,
+            }
+          }
         }
       }
       return {
