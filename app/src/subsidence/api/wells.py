@@ -31,12 +31,14 @@ class CurveInventoryItem(BaseModel):
     trusted_depth_reference: str = 'MD'
     curve_type: str = 'continuous'
     discrete_code_map: str | None = None
+    lithology_set_id: int | None = None
 
 
 class CurvePatchRequest(BaseModel):
     curve_type: str | None = None
     discrete_code_map: str | None = None
     family_code: str | None = None
+    lithology_set_id: int | None = None
 
 
 class FormationInventoryItem(BaseModel):
@@ -58,6 +60,7 @@ class CurveResponse(BaseModel):
     null_value: float
     curve_type: str = 'continuous'
     discrete_code_map: str | None = None
+    lithology_set_id: int | None = None
 
 
 class FormationResponse(BaseModel):
@@ -379,6 +382,7 @@ def list_well_inventories(request: Request) -> list[WellInventoryResponse]:
                             trusted_depth_reference=row.trusted_depth_reference,
                             curve_type=row.curve_type,
                             discrete_code_map=row.discrete_code_map,
+                            lithology_set_id=row.lithology_set_id,
                         )
                         for row in curve_rows
                     ],
@@ -432,6 +436,7 @@ def get_well(well_id: str, request: Request) -> WellResponse:
                         null_value=row.null_value,
                         curve_type=row.curve_type,
                         discrete_code_map=row.discrete_code_map,
+                        lithology_set_id=row.lithology_set_id,
                     )
                 )
 
@@ -544,6 +549,7 @@ def get_curves_lod(
                     null_value=row.null_value,
                     curve_type=row.curve_type,
                     discrete_code_map=row.discrete_code_map,
+                    lithology_set_id=row.lithology_set_id,
                 )
             )
         return results
@@ -610,6 +616,7 @@ def get_curves_full(
                         null_value=row.null_value,
                         curve_type=row.curve_type,
                         discrete_code_map=row.discrete_code_map,
+                        lithology_set_id=row.lithology_set_id,
                     )
                 )
             else:
@@ -623,6 +630,7 @@ def get_curves_full(
                         null_value=row.null_value,
                         curve_type=row.curve_type,
                         discrete_code_map=row.discrete_code_map,
+                        lithology_set_id=row.lithology_set_id,
                     )
                 )
         return results
@@ -647,13 +655,15 @@ def patch_curve_metadata(
         if row is None:
             raise HTTPException(status_code=404, detail=f'Curve not found: {mnemonic}')
         if body.curve_type is not None:
-            if body.curve_type not in ('continuous', 'discrete'):
-                raise HTTPException(status_code=422, detail="curve_type must be 'continuous' or 'discrete'")
+            if body.curve_type not in ('continuous', 'discrete', 'lithology_discrete', 'lithology_fraction'):
+                raise HTTPException(status_code=422, detail="curve_type must be 'continuous', 'discrete', 'lithology_discrete', or 'lithology_fraction'")
             row.curve_type = body.curve_type
         if body.discrete_code_map is not None:
             row.discrete_code_map = body.discrete_code_map
         if body.family_code is not None:
             row.family_code = body.family_code
+        if body.lithology_set_id is not None:
+            row.lithology_set_id = body.lithology_set_id
         session.commit()
         return CurveInventoryItem(
             mnemonic=row.mnemonic,
@@ -661,6 +671,7 @@ def patch_curve_metadata(
             trusted_depth_reference=row.trusted_depth_reference,
             curve_type=row.curve_type,
             discrete_code_map=row.discrete_code_map,
+            lithology_set_id=row.lithology_set_id,
         )
 
 

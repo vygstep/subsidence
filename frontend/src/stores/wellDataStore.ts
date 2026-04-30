@@ -34,8 +34,9 @@ interface CurveResponse {
   depths: number[]
   values: number[]
   null_value: number
-  curve_type?: 'continuous' | 'discrete'
+  curve_type?: 'continuous' | 'discrete' | 'lithology_discrete' | 'lithology_fraction'
   discrete_code_map?: Record<string, string> | null
+  lithology_set_id?: number | null
 }
 
 interface WellResponse extends Well {
@@ -203,6 +204,7 @@ export interface WellDataStore {
   cancelLoading: () => void
   fetchCurvesLOD: (depthMin: number, depthMax: number, resolution: number) => Promise<void>
   reloadCurvesForDepthBasis: (depthBasis: 'MD' | 'TVD' | 'TVDSS') => Promise<void>
+  patchCurveDiscreteCodeMap: (mnemonic: string, map: Record<string, string>) => void
   updateZoneLithology: (zoneId: number, lithologyFractions: string | null, lithologySource: 'manual' | 'auto') => Promise<void>
   loadSeaLevelCurves: () => Promise<SeaLevelCurve[]>
   loadSeaLevelPoints: (curveId: number) => Promise<SeaLevelPoint[]>
@@ -356,6 +358,7 @@ export const useWellDataStore = create<WellDataStore>((set, get) => ({
         null_value: curve.null_value,
         curve_type: curve.curve_type ?? 'continuous',
         discrete_code_map: curve.discrete_code_map ?? null,
+        lithology_set_id: curve.lithology_set_id ?? null,
       }))
 
       set({
@@ -1086,8 +1089,15 @@ export const useWellDataStore = create<WellDataStore>((set, get) => ({
       null_value: curve.null_value,
       curve_type: curve.curve_type ?? 'continuous',
       discrete_code_map: curve.discrete_code_map ?? null,
+      lithology_set_id: curve.lithology_set_id ?? null,
     }))
     set({ curves: mappedFull, fullCurves: mappedFull, depthBasis })
+  },
+  patchCurveDiscreteCodeMap(mnemonic, map) {
+    set((state) => ({
+      curves: state.curves.map((c) => c.mnemonic === mnemonic ? { ...c, discrete_code_map: map } : c),
+      fullCurves: state.fullCurves.map((c) => c.mnemonic === mnemonic ? { ...c, discrete_code_map: map } : c),
+    }))
   },
   async linkFormationToChart(formationId, chartId, stratUnitId) {
     const wellId = get().well?.well_id

@@ -109,6 +109,9 @@ def migrate_schema(engine: Engine) -> None:
         if 'discrete_code_map' not in curve_cols:
             conn.execute(text("ALTER TABLE curve_metadata ADD COLUMN discrete_code_map TEXT"))
             conn.commit()
+        if 'lithology_set_id' not in curve_cols:
+            conn.execute(text("ALTER TABLE curve_metadata ADD COLUMN lithology_set_id INTEGER REFERENCES lithology_sets(id)"))
+            conn.commit()
         table_names = {row[0] for row in conn.execute(text("SELECT name FROM sqlite_master WHERE type='table'"))}
         pattern_cols = {row[1] for row in conn.execute(text("PRAGMA table_info(lithology_patterns)"))}
         if 'group_name' not in pattern_cols:

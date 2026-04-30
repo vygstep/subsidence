@@ -24,16 +24,18 @@ export interface CurveData {
   depths: Float32Array
   values: Float32Array
   null_value: number
-  curve_type: 'continuous' | 'discrete'
+  curve_type: 'continuous' | 'discrete' | 'lithology_discrete' | 'lithology_fraction'
   discrete_code_map: Record<string, string> | null
+  lithology_set_id?: number | null
 }
 
 export interface CurveInventoryItem {
   mnemonic: string
   unit: string
   trusted_depth_reference?: string
-  curve_type?: 'continuous' | 'discrete'
+  curve_type?: 'continuous' | 'discrete' | 'lithology_discrete' | 'lithology_fraction'
   discrete_code_map?: Record<string, string> | null
+  lithology_set_id?: number | null
 }
 
 export interface FormationStratLink {

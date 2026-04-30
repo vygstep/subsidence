@@ -119,9 +119,11 @@ class CurveMetadata(Base, AuditMixin):
     family_code: Mapped[str | None] = mapped_column(String(64), nullable=True)
     unit: Mapped[str] = mapped_column(String(32), default="")
     original_unit: Mapped[str | None] = mapped_column(String(32), nullable=True)
-    curve_type: Mapped[str] = mapped_column(String(16), default="continuous")
-    # "continuous" — float measurements (GR, ILD, RHOB, …)
-    # "discrete"   — integer codes (lithofacies, zone flags) — Phase 3+
+    curve_type: Mapped[str] = mapped_column(String(24), default="continuous")
+    # "continuous"          — float measurements (GR, ILD, RHOB, …)
+    # "discrete"            — integer codes with label map (lithofacies flags, zone IDs)
+    # "lithology_fraction"  — v/v fraction for one lithology component (used in composition bands)
+    # "lithology_discrete"  — integer source code → lithology code via discrete_code_map
     depth_min: Mapped[float] = mapped_column(Float)
     depth_max: Mapped[float] = mapped_column(Float)
     n_samples: Mapped[int] = mapped_column(Integer)
@@ -129,8 +131,12 @@ class CurveMetadata(Base, AuditMixin):
     source_hash: Mapped[str] = mapped_column(String(64))  # sha256 of source file
     null_value: Mapped[float] = mapped_column(Float, default=-999.25)
     discrete_code_map: Mapped[str | None] = mapped_column(Text, nullable=True)
-    # JSON object mapping integer code → display label, e.g. {"1": "Sandstone", "2": "Shale"}
-    # Only meaningful when curve_type = 'discrete'; NULL means codes have no labels yet.
+    # curve_type='discrete':            JSON {"1": "Sandstone", "2": "Shale"}  (int → display label)
+    # curve_type='lithology_discrete':  JSON {"1": "sandstone", "2": "shale"}  (int → lithology_code)
+    lithology_set_id: Mapped[int | None] = mapped_column(
+        Integer, ForeignKey("lithology_sets.id"), nullable=True
+    )
+    # Optional: links the curve to a LithologySet for populating the code-map UI
     trusted_depth_reference: Mapped[str] = mapped_column(String(8), default="MD")
     # "MD" | "TVD" | "TVDSS" — depth type used in the source file
     sampling_kind: Mapped[str | None] = mapped_column(String(16), nullable=True)

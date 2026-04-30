@@ -3,6 +3,8 @@ import { useEffect, useMemo, useState } from 'react'
 import { useWellDataStore, useWorkspaceStore } from '@/stores'
 import type { TrackConfig } from '@/types'
 
+type CurveType = 'continuous' | 'discrete' | 'lithology_discrete' | 'lithology_fraction'
+
 interface CurveMatchResult {
   family_code: string | null
   canonical_unit: string | null
@@ -18,6 +20,7 @@ export function CurveSettings({ selectedCurveConfig, onCurveSettingUpdate }: Cur
   const curves = useWellDataStore((state) => state.curves)
   const well = useWellDataStore((state) => state.well)
   const lithologyDictionaryEntries = useWellDataStore((state) => state.lithologyDictionaryEntries)
+  const patchCurveDiscreteCodeMap = useWellDataStore((state) => state.patchCurveDiscreteCodeMap)
   const wellViewStates = useWorkspaceStore((state) => state.wellViewStates)
   const updateWellViewState = useWorkspaceStore((state) => state.updateWellViewState)
   const [dictMatch, setDictMatch] = useState<CurveMatchResult | null>(null)
@@ -35,8 +38,11 @@ export function CurveSettings({ selectedCurveConfig, onCurveSettingUpdate }: Cur
       .then((data) => setDictMatch(data))
   }, [selectedCurveConfig.mnemonic])
 
-  const curveType = selectedCurveConfig.curve_type ?? 'continuous'
+  const curveType = (selectedCurveConfig.curve_type ?? 'continuous') as CurveType
   const isDiscrete = curveType === 'discrete'
+  const isLithologyDiscrete = curveType === 'lithology_discrete'
+  const isLithologyFraction = curveType === 'lithology_fraction'
+  const isContinuous = curveType === 'continuous'
   const isLithologyTrack = containingTrack?.track_type === 'lithology'
 
   const lithologyWarning = useMemo(() => {
@@ -46,7 +52,7 @@ export function CurveSettings({ selectedCurveConfig, onCurveSettingUpdate }: Cur
     return `${missing} curve${missing > 1 ? 's' : ''} in this track ${missing > 1 ? 'have' : 'has'} no lithology code`
   }, [isLithologyTrack, containingTrack])
 
-  function handleRenderingModeChange(nextType: 'continuous' | 'discrete') {
+  function handleRenderingModeChange(nextType: CurveType) {
     if (!well) return
     onCurveSettingUpdate(selectedCurveConfig.mnemonic, { curve_type: nextType })
     void fetch(`/api/wells/${well.well_id}/curves/${encodeURIComponent(selectedCurveConfig.mnemonic)}`, {
@@ -66,6 +72,23 @@ export function CurveSettings({ selectedCurveConfig, onCurveSettingUpdate }: Cur
         ),
       }))
     }
+  }
+
+  function handleDiscreteCodeMapChange(intCode: string, lithCode: string) {
+    if (!well) return
+    const curveData = curves.find((c) => c.mnemonic === selectedCurveConfig.mnemonic)
+    const currentMap: Record<string, string> = { ...(curveData?.discrete_code_map ?? {}) }
+    if (lithCode) {
+      currentMap[intCode] = lithCode
+    } else {
+      delete currentMap[intCode]
+    }
+    patchCurveDiscreteCodeMap(selectedCurveConfig.mnemonic, currentMap)
+    void fetch(`/api/wells/${well.well_id}/curves/${encodeURIComponent(selectedCurveConfig.mnemonic)}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ discrete_code_map: JSON.stringify(currentMap) }),
+    })
   }
 
   function applyDataDefaults() {
@@ -104,13 +127,16 @@ export function CurveSettings({ selectedCurveConfig, onCurveSettingUpdate }: Cur
         <span>Rendering</span>
         <select
           value={curveType}
-          onChange={(event) => handleRenderingModeChange(event.target.value as 'continuous' | 'discrete')}
+          onChange={(event) => handleRenderingModeChange(event.target.value as CurveType)}
         >
           <option value="continuous">Line</option>
           <option value="discrete">Blocks</option>
+          <option value="lithology_fraction">Lithology fraction</option>
+          <option value="lithology_discrete">Lithology discrete</option>
         </select>
       </div>
-      {!isDiscrete && (
+
+      {isContinuous && (
         <>
           <div className="sf-row">
             <span>Color</span>
@@ -166,6 +192,7 @@ export function CurveSettings({ selectedCurveConfig, onCurveSettingUpdate }: Cur
           </div>
         </>
       )}
+
       {isDiscrete && uniqueCodes.length > 0 && (
         <div className="template-panel__group">
           <div className="template-panel__label">Codes in data</div>
@@ -181,23 +208,51 @@ export function CurveSettings({ selectedCurveConfig, onCurveSettingUpdate }: Cur
         </div>
       )}
 
-      <div className="template-panel__section-header">Lithology composition</div>
-      <div className="sf-row">
-        <span>Lithology code</span>
-        <select
-          value={selectedCurveConfig.lithology_code ?? ''}
-          onChange={(e) => handleLithologyCodeChange(e.target.value)}
-        >
-          <option value="">None</option>
-          {lithologyDictionaryEntries.map((entry) => (
-            <option key={entry.lithology_code} value={entry.lithology_code}>
-              {entry.display_name}
-            </option>
+      {isLithologyDiscrete && (
+        <>
+          <div className="template-panel__section-header">Discrete lithology mapping</div>
+          {uniqueCodes.length === 0 ? (
+            <p className="sidebar-panel__empty">No data codes found</p>
+          ) : uniqueCodes.map((code) => (
+            <div key={code} className="sf-row">
+              <span>Code {code}</span>
+              <select
+                value={discreteCodeMap?.[String(code)] ?? ''}
+                onChange={(e) => handleDiscreteCodeMapChange(String(code), e.target.value)}
+              >
+                <option value="">— none —</option>
+                {lithologyDictionaryEntries.map((entry) => (
+                  <option key={entry.lithology_code} value={entry.lithology_code}>
+                    {entry.display_name}
+                  </option>
+                ))}
+              </select>
+            </div>
           ))}
-        </select>
-      </div>
-      {isLithologyTrack && lithologyWarning && (
-        <p className="project-dialog__warning">{lithologyWarning}</p>
+        </>
+      )}
+
+      {isLithologyFraction && (
+        <>
+          <div className="template-panel__section-header">Lithology composition</div>
+          <div className="sf-row">
+            <span>Lithology code</span>
+            <select
+              value={selectedCurveConfig.lithology_code ?? ''}
+              onChange={(e) => handleLithologyCodeChange(e.target.value)}
+            >
+              <option value="">None</option>
+              {lithologyDictionaryEntries.map((entry) => (
+                <option key={entry.lithology_code} value={entry.lithology_code}>
+                  {entry.display_name}
+                </option>
+              ))}
+            </select>
+          </div>
+          {isLithologyTrack && lithologyWarning && (
+            <p className="project-dialog__warning">{lithologyWarning}</p>
+          )}
+        </>
       )}
     </div>
   )

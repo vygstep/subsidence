@@ -1,5 +1,40 @@
 import { drawLithologyBlock, type LithologyFillStyle } from './lithologyRenderer'
 
+export function drawLithologyDiscrete(
+  ctx: CanvasRenderingContext2D,
+  depths: Float32Array,
+  values: Float32Array,
+  nullValue: number,
+  codeMap: Record<string, string> | null,
+  fillStyles: Map<string, LithologyFillStyle>,
+  depthScale: (d: number) => number,
+  canvasWidth: number,
+  canvasHeight: number,
+  onPatternReady?: () => void,
+): void {
+  if (depths.length === 0) return
+
+  for (let i = 0; i < depths.length; i++) {
+    const v = values[i]
+    if (!Number.isFinite(v) || v === nullValue) continue
+
+    const lithCode = codeMap?.[String(Math.round(v))]
+    if (!lithCode) continue
+    const style = fillStyles.get(lithCode)
+    if (!style) continue
+
+    const y0 = depthScale(depths[i])
+    const y1 = i + 1 < depths.length ? depthScale(depths[i + 1]) : canvasHeight
+
+    if (y0 >= canvasHeight || y1 <= 0) continue
+    const top = Math.max(0, y0)
+    const bottom = Math.min(canvasHeight, y1)
+    if (bottom <= top) continue
+
+    drawLithologyBlock(ctx, style, 0, top, canvasWidth, bottom - top, onPatternReady)
+  }
+}
+
 export interface CompositionBand {
   depths: Float32Array
   values: Float32Array

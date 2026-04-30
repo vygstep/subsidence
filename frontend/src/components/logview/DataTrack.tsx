@@ -12,7 +12,7 @@ import {
   drawLogarithmicGrid,
 } from '@/renderers'
 import { drawDiscreteBlocks } from '@/renderers/discreteBlockRenderer'
-import { drawLithologyComposition, type CompositionBand } from '@/renderers/lithologyCompositionRenderer'
+import { drawLithologyComposition, drawLithologyDiscrete, type CompositionBand } from '@/renderers/lithologyCompositionRenderer'
 import type { LithologyFillStyle } from '@/renderers/lithologyRenderer'
 import type { CurveConfig, CurveData, LithologyPatternEntry, TrackConfig } from '@/types'
 import { useViewStore, useWellDataStore } from '@/stores'
@@ -295,6 +295,22 @@ export function DataTrack({ config, curves, width, height }: DataTrackProps) {
       })
 
       clippedCurves.forEach(({ curve, style }) => {
+        if (style.curve_type === 'lithology_discrete') {
+          drawLithologyDiscrete(
+            ctx,
+            curve.depths,
+            curve.values,
+            curve.null_value,
+            curve.discrete_code_map,
+            lithologyFillStyles,
+            depthScale,
+            canvasWidth,
+            canvasHeight,
+            () => setPatternRenderTick((t) => t + 1),
+          )
+          return
+        }
+
         if (style.curve_type === 'discrete') {
           drawDiscreteBlocks(
             ctx,
