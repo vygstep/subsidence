@@ -54,21 +54,17 @@ export function makeVisibilityHandlers(deps: VisibilityDeps) {
 
     updateWellViewState(activeWellId, (state) => {
       if (!nextValue) {
-        const nextTracks = state.tracks.map((track) => ({
-          ...track,
-          curves: track.curves.filter((c) => c.mnemonic !== mnemonic),
-        }))
-        const hasAnyCurve = nextTracks.some((track) => track.curves.length > 0)
-        const finalTracks = hasAnyCurve ? nextTracks : [createEmptyTrack()]
         return {
           ...state,
-          tracks: finalTracks,
-          trackOrder: buildTrackOrder(finalTracks.map((track) => track.id), state.trackOrder),
+          hiddenCurveMnemonics: Array.from(new Set([...state.hiddenCurveMnemonics, mnemonic])),
         }
       }
 
       if (state.tracks.some((track) => track.curves.some((c) => c.mnemonic === mnemonic))) {
-        return state
+        return {
+          ...state,
+          hiddenCurveMnemonics: state.hiddenCurveMnemonics.filter((item) => item !== mnemonic),
+        }
       }
 
       const existingCount = state.tracks.reduce((n, t) => n + t.curves.length, 0)
@@ -77,6 +73,7 @@ export function makeVisibilityHandlers(deps: VisibilityDeps) {
       if (selectedTrackId && state.tracks.some((t) => t.id === selectedTrackId)) {
         return {
           ...state,
+          hiddenCurveMnemonics: state.hiddenCurveMnemonics.filter((item) => item !== mnemonic),
           tracks: state.tracks.map((track) =>
             track.id !== selectedTrackId ? track : { ...track, curves: [...track.curves, curveConfig] },
           ),
@@ -86,6 +83,7 @@ export function makeVisibilityHandlers(deps: VisibilityDeps) {
       const trackNumber = nextTrackNumber(state.tracks)
       return {
         ...state,
+        hiddenCurveMnemonics: state.hiddenCurveMnemonics.filter((item) => item !== mnemonic),
         tracks: [
           ...state.tracks,
           {
@@ -109,12 +107,11 @@ export function makeVisibilityHandlers(deps: VisibilityDeps) {
   async function handleToggleAllCurves(wellId: string, nextValue: boolean): Promise<void> {
     if (wellId !== well?.well_id) await loadWell(wellId)
     if (!nextValue) {
+      const currentCurveMnemonics = useWellDataStore.getState().curves.map((curve) => curve.mnemonic)
       updateWellViewState(wellId, (state) => {
-        const track = createEmptyTrack()
         return {
           ...state,
-          tracks: [track],
-          trackOrder: buildTrackOrder([track.id], state.trackOrder),
+          hiddenCurveMnemonics: Array.from(new Set([...state.hiddenCurveMnemonics, ...currentCurveMnemonics])),
         }
       })
       return
@@ -128,10 +125,30 @@ export function makeVisibilityHandlers(deps: VisibilityDeps) {
     if (!well?.well_id) return
     updateWellViewState(well.well_id, (state) => ({
       ...state,
-      tracks: state.tracks.map((track) => ({
-        ...track,
-        curves: track.curves.map((curve) => (curve.mnemonic === mnemonic ? { ...curve, ...patch } : curve)),
-      })),
+      tracks: state.tracks.some((track) => track.curves.some((curve) => curve.mnemonic === mnemonic))
+        ? state.tracks.map((track) => ({
+            ...track,
+            curves: track.curves.map((curve) => (curve.mnemonic === mnemonic ? { ...curve, ...patch } : curve)),
+          }))
+        : (() => {
+            const curve = useWellDataStore.getState().curves.find((item) => item.mnemonic === mnemonic)
+            if (!curve) return state.tracks
+            const existingCount = state.tracks.reduce((n, t) => n + t.curves.length, 0)
+            const { curveConfig } = buildCurveDefaults(curve, existingCount)
+            const nextCurveConfig = { ...curveConfig, ...patch }
+            const targetTrackId = selectedTrackId && state.tracks.some((track) => track.id === selectedTrackId)
+              ? selectedTrackId
+              : state.tracks[0]?.id
+            if (targetTrackId) {
+              return state.tracks.map((track) =>
+                track.id === targetTrackId
+                  ? { ...track, curves: [...track.curves, nextCurveConfig] }
+                  : track,
+              )
+            }
+            const track = createEmptyTrack()
+            return [{ ...track, curves: [nextCurveConfig] }]
+          })(),
     }))
   }
 

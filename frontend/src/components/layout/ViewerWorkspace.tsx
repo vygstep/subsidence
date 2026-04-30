@@ -55,11 +55,12 @@ export function ViewerWorkspace() {
   }, [depthBasis])
 
   const curves = lodEnabled ? lodCurves : fullCurves
+  const wellId = well?.well_id ?? null
 
   const activeWellView = useMemo(() => {
-    if (!well?.well_id) return createDefaultWellView()
-    return wellViewStates[well.well_id] ?? createDefaultWellView()
-  }, [well?.well_id, wellViewStates])
+    if (!wellId) return createDefaultWellView()
+    return wellViewStates[wellId] ?? createDefaultWellView()
+  }, [wellId, wellViewStates])
 
   const maxDepth = useMemo(() => {
     if (curves.length === 0) return 1000
@@ -75,10 +76,12 @@ export function ViewerWorkspace() {
       .filter((track) => !activeWellView.hiddenTrackIds.includes(track.id))
       .map((track) => ({
         ...track,
-        curves: track.curves.map((curve) => ({
-          ...curve,
-          color: colorOverrides[curve.mnemonic] ?? curve.color,
-        })),
+        curves: track.curves
+          .filter((curve) => !activeWellView.hiddenCurveMnemonics.includes(curve.mnemonic))
+          .map((curve) => ({
+            ...curve,
+            color: colorOverrides[curve.mnemonic] ?? curve.color,
+          })),
       }))
   ), [activeWellView, colorOverrides])
 

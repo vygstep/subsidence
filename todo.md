@@ -6,7 +6,6 @@ Active contract: `docs/contracts/bugs_and_features_4.md`
 
 | Item | Title | Status |
 |---|---|---|
-| BF4-004 | Curve settings accessible when log is disabled | todo |
 | BF4-016 | Simplified LAS/CSV import — options on preview, direct Load | todo |
 | BF4-018 | Unified 2-step import — inline column mapping (Tops/Dev/Unconf) | todo |
 | BF4-010 | Move top-management buttons to side track toolbar | todo |

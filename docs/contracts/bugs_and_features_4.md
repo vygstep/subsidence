@@ -150,7 +150,7 @@ Implementation:
 
 ---
 
-## BF4-004: Curve settings accessible when log is disabled (todo)
+## BF4-004: Curve settings accessible when log is disabled (done)
 
 **Problem**: When a log curve's visibility checkbox is unchecked, the user cannot change the
 curve's settings. The exact failure mode needs investigation.
@@ -177,6 +177,27 @@ from the track config when unchecking, or merely hides it. If it removes the con
 **Affected files**:
 - `frontend/src/components/layout/settings/CurveSettings.tsx`
 - Workspace store / `onToggleCurve` implementation (investigate first)
+
+**Implemented**:
+- Added `hiddenCurveMnemonics` to per-well visual config (`WellViewState`) as the source of truth
+  for log-curve visibility.
+- Curve visibility toggles no longer remove curve configs from `TrackConfig.curves`; they only add
+  or remove mnemonics from `hiddenCurveMnemonics`.
+- Rendering filters hidden curves before passing track configs to `DataTrack`, so invisible curves
+  do not draw while their settings remain available.
+- Data Manager visible-curve counts and checkboxes now derive from configured curves minus
+  `hiddenCurveMnemonics`.
+- Selecting a curve that has no stored config yet still shows default curve settings; the first
+  settings edit creates a hidden config so user edits are not lost.
+
+**Manual check**:
+- Turn off a visible log curve in Data Manager; the curve should disappear from the track.
+- Click that disabled curve row; Settings should still show Color, Min/Max, Line width, Line style,
+  and Rendering.
+- Change a setting while the curve is disabled, then turn it back on; the edited setting should be
+  preserved.
+- Use the Logs group checkbox to hide/show all curves; settings for individual curves should remain
+  accessible after hiding.
 
 ---
 

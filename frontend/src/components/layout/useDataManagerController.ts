@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from 'react'
 
 import { createDefaultWellView, useViewStore, useWellDataStore, useWorkspaceStore } from '@/stores'
+import { buildCurveDefaults } from '@/utils/curvePresets'
 import { makeActionHandlers } from './dataManagerActions'
 import { makeSelectionHandlers } from './dataManagerSelection'
 import { makeVisibilityHandlers } from './dataManagerVisibility'
@@ -57,9 +58,12 @@ export function useDataManagerController() {
 
   const selectedTrackId = useViewStore((state) => state.selectedTrackId)
   const selectTrack = useViewStore((state) => state.selectTrack)
+  const wellId = well?.well_id ?? null
 
   useEffect(() => {
     if (!well) return
+    // Existing inspector draft is local editable state that must reset when active well changes.
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     setWellInspectorDraft({
       well_name: well.well_name,
       color_hex: well.color_hex,
@@ -73,9 +77,9 @@ export function useDataManagerController() {
   }, [well])
 
   const activeWellView = useMemo(() => {
-    if (!well?.well_id) return createDefaultWellView()
-    return wellViewStates[well.well_id] ?? createDefaultWellView()
-  }, [well?.well_id, wellViewStates])
+    if (!wellId) return createDefaultWellView()
+    return wellViewStates[wellId] ?? createDefaultWellView()
+  }, [wellId, wellViewStates])
 
   const { minDepth, maxDepth } = useMemo(() => {
     if (curves.length === 0) return { minDepth: 0, maxDepth: 1000 }
@@ -91,14 +95,26 @@ export function useDataManagerController() {
   }, [curves])
 
   const visibleCurveMnemonics = useMemo(() => (
-    Array.from(new Set(activeWellView.tracks.flatMap((track) => track.curves.map((curve) => curve.mnemonic))))
-  ), [activeWellView.tracks])
+    Array.from(new Set(
+      activeWellView.tracks.flatMap((track) =>
+        track.curves
+          .map((curve) => curve.mnemonic)
+          .filter((mnemonic) => !activeWellView.hiddenCurveMnemonics.includes(mnemonic)),
+      ),
+    ))
+  ), [activeWellView.hiddenCurveMnemonics, activeWellView.tracks])
 
   const visibleCurveMnemonicsByWellId = useMemo(
     () => Object.fromEntries(
       Object.entries(wellViewStates).map(([wellId, state]) => [
         wellId,
-        Array.from(new Set(state.tracks.flatMap((track) => track.curves.map((curve) => curve.mnemonic)))),
+        Array.from(new Set(
+          state.tracks.flatMap((track) =>
+            track.curves
+              .map((curve) => curve.mnemonic)
+              .filter((mnemonic) => !state.hiddenCurveMnemonics.includes(mnemonic)),
+          ),
+        )),
       ]),
     ),
     [wellViewStates],
@@ -125,8 +141,11 @@ export function useDataManagerController() {
 
   const selectedCurveConfig = useMemo(() => {
     if (selectedObject?.type !== 'curve') return null
-    return activeWellView.tracks.flatMap((t) => t.curves).find((c) => c.mnemonic === selectedObject.mnemonic) ?? null
-  }, [activeWellView.tracks, selectedObject])
+    const existing = activeWellView.tracks.flatMap((t) => t.curves).find((c) => c.mnemonic === selectedObject.mnemonic)
+    if (existing) return existing
+    const curve = curves.find((item) => item.mnemonic === selectedObject.mnemonic)
+    return curve ? buildCurveDefaults(curve, activeWellView.tracks.flatMap((track) => track.curves).length).curveConfig : null
+  }, [activeWellView.tracks, curves, selectedObject])
 
   const selectedCurveTrack = useMemo(() => {
     if (selectedObject?.type !== 'curve-track') return null
@@ -212,7 +231,7 @@ export function useDataManagerController() {
 
   return {
     activeSidebarTab,
-    activeWellId: well?.well_id ?? null,
+    activeWellId: wellId,
     activeWellView,
     compactionModels,
     compactionPresets,
