@@ -6,7 +6,6 @@ Active contract: `docs/contracts/bugs_and_features_4.md`
 
 | Item | Title | Status |
 |---|---|---|
-| BF4-012 | Sea level curve on same depth scale (remove dual axis) | todo |
 | BF4-013 | Use marker names not zone names on burial chart labels | todo |
 | BF4-014 | Horizontal km gridlines on subsidence chart | todo |
 | BF4-003 | StratCharts tab restructure (rename + collapsible roots) | todo |

@@ -650,7 +650,7 @@ reference table in the contract update.
 
 ---
 
-## BF4-012: Sea level curve — same depth scale as burial data (todo)
+## BF4-012: Sea level curve — same depth scale as burial data (done)
 
 **Problem**: On the single-well subsidence chart, the sea level line currently uses a **secondary
 independent Y axis** (right side, teal, `SEA_LEVEL_AXIS_EXTRA = 70 px` of extra right padding).
@@ -707,6 +707,20 @@ the chart — this is geologically correct and expected.
 
 **Affected files**:
 - `frontend/src/components/subsidence/SubsidenceCanvas.tsx`
+
+**Implemented**:
+- Removed the independent sea-level Y axis, extra right padding, and `slToY` mapping.
+- Single-well sea level overlay now uses the same `depthToY(pt.sea_level_m)` mapping as burial
+  curves.
+- Crosshair bounds and geological timescale padding now stay on the base chart padding regardless
+  of sea-level visibility.
+
+**Manual check**:
+- In Single Well subsidence chart, enable the sea-level overlay and verify the right teal sea-level
+  axis is gone.
+- Verify the cyan dashed sea-level line appears near the top of the depth chart and is clipped by
+  the normal plot area.
+- Toggle the overlay on/off and verify the geological timescale and crosshair width do not shift.
 
 ---
 

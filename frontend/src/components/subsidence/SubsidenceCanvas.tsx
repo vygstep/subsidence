@@ -11,7 +11,6 @@ import { GeologicalTimescale } from './GeologicalTimescale'
 
 const TIMESCALE_HEIGHT = 52
 const PADDING_BASE = { top: 12, right: 100, bottom: 48, left: 64 }
-const SEA_LEVEL_AXIS_EXTRA = 70
 
 type Padding = typeof PADDING_BASE
 
@@ -132,63 +131,6 @@ function drawFormationLabels(
   ctx.restore()
 }
 
-interface SeaLevelAxisData {
-  sorted: SeaLevelPoint[]
-  slToY: (sl: number) => number
-  minSL: number
-  maxSL: number
-}
-
-function drawSeaLevelAxis(
-  ctx: CanvasRenderingContext2D,
-  data: SeaLevelAxisData,
-  width: number,
-  height: number,
-  padding: Padding,
-) {
-  const plotH = height - padding.top - padding.bottom
-  const axisX = width - SEA_LEVEL_AXIS_EXTRA + 2
-
-  ctx.save()
-  ctx.strokeStyle = '#0891b2'
-  ctx.lineWidth = 1
-
-  ctx.beginPath()
-  ctx.moveTo(axisX, padding.top)
-  ctx.lineTo(axisX, padding.top + plotH)
-  ctx.stroke()
-
-  ctx.fillStyle = '#0891b2'
-  ctx.font = '10px system-ui, sans-serif'
-  ctx.textAlign = 'left'
-  ctx.textBaseline = 'middle'
-
-  const slStep = niceStep(data.maxSL - data.minSL || 1, 5)
-  const firstTick = Math.ceil(data.minSL / slStep) * slStep
-  for (let sl = firstTick; sl <= data.maxSL + slStep * 0.01; sl += slStep) {
-    const y = data.slToY(sl)
-    if (y < padding.top - 1 || y > padding.top + plotH + 1) continue
-    ctx.beginPath()
-    ctx.moveTo(axisX, y)
-    ctx.lineTo(axisX + 4, y)
-    ctx.stroke()
-    const label = Number.isInteger(slStep) ? `${sl}` : sl.toFixed(1)
-    ctx.fillText(label, axisX + 6, y)
-  }
-
-  ctx.save()
-  ctx.font = '11px system-ui, sans-serif'
-  ctx.fillStyle = '#0891b2'
-  ctx.textAlign = 'center'
-  ctx.textBaseline = 'middle'
-  ctx.translate(width - 8, padding.top + plotH / 2)
-  ctx.rotate(Math.PI / 2)
-  ctx.fillText('Sea level (m)', 0, 0)
-  ctx.restore()
-
-  ctx.restore()
-}
-
 function niceStep(range: number, targetTicks: number): number {
   const raw = range / targetTicks
   const mag = Math.pow(10, Math.floor(Math.log10(raw)))
@@ -280,7 +222,7 @@ export function SubsidenceCanvas() {
   maxAgeRef.current = maxAge
   minDepthMRef.current = effectiveMinDepthM
   maxDepthMRef.current = effectiveMaxDepthM
-  paddingRightRef.current = showSeaLevel ? PADDING_BASE.right + SEA_LEVEL_AXIS_EXTRA : PADDING_BASE.right
+  paddingRightRef.current = PADDING_BASE.right
 
   const drawCrosshair = useCallback((cssX: number | null, cssY: number | null) => {
     const canvas = crosshairRef.current
@@ -370,9 +312,7 @@ export function SubsidenceCanvas() {
     ctx.fillStyle = '#ffffff'
     ctx.fillRect(0, 0, width, height)
 
-    const pad: Padding = showSeaLevel
-      ? { ...PADDING_BASE, right: PADDING_BASE.right + SEA_LEVEL_AXIS_EXTRA }
-      : PADDING_BASE
+    const pad: Padding = PADDING_BASE
 
     const plotW = width - pad.left - pad.right
     const plotH = height - pad.top - pad.bottom
@@ -387,19 +327,11 @@ export function SubsidenceCanvas() {
 
     drawAxes(ctx, width, height, maxAge, effectiveMinDepthM, effectiveMaxDepthM, timeToX, depthToY, pad)
 
-    // Compute sea-level mapping before clip (shared between line and axis)
-    let slData: SeaLevelAxisData | null = null
-    if (showSeaLevel && seaLevelPoints.length > 0) {
-      const relevant = seaLevelPoints.filter((p) => p.age_ma >= 0 && p.age_ma <= maxAge)
-      if (relevant.length > 0) {
-        const minSL = Math.min(...relevant.map((p) => p.sea_level_m))
-        const maxSL = Math.max(...relevant.map((p) => p.sea_level_m))
-        const slRange = maxSL - minSL || 1
-        const slToY = (sl: number) => pad.top + plotH - ((sl - minSL) / slRange) * plotH
-        const sorted = [...seaLevelPoints].sort((a, b) => a.age_ma - b.age_ma)
-        slData = { sorted, slToY, minSL, maxSL }
-      }
-    }
+    const slPoints = showSeaLevel && seaLevelPoints.length > 0
+      ? [...seaLevelPoints]
+          .filter((p) => p.age_ma >= 0 && p.age_ma <= maxAge)
+          .sort((a, b) => a.age_ma - b.age_ma)
+      : []
 
     ctx.save()
     ctx.beginPath()
@@ -410,16 +342,15 @@ export function SubsidenceCanvas() {
     if (showBurialCurves) drawBurialCurves(ctx, subsidenceCurves, timeToX, depthToY)
 
     // Sea-level line (inside clip)
-    if (slData) {
+    if (slPoints.length > 0) {
       ctx.strokeStyle = '#0891b2'
       ctx.lineWidth = 1.5
       ctx.setLineDash([4, 3])
       ctx.beginPath()
       let started = false
-      for (const pt of slData.sorted) {
-        if (pt.age_ma < 0 || pt.age_ma > maxAge) continue
+      for (const pt of slPoints) {
         const x = timeToX(pt.age_ma)
-        const y = slData.slToY(pt.sea_level_m)
+        const y = depthToY(pt.sea_level_m)
         if (!started) { ctx.moveTo(x, y); started = true }
         else ctx.lineTo(x, y)
       }
@@ -430,16 +361,11 @@ export function SubsidenceCanvas() {
     ctx.restore()
 
     drawFormationLabels(ctx, subsidenceCurves, pad.left + plotW, depthToY)
-
-    // Sea-level right axis (outside clip)
-    if (slData) {
-      drawSeaLevelAxis(ctx, slData, width, height, pad)
-    }
   }, [subsidenceCurves, maxAge, effectiveMinDepthM, effectiveMaxDepthM, showFormationFills, showBurialCurves, showSeaLevel, seaLevelPoints])
 
   const canvasRef = useCanvasRenderer(draw, [draw])
 
-  const paddingRight = showSeaLevel ? PADDING_BASE.right + SEA_LEVEL_AXIS_EXTRA : PADDING_BASE.right
+  const paddingRight = PADDING_BASE.right
 
   return (
     <div ref={containerRef} className="subsidence-canvas-container">
