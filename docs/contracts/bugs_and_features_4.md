@@ -667,6 +667,197 @@ ctx.restore()
 
 ---
 
+## BF4-017: Delete well / delete top / delete all tops — ✕ buttons in data manager tree (todo)
+
+**Problem**: "Delete well", "Delete top", and "Delete all tops" are currently only accessible via
+the main project toolbar. The toolbar is already crowded; the data manager tree is the natural
+home for per-item delete actions, following the pattern already used for Strat Charts and Sea
+Level Curves (red `✕` ghost buttons).
+
+**Goal**: Add red `✕` buttons to three places in the data manager WELLS tree:
+1. The well root row → **Delete well**
+2. The TOPS group row → **Delete all tops** (only visible when there are tops)
+3. Each individual formation row → **Delete top**
+
+Then remove those three buttons from `ProjectToolbar.tsx`.
+
+---
+
+### Existing pattern (reference)
+
+`StratChartTab.tsx` already uses:
+```tsx
+<button
+  type="button"
+  className="dm-action dm-action--ghost dm-action--danger"
+  title="Delete this chart"
+  disabled={chart.is_builtin}
+  style={{ marginLeft: 'auto' }}
+  onClick={(event) => {
+    event.stopPropagation()
+    if (window.confirm(`Delete strat chart "${chart.name}"?`)) {
+      onDeleteById(chart.id, chart.name, chart.is_builtin)
+    }
+  }}
+>
+  ✕
+</button>
+```
+
+All three new buttons follow this exact pattern.
+
+---
+
+### BF4-017-A: ✕ on the well root row (delete well)
+
+**Location in `WellDataPanel.tsx`**: the `tree-node__row--root` div for each well (line ~309).
+Add a delete button as the last child of that row:
+
+```tsx
+<button
+  type="button"
+  className="dm-action dm-action--ghost dm-action--danger"
+  title={`Delete well "${item.well_name}"`}
+  style={{ marginLeft: 'auto' }}
+  onClick={(event) => {
+    event.stopPropagation()
+    if (window.confirm(`Delete well "${item.well_name}"?`)) {
+      onDeleteWell(item.well_id, item.well_name)
+    }
+  }}
+>
+  ✕
+</button>
+```
+
+**New prop**: `onDeleteWell: (wellId: string, wellName: string) => void`
+
+**Wire-up in `DataManagerPane.tsx`**:
+```tsx
+onDeleteWell={(wellId, wellName) => controller.onDeleteWellById(wellId, wellName)}
+```
+
+`controller.onDeleteWellById` already exists and handles the API call + view state cleanup.
+
+---
+
+### BF4-017-B: ✕ on the TOPS group row (delete all tops)
+
+**Location in `WellDataPanel.tsx`**: the `tree-node__row` div for the TOPS section (line ~391).
+Add a delete-all button that only renders when there are formations:
+
+```tsx
+{item.formations.length > 0 && (
+  <button
+    type="button"
+    className="dm-action dm-action--ghost dm-action--danger"
+    title="Delete all tops"
+    style={{ marginLeft: 'auto' }}
+    onClick={(event) => {
+      event.stopPropagation()
+      if (window.confirm(`Delete all ${item.formations.length} tops for "${item.well_name}"?`)) {
+        onDeleteAllFormations(item.well_id)
+      }
+    }}
+  >
+    ✕
+  </button>
+)}
+```
+
+**New prop**: `onDeleteAllFormations: (wellId: string) => void`
+
+**Wire-up in `DataManagerPane.tsx`**: add `controller.onDeleteAllFormations(wellId)` call, or
+implement inline by calling the existing `removeFormation` store action in a loop. Reuse the logic
+from `handleDeleteAllFormations` in `ProjectToolbar.tsx` (move it to the controller):
+
+```tsx
+onDeleteAllFormations: async (wellId: string) => {
+  const formations = wellInventories.find(w => w.well_id === wellId)?.formations ?? []
+  for (const f of formations) {
+    await removeFormation(f.id)
+  }
+  updateWellViewState(wellId, (state) => ({ ...state, visibleFormationIds: [] }))
+}
+```
+
+---
+
+### BF4-017-C: ✕ on each individual formation row (delete top)
+
+**Location in `WellDataPanel.tsx`**: each `top-leaf` div (line ~414). Currently it contains only
+`<CheckboxLeaf .../>`. Add the ✕ button alongside it:
+
+```tsx
+<div
+  key={formation.id}
+  className={`top-leaf ${...}`}
+  style={{ ['--top-leaf-color' as string]: topBackgroundColor(formation) }}
+  onClick={() => onSelectFormation(item.well_id, formation.id)}
+  onContextMenu={...}
+>
+  <CheckboxLeaf
+    checked={...}
+    label={formation.name}
+    secondary={formatNumber(formation.depth_md)}
+    onChange={...}
+  />
+  <button
+    type="button"
+    className="dm-action dm-action--ghost dm-action--danger"
+    title={`Delete "${formation.name}"`}
+    onClick={(event) => {
+      event.stopPropagation()
+      if (window.confirm(`Delete top "${formation.name}"?`)) {
+        onDeleteFormation(item.well_id, formation.id)
+      }
+    }}
+  >
+    ✕
+  </button>
+</div>
+```
+
+The `top-leaf` div must be flex with `align-items: center` for the button to sit inline. Check
+whether `.top-leaf` already has this; add it to `log-view.css` or `data-manager.css` if not.
+
+**New prop**: `onDeleteFormation: (wellId: string, formationId: string) => void`
+
+**Wire-up in `DataManagerPane.tsx`**:
+```tsx
+onDeleteFormation={(wellId, formationId) =>
+  controller.onDeleteFormation(wellId, formationId, /* name */ '')
+}
+```
+
+`controller.onDeleteFormation` already exists (used by the context menu, line ~139).
+
+---
+
+### BF4-017-D: Remove deleted buttons from ProjectToolbar
+
+Remove these three buttons from `ProjectToolbar.tsx`:
+- Line ~489: `<button ... onClick={() => void handleDeleteWell()}>Delete well</button>`
+- Line ~501: `<button ... onClick={() => ... handleRemoveFormation(...)}>Delete top</button>`
+- Line ~502: `<button ... onClick={() => void handleDeleteAllFormations()}>Delete all tops</button>`
+
+The associated handler functions (`handleDeleteWell`, `handleRemoveFormation`,
+`handleDeleteAllFormations`) can also be removed if they are not called from anywhere else.
+Verify with a grep before deleting.
+
+---
+
+**Affected files**:
+- `frontend/src/components/layout/WellDataPanel.tsx` (3 buttons + 3 new props)
+- `frontend/src/components/layout/DataManagerPane.tsx` (wire new props to controller)
+- `frontend/src/components/layout/ProjectToolbar.tsx` (remove 3 buttons + handlers)
+- `frontend/src/styles/data-manager.css` or `log-view.css` (ensure `.top-leaf` is flex)
+
+**Complexity**: XS — all frontend, no backend changes. Controller callbacks already exist for
+well delete and single formation delete; only "delete all" needs a new controller entry.
+
+---
+
 ## BF4-016: Simplified LAS/CSV import — options on preview step, direct Load (todo)
 
 **Summary**: The LAS and CSV log import dialogs have too many wizard steps. Both should collapse to
@@ -961,19 +1152,20 @@ lockstep with the header. Check at both 1× and 2× devicePixelRatio (browser zo
 | # | Item | Complexity | Notes |
 |---|---|---|---|
 | 1 | BF4-015 | XS | One CSS rule — highest priority, visible defect |
-| 2 | BF4-001 | XS | SVG overflow fix, 1–2 lines |
-| 3 | BF4-002 | XS | Remove span elements |
-| 4 | BF4-006 | XS | Remove hex input, update CSS for oval |
-| 5 | BF4-007-A | XS | CSS padding on select |
-| 6 | BF4-012 | XS | Remove sea level dual axis in SubsidenceCanvas |
-| 7 | BF4-013 | XS | Display label fix in drawFormationLabels |
-| 8 | BF4-014 | XS | Add km gridlines in draw callback |
-| 9 | BF4-003 | S | StratCharts hierarchy restructure |
-| 10 | BF4-008 | S | Move sea level selector to Models |
-| 11 | BF4-009 | S | Models computed state + radio |
-| 12 | BF4-004 | S | Curve settings when disabled (investigate first) |
-| 13 | BF4-016 | S | Simplified LAS/CSV import dialog (frontend only) |
-| 14 | BF4-010 | M | New side toolbar component |
-| 15 | BF4-007-B | M | Sea level override per top (backend + frontend) |
-| 16 | BF4-011 | M | API audit (research task) |
-| 17 | BF4-005 | L | Lithology discrete/fraction (multi-step) |
+| 2 | BF4-017 | XS | ✕ delete buttons in data manager tree |
+| 3 | BF4-001 | XS | SVG overflow fix, 1–2 lines |
+| 4 | BF4-002 | XS | Remove span elements |
+| 5 | BF4-006 | XS | Remove hex input, update CSS for oval |
+| 6 | BF4-007-A | XS | CSS padding on select |
+| 7 | BF4-012 | XS | Remove sea level dual axis in SubsidenceCanvas |
+| 8 | BF4-013 | XS | Display label fix in drawFormationLabels |
+| 9 | BF4-014 | XS | Add km gridlines in draw callback |
+| 10 | BF4-003 | S | StratCharts hierarchy restructure |
+| 11 | BF4-008 | S | Move sea level selector to Models |
+| 12 | BF4-009 | S | Models computed state + radio |
+| 13 | BF4-004 | S | Curve settings when disabled (investigate first) |
+| 14 | BF4-016 | S | Simplified LAS/CSV import dialog (frontend only) |
+| 15 | BF4-010 | M | New side toolbar component |
+| 16 | BF4-007-B | M | Sea level override per top (backend + frontend) |
+| 17 | BF4-011 | M | API audit (research task) |
+| 18 | BF4-005 | L | Lithology discrete/fraction (multi-step) |
