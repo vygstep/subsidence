@@ -343,6 +343,90 @@ body.is-resizing-row {
   }
 }
 
+/* ── QC warnings indicator ──────────────────────────────────────────── */
+
+.qc-indicator {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+}
+
+.qc-indicator__badge {
+  border: 0;
+  background: #f59e0b;
+  color: #1e293b;
+  font-size: 10px;
+  font-weight: 800;
+  line-height: 1;
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+}
+
+.qc-indicator__badge:hover {
+  background: #fbbf24;
+}
+
+.qc-indicator__panel {
+  position: absolute;
+  bottom: calc(100% + 8px);
+  right: 0;
+  width: 320px;
+  max-height: 280px;
+  display: flex;
+  flex-direction: column;
+  background: #1e293b;
+  border: 1px solid rgba(245, 158, 11, 0.4);
+  border-radius: 10px;
+  box-shadow: 0 12px 32px rgba(15, 23, 32, 0.5);
+  overflow: hidden;
+  z-index: 200;
+}
+
+.qc-indicator__panel-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 8px 12px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+  font-size: 0.72rem;
+  font-weight: 700;
+  color: #f59e0b;
+  flex-shrink: 0;
+}
+
+.qc-indicator__dismiss {
+  border: 0;
+  background: transparent;
+  color: #64748b;
+  font-size: 0.72rem;
+  font-weight: 600;
+  cursor: pointer;
+  padding: 2px 6px;
+}
+
+.qc-indicator__dismiss:hover {
+  color: #94a3b8;
+}
+
+.qc-indicator__list {
+  margin: 0;
+  padding: 8px 12px 8px 24px;
+  overflow-y: auto;
+  font-size: 0.72rem;
+  color: #cbd5e1;
+  line-height: 1.6;
+}
+
+.qc-indicator__list li {
+  margin-bottom: 2px;
+}
+
 .app-main--gated {
   position: relative;
   padding: 0;

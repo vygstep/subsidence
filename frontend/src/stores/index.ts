@@ -1,5 +1,6 @@
 export * from './computedStore'
 export * from './multiWellStore'
+export * from './notificationStore'
 export * from './projectStore'
 export * from './viewStore'
 export * from './wellDataStore'

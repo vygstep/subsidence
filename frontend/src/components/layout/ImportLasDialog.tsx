@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
 import type { FormEvent } from 'react'
 
-import { useProjectStore } from '@/stores'
+import { useNotificationStore, useProjectStore } from '@/stores'
 import { recordOperation } from '@/utils/diagnostics'
 
 import {
@@ -67,6 +67,7 @@ function detectColumnCurveType(colIndex: number, rows: string[][]): 'continuous'
 
 export function ImportLasDialog({ wells, activeWellId, onClose, onSuccess }: ImportLasDialogProps) {
   const projectPath = useProjectStore((state) => state.projectPath)
+  const addQcWarnings = useNotificationStore((state) => state.addQcWarnings)
   // Single selection value: well_id | CREATE_FROM_FILE | CREATE_NEW | ''
   const [wellSelection, setWellSelection] = useState(activeWellId ?? '')
   const [sourceType, setSourceType] = useState<LogSourceType>('las')
@@ -77,7 +78,6 @@ export function ImportLasDialog({ wells, activeWellId, onClose, onSuccess }: Imp
   const [currentStepIndex, setCurrentStepIndex] = useState(0)
   const [error, setError] = useState<string | null>(null)
   const [isSubmitting, setIsSubmitting] = useState(false)
-  const [qcWarnings, setQcWarnings] = useState<string[]>([])
   const lastImportRoot = getLastImportRoot()
   const preset = sourceType === 'las' ? importWizardPresets.logsLas : importWizardPresets.logsCsv
   const sourceIsValid = sourcePath.trim().length > 0
@@ -222,10 +222,10 @@ export function ImportLasDialog({ wells, activeWellId, onClose, onSuccess }: Imp
         const payload = (await response.json()) as ImportLasResponse & { qc_warnings?: string[]; well_id: string }
         rememberImportPath(nextPath)
         const warnings = payload.qc_warnings ?? []
-        setQcWarnings(warnings)
         await onSuccess(payload.well_id)
-        if (warnings.length === 0) {
-          onClose()
+        onClose()
+        if (warnings.length > 0) {
+          addQcWarnings(warnings)
         }
       }, {
         projectPath,
@@ -395,21 +395,6 @@ export function ImportLasDialog({ wells, activeWellId, onClose, onSuccess }: Imp
         )
       ) : null}
 
-      {qcWarnings.length > 0 ? (
-        <div className="import-qc-warnings">
-          <div className="import-qc-warnings__header">
-            Import completed with {qcWarnings.length} QC warning{qcWarnings.length > 1 ? 's' : ''}:
-          </div>
-          <ul className="import-qc-warnings__list">
-            {qcWarnings.map((msg, i) => (
-              <li key={i}>{msg}</li>
-            ))}
-          </ul>
-          <button type="button" className="project-dialog__close" onClick={onClose}>
-            Dismiss and close
-          </button>
-        </div>
-      ) : null}
     </ImportWizardShell>
   )
 }

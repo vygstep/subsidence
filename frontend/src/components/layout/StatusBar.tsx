@@ -1,6 +1,8 @@
 import { useComputedStore, useProjectStore, useViewStore, useWellDataStore } from '@/stores'
 import { mdToTvd } from '@/utils/depthTransform'
 
+import { QcWarningsIndicator } from './QcWarningsIndicator'
+
 export function StatusBar() {
   const cursorDepth = useViewStore((state) => state.cursorDepth)
   const depthType = useViewStore((state) => state.depthType)
@@ -23,6 +25,7 @@ export function StatusBar() {
         {isComputing && <span className="status-bar__computing">Computing…</span>}
       </span>
       <span className="status-bar__right">
+        <QcWarningsIndicator />
         {isDirty && <span className="status-bar__dirty">●</span>}
         {projectName ?? ''}
       </span>

@@ -536,25 +536,3 @@
   white-space: nowrap;
 }
 
-.import-qc-warnings {
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-  padding: 10px 12px;
-  border: 1px solid #f59e0b;
-  border-radius: 6px;
-  background: #fffbeb;
-}
-
-.import-qc-warnings__header {
-  font-size: 0.8rem;
-  font-weight: 600;
-  color: #92400e;
-}
-
-.import-qc-warnings__list {
-  margin: 0;
-  padding-left: 18px;
-  font-size: 0.78rem;
-  color: #78350f;
-}
