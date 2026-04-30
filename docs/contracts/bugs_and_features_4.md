@@ -143,52 +143,117 @@ from the track config when unchecking, or merely hides it. If it removes the con
 lithology code picker for ALL curves, including GR, RHOB, etc. This is confusing. Lithology
 is only meaningful for specific curve families.
 
+**Current storage model**:
+- Curve payload values are stored in Parquet and referenced by `curve_metadata.data_uri`.
+- Durable curve metadata is stored in `curve_metadata` (`curve_type`, `family_code`,
+  `discrete_code_map`, etc.).
+- Per-well viewer layout is stored in `visual_config` as `TrackConfig` / `CurveConfig`.
+- Lithology sets are stored in `lithology_sets` and `lithology_set_entries`.
+- Fraction lithology curve styling currently uses `TrackConfig.curves[*].lithology_code`, which is
+  visual metadata and is saved through well-scoped visual config.
+
+**Design decision**: durable lithology classification and code mapping must live in backend curve
+metadata, not only in visual config. Visual config may control how a curve is shown, but the meaning
+of a loaded lithology curve must survive save/reopen and be available to zone aggregation and future
+compute code without requiring the viewer layout to be loaded.
+
 **User requirement**: Two distinct lithology curve types:
 
 | Type | Family code | Description | Setup |
 |---|---|---|---|
-| `lithology_discrete` | `lithology_discrete` | Each sample value is an integer code (e.g., 1=sand, 2=shale). Always 100% one lithology. | User creates code-to-lithology mapping in Templates, assigns a lithology set. |
-| `lithology_fraction` | `lithology_fraction` | Each sample is a fraction (0–1 v/v) for one lithology component. Multiple fraction curves combine in a lithology track. | Current implementation — assign a lithology code per curve. |
+| `lithology_discrete` | `lithology` | Each sample value is an integer source code (e.g., 1=sand, 2=shale). Always 100% one lithology. | Assign a lithology set and map source integer code -> lithology code in that set. |
+| `lithology_fraction` | `lithology_fraction` | Each sample is a fraction (0-1 v/v) for one lithology component. Multiple fraction curves combine in a lithology track. | Current implementation — assign one lithology code per curve in visual config. |
+
+**Backend contract**:
+- Extend `curve_metadata.curve_type` allowed values from `continuous | discrete` to:
+  `continuous | discrete | lithology_discrete | lithology_fraction`.
+- Add nullable `curve_metadata.lithology_set_id` FK to `lithology_sets.id`.
+- Reuse `curve_metadata.discrete_code_map` for `lithology_discrete`, but define stricter semantics:
+  JSON object `{ "<source integer code>": "<lithology_set_entries.lithology_code>" }`.
+- For generic `discrete`, `discrete_code_map` remains a display label map.
+- `lithology_discrete` requires `family_code = 'lithology'`, `lithology_set_id != null`, and every
+  mapped lithology code must exist in the selected lithology set.
+- Migration: add `lithology_set_id` to `curve_metadata` if missing.
+- Existing projects remain valid: `continuous` and `discrete` keep current behavior; no automatic
+  conversion is performed.
 
 **Implementation plan**:
 
-### Step 1: Backend — new `curve_type` value
-- Add `'lithology_discrete'` to the allowed `curve_type` values on the curve schema
-  (`app/src/subsidence/data/schema.py`, `CurveConfig` or similar).
-- Backend already supports `continuous` and `discrete` (for `discrete_code_map` rendering).
-  `lithology_discrete` is separate: it implies each integer value is a lithology code, not just
-  a generic enum.
+### Step 1: Backend — durable curve metadata
+- Update `app/src/subsidence/data/schema.py`:
+  - add `CurveMetadata.lithology_set_id`;
+  - document the four allowed `curve_type` values.
+- Update `app/src/subsidence/data/engine.py` migration:
+  - `ALTER TABLE curve_metadata ADD COLUMN lithology_set_id INTEGER REFERENCES lithology_sets(id)`.
+- Update `app/src/subsidence/api/wells.py`:
+  - add `lithology_set_id` to `CurveInventoryItem`, `CurveResponse`, and `CurvePatchRequest`;
+  - validate `curve_type`;
+  - validate `lithology_set_id`;
+  - validate `discrete_code_map` as source-code -> lithology-code map when
+    `curve_type === 'lithology_discrete'`.
+- Update `zone_service.aggregate_zone_lithology_from_curve()`:
+  - search for `CurveMetadata.curve_type == 'lithology_discrete'`;
+  - use `discrete_code_map` to map source integer values to lithology codes;
+  - ignore source codes that are not mapped, and report them in logs/warnings later if needed.
 
 ### Step 2: Frontend — CurveSettings conditional sections
 
 Change `CurveSettings.tsx`:
 - Remove the always-visible "Lithology composition" section header and the single lithology code
   picker that currently appears for all curves.
-- Instead, determine rendering mode from `dictMatch.family_code` OR `selectedCurveConfig.curve_type`.
+- Determine rendering mode from `selectedCurveConfig.curve_type`, falling back to
+  `dictMatch.family_code` only for suggestions/defaults.
 - **If `curve_type === 'lithology_discrete'`**:
-  - Show "Lithology set" selector: a `<select>` from available lithology sets (fetched from store).
-  - Each integer value in the curve maps to a lithology code in the selected set.
-  - Show a code-mapping table: integer value → lithology entry from set (read-only, derived from set).
+  - Show "Lithology set" selector from `useWellDataStore().lithologySets`.
+  - Show a code-mapping table for unique integer values in the curve:
+    source integer value -> lithology entry from selected set.
+  - Persist mapping changes through `PATCH /api/wells/{well_id}/curves/{mnemonic}` by updating
+    `lithology_set_id` and `discrete_code_map`.
 - **If `curve_type === 'lithology_fraction'` (or `isLithologyTrack`)**:
   - Show the existing "Lithology code" picker (assigns this fraction curve to one component).
+  - Store the selected `lithology_code` in `TrackConfig.curves[*].lithology_code` as today.
 - **Otherwise**: hide the lithology section entirely.
 
 ### Step 3: Rendering — discrete lithology track
 - `lithologyCompositionRenderer.ts` currently handles fraction bands.
-- Add a `drawLithologyDiscrete` path: for each depth sample, look up the integer code in the
-  lithology set, fill the full track width with that lithology's color/pattern (no stacking).
-- In track rendering, detect `curve_type === 'lithology_discrete'` and use the discrete path.
+- Add a `drawLithologyDiscrete` path: for each depth interval, look up the integer source code in
+  `discrete_code_map`, resolve the lithology style from the selected lithology set, and fill the
+  full track width with that lithology's color/pattern (no stacking).
+- In `DataTrack.tsx`, detect `style.curve_type === 'lithology_discrete'` before the generic
+  `discrete` renderer and use the lithology renderer.
+- If a track contains a `lithology_discrete` curve, render only the first such curve in that track
+  and show a warning in settings if multiple discrete lithology curves are present.
 
 ### Step 4: Rendering mode selector
 - In `CurveSettings`, add `'lithology_discrete'` as a new option in the "Rendering" dropdown
   (currently Line / Blocks). Label: "Lithology (discrete)". Add "Lithology (fraction)" option too.
 - The "Blocks" mode (generic discrete blocks) remains as-is.
 
+### Step 5: Types and tests
+- Update frontend types:
+  - `CurveData.curve_type`
+  - `CurveInventoryItem.curve_type`
+  - `TrackConfig.curves[*].curve_type`
+  - add `lithology_set_id?: number | null` where curve metadata is represented.
+- Add backend tests:
+  - PATCH accepts valid `lithology_discrete` metadata;
+  - PATCH rejects unknown lithology set and mappings to lithology codes not in the selected set;
+  - zone aggregation uses `lithology_discrete` mapping.
+- Add frontend tests for `CurveSettings` visibility rules:
+  - no lithology section for GR/RHOB continuous curves;
+  - fraction picker only for `lithology_fraction` / lithology track curves;
+  - discrete mapping UI for `lithology_discrete`.
+
 **Affected files**:
 - `frontend/src/components/layout/settings/CurveSettings.tsx`
-- `frontend/src/renderers/lithologyCompositionRenderer.ts` (new discrete path)
-- `app/src/subsidence/data/schema.py` (new curve_type value)
-- Track rendering pipeline (wherever `curve_type` drives rendering dispatch)
+- `frontend/src/components/logview/DataTrack.tsx`
+- `frontend/src/renderers/lithologyCompositionRenderer.ts`
+- `frontend/src/types/tracks.ts`
+- `frontend/src/types/well.ts`
+- `app/src/subsidence/data/schema.py`
+- `app/src/subsidence/data/engine.py`
+- `app/src/subsidence/api/wells.py`
+- `app/src/subsidence/data/zone_service.py`
 
 ---
 
@@ -316,6 +381,11 @@ it should only appear in the Models settings panel, not in well settings.
 **Context**: Items BF4-007 and BF4-008 share the same underlying data (`active_sea_level_curve_id`
 on the well / inventory). The curve is still stored on the well; only the UI location changes.
 
+**Design decision**: the Models selector edits the well-wide active curve (`well_active_sea_level_curves`
+through `setWellActiveSeaLevelCurve`). It does NOT edit per-model visual config. The existing
+`viewStore.subsidenceModelConfigs[*].seaLevelCurveId` path is superseded and should be removed or
+ignored during this task to avoid two independent sources of truth.
+
 ### BF4-008-A: Remove from WellSettings
 
 In `WellSettings.tsx` lines 119–135, remove the entire "Sea level correction" section:
@@ -331,8 +401,8 @@ Remove all associated state and handlers:
 
 ### BF4-008-B: Add to ModelSettings
 
-In `frontend/src/components/layout/settings/ModelSettings.tsx` (or whichever component renders
-when a model node is selected), add a sea level section:
+In `frontend/src/components/layout/settings/SubsidenceModelSettings.tsx` (the settings component
+for the upper `Models` tree), add a sea level section:
 
 ```tsx
 <div className="template-panel__section-header">Sea level correction</div>
@@ -351,6 +421,13 @@ when a model node is selected), add a sea level section:
 - The handler calls `setWellActiveSeaLevelCurve(activeWellId, curveId)` — same backend call,
   different UI location.
 - The curve is applied well-wide (architecture does not change for now).
+- Remove or ignore `config.seaLevelCurveId` in `SubsidenceModelSettings`; `ZoneSet` can remain in
+  `subsidenceModelConfigs`, but sea level must not remain per-model.
+- Update `SubsidenceCanvas.tsx` to resolve the sea level curve from
+  `wellInventories.find(w => w.well_id === well.well_id)?.active_sea_level_curve_id` only.
+- Update `viewStore.ts` / `projectStore.ts` so new visual config no longer writes
+  `subsidenceModelConfigs[*].seaLevelCurveId`. Reading old visual config should not crash; old
+  `seaLevelCurveId` values may be ignored.
 
 ### BF4-008-C: Add sea level display in ZoneSettings
 
@@ -369,8 +446,10 @@ and looked up in `seaLevelCurves`. This is read-only — user must go to Models 
 
 **Affected files**:
 - `frontend/src/components/layout/settings/WellSettings.tsx` (remove section)
-- `frontend/src/components/layout/settings/ModelSettings.tsx` (add section — read file first, may not exist yet)
+- `frontend/src/components/layout/settings/SubsidenceModelSettings.tsx` (add well-wide selector)
 - `frontend/src/components/layout/settings/ZoneSettings.tsx` (add read-only display)
+- `frontend/src/components/subsidence/SubsidenceCanvas.tsx` (resolve well-wide curve only)
+- `frontend/src/stores/viewStore.ts` and `frontend/src/stores/projectStore.ts` (remove/ignore per-model sea level config)
 
 ---
 
@@ -392,8 +471,9 @@ styled only with a CSS highlight class. There is no visual indicator for:
 
 ### Active indicator
 - In single-well chart mode (current): show a radio-button-style circle indicator next to computed
-  models. The circle is filled when that model is the active model type (`viewStore.activeModelType`).
-- The `ModelsRoot` component must read `activeModelType` from `viewStore`.
+  models. The circle is filled when that model is the active model type
+  (`viewStore.activeSubsidenceModelType`).
+- The `ModelsRoot` component must read `activeSubsidenceModelType` from `viewStore`.
 - CSS: add a small circle before the model label:
   ```css
   .tree-leaf__radio {
@@ -413,7 +493,7 @@ styled only with a CSS highlight class. There is no visual indicator for:
 ### ModelsRoot changes
 ```tsx
 // add to ModelsRoot:
-const activeModelType = useViewStore((s) => s.activeModelType)
+const activeModelType = useViewStore((s) => s.activeSubsidenceModelType)
 const formations = useWellDataStore((s) => s.formations)  // active well formations
 const isComputed = (type: SubsidenceModelType) => type === 'total' && formations.length > 0
 ```
@@ -433,9 +513,12 @@ Show the radio span only for computed models (hide for planned).
 ## BF4-010: Move top-management buttons to side track toolbar (todo)
 
 **Problem**: Toolbar buttons for zoom presets (1:200, 1:500, 1:1000) and top management
-(Add top, Link top, Set age, Set type, Delete top, Delete all tops, Move top) are located in
+(Add top, Link top, Set age, Set type, Move top) are located in
 `ProjectToolbar.tsx` at the top of the application. User wants them in a vertical side panel
 adjacent to the well tracks, following the pattern of `SubsidenceToolbar.tsx`.
+
+**Decision**: Delete actions stay in the Data Manager tree (BF4-017). Do not move `Delete well`,
+`Delete top`, or `Delete all tops` into the side toolbar.
 
 ### What to move
 From `ProjectToolbar.tsx` lines ~495–503:
@@ -444,8 +527,6 @@ From `ProjectToolbar.tsx` lines ~495–503:
 - `Link top`
 - `Set age`
 - `Set type`
-- `Delete top`
-- `Delete all tops`
 - `Move top`
 
 ### What stays in ProjectToolbar
@@ -459,7 +540,7 @@ Create `frontend/src/components/layout/WellTrackSideToolbar.tsx`:
 - Sections:
   1. **Zoom** — three buttons: 1:200, 1:500, 1:1000 (from `ZoomControl` — reuse or inline)
   2. **Divider**
-  3. **Tops** — Add top, Link top, Set age, Set type, Delete top, Delete all tops, Move top
+  3. **Tops** — Add top, Link top, Set age, Set type, Move top
      (same `onClick` handlers as current toolbar; extract or pass as props)
 - Disabled states match existing toolbar: `disabled={!well}` for Add top, `disabled={!selectedFormation}`
   for the rest.
@@ -496,20 +577,27 @@ reference table in the contract update.
 **Audit method**:
 1. List all routes (method + path) from each API file.
 2. For each route, search `frontend/src/` for a `fetch` call or store action that calls it.
-3. Mark as: `ui` (has a frontend button/action), `cli-only` (CLI only), `unreachable` (no caller).
+3. Mark as:
+   - `ui` — reachable from a frontend user action or store effect.
+   - `internal` — called by backend, tests, or app lifecycle but not directly by a visible UI button.
+   - `dev-only` — useful for scripts/manual debugging but not part of current UI.
+   - `unreachable` — no known caller and no clear current purpose.
 
 **Files to audit**:
+- `app/src/subsidence/api/projects.py`
+- `app/src/subsidence/api/projects_config.py`
+- `app/src/subsidence/api/projects_imports.py`
+- `app/src/subsidence/api/projects_export.py`
+- `app/src/subsidence/api/import_preview.py`
 - `app/src/subsidence/api/wells.py`
 - `app/src/subsidence/api/formations.py`
 - `app/src/subsidence/api/sea_level.py`
-- `app/src/subsidence/api/strat_charts.py`
-- `app/src/subsidence/api/lithology_sets.py`
+- `app/src/subsidence/api/strat_chart.py`
 - `app/src/subsidence/api/lithology_patterns.py`
-- `app/src/subsidence/api/compaction_presets.py`
-- `app/src/subsidence/api/curve_mnemonics.py`
-- `app/src/subsidence/api/measurement_units.py`
-- `app/src/subsidence/api/zones.py`
+- `app/src/subsidence/api/compaction.py` (compaction presets, mnemonic sets, lithology sets,
+  measurement units, legacy compaction models)
 - `app/src/subsidence/api/top_sets.py`
+- `app/src/subsidence/api/subsidence.py`
 
 **Deliverable**: Update this section with a table of all endpoints + coverage status after audit.
 
