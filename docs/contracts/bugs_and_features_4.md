@@ -2176,3 +2176,72 @@ name should be displayed.
 | 25 | BF4-024 | XS | Single-well labels show upper marker only |
 | 26 | BF4-025 | M/L | Durable curve style settings + dictionary mnemonic assignment |
 | 27 | BF4-005 | L | Lithology discrete/fraction (multi-step) |
+| 28 | BF4-026 | S | Simplify curve_type taxonomy: remove lithology_discrete/fraction types |
+
+---
+
+## BF4-026: Simplify curve_type taxonomy (todo)
+
+**Context**: BF4-005 introduced `lithology_discrete` and `lithology_fraction` as explicit
+`curve_type` values. After review, the simpler two-type taxonomy is sufficient and cleaner.
+
+**Decision**:
+- `curve_type` has exactly two valid values: `continuous` and `discrete`.
+- "Lithology fraction" behaviour = `continuous` curve + `lithology_code` set in visual config
+  (`TrackConfig.curves[*].lithology_code`). This was already the pre-BF4-005 implementation.
+- "Lithology discrete" behaviour = `discrete` curve + `lithology_set_id` filled in
+  `curve_metadata`. The renderer checks `lithologyFillStyles` to determine whether to draw
+  lithology blocks or plain discrete blocks.
+- "Point" rendering mode = display option within `continuous` curves; will be a new value of
+  `lineStyle` or a separate `renderMode` field in `CurveConfig`, not a curve type.
+
+**Required changes**:
+
+### Backend
+- `schema.py`: revert `curve_type` column width back to `String(16)` and remove
+  `'lithology_discrete'` and `'lithology_fraction'` from the docstring allowed values.
+- `wells.py`: remove `'lithology_discrete'` and `'lithology_fraction'` from PATCH validation;
+  migrate any existing rows with these values to `'continuous'` and `'discrete'` respectively
+  in `migrate_schema()`.
+
+### Frontend types
+- `types/tracks.ts`, `types/well.ts`, `stores/wellDataStore.ts`: revert `curve_type` union to
+  `'continuous' | 'discrete'`.
+
+### CurveSettings
+- Remove `'lithology_fraction'` and `'lithology_discrete'` options from Rendering dropdown.
+- "Lithology composition" section (lithology code picker) shows when
+  `containingTrack.track_type === 'lithology'` OR `!!selectedCurveConfig.lithology_code` —
+  same as pre-BF4-005 behaviour.
+- For `discrete` curves: show lithology mapping table when `curve.lithology_set_id` is set
+  (same UI as the BF4-005 `lithology_discrete` section, but triggered by `lithology_set_id`
+  presence, not by `curve_type`).
+
+### DataTrack / renderer
+- Remove `lithology_fraction` dispatch path (was a no-op since it still went to composition bands
+  via `lithology_code`).
+- Keep `drawLithologyDiscrete`; change dispatch condition in DataTrack from
+  `style.curve_type === 'lithology_discrete'` to
+  `style.curve_type === 'discrete' && !!curve.lithology_set_id`.
+
+**Affected files**:
+- `app/src/subsidence/data/schema.py`
+- `app/src/subsidence/data/engine.py`
+- `app/src/subsidence/api/wells.py`
+- `frontend/src/types/tracks.ts`
+- `frontend/src/types/well.ts`
+- `frontend/src/stores/wellDataStore.ts`
+- `frontend/src/components/layout/settings/CurveSettings.tsx`
+- `frontend/src/components/logview/DataTrack.tsx`
+
+**Complexity**: S — mostly revert of BF4-005 type additions; renderer condition change is one
+line; no data migration needed in practice (no real data has `lithology_discrete` values yet).
+
+**Verification**:
+- `discrete` curve with `lithology_set_id` set → renders lithology blocks in DataTrack.
+- `discrete` curve without `lithology_set_id` → renders plain discrete blocks.
+- `continuous` curve with `lithology_code` in visual config → renders as fraction band in
+  lithology track.
+- PATCH curve with `curve_type='lithology_discrete'` → rejected with 422.
+- Old projects with `curve_type='continuous'` or `'discrete'` → work unchanged.
+
