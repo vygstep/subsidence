@@ -1797,13 +1797,73 @@ footer already has a "Cancel" button — both call `onClose`. Remove the header 
 the removal affects all of them. None have special logic in the header close; the footer Cancel
 is sufficient.
 
+---
+
+### BF4-016-H: Curve type selection per curve in LAS/CSV preview
+
+In the LAS and CSV preview step, add a **Type** column to the curve list so the user can override
+the auto-detected `curve_type` before loading.
+
+**LAS preview** — `LasPreviewPane` renders a table of curves (`lasPreview.curves`). Add a `Type`
+column after the mnemonic/unit columns with a `<select>` per row:
+
+```tsx
+<select
+  value={curveTypes[curve.mnemonic] ?? 'continuous'}
+  onChange={(e) => setCurveTypes((prev) => ({ ...prev, [curve.mnemonic]: e.target.value }))}
+>
+  <option value="continuous">continuous</option>
+  <option value="discrete">discrete</option>
+</select>
+```
+
+State: `const [curveTypes, setCurveTypes] = useState<Record<string, 'continuous' | 'discrete'>>({})`.
+
+**Auto-detect on preview load** (populate `curveTypes` from `lasPreview`):
+```tsx
+useEffect(() => {
+  if (!lasPreview) return
+  const detected: Record<string, 'continuous' | 'discrete'> = {}
+  for (const curve of lasPreview.curves) {
+    // Skip the depth curve (first in list)
+    if (curve === lasPreview.curves[0]) continue
+    detected[curve.mnemonic] = detectCurveType(curve)
+  }
+  setCurveTypes(detected)
+}, [lasPreview])
+```
+
+**CSV preview** — add the same per-column Type selector row in `TabularPreviewPane` (or inline in
+`ImportLasDialog`), skipping the depth column.
+
+**`detectCurveType` heuristic**:
+```tsx
+function detectCurveType(curve: LasPreviewCurve): 'continuous' | 'discrete' {
+  // All sample values in preview are integers → discrete
+  if (curve.sample_values?.every((v) => Number.isFinite(v) && Number.isInteger(v))) return 'discrete'
+  return 'continuous'
+}
+```
+
+**Pass `curveTypes` to the import payload**: when submitting, include `curve_types` in the POST
+body. Backend already stores `curve_type` per curve in `curve_metadata`; extend the LAS/CSV import
+endpoint to accept and apply the override map.
+
+**Backend** (`wells.py` or import handler):
+- Accept optional `curve_types: dict[str, Literal['continuous', 'discrete']]` in the import
+  request body.
+- After writing curve metadata rows, patch `curve_type` for any mnemonic present in the map.
+- Default remains `'continuous'` for curves not in the map.
+
 **Affected files**:
 - `frontend/src/components/layout/ImportLasDialog.tsx` (sub-items A–E)
-- `frontend/src/components/layout/importWizard/TabularPreviewPane.tsx` (sub-item F)
+- `frontend/src/components/layout/importWizard/LasPreviewPane.tsx` (sub-item H — Type column)
+- `frontend/src/components/layout/importWizard/TabularPreviewPane.tsx` (sub-items F, H)
 - `frontend/src/components/layout/importWizard/ImportWizardShell.tsx` (sub-item G)
 - CSS file where `.import-preview__table` styles live (sub-item F)
+- `app/src/subsidence/api/wells.py` or the LAS/CSV import endpoint (sub-item H — backend)
 
-**Complexity**: S — frontend only, no backend changes. All sub-items are independent.
+**Complexity**: S — frontend only for A–G; sub-item H adds a small backend touch.
 
 ---
 
