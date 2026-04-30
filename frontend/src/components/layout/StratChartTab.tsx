@@ -57,7 +57,6 @@ export function StratChartTab({ charts, onActivate, onDeleteById, onContextMenu,
               >
                 {chart.name}
               </button>
-              <span className="tree-node__item-meta">{chart.unit_count} units</span>
               <button
                 type="button"
                 className="dm-action dm-action--ghost dm-action--danger"
@@ -84,7 +83,6 @@ export function StratChartTab({ charts, onActivate, onDeleteById, onContextMenu,
         onClick={() => setSelectedObject({ type: 'sea-level-curves-root' })}
       >
         <span className="tree-node__label">Sea level curves</span>
-        <span className="tree-node__item-meta">{seaLevelCurves.length}</span>
       </div>
       {seaLevelCurves.map((curve) => (
         <div
@@ -102,7 +100,6 @@ export function StratChartTab({ charts, onActivate, onDeleteById, onContextMenu,
           >
             {curve.name}
           </button>
-          <span className="tree-node__item-meta">{curve.point_count} pts</span>
           {curve.is_builtin && (
             <span className="tree-node__badge">built-in</span>
           )}

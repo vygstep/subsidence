@@ -45,7 +45,7 @@ line is supposed to stop at the right edge of the tracks, not overflow.
 
 ---
 
-## BF4-002: Remove object counters from data manager tree (todo)
+## BF4-002: Remove object counters from data manager tree (done)
 
 **Problem**: Every tree root node in the data manager shows a count badge next to its label
 (e.g., `WELLS (3)`, `ZONES (2)`, `Models (5)`). These are visual noise the user wants removed.
@@ -64,6 +64,17 @@ line is supposed to stop at the right edge of the tracks, not overflow.
 **Affected files**:
 - `frontend/src/components/layout/WellDataPanel.tsx`
 - `frontend/src/components/layout/StratChartTab.tsx`
+
+**Implemented**:
+- Removed root/child count badges from WELLS, ZONES, ZoneSet rows, and Models.
+- Removed tree metadata counters from StratChart rows, Sea level curves root, and Sea level curve rows.
+- Kept badges that communicate state, such as `built-in` and `planned`.
+
+**Manual check**:
+- Open Data Manager and verify WELLS, ZONES, Models, StratCharts, and Sea level curves no longer
+  show numeric counters in the tree.
+- Verify radio buttons, checkboxes, delete buttons, built-in badges, and planned model badges still
+  behave as before.
 
 ---
 

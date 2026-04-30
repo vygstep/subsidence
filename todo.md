@@ -6,7 +6,6 @@ Active contract: `docs/contracts/bugs_and_features_4.md`
 
 | Item | Title | Status |
 |---|---|---|
-| BF4-002 | Remove object counters from data manager tree | todo |
 | BF4-006 | Well color — swatch only, oval marker | todo |
 | BF4-007-A | Select dropdown arrow overlap fix (CSS) | todo |
 | BF4-012 | Sea level curve on same depth scale (remove dual axis) | todo |

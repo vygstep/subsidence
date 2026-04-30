@@ -169,7 +169,6 @@ function ModelsRoot() {
         <button type="button" className="tree-node__label-button">
           Models
         </button>
-        <span className="tree-node__count">{MODEL_NODES.length}</span>
       </div>
       {isExpanded('models-root') ? (
         <div className="tree-node__children">
@@ -281,7 +280,6 @@ export function WellDataPanel({
             <button type="button" className="tree-node__label-button">
               WELLS
             </button>
-            <span className="tree-node__count">{wells.length}</span>
           </div>
           {isOpen('wells-root') ? (
             <div className="tree-node__children">
@@ -532,7 +530,6 @@ export function WellDataPanel({
             <button type="button" className="tree-node__label-button">
               ZONES
             </button>
-            <span className="tree-node__count">{zoneSets.length}</span>
           </div>
           {isOpen('zones-root') ? (
             <div className="tree-node__children">
@@ -554,7 +551,6 @@ export function WellDataPanel({
                       <button type="button" className="tree-node__section-label">
                         {zoneSet.name}
                       </button>
-                      <span className="tree-node__count">{zoneSet.zones.length}</span>
                     </div>
                     {isOpen(`zones:${zoneSet.id}`) ? (
                       <div className="tree-node__children">
