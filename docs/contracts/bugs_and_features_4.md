@@ -1460,7 +1460,7 @@ is sufficient.
 
 ---
 
-## BF4-015: Track resize — narrowing only updates header, not canvas (todo)
+## BF4-015: Track resize — narrowing only updates header, not canvas (done)
 
 **Problem**: When dragging the right edge of a track to the **right** (widening), the track header
 and canvas both update correctly. When dragging **left** (narrowing) — including reversing direction
@@ -1506,6 +1506,10 @@ increasing — it only removes the hidden lower bound that prevents shrinking.
 
 **Verification**: After the fix, drag a track right edge left; the canvas should collapse in
 lockstep with the header. Check at both 1× and 2× devicePixelRatio (browser zoom 100% and 200%).
+
+**Implemented**:
+- Added `min-width: 0` to `.depth-track`, `.data-track`, and `.formation-column` in
+  `frontend/src/styles/log-view.css`.
 
 ---
 

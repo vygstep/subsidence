@@ -6,7 +6,6 @@ Active contract: `docs/contracts/bugs_and_features_4.md`
 
 | Item | Title | Status |
 |---|---|---|
-| BF4-015 | Track resize — narrowing only updates header, not canvas | todo |
 | BF4-017 | Delete well / top / all tops — ✕ buttons in data manager tree | todo |
 | BF4-001 | Marker lines clipped to track area | todo |
 | BF4-002 | Remove object counters from data manager tree | todo |

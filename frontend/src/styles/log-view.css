@@ -1,6 +1,7 @@
 .depth-track {
   width: 60px;
   display: block;
+  min-width: 0;
   background: #ffffff;
   border-right: 1px solid #c4d0dc;
 }
@@ -13,6 +14,7 @@
 .data-track,
 .formation-column {
   display: block;
+  min-width: 0;
   background: #ffffff;
 }
 
@@ -274,4 +276,3 @@
   flex: 1;
   overflow: hidden;
 }
-
