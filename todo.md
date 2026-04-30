@@ -15,7 +15,6 @@ Active contract: `docs/contracts/bugs_and_features_4.md`
 | BF4-019 | Delete log curve / delete all logs from Data Manager | todo |
 | BF4-020 | Delete deviation survey from Data Manager | todo |
 | BF4-021 | Rebuild zones after formation top delete | todo |
-| BF4-005 | Lithology discrete vs fraction curve types | done |
 
 ## Implemented contracts
 

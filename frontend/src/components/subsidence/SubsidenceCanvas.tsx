@@ -2,7 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 
 import { useCanvasRenderer } from '@/hooks/useCanvasRenderer'
 import { drawBurialCurves, drawFormationFills } from '@/renderers/subsidenceRenderer'
-import { useComputedStore, useViewStore } from '@/stores'
+import { defaultSeaLevelOverlayStyle, useComputedStore, useViewStore, type SeaLevelOverlayLineStyle } from '@/stores'
 import { useWorkspaceStore } from '@/stores/workspaceStore'
 import { useWellDataStore } from '@/stores/wellDataStore'
 import type { SeaLevelPoint } from '@/types'
@@ -13,6 +13,12 @@ const TIMESCALE_HEIGHT = 52
 const PADDING_BASE = { top: 12, right: 100, bottom: 48, left: 64 }
 
 type Padding = typeof PADDING_BASE
+
+function seaLevelLineDash(lineStyle: SeaLevelOverlayLineStyle): number[] {
+  if (lineStyle === 'dashed') return [4, 3]
+  if (lineStyle === 'dotted') return [1, 3]
+  return []
+}
 
 function drawAxes(
   ctx: CanvasRenderingContext2D,
@@ -131,9 +137,9 @@ function drawFormationLabels(
   depthToY: (depth: number) => number,
 ) {
   function displayLabel(fullName: string): string {
-    const arrowIdx = fullName.indexOf(' -> ')
-    const name = arrowIdx !== -1 ? fullName.slice(0, arrowIdx) : fullName
-    return name.length > 18 ? `${name.slice(0, 17)}…` : name
+    const arrowIdx = fullName.search(/\s*(?:->|→)\s*/)
+    const name = (arrowIdx !== -1 ? fullName.slice(0, arrowIdx) : fullName).trim()
+    return name.length > 18 ? `${name.slice(0, 17)}...` : name
   }
 
   ctx.save()
@@ -186,6 +192,8 @@ export function SubsidenceCanvas() {
   const subsidenceDepthMinM = useViewStore((s) => s.subsidenceSingleDepthMin)
   const subsidenceDepthMaxM = useViewStore((s) => s.subsidenceSingleDepthMax)
   const showSeaLevel = useViewStore((s) => s.subsidenceSingleShowSeaLevel)
+  const overlayCurveIds = useViewStore((s) => s.subsidenceSingleSeaLevelOverlayCurveIds)
+  const seaLevelOverlayStyles = useViewStore((s) => s.seaLevelOverlayStyles)
   const activeModelType = useViewStore((s) => s.activeSubsidenceModelType)
 
   const wellName = useWellDataStore((s) => s.well?.well_name ?? null)
@@ -208,33 +216,43 @@ export function SubsidenceCanvas() {
     return inv?.active_sea_level_curve_id ?? null
   }, [wellInventories, well?.well_id])
 
-  const [loadedSeaLevelPoints, setLoadedSeaLevelPoints] = useState<{ curveId: number | null; points: SeaLevelPoint[] }>({
-    curveId: null,
-    points: [],
-  })
-  const seaLevelPoints = useMemo(
-    () => (
-      showSeaLevel && seaLevelCurveId !== null && loadedSeaLevelPoints.curveId === seaLevelCurveId
-        ? loadedSeaLevelPoints.points
-        : []
-    ),
-    [loadedSeaLevelPoints, seaLevelCurveId, showSeaLevel],
+  const selectedSeaLevelCurveIds = useMemo(() => {
+    if (overlayCurveIds.length > 0) return overlayCurveIds
+    if (showSeaLevel && seaLevelCurveId !== null) return [seaLevelCurveId]
+    return []
+  }, [overlayCurveIds, seaLevelCurveId, showSeaLevel])
+
+  const [loadedSeaLevelPointsByCurveId, setLoadedSeaLevelPointsByCurveId] = useState<Record<number, SeaLevelPoint[]>>({})
+  const seaLevelOverlays = useMemo(
+    () => selectedSeaLevelCurveIds.map((curveId) => ({
+      curveId,
+      points: loadedSeaLevelPointsByCurveId[curveId] ?? [],
+      style: seaLevelOverlayStyles[curveId] ?? defaultSeaLevelOverlayStyle(curveId),
+    })),
+    [loadedSeaLevelPointsByCurveId, seaLevelOverlayStyles, selectedSeaLevelCurveIds],
   )
 
   useEffect(() => {
-    if (!showSeaLevel || seaLevelCurveId === null) {
+    if (selectedSeaLevelCurveIds.length === 0) {
       return
     }
     let cancelled = false
-    loadSeaLevelPoints(seaLevelCurveId)
-      .then((points) => {
-        if (!cancelled) setLoadedSeaLevelPoints({ curveId: seaLevelCurveId, points })
-      })
-      .catch(() => {
-        if (!cancelled) setLoadedSeaLevelPoints({ curveId: seaLevelCurveId, points: [] })
-      })
+    const missingCurveIds = selectedSeaLevelCurveIds.filter((curveId) => loadedSeaLevelPointsByCurveId[curveId] === undefined)
+    for (const curveId of missingCurveIds) {
+      loadSeaLevelPoints(curveId)
+        .then((points) => {
+          if (!cancelled) {
+            setLoadedSeaLevelPointsByCurveId((state) => ({ ...state, [curveId]: points }))
+          }
+        })
+        .catch(() => {
+          if (!cancelled) {
+            setLoadedSeaLevelPointsByCurveId((state) => ({ ...state, [curveId]: [] }))
+          }
+        })
+    }
     return () => { cancelled = true }
-  }, [showSeaLevel, seaLevelCurveId, loadSeaLevelPoints])
+  }, [loadedSeaLevelPointsByCurveId, loadSeaLevelPoints, selectedSeaLevelCurveIds])
 
   // X axis: 0 (present, right) → oldest formation age (left)
   const maxAge = useMemo(() => {
@@ -369,12 +387,6 @@ export function SubsidenceCanvas() {
 
     drawAxes(ctx, width, height, maxAge, effectiveMinDepthM, effectiveMaxDepthM, timeToX, depthToY, pad)
 
-    const slPoints = showSeaLevel && seaLevelPoints.length > 0
-      ? [...seaLevelPoints]
-          .filter((p) => p.age_ma >= 0 && p.age_ma <= maxAge)
-          .sort((a, b) => a.age_ma - b.age_ma)
-      : []
-
     ctx.save()
     ctx.beginPath()
     ctx.rect(pad.left, pad.top, plotW, plotH)
@@ -384,11 +396,16 @@ export function SubsidenceCanvas() {
     if (showFormationFills) drawFormationFills(ctx, subsidenceCurves, timeToX, depthToY)
     if (showBurialCurves) drawBurialCurves(ctx, subsidenceCurves, timeToX, depthToY)
 
-    // Sea-level line (inside clip)
-    if (slPoints.length > 0) {
-      ctx.strokeStyle = '#0891b2'
+    // Sea-level overlay lines (inside clip). These are display-only curves.
+    seaLevelOverlays.forEach((overlay) => {
+      const slPoints = [...overlay.points]
+        .filter((p) => p.age_ma >= 0 && p.age_ma <= maxAge)
+        .sort((a, b) => a.age_ma - b.age_ma)
+      if (slPoints.length === 0) return
+
+      ctx.strokeStyle = overlay.style.colorHex
       ctx.lineWidth = 1.5
-      ctx.setLineDash([4, 3])
+      ctx.setLineDash(seaLevelLineDash(overlay.style.lineStyle))
       ctx.beginPath()
       let started = false
       for (const pt of slPoints) {
@@ -399,12 +416,12 @@ export function SubsidenceCanvas() {
       }
       ctx.stroke()
       ctx.setLineDash([])
-    }
+    })
 
     ctx.restore()
 
     drawFormationLabels(ctx, subsidenceCurves, pad.left + plotW, depthToY)
-  }, [subsidenceCurves, maxAge, effectiveMinDepthM, effectiveMaxDepthM, showFormationFills, showBurialCurves, showSeaLevel, seaLevelPoints])
+  }, [subsidenceCurves, maxAge, effectiveMinDepthM, effectiveMaxDepthM, showFormationFills, showBurialCurves, seaLevelOverlays])
 
   const canvasRef = useCanvasRenderer(draw, [draw])
 

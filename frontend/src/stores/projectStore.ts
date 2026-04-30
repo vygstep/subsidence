@@ -3,7 +3,7 @@ import { create } from 'zustand'
 import { rememberProjectBundlePath } from '@/components/layout/pathMemory'
 import { recordOperation } from '@/utils/diagnostics'
 
-import { useViewStore, type DepthTrackConfig, type FormationsTrackConfig, type SubsidenceModelType, type SubsidenceModelConfig } from './viewStore'
+import { useViewStore, type DepthTrackConfig, type FormationsTrackConfig, type SeaLevelOverlayStyle, type SubsidenceModelType, type SubsidenceModelConfig } from './viewStore'
 import { useWellDataStore } from './wellDataStore'
 import { useWorkspaceStore } from './workspaceStore'
 
@@ -62,6 +62,8 @@ interface VisualConfigPayload {
   activeSubsidenceModelType?: string
   subsidenceModelConfigs?: Record<string, { zoneSetId?: number | null; seaLevelCurveId?: number | null }>
   subsidenceSingleShowSeaLevel?: boolean
+  subsidenceSingleSeaLevelOverlayCurveIds?: number[]
+  seaLevelOverlayStyles?: Record<string, Partial<SeaLevelOverlayStyle>>
 }
 
 interface ProjectStatusResponse {
@@ -197,6 +199,8 @@ function applyVisualConfigPayload(config: Record<string, unknown>): void {
     activeSubsidenceModelType: payload.activeSubsidenceModelType as SubsidenceModelType | undefined,
     subsidenceModelConfigs: payload.subsidenceModelConfigs as Partial<Record<SubsidenceModelType, SubsidenceModelConfig>> | undefined,
     subsidenceSingleShowSeaLevel: payload.subsidenceSingleShowSeaLevel,
+    subsidenceSingleSeaLevelOverlayCurveIds: payload.subsidenceSingleSeaLevelOverlayCurveIds,
+    seaLevelOverlayStyles: payload.seaLevelOverlayStyles,
   })
   useWellDataStore.getState().setColorOverrides(payload.curveColors ?? {})
 }
@@ -232,6 +236,8 @@ export function collectProjectVisualConfig(): VisualConfigPayload {
     activeSubsidenceModelType: vs.activeSubsidenceModelType,
     subsidenceModelConfigs: vs.subsidenceModelConfigs,
     subsidenceSingleShowSeaLevel: vs.subsidenceSingleShowSeaLevel,
+    subsidenceSingleSeaLevelOverlayCurveIds: vs.subsidenceSingleSeaLevelOverlayCurveIds,
+    seaLevelOverlayStyles: vs.seaLevelOverlayStyles,
   }
 }
 

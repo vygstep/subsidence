@@ -1161,5 +1161,10 @@ export const useWellDataStore = create<WellDataStore>((set, get) => ({
     })
     if (!response.ok) throw new Error(await readError(response, `Failed to set sea level curve (${response.status})`))
     await get().loadWellInventories()
+    const activeWellId = get().well?.well_id
+    if (activeWellId === wellId) {
+      const { useComputedStore } = await import('./computedStore')
+      useComputedStore.getState().triggerRecalculation()
+    }
   },
 }))

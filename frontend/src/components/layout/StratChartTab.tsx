@@ -1,6 +1,6 @@
-import { useEffect, useRef } from 'react'
+import { useEffect, useLayoutEffect, useRef } from 'react'
 
-import { useWellDataStore, useWorkspaceStore } from '@/stores'
+import { defaultSeaLevelOverlayStyle, useViewStore, useWellDataStore, useWorkspaceStore } from '@/stores'
 import type { StratChartInfo } from '@/types'
 import { useDataManager } from './dataManager/DataManagerContext'
 
@@ -35,6 +35,37 @@ function TreeToggleButton({ isOpen, onToggle }: TreeToggleButtonProps) {
   )
 }
 
+interface OverlayAllCheckboxProps {
+  curveIds: number[]
+  selectedCurveIds: number[]
+  onChange: (checked: boolean) => void
+}
+
+function OverlayAllCheckbox({ curveIds, selectedCurveIds, onChange }: OverlayAllCheckboxProps) {
+  const inputRef = useRef<HTMLInputElement | null>(null)
+  const selectedCount = curveIds.filter((id) => selectedCurveIds.includes(id)).length
+  const allChecked = curveIds.length > 0 && selectedCount === curveIds.length
+  const partiallyChecked = selectedCount > 0 && selectedCount < curveIds.length
+
+  useLayoutEffect(() => {
+    if (inputRef.current) {
+      inputRef.current.indeterminate = partiallyChecked
+    }
+  }, [partiallyChecked])
+
+  return (
+    <input
+      ref={inputRef}
+      type="checkbox"
+      checked={allChecked}
+      disabled={curveIds.length === 0}
+      aria-label="Toggle all sea level curve overlays"
+      onChange={(event) => onChange(event.target.checked)}
+      onClick={(event) => event.stopPropagation()}
+    />
+  )
+}
+
 export function StratChartTab({
   charts,
   onActivate,
@@ -47,6 +78,12 @@ export function StratChartTab({
   const seaLevelCurves = useWellDataStore((s) => s.seaLevelCurves)
   const deleteSeaLevelCurve = useWellDataStore((s) => s.deleteSeaLevelCurve)
   const wellInventories = useWellDataStore((s) => s.wellInventories)
+  const activeWellId = useWellDataStore((s) => s.well?.well_id ?? null)
+  const showSeaLevel = useViewStore((s) => s.subsidenceSingleShowSeaLevel)
+  const overlayCurveIds = useViewStore((s) => s.subsidenceSingleSeaLevelOverlayCurveIds)
+  const seaLevelOverlayStyles = useViewStore((s) => s.seaLevelOverlayStyles)
+  const setOverlayCurveIds = useViewStore((s) => s.setSubsidenceSingleSeaLevelOverlayCurveIds)
+  const toggleOverlayCurve = useViewStore((s) => s.toggleSubsidenceSingleSeaLevelOverlayCurve)
   const setSelectedObject = useWorkspaceStore((s) => s.setSelectedObject)
   const selectedObject = useWorkspaceStore((s) => s.selectedObject)
 
@@ -54,6 +91,13 @@ export function StratChartTab({
   const selectedCurveId = selectedObject?.type === 'sea-level-curve' ? selectedObject.curveId : null
   const isSeaLevelRootSelected = selectedObject?.type === 'sea-level-curves-root'
   const didInitializeExpanded = useRef(false)
+  const activeWellCurveId = wellInventories.find((well) => well.well_id === activeWellId)?.active_sea_level_curve_id ?? null
+  const effectiveOverlayCurveIds = overlayCurveIds.length > 0
+    ? overlayCurveIds
+    : showSeaLevel && activeWellCurveId !== null
+      ? [activeWellCurveId]
+      : []
+  const allSeaLevelCurveIds = seaLevelCurves.map((curve) => curve.id)
 
   useEffect(() => {
     if (didInitializeExpanded.current) return
@@ -68,6 +112,21 @@ export function StratChartTab({
   function handleDeleteCurve(curveId: number, name: string) {
     if (!window.confirm(`Delete sea level curve "${name}"?`)) return
     void deleteSeaLevelCurve(curveId).catch((error: unknown) => window.alert(String(error)))
+  }
+
+  function handleOverlayToggle(curveId: number, checked: boolean): void {
+    if (overlayCurveIds.length === 0 && effectiveOverlayCurveIds.length > 0) {
+      const next = new Set(effectiveOverlayCurveIds)
+      if (checked) next.add(curveId)
+      else next.delete(curveId)
+      setOverlayCurveIds(Array.from(next))
+      return
+    }
+    toggleOverlayCurve(curveId, checked)
+  }
+
+  function curveColor(curveId: number): string {
+    return (seaLevelOverlayStyles[curveId] ?? defaultSeaLevelOverlayStyle(curveId)).colorHex
   }
 
   return (
@@ -150,6 +209,11 @@ export function StratChartTab({
               isOpen={isExpanded('sea-level-curves-root')}
               onToggle={() => toggleExpanded('sea-level-curves-root')}
             />
+            <OverlayAllCheckbox
+              curveIds={allSeaLevelCurveIds}
+              selectedCurveIds={effectiveOverlayCurveIds}
+              onChange={(checked) => setOverlayCurveIds(checked ? allSeaLevelCurveIds : [])}
+            />
             <button type="button" className="tree-node__label-button">
               SEA LEVEL CURVES
             </button>
@@ -162,6 +226,14 @@ export function StratChartTab({
                   className={`tree-node__row ${selectedCurveId === curve.id ? 'tree-node__row--selected' : ''}`}
                   onClick={() => setSelectedObject({ type: 'sea-level-curve', curveId: curve.id })}
                 >
+                  <input
+                    type="checkbox"
+                    checked={effectiveOverlayCurveIds.includes(curve.id)}
+                    aria-label={`Toggle sea level curve overlay "${curve.name}"`}
+                    onChange={(event) => handleOverlayToggle(curve.id, event.target.checked)}
+                    onClick={(event) => event.stopPropagation()}
+                  />
+                  <span className="dm-object-color-bar" style={{ ['--dm-object-color' as string]: curveColor(curve.id) }} />
                   <button
                     type="button"
                     className="tree-node__label-button"

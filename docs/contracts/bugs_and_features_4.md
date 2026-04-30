@@ -1872,6 +1872,141 @@ action.
 
 ---
 
+## BF4-022: Data Manager style tokens and reusable object controls (done)
+
+**Problem**: Recent small fixes introduced local styles for object markers and model active
+indicators. This breaks the previously agreed Data Manager style unification:
+- well color marker is a horizontal pill while formation/top markers are vertical bars;
+- Models active indicator uses custom `.tree-leaf__radio` CSS instead of the same native radio
+  control used by WELLS;
+- future sea-level overlay checkboxes could easily add another visual style if not constrained.
+
+**Design decision**: `frontend/src/styles/data-manager.css` remains the single source of truth for
+Data Manager and Settings object controls. New shared controls must be defined near the existing
+DM tokens/tree primitives, then reused by components. Component-specific styles are allowed only
+when the component has a genuinely unique layout.
+
+**Implementation requirements**:
+- Add a reusable vertical object color marker class, e.g. `.dm-object-color-bar`, using the same
+  proportions as `.top-leaf::before`.
+- Replace the WELLS row color swatch with `.dm-object-color-bar`.
+- Stop using custom `.tree-leaf__radio` / `.tree-leaf__radio--active` for Models. Use native
+  `input type="radio"` in the same row pattern as WELLS.
+- Keep checkboxes for chart overlay and tree visibility as native controls styled by existing
+  `.sf-row` / tree rules unless a missing shared style is identified before implementation.
+- Remove obsolete component-specific radio/marker styles if they are no longer used.
+
+**Affected files**:
+- `frontend/src/styles/data-manager.css`
+- `frontend/src/components/layout/WellDataPanel.tsx`
+
+**Verification**:
+- WELLS color marker is vertical and visually matches top marker bars.
+- Models -> Total active indicator is the same native radio style as WELLS.
+- Planned model rows remain selectable for settings but cannot become active computed models.
+
+**Implemented**:
+- Added `.dm-object-color-bar` as the shared vertical object color marker in
+  `frontend/src/styles/data-manager.css`.
+- Replaced the WELLS color pill with `.dm-object-color-bar`.
+- Replaced the custom Models radio indicator with a native `input type="radio"` row control.
+- Removed obsolete `.tree-leaf__radio` styles.
+
+---
+
+## BF4-023: Sea-level correction recomputes model, overlay is independent (done)
+
+**Problem**: Models -> Total can select a sea-level correction curve, but changing the curve only
+updates the active curve link and does not recalculate the subsidence model. Separately, the
+single-well chart overlay currently visualizes only the active correction curve, so visual overlay
+and model correction are mixed together.
+
+**Design decision**:
+- `well_active_sea_level_curves.active_sea_level_curve_id` is the compute setting. `None` means the
+  model ignores eustatic correction.
+- Single-well chart sea-level overlay is a display setting stored in project visual config. It can
+  show any subset of available curves, including all curves, and does not change model inputs.
+
+**Implementation requirements**:
+- After `setWellActiveSeaLevelCurve(wellId, curveId)` succeeds, refresh inventories and trigger
+  the existing subsidence recalculation path for the active well.
+- Add `subsidenceSingleSeaLevelOverlayCurveIds: number[]` to `viewStore` and project visual config.
+- In `StratChartTab`, render per-curve overlay checkboxes under `Charts / SEA LEVEL CURVES` plus
+  a root checkbox for "all curves".
+- Each sea-level curve row in `Charts / SEA LEVEL CURVES` must show the same reusable vertical
+  object color marker used by wells.
+- Keep Single Well chart settings focused on chart-local options such as depth range; do not
+  duplicate the sea-level curve checklist there.
+- Selecting a sea-level curve opens its Settings panel, where the user can edit display `Color`
+  and `Line style` (`solid | dashed | dotted`) for the overlay.
+- Store sea-level overlay display styles in project visual config, not in the built-in dictionary
+  rows.
+- Preserve legacy behavior: if old projects have `subsidenceSingleShowSeaLevel=true` and no explicit
+  overlay ids, show the active correction curve.
+- In `SubsidenceCanvas`, load and draw all selected overlay curves using their configured color and
+  line style. Overlay curves must remain clipped to the plot area and use the depth axis, as
+  BF4-012 established.
+
+**Affected files**:
+- `frontend/src/stores/viewStore.ts`
+- `frontend/src/stores/projectStore.ts`
+- `frontend/src/stores/wellDataStore.ts`
+- `frontend/src/components/layout/StratChartTab.tsx`
+- `frontend/src/components/layout/settings/SeaLevelCurveSettings.tsx`
+- `frontend/src/components/subsidence/SubsidenceCanvas.tsx`
+- `frontend/src/App.tsx`
+
+**Verification**:
+- In Models -> Total, select a sea-level correction curve and confirm the subsidence result
+  recalculates.
+- Set correction to `None`; model recalculates without eustatic correction.
+- Select one overlay curve in `Charts / SEA LEVEL CURVES`; only that curve is drawn.
+- Select "All curves"; all available curves are drawn.
+- Overlay checkbox changes do not alter the Models -> Total correction selector.
+- Select a sea-level curve row; Settings can change its color and line style.
+- Data Manager sea-level curve row marker updates to the selected color.
+
+**Implemented**:
+- `setWellActiveSeaLevelCurve` now refreshes inventories and triggers subsidence recalculation for
+  the active well after changing the compute correction curve.
+- Added `subsidenceSingleSeaLevelOverlayCurveIds` to `viewStore` and project visual config.
+- `Charts / SEA LEVEL CURVES` now exposes native checkboxes for all sea-level curves plus an
+  all-curves root checkbox.
+- Single Well chart settings no longer duplicate the sea-level curve checklist.
+- Added `seaLevelOverlayStyles` to project visual config.
+- `SeaLevelCurveSettings` now edits overlay color and line style for the selected curve.
+- Data Manager sea-level curve rows now show reusable vertical color markers.
+- `SubsidenceCanvas` now loads and draws all selected display overlay curves using configured
+  colors and line styles.
+- Legacy projects with `subsidenceSingleShowSeaLevel=true` and no explicit overlay ids still show
+  the active Models correction curve.
+
+---
+
+## BF4-024: Single-well zone labels show upper marker only (done)
+
+**Problem**: Single-well subsidence chart labels still show zone intervals such as
+`Top -> Base` / `Top -> Base` variants. The user needs shorter labels: only the upper marker/top
+name should be displayed.
+
+**Implementation requirements**:
+- Update the chart label formatter to split on both ASCII `->` and the Unicode arrow `→`.
+- Trim whitespace and keep only the upper marker name.
+- Keep a short length limit so labels do not overlap the chart margin.
+
+**Affected files**:
+- `frontend/src/components/subsidence/SubsidenceCanvas.tsx`
+
+**Verification**:
+- Single Well chart right-side labels show only the top marker name.
+- Existing long top names are still truncated.
+
+**Implemented**:
+- `SubsidenceCanvas` label formatting now splits zone names on both `->` and `→`, trims the result,
+  and draws only the upper marker name with a short length limit.
+
+---
+
 ## Implementation order
 
 | # | Item | Complexity | Notes |
@@ -1897,4 +2032,7 @@ action.
 | 20 | BF4-019 | M | Delete log curves from Data Manager |
 | 21 | BF4-020 | S/M | Delete deviation survey from Data Manager |
 | 22 | BF4-021 | S/M | Rebuild zones after formation top delete |
-| 23 | BF4-005 | L | Lithology discrete/fraction (multi-step) |
+| 23 | BF4-022 | XS | Restore shared Data Manager style primitives |
+| 24 | BF4-023 | S | Separate sea-level compute selector from overlay checkboxes |
+| 25 | BF4-024 | XS | Single-well labels show upper marker only |
+| 26 | BF4-005 | L | Lithology discrete/fraction (multi-step) |

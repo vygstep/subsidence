@@ -8,6 +8,12 @@ interface VisibleDepthRange {
 }
 
 export type SubsidenceModelType = 'total' | 'decompaction' | 'airy' | 'stepwise' | 'thermal'
+export type SeaLevelOverlayLineStyle = 'solid' | 'dashed' | 'dotted'
+
+export interface SeaLevelOverlayStyle {
+  colorHex: string
+  lineStyle: SeaLevelOverlayLineStyle
+}
 
 export interface SubsidenceModelConfig {
   zoneSetId: number | null
@@ -34,6 +40,8 @@ interface VisualConfigPayload {
   activeSubsidenceModelType?: SubsidenceModelType
   subsidenceModelConfigs?: Partial<Record<SubsidenceModelType, Partial<SubsidenceModelConfig> & { seaLevelCurveId?: number | null }>>
   subsidenceSingleShowSeaLevel?: boolean
+  subsidenceSingleSeaLevelOverlayCurveIds?: number[]
+  seaLevelOverlayStyles?: Record<string, Partial<SeaLevelOverlayStyle>>
 }
 
 export type SelectedElementType = 'curve' | 'track' | 'formation'
@@ -82,6 +90,8 @@ export interface ViewStore {
   activeSubsidenceModelType: SubsidenceModelType
   subsidenceModelConfigs: Record<SubsidenceModelType, SubsidenceModelConfig>
   subsidenceSingleShowSeaLevel: boolean
+  subsidenceSingleSeaLevelOverlayCurveIds: number[]
+  seaLevelOverlayStyles: Record<number, SeaLevelOverlayStyle>
   setScroll: (depth: number) => void
   setScale: (dpp: number) => void
   setCursorDepth: (depth: number | null) => void
@@ -106,6 +116,9 @@ export interface ViewStore {
   setActiveSubsidenceModelType: (t: SubsidenceModelType) => void
   updateSubsidenceModelConfig: (modelType: SubsidenceModelType, patch: Partial<SubsidenceModelConfig>) => void
   setSubsidenceSingleShowSeaLevel: (v: boolean) => void
+  setSubsidenceSingleSeaLevelOverlayCurveIds: (ids: number[]) => void
+  toggleSubsidenceSingleSeaLevelOverlayCurve: (id: number, visible: boolean) => void
+  updateSeaLevelOverlayStyle: (id: number, patch: Partial<SeaLevelOverlayStyle>) => void
   lodEnabled: boolean
   setLodEnabled: (v: boolean) => void
   applyActiveWellTrackWidths: (trackWidths: Record<string, number>) => void
@@ -148,6 +161,8 @@ const initialFormationsTrackConfig: FormationsTrackConfig = {
   markerLabelPosition: 'left',
 }
 
+const SEA_LEVEL_OVERLAY_PALETTE = ['#0891b2', '#7c3aed', '#ea580c', '#16a34a', '#dc2626', '#2563eb']
+
 function normalizeTrackWidths(trackWidths: Record<string, number> | undefined): Record<string, number> {
   if (!trackWidths) {
     return {}
@@ -155,6 +170,38 @@ function normalizeTrackWidths(trackWidths: Record<string, number> | undefined): 
   return Object.fromEntries(
     Object.entries(trackWidths).map(([id, width]) => [id, Math.max(minimumTrackWidth, Math.round(width))]),
   )
+}
+
+function normalizeCurveIds(ids: number[] | undefined): number[] {
+  if (!ids) return []
+  return Array.from(new Set(ids.filter((id) => Number.isFinite(id)).map((id) => Math.trunc(id)))).sort((a, b) => a - b)
+}
+
+export function defaultSeaLevelOverlayStyle(curveId: number): SeaLevelOverlayStyle {
+  return {
+    colorHex: SEA_LEVEL_OVERLAY_PALETTE[Math.abs(curveId) % SEA_LEVEL_OVERLAY_PALETTE.length],
+    lineStyle: 'dashed',
+  }
+}
+
+function normalizeSeaLevelOverlayStyles(
+  styles: Record<string, Partial<SeaLevelOverlayStyle>> | undefined,
+): Record<number, SeaLevelOverlayStyle> {
+  if (!styles) return {}
+  const next: Record<number, SeaLevelOverlayStyle> = {}
+  for (const [rawId, rawStyle] of Object.entries(styles)) {
+    const curveId = Number(rawId)
+    if (!Number.isFinite(curveId)) continue
+    const defaults = defaultSeaLevelOverlayStyle(curveId)
+    const colorHex = typeof rawStyle.colorHex === 'string' && /^#[0-9a-fA-F]{6}$/.test(rawStyle.colorHex)
+      ? rawStyle.colorHex
+      : defaults.colorHex
+    const lineStyle = rawStyle.lineStyle === 'solid' || rawStyle.lineStyle === 'dashed' || rawStyle.lineStyle === 'dotted'
+      ? rawStyle.lineStyle
+      : defaults.lineStyle
+    next[curveId] = { colorHex, lineStyle }
+  }
+  return next
 }
 
 export const useViewStore = create<ViewStore>((set) => ({
@@ -183,6 +230,8 @@ export const useViewStore = create<ViewStore>((set) => ({
   activeSubsidenceModelType: 'total' as SubsidenceModelType,
   subsidenceModelConfigs: defaultModelConfigs(),
   subsidenceSingleShowSeaLevel: false,
+  subsidenceSingleSeaLevelOverlayCurveIds: [],
+  seaLevelOverlayStyles: {},
   lodEnabled: false,
   setScroll(depth) {
     set((state) => ({
@@ -269,6 +318,40 @@ export const useViewStore = create<ViewStore>((set) => ({
   setSubsidenceMultiDepthMax(v) { set({ subsidenceMultiDepthMax: v }) },
   setActiveSubsidenceModelType(t) { set({ activeSubsidenceModelType: t }) },
   setSubsidenceSingleShowSeaLevel(v) { set({ subsidenceSingleShowSeaLevel: v }) },
+  setSubsidenceSingleSeaLevelOverlayCurveIds(ids) {
+    const normalized = normalizeCurveIds(ids)
+    set({
+      subsidenceSingleSeaLevelOverlayCurveIds: normalized,
+      subsidenceSingleShowSeaLevel: normalized.length > 0,
+    })
+  },
+  toggleSubsidenceSingleSeaLevelOverlayCurve(id, visible) {
+    set((state) => {
+      const current = new Set(state.subsidenceSingleSeaLevelOverlayCurveIds)
+      if (visible) current.add(id)
+      else current.delete(id)
+      const normalized = normalizeCurveIds(Array.from(current))
+      return {
+        subsidenceSingleSeaLevelOverlayCurveIds: normalized,
+        subsidenceSingleShowSeaLevel: normalized.length > 0,
+      }
+    })
+  },
+  updateSeaLevelOverlayStyle(id, patch) {
+    set((state) => {
+      const current = state.seaLevelOverlayStyles[id] ?? defaultSeaLevelOverlayStyle(id)
+      const nextStyle: SeaLevelOverlayStyle = {
+        ...current,
+        ...patch,
+      }
+      return {
+        seaLevelOverlayStyles: {
+          ...state.seaLevelOverlayStyles,
+          [id]: nextStyle,
+        },
+      }
+    })
+  },
   updateSubsidenceModelConfig(modelType, patch) {
     set((state) => ({
       subsidenceModelConfigs: {
@@ -334,6 +417,10 @@ export const useViewStore = create<ViewStore>((set) => ({
         activeSubsidenceModelType: config.activeSubsidenceModelType ?? state.activeSubsidenceModelType,
         subsidenceModelConfigs: mergedModelConfigs,
         subsidenceSingleShowSeaLevel: config.subsidenceSingleShowSeaLevel ?? state.subsidenceSingleShowSeaLevel,
+        subsidenceSingleSeaLevelOverlayCurveIds: normalizeCurveIds(config.subsidenceSingleSeaLevelOverlayCurveIds ?? state.subsidenceSingleSeaLevelOverlayCurveIds),
+        seaLevelOverlayStyles: config.seaLevelOverlayStyles
+          ? normalizeSeaLevelOverlayStyles(config.seaLevelOverlayStyles)
+          : state.seaLevelOverlayStyles,
         visibleDepthRange: deriveVisibleDepthRange(state.scrollDepth, nextDepthPerPixel, state.viewportHeight),
       }
     })
@@ -353,6 +440,8 @@ export const useViewStore = create<ViewStore>((set) => ({
       activeSubsidenceModelType: 'total',
       subsidenceModelConfigs: defaultModelConfigs(),
       subsidenceSingleShowSeaLevel: false,
+      subsidenceSingleSeaLevelOverlayCurveIds: [],
+      seaLevelOverlayStyles: {},
       visibleDepthRange: deriveVisibleDepthRange(state.scrollDepth, initialDepthPerPixel, state.viewportHeight),
     }))
   },

@@ -190,11 +190,19 @@ function ModelsRoot() {
                 setSelectedObject({ type: 'subsidence-model', modelType: model.type })
               }}
             >
-              {isComputed(model.type) ? (
-                <span
-                  className={`tree-leaf__radio${activeModelType === model.type ? ' tree-leaf__radio--active' : ''}`}
-                />
-              ) : null}
+              <input
+                type="radio"
+                name="active-subsidence-model"
+                checked={activeModelType === model.type}
+                disabled={!isComputed(model.type)}
+                onChange={() => {
+                  if (isComputed(model.type)) {
+                    setActiveModelType(model.type)
+                    setSelectedObject({ type: 'subsidence-model', modelType: model.type })
+                  }
+                }}
+                onClick={(event) => event.stopPropagation()}
+              />
               <span className="tree-leaf__label">{model.label}</span>
               {!model.available && <span className="tree-node__badge">planned</span>}
             </div>
@@ -350,7 +358,7 @@ export function WellDataPanel({
                         checked={isActive}
                         onChange={() => onSelectWell(item.well_id)}
                       />
-                      <span className="tree-node__color-swatch" style={{ backgroundColor: item.color_hex }} />
+                      <span className="dm-object-color-bar" style={{ ['--dm-object-color' as string]: item.color_hex }} />
                       <button
                         type="button"
                         className="tree-node__label-button"
