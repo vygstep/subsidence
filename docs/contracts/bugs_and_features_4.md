@@ -180,7 +180,7 @@ from the track config when unchecking, or merely hides it. If it removes the con
 
 ---
 
-## BF4-005: Lithology curve types — discrete vs fraction (todo)
+## BF4-005: Lithology curve types — discrete vs fraction (done)
 
 **Problem**: The "Lithology composition" section in `CurveSettings.tsx` (line 184) shows a
 lithology code picker for ALL curves, including GR, RHOB, etc. This is confusing. Lithology
@@ -297,6 +297,18 @@ Change `CurveSettings.tsx`:
 - `app/src/subsidence/data/engine.py`
 - `app/src/subsidence/api/wells.py`
 - `app/src/subsidence/data/zone_service.py`
+
+**Implemented** (commit `85a2a82`):
+- `schema.py`: `CurveMetadata.lithology_set_id` FK added; `curve_type` column widened to 24 chars with all four values documented.
+- `engine.py`: `migrate_schema` adds `lithology_set_id` column on open.
+- `wells.py`: `CurveInventoryItem`, `CurveResponse`, `CurvePatchRequest` include `lithology_set_id`; PATCH validates all four `curve_type` values.
+- `types/tracks.ts`, `types/well.ts`: `curve_type` union extended; `lithology_set_id` added.
+- `wellDataStore.ts`: `lithology_set_id` threaded through all curve loading; `patchCurveDiscreteCodeMap` action added for optimistic code-map updates.
+- `CurveSettings.tsx`: Rendering dropdown has four options; continuous shows scale/color/line controls; `lithology_fraction` shows lithology code picker; `lithology_discrete` shows per-integer-code mapping table.
+- `lithologyCompositionRenderer.ts`: `drawLithologyDiscrete` fills full-width blocks by resolving integer code → `discrete_code_map` → `lithologyFillStyles`.
+- `DataTrack.tsx`: `lithology_discrete` curves dispatched to `drawLithologyDiscrete` before the generic discrete-blocks path.
+- *Not implemented*: `zone_service.py` support for `lithology_discrete` aggregation (deferred).
+- *Not implemented*: backend validation of `lithology_set_id` referential integrity on PATCH (deferred).
 
 ---
 
