@@ -5,7 +5,7 @@
 
 ---
 
-## BF4-001: Marker lines clipped to track area (todo)
+## BF4-001: Marker lines clipped to track area (done)
 
 **Problem**: Formation top lines in `FormationTopLine.tsx` draw an SVG `<line x1={0} x2="100%">`.
 The container SVG in `InteractionOverlay.tsx` has `overflow: 'visible'`, so lines extend into
@@ -28,6 +28,20 @@ line is supposed to stop at the right edge of the tracks, not overflow.
 **Affected files**:
 - `frontend/src/components/interaction/InteractionOverlay.tsx` (SVG overflow)
 - `frontend/src/components/interaction/FormationTopLine.tsx` (line element)
+
+**Implemented**:
+- `LogViewPanel` now computes the actual rendered track-strip width from the depth track,
+  formation track, data tracks, and resize handles.
+- `InteractionOverlay` receives that pixel width instead of spanning the whole flex workspace.
+- Formation top lines and the edit-mode ghost line are clipped to the real track strip while labels
+  and popovers can still render normally.
+
+**Manual check**:
+- Open a well with formation tops in a wide viewport; marker lines must stop at the right edge of
+  the last visible track and must not continue into blank workspace.
+- Switch top label positions left/center/right and verify labels remain visible.
+- In edit-tops mode, activate a not-picked top and verify the ghost cursor line also stops at the
+  last track edge.
 
 ---
 

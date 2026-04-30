@@ -10,6 +10,7 @@ interface FormationTopLineProps {
   editable: boolean
   isActivePick?: boolean
   onSetActivePick?: (id: string | null) => void
+  lineClipPathId?: string
 }
 
 const LABEL_HEIGHT = 18
@@ -28,6 +29,7 @@ export function FormationTopLine({
   editable,
   isActivePick = false,
   onSetActivePick,
+  lineClipPathId,
 }: FormationTopLineProps) {
   const updateFormationDepth = useWellDataStore((state) => state.updateFormationDepth)
   const updateFormation = useWellDataStore((state) => state.updateFormation)
@@ -171,6 +173,7 @@ export function FormationTopLine({
           strokeWidth={strokeWidth}
           strokeDasharray={strokeDasharray}
           strokeOpacity={strokeOpacity}
+          clipPath={lineClipPathId ? `url(#${lineClipPathId})` : undefined}
         />
         {isActivePick && (
           <circle cx={8} cy={displayY} r={5} fill={color} strokeWidth={0} />

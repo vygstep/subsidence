@@ -1,3 +1,5 @@
+import { useId } from 'react'
+
 import { useViewStore } from '@/stores'
 import type { CurveData, FormationTop } from '@/types'
 
@@ -6,6 +8,7 @@ import { DepthCursor } from './DepthCursor'
 import { FormationTopLine } from './FormationTopLine'
 
 interface InteractionOverlayProps {
+  width: number
   height: number
   formations: FormationTop[]
   curves: CurveData[]
@@ -17,6 +20,7 @@ interface InteractionOverlayProps {
 }
 
 export function InteractionOverlay({
+  width,
   height,
   formations,
   curves,
@@ -28,6 +32,7 @@ export function InteractionOverlay({
 }: InteractionOverlayProps) {
   const activePickId = useViewStore((state) => state.activePickId)
   const setActivePickId = useViewStore((state) => state.setActivePickId)
+  const clipPathId = `${useId().replace(/:/g, '')}-track-bounds`
 
   // Collect not-picked formations for indicator strip at top
   const notPickedFormations = formations.filter((f) => f.depth_md === null)
@@ -35,17 +40,24 @@ export function InteractionOverlay({
   return (
     <>
       <svg
+        width={width}
+        height={height}
         style={{
           position: 'absolute',
           top: 0,
           left: 0,
-          width: '100%',
-          height: '100%',
+          width,
+          height,
           pointerEvents: 'none',
           zIndex: 10,
           overflow: 'visible',
         }}
       >
+        <defs>
+          <clipPath id={clipPathId}>
+            <rect x={0} y={0} width={width} height={height} />
+          </clipPath>
+        </defs>
         {formations.map((formation) => {
           if (formation.depth_md === null) return null
           const y = depthToPixel(formation.depth_md)
@@ -58,6 +70,7 @@ export function InteractionOverlay({
               editable={topsEditable}
               isActivePick={activePickId === formation.id}
               onSetActivePick={setActivePickId}
+              lineClipPathId={clipPathId}
             />
           )
         })}
@@ -76,6 +89,7 @@ export function InteractionOverlay({
             strokeWidth={1.5}
             strokeDasharray="4 4"
             strokeOpacity={0.5}
+            clipPath={`url(#${clipPathId})`}
             style={{ pointerEvents: 'none' }}
           />
         )}

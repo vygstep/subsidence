@@ -10,7 +10,7 @@ import { DataTrack } from './DataTrack'
 import { DepthTrack } from './DepthTrack'
 import { FormationColumn } from './FormationColumn'
 import { TrackHeaderRow } from './TrackHeaderRow'
-import { TrackResizeHandle } from './TrackResizeHandle'
+import { TrackResizeHandle, TRACK_RESIZE_HANDLE_WIDTH } from './TrackResizeHandle'
 import { WellOverviewMinimap } from './WellOverviewMinimap'
 import { WellViewerToolbar } from './WellViewerToolbar'
 
@@ -49,6 +49,19 @@ export function LogViewPanel({ tracks, trackOrder, curves, formations, minDepth,
   const depthWidth = trackWidths[DEPTH_TRACK_ID] ?? DEFAULT_DEPTH_WIDTH
   const formationWidth = trackWidths[FORMATION_TRACK_ID] ?? DEFAULT_FORMATION_WIDTH
   const tracksById = useMemo(() => new Map(tracks.map((track) => [track.id, track])), [tracks])
+  const tracksPixelWidth = useMemo(() => trackOrder.reduce((total, trackId) => {
+    if (trackId === DEPTH_TRACK_ID) {
+      return total + depthWidth + TRACK_RESIZE_HANDLE_WIDTH
+    }
+    if (trackId === FORMATION_TRACK_ID) {
+      return total + formationWidth + TRACK_RESIZE_HANDLE_WIDTH
+    }
+    const track = tracksById.get(trackId)
+    if (!track) {
+      return total
+    }
+    return total + (trackWidths[track.id] ?? track.width) + TRACK_RESIZE_HANDLE_WIDTH
+  }, 0), [depthWidth, formationWidth, trackOrder, tracksById, trackWidths])
 
   const depthToPixel = useCallback(
     (depth: number) => (depth - scrollDepth) / depthPerPixel,
@@ -67,7 +80,6 @@ export function LogViewPanel({ tracks, trackOrder, curves, formations, minDepth,
       setMouseClient({ x: e.clientX, y: e.clientY })
 
       // Determine which data track is under the cursor
-      const HANDLE_W = 2
       let offsetX = 0
       let nextHovered: string | null = null
       for (const trackId of trackOrder) {
@@ -84,7 +96,7 @@ export function LogViewPanel({ tracks, trackOrder, curves, formations, minDepth,
             break
           }
         }
-        offsetX += w + HANDLE_W
+        offsetX += w + TRACK_RESIZE_HANDLE_WIDTH
       }
       setHoveredTrackId(nextHovered)
     },
@@ -206,6 +218,7 @@ export function LogViewPanel({ tracks, trackOrder, curves, formations, minDepth,
               )
             })}
             <InteractionOverlay
+              width={tracksPixelWidth}
               height={trackHeight}
               formations={formations}
               curves={tooltipCurves}
