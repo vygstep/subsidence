@@ -667,6 +667,266 @@ ctx.restore()
 
 ---
 
+## BF4-018: Unified 2-step import — inline column mapping in all tabular dialogs (todo)
+
+**Context**: BF4-016 collapses the LAS and CSV-logs dialogs to 2 steps. This item applies the same
+pattern to the remaining tabular import dialogs (Tops, Deviation, Unconformities) and introduces a
+new **inline column-mapping** UI: instead of a separate Mapping step, field-assignment dropdowns
+appear directly above each column in the preview table.
+
+After BF4-016 + BF4-018, **every** import dialog is 2-step (File → Preview) with a single "Load"
+button. `MappingPane.tsx` and `MAPPING_STEP_LABELS` become unused and can be deleted.
+
+`LoadStratChartDialog.tsx` is already single-step (no wizard) — no changes needed.
+
+---
+
+### BF4-018-A: Inline column mapping in `TabularPreviewPane`
+
+Add three optional props to `TabularPreviewPane` in
+`frontend/src/components/layout/importWizard/TabularPreviewPane.tsx`:
+
+```tsx
+interface TabularPreviewPaneProps {
+  // ... existing props unchanged ...
+  fields?: FieldDefinition[]
+  mapping?: ColumnMapping
+  onMappingChange?: (fieldId: string, colName: string | null) => void
+}
+```
+
+When `fields`, `mapping`, and `onMappingChange` are all provided, render an extra `<tr>` as the
+**first row of `<thead>`** containing a `<select>` per column:
+
+```tsx
+{fields && mapping && onMappingChange && preview && (
+  <tr className="import-preview__mapping-row">
+    {preview.columns.map((col, colIdx) => {
+      const assignedFieldId = Object.entries(mapping).find(([, v]) => v === col)?.[0] ?? ''
+      return (
+        <th key={colIdx} className="import-preview__mapping-cell">
+          <select
+            value={assignedFieldId}
+            onChange={(e) => {
+              const nextFieldId = e.target.value
+              // Un-assign previous field pointing to this column
+              const prevFieldId = Object.entries(mapping).find(([, v]) => v === col)?.[0]
+              if (prevFieldId) onMappingChange(prevFieldId, null)
+              // Assign new field
+              if (nextFieldId) onMappingChange(nextFieldId, col)
+            }}
+          >
+            <option value="">—</option>
+            {fields.map((f) => (
+              <option
+                key={f.id}
+                value={f.id}
+                disabled={mapping[f.id] !== null && mapping[f.id] !== col}
+              >
+                {f.label}{f.required ? ' *' : ''}
+              </option>
+            ))}
+          </select>
+        </th>
+      )
+    })}
+  </tr>
+)}
+```
+
+The second `<tr>` in `<thead>` is the existing column-name row (unchanged).
+
+**Required-field indicator**: below the table, show an inline warning for any required field not yet
+mapped (reuse `.project-dialog__validation`):
+```tsx
+{fields && mapping && (() => {
+  const missing = fields.filter(f => f.required && !mapping[f.id])
+  return missing.length > 0 ? (
+    <div className="project-dialog__validation" aria-label="Mapping validation">
+      {missing.map(f => <span key={f.id}>Required: {f.label}</span>)}
+    </div>
+  ) : null
+})()}
+```
+
+**CSS** — add to the import preview stylesheet:
+```css
+.import-preview__mapping-row th {
+  padding: 2px 4px;
+  vertical-align: bottom;
+}
+.import-preview__mapping-row select {
+  width: 100%;
+  font-size: 11px;
+}
+```
+
+**Affected file**: `frontend/src/components/layout/importWizard/TabularPreviewPane.tsx`
+
+---
+
+### BF4-018-B: Tops dialog — 2-step with inline mapping
+
+In `ImportTopsDialog.tsx`:
+- Change step labels to `['File', 'Preview']` (remove `MAPPING_STEP_LABELS`)
+- Remove: `{currentStepIndex === 2 ? <MappingPane ...> : null}` (Mapping step)
+- Remove: `{currentStepIndex === 3 ? ...options... : null}` (Options step)
+- Remove: `{currentStepIndex === 4 ? ...summary... : null}` (Import/Summary step)
+
+New step 1 renders everything inline:
+```tsx
+{currentStepIndex === 1 ? (
+  <>
+    <TabularPreviewPane
+      isLoading={previewLoading}
+      error={previewError}
+      preview={tabularPreview}
+      settings={parserSettings}
+      onSettingsChange={updateParserSettings}
+      fields={TOPS_FIELDS}
+      mapping={mapping}
+      onMappingChange={(fieldId, col) => setMapping((prev) => ({ ...prev, [fieldId]: col }))}
+    />
+
+    {!previewLoading && tabularPreview && (
+      <div className="import-wizard__options">
+        <ImportWizardTargetWellFields
+          wells={wells}
+          wellId={wellId}
+          createNewWell={createNewWell}
+          emptyLabel="Create or match by file well_name"
+          fileWellSource={fileWellSource}
+          wellPolicy={wellPolicy}
+          onWellIdChange={setWellId}
+          onCreateNewWellChange={setCreateNewWell}
+          onWellPolicyChange={setWellPolicy}
+        />
+        <label className="project-dialog__field">
+          <span>Depth reference</span>
+          <select value={depthRef} onChange={(e) => setDepthRef(e.target.value as 'MD' | 'TVD' | 'TVDSS')}>
+            <option value="MD">MD</option>
+            <option value="TVD">TVD</option>
+            <option value="TVDSS">TVDSS</option>
+          </select>
+        </label>
+        <label className="project-dialog__field">
+          <span>Depth unit</span>
+          <select value={depthUnit} onChange={(e) => setDepthUnit(e.target.value as 'm' | 'ft')}>
+            <option value="m">m — metres</option>
+            <option value="ft">ft — feet</option>
+          </select>
+        </label>
+        {/* ZoneSet policy section — unchanged, moved here */}
+        <div className="project-dialog__field">
+          <span>ZoneSet</span>
+          ...existing ZoneSet radio group...
+        </div>
+      </div>
+    )}
+  </>
+) : null}
+```
+
+**New state**: `const [depthUnit, setDepthUnit] = useState<'m' | 'ft'>('m')`
+
+**Submit payload**: add `depth_unit: depthUnit` to the JSON body.
+
+`canSubmit`: `sourceIsValid && mappingOk && zoneSetOk`
+(same condition as before — `mappingOk` derives from `validateTopsMapping(mapping)`)
+
+---
+
+### BF4-018-C: Deviation dialog — 2-step with inline mapping
+
+In `ImportDeviationDialog.tsx`:
+- Change step labels to `['File', 'Preview']`
+- Remove Mapping, Options, Summary steps
+- Render all inline in step 1:
+
+```tsx
+<TabularPreviewPane
+  ...
+  fields={DEVIATION_FIELDS}
+  mapping={mapping}
+  onMappingChange={...}
+/>
+{!previewLoading && tabularPreview && (
+  <div className="import-wizard__options">
+    <ImportWizardTargetWellFields ... />
+    <label className="project-dialog__field">
+      <span>Depth unit</span>
+      <select value={depthUnit} ...>
+        <option value="m">m — metres</option>
+        <option value="ft">ft — feet</option>
+      </select>
+    </label>
+  </div>
+)}
+```
+
+Note: deviation has no `depth_ref` selector — all depth types (MD, TVD, TVDSS) are columns in the
+file and mapped individually via inline mapping.
+
+**New state**: `depthUnit: 'm' | 'ft'`
+**Submit payload**: add `depth_unit: depthUnit`
+`canSubmit`: `sourceIsValid && mappingOk`
+
+---
+
+### BF4-018-D: Unconformities dialog — 2-step with inline mapping
+
+In `ImportUnconformitiesDialog.tsx`:
+- Same pattern as B/C above
+- Fields: `UNCONFORMITIES_FIELDS`
+- Options: target well (required) + depth unit
+- No depth reference dropdown (unconformities have a fixed depth field)
+
+`canSubmit`: `sourceIsValid && mappingOk && !!wellId`
+
+---
+
+### BF4-018-E: Backend — `depth_unit` field for tabular imports
+
+Add `depth_unit: 'm' | 'ft'` (default `'m'`) to the import endpoints:
+- `POST /api/projects/import-tops`
+- `POST /api/projects/import-deviation`
+- `POST /api/projects/import-unconformities`
+- `POST /api/projects/import-logs-csv` (also affects BF4-016-D)
+
+Backend behaviour: when `depth_unit === 'ft'`, multiply all incoming depth values by `0.3048`
+before storing (convert feet → metres). When `depth_unit === 'm'`, store as-is.
+
+**Backend files to check**:
+- `app/src/subsidence/api/wells.py` — the import endpoints
+- Wherever depth values are written to the formation/deviation schema
+
+---
+
+### BF4-018-F: Remove `MappingPane` and `MAPPING_STEP_LABELS` after migration
+
+Once BF4-016 and BF4-018 are all implemented:
+- Delete `frontend/src/components/layout/importWizard/MappingPane.tsx`
+- Remove `MAPPING_STEP_LABELS` from `importWizardUtils.ts`
+- Remove `MappingPane` from `index.ts` exports
+- Remove `MappingPane` imports from all dialog files
+
+Do this last, as a cleanup step, to avoid blocking the other items.
+
+---
+
+**Affected files**:
+- `frontend/src/components/layout/importWizard/TabularPreviewPane.tsx` (BF4-018-A)
+- `frontend/src/components/layout/ImportTopsDialog.tsx` (BF4-018-B)
+- `frontend/src/components/layout/ImportDeviationDialog.tsx` (BF4-018-C)
+- `frontend/src/components/layout/ImportUnconformitiesDialog.tsx` (BF4-018-D)
+- `app/src/subsidence/api/wells.py` + import handlers (BF4-018-E)
+- `frontend/src/components/layout/importWizard/MappingPane.tsx` — delete (BF4-018-F)
+- `frontend/src/components/layout/importWizard/importWizardUtils.ts` — remove constant (BF4-018-F)
+
+**Complexity**: M — three dialogs + shared component change + backend depth_unit field
+
+---
+
 ## BF4-017: Delete well / delete top / delete all tops — ✕ buttons in data manager tree (todo)
 
 **Problem**: "Delete well", "Delete top", and "Delete all tops" are currently only accessible via
@@ -1165,7 +1425,8 @@ lockstep with the header. Check at both 1× and 2× devicePixelRatio (browser zo
 | 12 | BF4-009 | S | Models computed state + radio |
 | 13 | BF4-004 | S | Curve settings when disabled (investigate first) |
 | 14 | BF4-016 | S | Simplified LAS/CSV import dialog (frontend only) |
-| 15 | BF4-010 | M | New side toolbar component |
-| 16 | BF4-007-B | M | Sea level override per top (backend + frontend) |
-| 17 | BF4-011 | M | API audit (research task) |
-| 18 | BF4-005 | L | Lithology discrete/fraction (multi-step) |
+| 15 | BF4-018 | M | Inline column mapping + 2-step for Tops/Deviation/Unconformities |
+| 17 | BF4-010 | M | New side toolbar component |
+| 18 | BF4-007-B | M | Sea level override per top (backend + frontend) |
+| 19 | BF4-011 | M | API audit (research task) |
+| 20 | BF4-005 | L | Lithology discrete/fraction (multi-step) |
