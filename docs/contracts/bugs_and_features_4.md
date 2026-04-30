@@ -336,7 +336,7 @@ CSS update in `data-manager.css` (or whichever file defines `.tree-node__color-s
 
 ## BF4-007: Tops settings — dropdown arrow overlap + sea level override (todo)
 
-### BF4-007-A: Select dropdown arrow overlaps text
+### BF4-007-A: Select dropdown arrow overlaps text (done)
 
 In `TopPickSettings.tsx`, the native `<select>` elements ("Kind" and "Marker position") suffer from
 the browser arrow overlapping the selected text due to insufficient `padding-right`.
@@ -354,6 +354,15 @@ CurveSettings). Apply globally to all `<select>` within `.sf-row` or the setting
 
 **Affected files**:
 - `frontend/src/styles/settings.css` or `frontend/src/styles/app.css` (wherever `select` is styled)
+
+**Implemented**:
+- Added scoped `.sf-row select` padding-right and text overflow handling in `data-manager.css`.
+- Kept the broader `.sf-row input, .sf-row select` sizing rule unchanged.
+
+**Manual check**:
+- Open TopPick settings and verify the "Kind" and "Marker position" dropdown text no longer sits
+  under the native arrow.
+- Check Well/Curve/Zone settings dropdowns for any visible width regression.
 
 ### BF4-007-B: Sea level value override per formation
 
