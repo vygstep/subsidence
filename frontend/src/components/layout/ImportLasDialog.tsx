@@ -6,7 +6,6 @@ import { recordOperation } from '@/utils/diagnostics'
 
 import {
   ImportWizardShell,
-  ImportWizardTargetWellFields,
   LasPreviewPane,
   TabularPreviewPane,
   buildImportWizardSteps,
@@ -22,6 +21,10 @@ import type { ColumnMapping } from './importWizard/mapping'
 import { getLastImportRoot, pickFile, rememberImportPath } from './pathMemory'
 
 const STEP_LABELS = ['File', 'Preview']
+
+// Sentinel values for the target well dropdown
+const CREATE_FROM_FILE = '__create_from_file__'
+const CREATE_NEW = '__create_new__'
 
 interface WellOption {
   well_id: string
@@ -64,9 +67,8 @@ function detectColumnCurveType(colIndex: number, rows: string[][]): 'continuous'
 
 export function ImportLasDialog({ wells, activeWellId, onClose, onSuccess }: ImportLasDialogProps) {
   const projectPath = useProjectStore((state) => state.projectPath)
-  const [wellId, setWellId] = useState(activeWellId ?? '')
-  const [createNewWell, setCreateNewWell] = useState(false)
-  const [wellPolicy, setWellPolicy] = useState<'file' | 'override'>('override')
+  // Single selection value: well_id | CREATE_FROM_FILE | CREATE_NEW | ''
+  const [wellSelection, setWellSelection] = useState(activeWellId ?? '')
   const [sourceType, setSourceType] = useState<LogSourceType>('las')
   const [sourcePath, setSourcePath] = useState(() => getLastImportRoot())
   const [mapping, setMapping] = useState<ColumnMapping>({})
@@ -107,24 +109,21 @@ export function ImportLasDialog({ wells, activeWellId, onClose, onSuccess }: Imp
     if (col) setTrustedDepthRef(detectCsvDepthRef(col))
   }, [mapping])
 
-  // Auto-match LAS well name to existing wells
+  // Auto-select target well from LAS well name
   useEffect(() => {
-    if (!lasPreview?.well_name) {
-      setWellPolicy('override')
+    if (sourceType !== 'las') return
+    if (!lasPreview) return
+    if (!lasPreview.well_name) {
+      // No well name in file — prefer active well
+      setWellSelection(activeWellId ?? '')
       return
     }
     const normalized = lasPreview.well_name.trim().toLowerCase()
     const match = wells.find((w) => w.well_name.trim().toLowerCase() === normalized)
-    if (match) {
-      setWellId(match.well_id)
-      setWellPolicy('override')
-    } else {
-      setWellId('')
-      setWellPolicy('file')
-    }
-  }, [lasPreview, wells])
+    setWellSelection(match ? match.well_id : CREATE_FROM_FILE)
+  }, [lasPreview, wells, activeWellId, sourceType])
 
-  // Auto-detect curve types for LAS preview (default continuous; no sample values in preview)
+  // Auto-detect curve types for LAS (default continuous; no sample values in preview)
   useEffect(() => {
     if (!lasPreview) return
     const detected: Record<string, 'continuous' | 'discrete'> = {}
@@ -134,7 +133,7 @@ export function ImportLasDialog({ wells, activeWellId, onClose, onSuccess }: Imp
     setCurveTypes(detected)
   }, [lasPreview])
 
-  // Auto-detect curve types for CSV columns (from preview rows)
+  // Auto-detect curve types for CSV columns from preview rows
   useEffect(() => {
     if (!tabularPreview || sourceType !== 'csv') return
     const depthCol = mapping['depth']
@@ -146,13 +145,14 @@ export function ImportLasDialog({ wells, activeWellId, onClose, onSuccess }: Imp
     setCurveTypes(detected)
   }, [tabularPreview, mapping, sourceType])
 
-  const fileWellSource = sourceType === 'las' ? (lasPreview?.well_name ?? null) : null
+  const lasWellName = lasPreview?.well_name ?? null
 
   const handleSourceTypeChange = (next: LogSourceType) => {
     setSourceType(next)
     setCurrentStepIndex(0)
     setMapping({})
     setCurveTypes({})
+    setWellSelection(activeWellId ?? '')
   }
 
   const previewReady = previewLoading
@@ -178,7 +178,11 @@ export function ImportLasDialog({ wells, activeWellId, onClose, onSuccess }: Imp
       return
     }
 
-    const useFileWell = sourceType === 'las' && wellPolicy === 'file'
+    // Resolve selection to API params
+    const isCreateFromFile = wellSelection === CREATE_FROM_FILE
+    const isCreateNew = wellSelection === CREATE_NEW
+    const resolvedWellId = (!isCreateFromFile && !isCreateNew && wellSelection) ? wellSelection : null
+    const createNewWell = isCreateNew
 
     setIsSubmitting(true)
     setError(null)
@@ -191,16 +195,16 @@ export function ImportLasDialog({ wells, activeWellId, onClose, onSuccess }: Imp
             sourceType === 'las'
               ? {
                   las_path: nextPath,
-                  well_id: useFileWell ? null : (wellId || null),
-                  create_new_well: useFileWell ? false : (!wellId && createNewWell),
+                  well_id: resolvedWellId,
+                  create_new_well: createNewWell,
                   trusted_depth_reference: trustedDepthRef,
                   curve_types: curveTypes,
                 }
               : {
                   csv_path: nextPath,
-                  well_id: wellId || null,
+                  well_id: resolvedWellId,
                   depth_column: mapping['depth'] ?? null,
-                  create_new_well: !wellId && createNewWell,
+                  create_new_well: createNewWell,
                   trusted_depth_reference: trustedDepthRef,
                   curve_types: curveTypes,
                 },
@@ -225,7 +229,7 @@ export function ImportLasDialog({ wells, activeWellId, onClose, onSuccess }: Imp
         }
       }, {
         projectPath,
-        activeWellId: useFileWell ? null : (wellId || activeWellId || null),
+        activeWellId: resolvedWellId ?? activeWellId ?? null,
         details: { inputPath: nextPath, createNewWell, depthColumn: mapping['depth'] ?? null },
       })
     } catch (cause) {
@@ -305,17 +309,18 @@ export function ImportLasDialog({ wells, activeWellId, onClose, onSuccess }: Imp
             />
             {!previewLoading && (lasPreview !== null || previewError !== null) && (
               <div className="import-wizard__options">
-                <ImportWizardTargetWellFields
-                  wells={wells}
-                  wellId={wellId}
-                  createNewWell={createNewWell}
-                  emptyLabel="Create or match by LAS well name"
-                  fileWellSource={fileWellSource}
-                  wellPolicy={wellPolicy}
-                  onWellIdChange={setWellId}
-                  onCreateNewWellChange={setCreateNewWell}
-                  onWellPolicyChange={setWellPolicy}
-                />
+                <label className="project-dialog__field">
+                  <span>Target well</span>
+                  <select value={wellSelection} onChange={(e) => setWellSelection(e.target.value)}>
+                    {wells.map((w) => (
+                      <option key={w.well_id} value={w.well_id}>{w.well_name}</option>
+                    ))}
+                    {lasWellName && (
+                      <option value={CREATE_FROM_FILE}>Create new well &quot;{lasWellName}&quot;</option>
+                    )}
+                    <option value={CREATE_NEW}>Create new well</option>
+                  </select>
+                </label>
                 <label className="project-dialog__field">
                   <span>Depth reference</span>
                   <select value={trustedDepthRef} onChange={(e) => setTrustedDepthRef(e.target.value as 'MD' | 'TVD' | 'TVDSS')}>
@@ -339,14 +344,15 @@ export function ImportLasDialog({ wells, activeWellId, onClose, onSuccess }: Imp
             />
             {!previewLoading && tabularPreview && (
               <div className="import-wizard__options">
-                <ImportWizardTargetWellFields
-                  wells={wells}
-                  wellId={wellId}
-                  createNewWell={createNewWell}
-                  emptyLabel="Select target well"
-                  onWellIdChange={setWellId}
-                  onCreateNewWellChange={setCreateNewWell}
-                />
+                <label className="project-dialog__field">
+                  <span>Target well</span>
+                  <select value={wellSelection} onChange={(e) => setWellSelection(e.target.value)}>
+                    {wells.map((w) => (
+                      <option key={w.well_id} value={w.well_id}>{w.well_name}</option>
+                    ))}
+                    <option value={CREATE_NEW}>Create new well</option>
+                  </select>
+                </label>
                 <div className="project-dialog__field">
                   <span>Depth column</span>
                   <span>{mapping['depth'] ?? <em>not detected</em>}</span>
