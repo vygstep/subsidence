@@ -201,6 +201,124 @@ from the track config when unchecking, or merely hides it. If it removes the con
 
 ---
 
+## BF4-025: Durable per-curve settings and dictionary mnemonic assignment (todo)
+
+**Problem**: BF4-004 preserves curve settings when a curve is hidden, but viewer settings are still
+owned by `TrackConfig.curves[*]`. If the user deletes a track, every curve placement inside that
+track is deleted, and the curve's visual settings are lost. Re-adding the same curve creates a new
+default config through `buildCurveDefaults(...)`.
+
+**Second problem**: the loaded source mnemonic is currently treated as both the source column name
+and the semantic identity of the curve. The user needs to assign a built-in dictionary mnemonic /
+canonical mnemonic from a dropdown, without renaming the original loaded curve column.
+
+**Design decision**:
+- Track membership and curve visual settings must be separated.
+- `TrackConfig.curves[*]` should represent placement of a curve in a track.
+- Durable per-curve viewer settings should live at the well visual-config level, keyed by source
+  mnemonic.
+- Semantic dictionary assignment is not a viewer-only setting. It belongs in backend
+  `curve_metadata`, because compute, lithology, future import validation, and semantic grouping
+  need to read it without depending on viewer layout.
+
+### BF4-025-A: Well-level curve visual settings
+
+Add to `WellViewState`:
+
+```ts
+curveSettingsByMnemonic: Record<string, CurveConfig>
+```
+
+Rules:
+- `curveSettingsByMnemonic[mnemonic]` is the canonical viewer style for that curve in the well.
+- `TrackConfig.curves[*]` should keep only placement data long-term. During migration it may still
+  contain the full `CurveConfig` shape, but the settings source of truth must be
+  `curveSettingsByMnemonic`.
+- Deleting a track removes placement only. It must not delete
+  `curveSettingsByMnemonic[mnemonic]`.
+- Adding a curve to a track uses:
+  1. existing `curveSettingsByMnemonic[mnemonic]`, if present;
+  2. migrated settings from an existing `TrackConfig.curves[*]`, if present;
+  3. `buildCurveDefaults(...)`, if no user settings exist.
+- Editing settings in `CurveSettings` updates `curveSettingsByMnemonic[mnemonic]`.
+- Rendered track configs are resolved by merging placement with
+  `curveSettingsByMnemonic[mnemonic]` before passing to `DataTrack`.
+
+Migration:
+- In `coerceWellViewState`, populate `curveSettingsByMnemonic` from existing
+  `TrackConfig.curves[*]` when the new field is absent.
+- If the same mnemonic appears in multiple tracks with different settings, prefer the first
+  occurrence in `trackOrder`; document this as the migration rule.
+- Keep old projects valid and do not delete legacy curve config fields until a later cleanup.
+
+### BF4-025-B: Restore defaults
+
+Add a `Restore defaults` action to `CurveSettings`.
+
+Behavior:
+- Recompute defaults using `buildCurveDefaults(curveData, indexOrStableSeed)`.
+- Replace `curveSettingsByMnemonic[mnemonic]` with the default style.
+- Keep the curve placement in its current track.
+- If the curve is hidden, it remains hidden.
+- The button affects viewer style only; it must not alter backend semantic metadata.
+
+### BF4-025-C: Dictionary mnemonic assignment
+
+Add a dropdown in `CurveSettings`:
+
+```text
+Dictionary mnemonic
+```
+
+Behavior:
+- Options come from the built-in/user curve mnemonic dictionary entries.
+- The original loaded mnemonic remains unchanged and continues to identify the data column.
+- Store selected semantic assignment in backend curve metadata, not visual config.
+- Extend backend `CurveMetadata` if needed with fields such as:
+  - `canonical_mnemonic`
+  - `family_code`
+  - `canonical_unit`
+  - `mnemonic_entry_id` (optional FK if stable dictionary row identity is needed)
+- `PATCH /api/wells/{well_id}/curves/{mnemonic}` must support updating the semantic assignment.
+- Frontend inventory/detail responses must expose the selected semantic assignment.
+- Dictionary matching can still provide an initial suggestion, but the user assignment is explicit
+  and must survive save/reopen.
+
+Validation:
+- If the selected dictionary row has a canonical unit, show it in settings.
+- Do not force unit conversion in this task; only store the semantic assignment.
+- If the user clears the dropdown, backend metadata returns to source-only semantics.
+
+### Affected files
+
+- `frontend/src/stores/workspaceStore.ts`
+- `frontend/src/components/layout/dataManagerVisibility.ts`
+- `frontend/src/components/layout/useDataManagerController.ts`
+- `frontend/src/components/layout/ViewerWorkspace.tsx`
+- `frontend/src/components/layout/settings/CurveSettings.tsx`
+- `frontend/src/utils/curvePresets.ts`
+- `frontend/src/types/tracks.ts`
+- `frontend/src/types/well.ts`
+- `app/src/subsidence/data/schema.py`
+- `app/src/subsidence/data/engine.py`
+- `app/src/subsidence/api/wells.py`
+- backend tests for curve metadata patching
+- frontend tests for visual-config migration and restore defaults
+
+**Complexity**: M/L — visual-config migration plus backend metadata extension.
+
+**Verification**:
+- Change curve color/scale/line style, delete the track, create a new track, add the same curve:
+  settings should be restored from `curveSettingsByMnemonic`.
+- Click `Restore defaults`; style returns to dictionary/default preset values without moving the
+  curve between tracks.
+- Hide a curve, change settings, delete another track, save/reopen: hidden state and settings both
+  survive.
+- Assign a dictionary mnemonic from the dropdown, save/reopen, and verify the assignment remains.
+- Clear dictionary assignment and verify the curve returns to source-only metadata.
+
+---
+
 ## BF4-005: Lithology curve types — discrete vs fraction (done)
 
 **Problem**: The "Lithology composition" section in `CurveSettings.tsx` (line 184) shows a
@@ -2056,4 +2174,5 @@ name should be displayed.
 | 23 | BF4-022 | XS | Restore shared Data Manager style primitives |
 | 24 | BF4-023 | S | Separate sea-level compute selector from overlay checkboxes |
 | 25 | BF4-024 | XS | Single-well labels show upper marker only |
-| 26 | BF4-005 | L | Lithology discrete/fraction (multi-step) |
+| 26 | BF4-025 | M/L | Durable curve style settings + dictionary mnemonic assignment |
+| 27 | BF4-005 | L | Lithology discrete/fraction (multi-step) |
