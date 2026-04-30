@@ -216,11 +216,12 @@
 }
 
 .tree-node__color-swatch {
-  width: 10px;
+  display: inline-block;
+  width: 18px;
   height: 10px;
   flex-shrink: 0;
   border: 1px solid rgba(15, 23, 42, 0.22);
-  border-radius: 50%;
+  border-radius: 999px;
 }
 
 /* ─── tree leaf rows ─────────────────────────────────────────────────────── */

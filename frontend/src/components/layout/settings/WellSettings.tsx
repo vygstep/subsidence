@@ -66,11 +66,6 @@ export function WellSettings({ well: _well, wellInspectorDraft, onWellInspectorD
             onChange={(event) => onWellInspectorDraftChange('color_hex', event.target.value)}
             aria-label="Well color"
           />
-          <input
-            type="text"
-            value={wellInspectorDraft.color_hex}
-            onChange={(event) => onWellInspectorDraftChange('color_hex', event.target.value)}
-          />
         </div>
       </div>
       <div className="sf-row">

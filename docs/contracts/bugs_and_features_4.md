@@ -282,7 +282,7 @@ Change `CurveSettings.tsx`:
 
 ---
 
-## BF4-006: Well color — swatch only, oval marker (todo)
+## BF4-006: Well color — swatch only, oval marker (done)
 
 ### BF4-006-A: Remove hex code text input in WellSettings
 
@@ -320,6 +320,17 @@ CSS update in `data-manager.css` (or whichever file defines `.tree-node__color-s
 **Affected files**:
 - `frontend/src/components/layout/settings/WellSettings.tsx`
 - `frontend/src/styles/data-manager.css` (or wherever `.tree-node__color-swatch` is defined)
+
+**Implemented**:
+- Removed the hex text input from Well settings; the native color picker remains the only visible
+  well color editor.
+- Changed `.tree-node__color-swatch` from a small circle into a horizontal pill marker.
+
+**Manual check**:
+- Select a well, open Well settings, and verify the Color row shows only the color swatch picker,
+  not a hex text field.
+- Change the color and save the well; the pill marker in the WELLS tree should update to the new
+  color.
 
 ---
 
