@@ -764,7 +764,7 @@ This:
 
 ---
 
-## BF4-014: Horizontal km gridlines on single-well subsidence chart (todo)
+## BF4-014: Horizontal km gridlines on single-well subsidence chart (done)
 
 **Requirement**: Draw very thin horizontal gridlines behind the chart content at exact whole-km
 depth values: 0 km, 1 km, 2 km, 3 km … (i.e., 0 m, 1000 m, 2000 m, 3000 m, …).
@@ -820,6 +820,15 @@ ctx.restore()
 
 **Affected files**:
 - `frontend/src/components/subsidence/SubsidenceCanvas.tsx`
+
+**Implemented**:
+- Added `drawKmGridlines()` for exact whole-km horizontal gridlines.
+- Gridlines are drawn inside the plot clip before formation fills, burial curves, and sea-level
+  overlay.
+
+**Manual check**:
+- Open Single Well subsidence chart and verify faint horizontal lines appear at 0, 1, 2, 3 km, etc.
+- Verify the lines stay behind formation fills, burial curves, and sea-level overlay.
 
 ---
 

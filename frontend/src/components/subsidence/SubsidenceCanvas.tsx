@@ -100,6 +100,30 @@ function drawAxes(
   ctx.restore()
 }
 
+function drawKmGridlines(
+  ctx: CanvasRenderingContext2D,
+  plotLeft: number,
+  plotWidth: number,
+  minDepthM: number,
+  maxDepthM: number,
+  depthToY: (depthM: number) => number,
+) {
+  ctx.save()
+  ctx.strokeStyle = 'rgba(148, 163, 184, 0.3)'
+  ctx.lineWidth = 0.5
+
+  const firstKm = Math.ceil(minDepthM / 1000) * 1000
+  for (let depthM = firstKm; depthM <= maxDepthM; depthM += 1000) {
+    const y = depthToY(depthM)
+    ctx.beginPath()
+    ctx.moveTo(plotLeft, y)
+    ctx.lineTo(plotLeft + plotWidth, y)
+    ctx.stroke()
+  }
+
+  ctx.restore()
+}
+
 function drawFormationLabels(
   ctx: CanvasRenderingContext2D,
   curves: SubsidenceResult[],
@@ -344,6 +368,7 @@ export function SubsidenceCanvas() {
     ctx.rect(pad.left, pad.top, plotW, plotH)
     ctx.clip()
 
+    drawKmGridlines(ctx, pad.left, plotW, effectiveMinDepthM, effectiveMaxDepthM, depthToY)
     if (showFormationFills) drawFormationFills(ctx, subsidenceCurves, timeToX, depthToY)
     if (showBurialCurves) drawBurialCurves(ctx, subsidenceCurves, timeToX, depthToY)
 
