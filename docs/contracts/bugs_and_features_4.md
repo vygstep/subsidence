@@ -1226,6 +1226,67 @@ well delete and single formation delete; only "delete all" needs a new controlle
 
 ---
 
+## BF4-021: Rebuild zones after formation top delete (todo)
+
+**Problem**: BF4-017 moved top deletion into the Data Manager tree, but deleting a formation top
+through `DELETE /api/wells/{well_id}/formations/{formation_id}` can leave zone data stale. ZoneSets
+are defined by horizons/markers, and per-well zone data depends on the available picks for those
+horizons. After deleting one pick, the affected well may no longer have a valid upper/lower pick
+pair for one or more zones.
+
+**Goal**: Any delete-top operation must refresh the affected well's zone state so ZoneSettings and
+future calculations do not read stale zone thickness/lithology.
+
+### Required behavior
+
+Single top delete:
+- Delete the `FormationTopModel` row as today.
+- If the deleted top belongs to a `horizon_id` and the well has an active top set:
+  - rebuild/recalculate zone well data for that well/top set;
+  - zones whose upper/lower pick is now missing should show null thickness and no auto-derived
+    lithology for that well.
+- Refresh well inventory response so Data Manager/Settings receive the updated zone list.
+
+Delete all tops:
+- Delete all formation tops for the well.
+- Clear visibleFormationIds in visual config as BF4-017 already does.
+- Rebuild/recalculate zones for the affected well so every zone in the active ZoneSet has null
+  per-well thickness/lithology for that well.
+
+### Implementation options
+
+Preferred backend fix:
+- Update `app/src/subsidence/api/formations.py` delete endpoint to call a zone-service helper after
+  deleting a top.
+- Add/extend a helper in `app/src/subsidence/data/zone_service.py`, for example
+  `rebuild_well_zones_after_pick_change(session, well_id)`, that:
+  - finds the active top set for the well;
+  - calls existing `recalculate_zone_thickness(...)` / zone rebuild logic;
+  - clears auto lithology where valid pick pairs no longer exist.
+
+Frontend fallback if backend cannot own it cleanly:
+- After delete-top/delete-all-tops, call the existing zone recalculation endpoint for the well.
+- This is weaker because backend consistency depends on UI behavior, so use only if backend helper
+  becomes too invasive.
+
+### Affected files
+
+- `app/src/subsidence/api/formations.py`
+- `app/src/subsidence/data/zone_service.py`
+- `frontend/src/components/layout/dataManagerActions.ts` only if a frontend fallback is needed
+- Backend tests for formation delete + zone refresh
+
+**Complexity**: S/M — mostly backend consistency, small frontend only if needed.
+
+**Verification**:
+- Create/import a ZoneSet with two or more tops for a well.
+- Delete one top used by a zone.
+- ZoneSettings should no longer show stale thickness/lithology for zones that require the deleted
+  pick.
+- Delete all tops; zones remain as ZoneSet definitions, but per-well zone values are empty/null.
+
+---
+
 ## BF4-016: Simplified LAS/CSV import — options on preview step, direct Load (todo)
 
 **Summary**: The LAS and CSV log import dialogs have too many wizard steps. Both should collapse to
@@ -1519,6 +1580,157 @@ lockstep with the header. Check at both 1× and 2× devicePixelRatio (browser zo
 
 ---
 
+## BF4-019: Delete log curve / delete all logs from Data Manager (todo)
+
+**Problem**: BF4-017 added delete buttons for wells and tops, but log curves still cannot be
+deleted from the Data Manager tree. The Logs group and individual curve rows only support visibility
+toggling and selection.
+
+**Goal**: Add explicit delete actions for:
+1. A single log curve under `Logs`.
+2. All log curves for a well from the `Logs` group row.
+
+This is intentionally separate from BF4-017 because deleting log data affects backend metadata,
+Parquet payload storage, visual config, lithology/zone aggregation, and recalculation state.
+
+### Backend contract
+
+Add endpoints in `app/src/subsidence/api/wells.py`:
+
+```http
+DELETE /api/wells/{well_id}/curves/{mnemonic}
+DELETE /api/wells/{well_id}/curves
+```
+
+Single-curve delete:
+- Validate that the well and curve exist.
+- Remove the `CurveMetadata` row.
+- Rewrite the well Parquet payload without that curve column.
+- If no curves remain, keep a valid Parquet payload with only `DEPT` or remove the payload file
+  consistently; choose one behavior and document it in code/tests.
+- Return `204`.
+
+Delete-all logs:
+- Remove all `CurveMetadata` rows for the well.
+- Remove or rewrite the well Parquet payload consistently with the single-curve behavior.
+- Return `204`.
+
+Safety:
+- Built-in dictionaries are not affected.
+- Formation tops, deviation survey, zones, and well metadata are not deleted.
+- Deleting a curve used for lithology aggregation must leave existing manual zone lithology intact,
+  but auto-derived zone lithology should become stale/recalculated as empty if no lithology curve
+  remains.
+
+### Frontend contract
+
+Data Manager tree:
+- Add red `✕` to each curve row under `Logs`.
+- Add red `✕` to the `Logs` group row when at least one curve exists.
+- Match the BF4-017 button style:
+  `dm-action dm-action--ghost dm-action--danger`.
+- Confirm before deleting:
+  - single curve: `Delete log curve "GR"?`
+  - all logs: `Delete all 12 log curves for "Well A"?`
+
+State cleanup after delete:
+- Remove deleted curve mnemonics from every `TrackConfig.curves` entry for that well.
+- If a track becomes empty, keep the track shell for now unless existing store helpers already
+  remove empty tracks safely.
+- Clear selected curve if it was deleted.
+- Refresh well detail and well inventory.
+- Trigger subsidence recalculation / stored result invalidation through existing store paths.
+
+### Affected files
+
+- `app/src/subsidence/api/wells.py`
+- `app/src/subsidence/data/loaders.py` or a new helper near import payload writing if Parquet
+  rewrite logic should be shared
+- `frontend/src/stores/wellDataStore.ts`
+- `frontend/src/components/layout/WellDataPanel.tsx`
+- `frontend/src/components/layout/DataManagerTopPane.tsx`
+- `frontend/src/components/layout/DataManagerPane.tsx`
+- `frontend/src/components/layout/dataManagerActions.ts`
+- `frontend/src/components/layout/useDataManagerController.ts`
+- `frontend/src/styles/data-manager.css`
+
+**Complexity**: M — backend payload rewrite + frontend tree actions + visual config cleanup.
+
+**Verification**:
+- Delete one log curve; it disappears from Data Manager and track rendering after refresh.
+- Save/reopen project; deleted curve does not return.
+- Delete all logs; well remains, tops remain, deviation remains, log tracks do not render deleted
+  curves.
+- Delete a lithology curve used for auto zones; manual zone lithology stays, auto aggregation no
+  longer uses the deleted curve.
+
+---
+
+## BF4-020: Delete deviation survey from Data Manager (todo)
+
+**Problem**: Deviation/inclinometry can be imported and shown under the `DEV` group, but there is no
+explicit delete action. If a deviation survey is removed, the well must behave as vertical again:
+MD, TVD, and TVDSS calculations should no longer use the deleted survey.
+
+**Goal**: Add a delete action for the `DEV` group in the Data Manager tree.
+
+### Backend contract
+
+Add endpoint in `app/src/subsidence/api/wells.py`:
+
+```http
+DELETE /api/wells/{well_id}/deviation
+```
+
+Behavior:
+- Validate that the well exists.
+- If no deviation survey exists, return `204` (idempotent delete) or `404`; choose one behavior and
+  document it in the test. Preferred: `204`, because the requested final state is already true.
+- Delete the `DeviationSurveyModel` row.
+- Delete the referenced deviation payload file if it exists.
+- Recalculate formation TVD/TVDSS fields back to vertical-well behavior:
+  - `depth_tvd = depth_md`
+  - `depth_tvdss = depth_md - kb_elev` (or the existing vertical convention in
+    `deviation_transform.py`; confirm before implementation)
+- Trigger/save dirty project state through the existing backend mutation path.
+
+### Frontend contract
+
+Data Manager tree:
+- Add red `✕` to the `DEV` group row when `item.deviation` exists.
+- Match BF4-017 delete button style:
+  `dm-action dm-action--ghost dm-action--danger`.
+- Confirm before deleting: `Delete deviation survey for "Well A"?`
+
+State cleanup after delete:
+- Hide deviation overlay for that well.
+- Refresh well detail and well inventory.
+- Keep logs, tops, zones, and well metadata.
+- Clear selected object if it points to the deleted DEV group.
+- Recalculation should run through existing store refresh/recalculation paths.
+
+### Affected files
+
+- `app/src/subsidence/api/wells.py`
+- `app/src/subsidence/data/deviation_transform.py` if a helper is needed for vertical reset
+- `frontend/src/stores/wellDataStore.ts`
+- `frontend/src/components/layout/WellDataPanel.tsx`
+- `frontend/src/components/layout/DataManagerTopPane.tsx`
+- `frontend/src/components/layout/DataManagerPane.tsx`
+- `frontend/src/components/layout/dataManagerActions.ts`
+- `frontend/src/components/layout/useDataManagerController.ts`
+
+**Complexity**: S/M — one backend delete endpoint, payload cleanup, TVD/TVDSS reset, frontend tree
+action.
+
+**Verification**:
+- Import deviation, confirm well shows DEV metadata.
+- Delete DEV from Data Manager; DEV disappears and the well behaves as vertical.
+- Existing tops remain; their TVD/TVDSS values are reset according to the vertical convention.
+- Save/reopen project; deleted deviation does not return.
+
+---
+
 ## Implementation order
 
 | # | Item | Complexity | Notes |
@@ -1541,4 +1753,7 @@ lockstep with the header. Check at both 1× and 2× devicePixelRatio (browser zo
 | 17 | BF4-010 | M | New side toolbar component |
 | 18 | BF4-007-B | M | Sea level override per top (backend + frontend) |
 | 19 | BF4-011 | M | API audit (research task) |
-| 20 | BF4-005 | L | Lithology discrete/fraction (multi-step) |
+| 20 | BF4-019 | M | Delete log curves from Data Manager |
+| 21 | BF4-020 | S/M | Delete deviation survey from Data Manager |
+| 22 | BF4-021 | S/M | Rebuild zones after formation top delete |
+| 23 | BF4-005 | L | Lithology discrete/fraction (multi-step) |
