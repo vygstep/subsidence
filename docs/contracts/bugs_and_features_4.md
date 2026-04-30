@@ -535,7 +535,7 @@ and looked up in `seaLevelCurves`. This is read-only — user must go to Models 
 
 ---
 
-## BF4-009: Models tree — computed state and active indicator (todo)
+## BF4-009: Models tree — computed state and active indicator (done)
 
 **Problem**: Model nodes in `WellDataPanel.tsx` `ModelsRoot` component are plain tree-leaf items
 styled only with a CSS highlight class. There is no visual indicator for:
@@ -589,6 +589,21 @@ Show the radio span only for computed models (hide for planned).
 **Affected files**:
 - `frontend/src/components/layout/WellDataPanel.tsx` (`ModelsRoot` component)
 - `frontend/src/styles/data-manager.css` (new radio CSS)
+
+**Implemented**:
+- `ModelsRoot` reads active well formations and treats `total` as computed only when at least one
+  picked formation has `depth_md != null`.
+- Computed models show a radio-style indicator; the active model indicator is filled from
+  `viewStore.activeSubsidenceModelType`.
+- Planned/unimplemented models stay muted and keep the `planned` badge.
+- Clicking a computed model also updates `activeSubsidenceModelType`; clicking planned models still
+  opens their settings without activating them.
+
+**Manual check**:
+- With an active well that has picked tops, `Models -> Total burial / total subsidence` should show
+  a filled radio indicator.
+- Remove/no-load tops case should mute the total model and hide its radio indicator.
+- Planned models should remain muted with `planned` badges and no radio indicator.
 
 ---
 

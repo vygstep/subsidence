@@ -2,7 +2,8 @@ import { useEffect, useLayoutEffect, useMemo, useRef } from 'react'
 
 import { useDataManager } from './dataManager/DataManagerContext'
 import { useWorkspaceStore } from '@/stores/workspaceStore'
-import type { SubsidenceModelType } from '@/stores/viewStore'
+import { useViewStore, type SubsidenceModelType } from '@/stores/viewStore'
+import { useWellDataStore } from '@/stores/wellDataStore'
 import type { FormationInventoryItem, WellInventory } from '@/types'
 import type { FormationZone } from '@/types'
 
@@ -152,8 +153,16 @@ function ModelsRoot() {
   const { isExpanded, toggleExpanded } = useDataManager()
   const selectedObject = useWorkspaceStore((s) => s.selectedObject)
   const setSelectedObject = useWorkspaceStore((s) => s.setSelectedObject)
+  const activeModelType = useViewStore((s) => s.activeSubsidenceModelType)
+  const setActiveModelType = useViewStore((s) => s.setActiveSubsidenceModelType)
+  const formations = useWellDataStore((s) => s.formations)
 
   const selectedModelType = selectedObject?.type === 'subsidence-model' ? selectedObject.modelType : null
+  const hasPickedFormation = formations.some((formation) => formation.depth_md !== null)
+
+  function isComputed(modelType: SubsidenceModelType): boolean {
+    return modelType === 'total' && hasPickedFormation
+  }
 
   return (
     <div className="tree-node tree-node--root">
@@ -175,10 +184,18 @@ function ModelsRoot() {
           {MODEL_NODES.map((model) => (
             <div
               key={model.type}
-              className={`tree-leaf tree-leaf--clickable${selectedModelType === model.type ? ' tree-leaf--selected' : ''}${!model.available ? ' tree-leaf--muted' : ''}`}
-              onClick={() => setSelectedObject({ type: 'subsidence-model', modelType: model.type })}
+              className={`tree-leaf tree-leaf--model tree-leaf--clickable${selectedModelType === model.type ? ' tree-leaf--selected' : ''}${!isComputed(model.type) ? ' tree-leaf--muted' : ''}`}
+              onClick={() => {
+                if (isComputed(model.type)) setActiveModelType(model.type)
+                setSelectedObject({ type: 'subsidence-model', modelType: model.type })
+              }}
             >
-              <span>{model.label}</span>
+              {isComputed(model.type) ? (
+                <span
+                  className={`tree-leaf__radio${activeModelType === model.type ? ' tree-leaf__radio--active' : ''}`}
+                />
+              ) : null}
+              <span className="tree-leaf__label">{model.label}</span>
               {!model.available && <span className="tree-node__badge">planned</span>}
             </div>
           ))}
@@ -227,11 +244,14 @@ export function WellDataPanel({
   selectedZoneSetId = null,
 }: WellDataPanelProps) {
   const { isExpanded, toggleExpanded, setExpanded } = useDataManager()
+  const didInitializeExpanded = useRef(false)
 
   useEffect(() => {
+    if (didInitializeExpanded.current) return
+    didInitializeExpanded.current = true
     setExpanded('wells-root', true)
     setExpanded('zones-root', true)
-  }, [])
+  }, [setExpanded])
 
   function isOpen(nodeId: string): boolean {
     return isExpanded(nodeId)
@@ -267,7 +287,12 @@ export function WellDataPanel({
       byId.set(entry.id, entry)
     }
     return Array.from(byId.values())
-      .map(({ zoneIds: _zoneIds, wellIds: _wellIds, ...entry }) => entry)
+      .map((entry) => ({
+        id: entry.id,
+        name: entry.name,
+        wells: entry.wells,
+        zones: entry.zones,
+      }))
       .sort((a, b) => a.name.localeCompare(b.name))
   }, [wells])
 
