@@ -30,6 +30,9 @@ interface DataManagerTopPaneProps {
   onContextMenuStratChart: (event: React.MouseEvent, chart: StratChartInfo) => void
   onContextMenuTopsGroup: (event: React.MouseEvent, wellId: string) => void
   onContextMenuWell: (event: React.MouseEvent, well: WellInventory) => void
+  onDeleteWell: (wellId: string, wellName: string) => void
+  onDeleteAllFormations: (wellId: string, formations: FormationInventoryItem[], wellName: string) => void
+  onDeleteFormation: (wellId: string, formationId: string, formationName: string) => void
   onDeleteStratChartById: (chartId: number, name: string, isBuiltin: boolean) => void
   onFocusCurveObject: (wellId: string, mnemonic: string) => void
   onFocusFormationObject: (wellId: string, formationId: string) => void
@@ -103,6 +106,9 @@ export function DataManagerTopPane({
   onContextMenuStratChart,
   onContextMenuTopsGroup,
   onContextMenuWell,
+  onDeleteWell,
+  onDeleteAllFormations,
+  onDeleteFormation,
   onDeleteStratChartById,
   onFocusCurveObject,
   onFocusFormationObject,
@@ -223,6 +229,9 @@ export function DataManagerTopPane({
           onContextMenuLasGroup={onContextMenuLasGroup}
           onContextMenuTopsGroup={onContextMenuTopsGroup}
           onContextMenuWell={onContextMenuWell}
+          onDeleteWell={onDeleteWell}
+          onDeleteAllFormations={onDeleteAllFormations}
+          onDeleteFormation={onDeleteFormation}
           onSelectZoneSetsRoot={onSelectZoneSetsRoot}
           onSelectZoneSet={onSelectZoneSet}
           onSelectZoneInSet={onSelectZoneInSet}

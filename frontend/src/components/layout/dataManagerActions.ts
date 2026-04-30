@@ -1,6 +1,6 @@
 import { useWellDataStore } from '@/stores'
 import type { CompactionModel, FormationTop, Well } from '@/types'
-import type { SelectedObject } from '@/stores/workspaceStore'
+import type { SelectedObject, WellViewState } from '@/stores/workspaceStore'
 
 export async function readError(response: Response, fallback: string): Promise<string> {
   try {
@@ -34,6 +34,7 @@ interface ActionDeps {
   setSelectedObject: (obj: SelectedObject | null) => void
   setSelectedFormationId: (id: string | null) => void
   dropWellViewState: (wellId: string) => void
+  updateWellViewState: (wellId: string, updater: (state: WellViewState) => WellViewState) => void
   selectTrack: (id: string | null) => void
   refreshWell: (preferredWellId?: string) => Promise<void>
   loadWellInventories: () => Promise<boolean>
@@ -55,6 +56,7 @@ export function makeActionHandlers(deps: ActionDeps) {
     setSelectedObject,
     setSelectedFormationId,
     dropWellViewState,
+    updateWellViewState,
     selectTrack,
     refreshWell,
     loadWellInventories,
@@ -197,12 +199,44 @@ export function makeActionHandlers(deps: ActionDeps) {
     }
 
     await loadWellInventories()
+    updateWellViewState(wellId, (state) => ({
+      ...state,
+      visibleFormationIds: state.visibleFormationIds.filter((id) => id !== formationId),
+    }))
     if (well?.well_id === wellId) {
       await refreshWell(wellId)
     }
     if (selectedFormationId === formationId) {
       setSelectedFormationId(null)
       setSelectedObject(null)
+    }
+  }
+
+  async function handleDeleteAllFormations(
+    wellId: string,
+    formations: Array<{ id: string; name: string }>,
+    wellName: string,
+  ): Promise<void> {
+    if (formations.length === 0) return
+    if (!window.confirm(`Delete all ${formations.length} tops for "${wellName}"?`)) return
+
+    for (const formation of formations) {
+      // eslint-disable-next-line no-await-in-loop
+      const response = await fetch(`/api/wells/${wellId}/formations/${formation.id}`, { method: 'DELETE' })
+      if (!response.ok) {
+        window.alert(await readError(response, `Failed to delete top '${formation.name}' (${response.status})`))
+        return
+      }
+    }
+
+    updateWellViewState(wellId, (state) => ({ ...state, visibleFormationIds: [] }))
+    if (formations.some((formation) => formation.id === selectedFormationId)) {
+      setSelectedFormationId(null)
+      setSelectedObject(null)
+    }
+    await loadWellInventories()
+    if (well?.well_id === wellId) {
+      await refreshWell(wellId)
     }
   }
 
@@ -281,6 +315,7 @@ export function makeActionHandlers(deps: ActionDeps) {
     handleDeleteWell,
     handleRenameFormation,
     handleDeleteFormation,
+    handleDeleteAllFormations,
     handleDuplicateFormation,
     handleDeleteChartById,
     handleDuplicateCompactionModel,

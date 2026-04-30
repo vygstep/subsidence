@@ -200,6 +200,7 @@ export function useDataManagerController() {
     setSelectedObject,
     setSelectedFormationId,
     dropWellViewState,
+    updateWellViewState,
     selectTrack,
     refreshWell,
     loadWellInventories,
@@ -264,6 +265,8 @@ export function useDataManagerController() {
     onDeleteCompactionModelById: (id: number, name: string, isBuiltin: boolean, isActive: boolean) =>
       void actions.handleDeleteCompactionModelById(id, name, isBuiltin, isActive),
     onDeleteFormation: (wellId: string, formationId: string, name: string) => void actions.handleDeleteFormation(wellId, formationId, name),
+    onDeleteAllFormations: (wellId: string, formations: Array<{ id: string; name: string }>, wellName: string) =>
+      void actions.handleDeleteAllFormations(wellId, formations, wellName),
     onDeleteStratChartById: (chartId: number, name: string, isBuiltin: boolean) => void actions.handleDeleteChartById(chartId, name, isBuiltin),
     onDeleteWellById: (wellId: string, wellName: string) => void actions.handleDeleteWell(wellId, wellName),
     onDuplicateCompactionModel: (id: number, name: string) => void actions.handleDuplicateCompactionModel(id, name),

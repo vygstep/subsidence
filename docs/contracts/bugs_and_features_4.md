@@ -1029,7 +1029,7 @@ Do this last, as a cleanup step, to avoid blocking the other items.
 
 ---
 
-## BF4-017: Delete well / delete top / delete all tops — ✕ buttons in data manager tree (todo)
+## BF4-017: Delete well / delete top / delete all tops — ✕ buttons in data manager tree (done)
 
 **Problem**: "Delete well", "Delete top", and "Delete all tops" are currently only accessible via
 the main project toolbar. The toolbar is already crowded; the data manager tree is the natural
@@ -1217,6 +1217,12 @@ Verify with a grep before deleting.
 
 **Complexity**: XS — all frontend, no backend changes. Controller callbacks already exist for
 well delete and single formation delete; only "delete all" needs a new controller entry.
+
+**Implemented**:
+- Added Data Manager tree delete buttons for well rows, TOPS groups, and individual top rows.
+- Wired tree buttons through `DataManagerTopPane` / `DataManagerPane` to controller actions.
+- Added controller-level delete-all-tops action.
+- Removed Delete well / Delete top / Delete all tops from `ProjectToolbar.tsx`.
 
 ---
 

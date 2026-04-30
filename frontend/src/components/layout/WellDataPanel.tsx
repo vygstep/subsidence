@@ -35,6 +35,9 @@ interface WellDataPanelProps {
   onContextMenuLasGroup: (event: React.MouseEvent, wellId: string) => void
   onContextMenuTopsGroup: (event: React.MouseEvent, wellId: string) => void
   onContextMenuWell: (event: React.MouseEvent, well: WellInventory) => void
+  onDeleteWell: (wellId: string, wellName: string) => void
+  onDeleteAllFormations: (wellId: string, formations: FormationInventoryItem[], wellName: string) => void
+  onDeleteFormation: (wellId: string, formationId: string, formationName: string) => void
   onSelectZoneSetsRoot?: () => void
   onSelectZoneSet?: (zoneSetId: number, wellId: string) => void
   onSelectZoneInSet?: (zoneSetId: number, wellId: string, zoneId: number) => void
@@ -215,6 +218,9 @@ export function WellDataPanel({
   onContextMenuLasGroup,
   onContextMenuTopsGroup,
   onContextMenuWell,
+  onDeleteWell,
+  onDeleteAllFormations,
+  onDeleteFormation,
   onSelectZoneSetsRoot = () => {},
   onSelectZoneSet = () => {},
   onSelectZoneInSet = () => {},
@@ -329,6 +335,19 @@ export function WellDataPanel({
                       >
                         {item.well_name}
                       </button>
+                      <button
+                        type="button"
+                        className="dm-action dm-action--ghost dm-action--danger"
+                        title={`Delete well "${item.well_name}"`}
+                        aria-label={`Delete well "${item.well_name}"`}
+                        style={{ marginLeft: 'auto' }}
+                        onClick={(event) => {
+                          event.stopPropagation()
+                          onDeleteWell(item.well_id, item.well_name)
+                        }}
+                      >
+                        ✕
+                      </button>
                     </div>
 
                     {showDetails ? (
@@ -404,6 +423,21 @@ export function WellDataPanel({
                             <button type="button" className="tree-node__section-label" onClick={() => onSelectTopsGroup(item.well_id)}>
                               TOPS
                             </button>
+                            {item.formations.length > 0 && (
+                              <button
+                                type="button"
+                                className="dm-action dm-action--ghost dm-action--danger"
+                                title={`Delete all tops for "${item.well_name}"`}
+                                aria-label={`Delete all tops for "${item.well_name}"`}
+                                style={{ marginLeft: 'auto' }}
+                                onClick={(event) => {
+                                  event.stopPropagation()
+                                  onDeleteAllFormations(item.well_id, item.formations, item.well_name)
+                                }}
+                              >
+                                ✕
+                              </button>
+                            )}
                           </div>
                           {isOpen(`${rootId}:tops`) ? (
                             <div className="tree-node__children">
@@ -425,6 +459,18 @@ export function WellDataPanel({
                                       secondary={formatNumber(formation.depth_md)}
                                       onChange={(nextValue) => onToggleFormation(item.well_id, formation.id, nextValue)}
                                     />
+                                    <button
+                                      type="button"
+                                      className="dm-action dm-action--ghost dm-action--danger"
+                                      title={`Delete top "${formation.name}"`}
+                                      aria-label={`Delete top "${formation.name}"`}
+                                      onClick={(event) => {
+                                        event.stopPropagation()
+                                        onDeleteFormation(item.well_id, formation.id, formation.name)
+                                      }}
+                                    >
+                                      ✕
+                                    </button>
                                   </div>
                                 ))
                               ) : (

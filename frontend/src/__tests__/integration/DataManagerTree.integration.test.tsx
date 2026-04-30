@@ -80,6 +80,9 @@ function renderPanel(overrides: Partial<React.ComponentProps<typeof WellDataPane
     onContextMenuLasGroup: vi.fn(),
     onContextMenuTopsGroup: vi.fn(),
     onContextMenuWell: vi.fn(),
+    onDeleteWell: vi.fn(),
+    onDeleteAllFormations: vi.fn(),
+    onDeleteFormation: vi.fn(),
     ...overrides,
   }
   return {
@@ -348,5 +351,26 @@ describe('Data Manager well tree', () => {
 
     fireEvent.click(checkbox)
     expect(props.onToggleAllFormations).toHaveBeenCalledWith('well-a', true)
+  })
+
+  it('exposes delete actions in the well tree', () => {
+    const { props } = renderPanel()
+
+    fireEvent.click(screen.getAllByLabelText('Expand')[0])
+    fireEvent.click(screen.getByLabelText('Delete well "Well A"'))
+    expect(props.onDeleteWell).toHaveBeenCalledWith('well-a', 'Well A')
+
+    fireEvent.click(screen.getByLabelText('Delete all tops for "Well A"'))
+    expect(props.onDeleteAllFormations).toHaveBeenCalledWith(
+      'well-a',
+      expect.arrayContaining([expect.objectContaining({ id: 'top-a' })]),
+      'Well A',
+    )
+
+    const topsRow = screen.getByText('TOPS').closest('.tree-node__row')
+    const topsExpand = topsRow?.querySelector('button[aria-label="Expand"]') as HTMLButtonElement
+    fireEvent.click(topsExpand)
+    fireEvent.click(screen.getByLabelText('Delete top "Top A"'))
+    expect(props.onDeleteFormation).toHaveBeenCalledWith('well-a', 'top-a', 'Top A')
   })
 })

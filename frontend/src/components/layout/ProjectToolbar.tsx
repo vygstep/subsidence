@@ -19,16 +19,6 @@ type FormationTypeOption = 'strat' | 'unconformity'
 
 const FORMATION_TYPE_OPTIONS: FormationTypeOption[] = ['strat', 'unconformity']
 
-async function readError(response: Response, fallback: string): Promise<string> {
-  try {
-    const payload = (await response.json()) as { detail?: string }
-    if (payload.detail) return payload.detail
-  } catch {
-    // ignore non-JSON payloads
-  }
-  return fallback
-}
-
 interface UnsavedChangesDialogProps {
   projectName: string | null
   onSave: () => void
@@ -124,7 +114,6 @@ export function ProjectToolbar() {
   const cancelLoading = useWellDataStore((state) => state.cancelLoading)
   const error = useWellDataStore((state) => state.error)
   const addFormation = useWellDataStore((state) => state.addFormation)
-  const removeFormation = useWellDataStore((state) => state.removeFormation)
   const linkFormationToChart = useWellDataStore((state) => state.linkFormationToChart)
   const loadWell = useWellDataStore((state) => state.loadWell)
   const loadStratCharts = useWellDataStore((state) => state.loadStratCharts)
@@ -148,9 +137,6 @@ export function ProjectToolbar() {
   const selectedFormationId = useWorkspaceStore((state) => state.selectedFormationId)
   const setSelectedFormationId = useWorkspaceStore((state) => state.setSelectedFormationId)
   const updateWellViewState = useWorkspaceStore((state) => state.updateWellViewState)
-  const dropWellViewState = useWorkspaceStore((state) => state.dropWellViewState)
-
-  const selectTrack = useViewStore((state) => state.selectTrack)
   const lodEnabled = useViewStore((state) => state.lodEnabled)
   const setLodEnabled = useViewStore((state) => state.setLodEnabled)
 
@@ -269,24 +255,6 @@ export function ProjectToolbar() {
     }
   }
 
-  async function handleDeleteWell(): Promise<void> {
-    if (!well) return
-    if (!window.confirm(`Delete well "${well.well_name}"?`)) return
-
-    try {
-      const response = await fetch(`/api/projects/wells/${well.well_id}`, { method: 'DELETE' })
-      if (!response.ok) {
-        throw new Error(await readError(response, `Failed to delete well '${well.well_name}' (${response.status})`))
-      }
-      dropWellViewState(well.well_id)
-      setSelectedFormationId(null)
-      selectTrack(null)
-      await refreshWell()
-    } catch (err) {
-      window.alert(err instanceof Error ? err.message : 'Failed to delete well.')
-    }
-  }
-
   async function handleDeleteStratChart(): Promise<void> {
     const activeChart = stratCharts.find((c) => c.is_active) ?? null
     if (!activeChart) return
@@ -321,26 +289,6 @@ export function ProjectToolbar() {
         visibleFormationIds: Array.from(new Set([...state.visibleFormationIds, latest.id])),
       }))
     }
-  }
-
-  async function handleDeleteAllFormations(): Promise<void> {
-    if (!well?.well_id || formations.length === 0) return
-    for (const formation of formations) {
-      // eslint-disable-next-line no-await-in-loop
-      await removeFormation(formation.id)
-    }
-    updateWellViewState(well.well_id, (state) => ({ ...state, visibleFormationIds: [] }))
-    setSelectedFormationId(null)
-  }
-
-  function handleRemoveFormation(formationId: string): void {
-    if (!well?.well_id) return
-    updateWellViewState(well.well_id, (state) => ({
-      ...state,
-      visibleFormationIds: state.visibleFormationIds.filter((id) => id !== formationId),
-    }))
-    if (selectedFormationId === formationId) setSelectedFormationId(null)
-    void removeFormation(formationId)
   }
 
   async function handleSetFormationAge(): Promise<void> {
@@ -486,7 +434,6 @@ export function ProjectToolbar() {
       <button type="button" className="app-action-button" onClick={() => setActiveDialog('load-las')}>Load logs</button>
       <button type="button" className="app-action-button" onClick={() => setActiveDialog('load-tops')}>Load tops</button>
       <button type="button" className="app-action-button" onClick={() => setActiveDialog('load-deviation')}>Load deviation</button>
-      <button type="button" className="app-action-button" onClick={() => void handleDeleteWell()} disabled={!well}>Delete well</button>
     </>
   )
 
@@ -498,8 +445,6 @@ export function ProjectToolbar() {
       <button type="button" className="app-action-button" onClick={() => selectedFormation && handleOpenFormationLink(selectedFormation.id)} disabled={!selectedFormation}>Link top</button>
       <button type="button" className="app-action-button" onClick={() => void handleSetFormationAge()} disabled={!selectedFormation}>Set age</button>
       <button type="button" className="app-action-button" onClick={() => void handleSetFormationType()} disabled={!selectedFormation}>Set type</button>
-      <button type="button" className="app-action-button" onClick={() => selectedFormation && handleRemoveFormation(selectedFormation.id)} disabled={!selectedFormation}>Delete top</button>
-      <button type="button" className="app-action-button" onClick={() => void handleDeleteAllFormations()} disabled={formations.length === 0}>Delete all tops</button>
       <button type="button" className="app-action-button" onClick={() => void handleMoveSelectedFormation()} disabled={!selectedFormation}>Move top</button>
     </>
   )

@@ -368,6 +368,11 @@
   background: var(--dm-bg);
 }
 
+.top-leaf .tree-checkbox-leaf {
+  flex: 1;
+  min-width: 0;
+}
+
 .top-leaf::before {
   content: '';
   position: absolute;

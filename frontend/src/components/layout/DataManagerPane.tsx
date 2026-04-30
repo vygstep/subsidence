@@ -259,6 +259,9 @@ export function DataManagerPane({ sidebarRef, onInternalSplitterMouseDown }: Dat
             wellId: wellInventory.well_id,
             name: wellInventory.well_name,
           })}
+          onDeleteWell={controller.onDeleteWellById}
+          onDeleteAllFormations={controller.onDeleteAllFormations}
+          onDeleteFormation={controller.onDeleteFormation}
           onDeleteStratChartById={controller.onDeleteStratChartById}
           onFocusCurveObject={controller.handleFocusCurveObject}
           onSelectChart={controller.onSelectChart}
