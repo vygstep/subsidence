@@ -810,10 +810,11 @@ New step 1 renders everything inline:
           </select>
         </label>
         <label className="project-dialog__field">
-          <span>Depth unit</span>
-          <select value={depthUnit} onChange={(e) => setDepthUnit(e.target.value as 'm' | 'ft')}>
+          <span>Depth unit in file</span>
+          <select value={depthUnit} onChange={(e) => setDepthUnit(e.target.value as 'm' | 'ft' | 'km')}>
             <option value="m">m — metres</option>
             <option value="ft">ft — feet</option>
+            <option value="km">km — kilometres</option>
           </select>
         </label>
         {/* ZoneSet policy section — unchanged, moved here */}
@@ -854,10 +855,11 @@ In `ImportDeviationDialog.tsx`:
   <div className="import-wizard__options">
     <ImportWizardTargetWellFields ... />
     <label className="project-dialog__field">
-      <span>Depth unit</span>
+      <span>Depth unit in file</span>
       <select value={depthUnit} ...>
         <option value="m">m — metres</option>
         <option value="ft">ft — feet</option>
+        <option value="km">km — kilometres</option>
       </select>
     </label>
   </div>
@@ -867,8 +869,8 @@ In `ImportDeviationDialog.tsx`:
 Note: deviation has no `depth_ref` selector — all depth types (MD, TVD, TVDSS) are columns in the
 file and mapped individually via inline mapping.
 
-**New state**: `depthUnit: 'm' | 'ft'`
-**Submit payload**: add `depth_unit: depthUnit`
+**New state**: `const [depthUnit, setDepthUnit] = useState<'m' | 'ft' | 'km'>('m')`
+**Submit payload**: add `depth_unit: depthUnit` — stored as metadata, no conversion
 `canSubmit`: `sourceIsValid && mappingOk`
 
 ---
@@ -885,20 +887,32 @@ In `ImportUnconformitiesDialog.tsx`:
 
 ---
 
-### BF4-018-E: Backend — `depth_unit` field for tabular imports
+### BF4-018-E: Backend — store `depth_unit` as metadata, no conversion on import
 
-Add `depth_unit: 'm' | 'ft'` (default `'m'`) to the import endpoints:
+**Important**: data is stored exactly as loaded — **no unit conversion during import**.
+The `depth_unit` field is metadata that tells the engine what unit the stored values are in,
+so it can convert correctly at compute time (e.g., ft → m before backstripping).
+
+Add `depth_unit: 'm' | 'ft' | 'km'` (default `'m'`) to the import endpoints:
 - `POST /api/projects/import-tops`
 - `POST /api/projects/import-deviation`
 - `POST /api/projects/import-unconformities`
 - `POST /api/projects/import-logs-csv` (also affects BF4-016-D)
 
-Backend behaviour: when `depth_unit === 'ft'`, multiply all incoming depth values by `0.3048`
-before storing (convert feet → metres). When `depth_unit === 'm'`, store as-is.
+Backend behaviour: store depth values verbatim as received. Persist `depth_unit` in the
+database alongside the formation/deviation/curve records so the compute engine can read it
+and apply the appropriate conversion factor when needed.
+
+**Schema changes** (investigate before implementing):
+- Formation top: add `depth_unit` column (default `'m'`), persisted per-well or per-import
+- Deviation survey: add `depth_unit` column
+- Log curves: `depth_unit` may already be implied by the LAS `depth_unit` header field
+  (`lasPreview.depth_unit`) — verify whether it is stored; if not, add it
 
 **Backend files to check**:
-- `app/src/subsidence/api/wells.py` — the import endpoints
-- Wherever depth values are written to the formation/deviation schema
+- `app/src/subsidence/api/wells.py` — import endpoints
+- `app/src/subsidence/data/schema.py` — add `depth_unit` columns
+- Compute engine — wherever depth values are read back for backstripping/subsidence calculation
 
 ---
 
