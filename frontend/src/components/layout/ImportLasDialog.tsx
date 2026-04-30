@@ -8,10 +8,7 @@ import {
   ImportWizardShell,
   ImportWizardTargetWellFields,
   LasPreviewPane,
-  MappingPane,
   TabularPreviewPane,
-  DEFAULT_STEP_LABELS,
-  MAPPING_STEP_LABELS,
   buildImportWizardSteps,
   importWizardPresets,
   readImportError,
@@ -20,11 +17,11 @@ import {
 import {
   LOGS_CSV_FIELDS,
   autoMap,
-  isMappingValid,
-  validateLogsCsvMapping,
 } from './importWizard/mapping'
 import type { ColumnMapping } from './importWizard/mapping'
 import { getLastImportRoot, pickFile, rememberImportPath } from './pathMemory'
+
+const STEP_LABELS = ['File', 'Preview']
 
 interface WellOption {
   well_id: string
@@ -44,6 +41,27 @@ interface ImportLasResponse {
 
 type LogSourceType = 'las' | 'csv'
 
+function detectLasDepthRef(mnemonic: string): 'MD' | 'TVD' | 'TVDSS' {
+  const m = mnemonic.toUpperCase().trim()
+  if (m.startsWith('TVDSS')) return 'TVDSS'
+  if (m.startsWith('TVD')) return 'TVD'
+  return 'MD'
+}
+
+function detectCsvDepthRef(columnName: string): 'MD' | 'TVD' | 'TVDSS' {
+  const c = columnName.toLowerCase().replace(/[_\s-]/g, '')
+  if (c.includes('tvdss')) return 'TVDSS'
+  if (c.includes('tvd')) return 'TVD'
+  return 'MD'
+}
+
+function detectColumnCurveType(colIndex: number, rows: string[][]): 'continuous' | 'discrete' {
+  const vals = rows.map((r) => r[colIndex]).filter((v) => v !== '' && v !== null && v !== undefined)
+  if (vals.length === 0) return 'continuous'
+  if (vals.every((v) => /^-?\d+$/.test(v.trim()))) return 'discrete'
+  return 'continuous'
+}
+
 export function ImportLasDialog({ wells, activeWellId, onClose, onSuccess }: ImportLasDialogProps) {
   const projectPath = useProjectStore((state) => state.projectPath)
   const [wellId, setWellId] = useState(activeWellId ?? '')
@@ -53,6 +71,7 @@ export function ImportLasDialog({ wells, activeWellId, onClose, onSuccess }: Imp
   const [sourcePath, setSourcePath] = useState(() => getLastImportRoot())
   const [mapping, setMapping] = useState<ColumnMapping>({})
   const [trustedDepthRef, setTrustedDepthRef] = useState<'MD' | 'TVD' | 'TVDSS'>('MD')
+  const [curveTypes, setCurveTypes] = useState<Record<string, 'continuous' | 'discrete'>>({})
   const [currentStepIndex, setCurrentStepIndex] = useState(0)
   const [error, setError] = useState<string | null>(null)
   const [isSubmitting, setIsSubmitting] = useState(false)
@@ -61,7 +80,6 @@ export function ImportLasDialog({ wells, activeWellId, onClose, onSuccess }: Imp
   const preset = sourceType === 'las' ? importWizardPresets.logsLas : importWizardPresets.logsCsv
   const sourceIsValid = sourcePath.trim().length > 0
   const isOnPreviewStep = currentStepIndex === 1
-  const stepLabels = sourceType === 'csv' ? MAPPING_STEP_LABELS : DEFAULT_STEP_LABELS
 
   const { isLoading: previewLoading, error: previewError, tabularPreview, lasPreview, parserSettings, updateParserSettings } = useImportPreview(
     preset.previewMode,
@@ -69,23 +87,72 @@ export function ImportLasDialog({ wells, activeWellId, onClose, onSuccess }: Imp
     isOnPreviewStep,
   )
 
+  // Auto-map CSV columns on preview load
   useEffect(() => {
     if (tabularPreview && sourceType === 'csv') {
       setMapping(autoMap(tabularPreview.columns, LOGS_CSV_FIELDS))
     }
   }, [tabularPreview, sourceType])
 
-  // LAS files carry a well name in their header; use it as the file well source.
-  const fileWellSource = sourceType === 'las' ? (lasPreview?.well_name ?? null) : null
-
+  // Auto-detect LAS depth ref from depth curve mnemonic
   useEffect(() => {
-    setWellPolicy(fileWellSource ? 'file' : 'override')
-  }, [fileWellSource])
+    if (lasPreview?.curves.length) {
+      setTrustedDepthRef(detectLasDepthRef(lasPreview.curves[0].mnemonic))
+    }
+  }, [lasPreview])
+
+  // Auto-detect CSV depth ref from depth column name
+  useEffect(() => {
+    const col = mapping['depth']
+    if (col) setTrustedDepthRef(detectCsvDepthRef(col))
+  }, [mapping])
+
+  // Auto-match LAS well name to existing wells
+  useEffect(() => {
+    if (!lasPreview?.well_name) {
+      setWellPolicy('override')
+      return
+    }
+    const normalized = lasPreview.well_name.trim().toLowerCase()
+    const match = wells.find((w) => w.well_name.trim().toLowerCase() === normalized)
+    if (match) {
+      setWellId(match.well_id)
+      setWellPolicy('override')
+    } else {
+      setWellId('')
+      setWellPolicy('file')
+    }
+  }, [lasPreview, wells])
+
+  // Auto-detect curve types for LAS preview (default continuous; no sample values in preview)
+  useEffect(() => {
+    if (!lasPreview) return
+    const detected: Record<string, 'continuous' | 'discrete'> = {}
+    for (let i = 1; i < lasPreview.curves.length; i++) {
+      detected[lasPreview.curves[i].mnemonic] = 'continuous'
+    }
+    setCurveTypes(detected)
+  }, [lasPreview])
+
+  // Auto-detect curve types for CSV columns (from preview rows)
+  useEffect(() => {
+    if (!tabularPreview || sourceType !== 'csv') return
+    const depthCol = mapping['depth']
+    const detected: Record<string, 'continuous' | 'discrete'> = {}
+    tabularPreview.columns.forEach((col, idx) => {
+      if (col === depthCol) return
+      detected[col] = detectColumnCurveType(idx, tabularPreview.rows)
+    })
+    setCurveTypes(detected)
+  }, [tabularPreview, mapping, sourceType])
+
+  const fileWellSource = sourceType === 'las' ? (lasPreview?.well_name ?? null) : null
 
   const handleSourceTypeChange = (next: LogSourceType) => {
     setSourceType(next)
     setCurrentStepIndex(0)
     setMapping({})
+    setCurveTypes({})
   }
 
   const previewReady = previewLoading
@@ -94,13 +161,14 @@ export function ImportLasDialog({ wells, activeWellId, onClose, onSuccess }: Imp
       ? lasPreview !== null
       : tabularPreview !== null
 
-  const mappingErrors = sourceType === 'csv' ? validateLogsCsvMapping(mapping) : []
-  const mappingOk = isMappingValid(mappingErrors)
-
-  const steps = buildImportWizardSteps(currentStepIndex, sourceIsValid, stepLabels)
+  const steps = buildImportWizardSteps(currentStepIndex, sourceIsValid, STEP_LABELS)
   const validationMessages = currentStepIndex === 0 && !sourceIsValid
     ? [`${sourceType === 'las' ? 'LAS' : 'CSV'} path is required.`]
     : []
+
+  const canSubmit = sourceType === 'las'
+    ? sourceIsValid && previewReady
+    : sourceIsValid && tabularPreview !== null && !!mapping['depth']
 
   const handleSubmit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault()
@@ -108,11 +176,6 @@ export function ImportLasDialog({ wells, activeWellId, onClose, onSuccess }: Imp
     if (!nextPath) {
       setError(sourceType === 'las' ? 'LAS path is required' : 'CSV path is required')
       return
-    }
-
-    const columnMap: Record<string, string> = {}
-    for (const [fieldId, col] of Object.entries(mapping)) {
-      if (col) columnMap[fieldId] = col
     }
 
     const useFileWell = sourceType === 'las' && wellPolicy === 'file'
@@ -131,13 +194,15 @@ export function ImportLasDialog({ wells, activeWellId, onClose, onSuccess }: Imp
                   well_id: useFileWell ? null : (wellId || null),
                   create_new_well: useFileWell ? false : (!wellId && createNewWell),
                   trusted_depth_reference: trustedDepthRef,
+                  curve_types: curveTypes,
                 }
               : {
                   csv_path: nextPath,
                   well_id: wellId || null,
-                  depth_column: columnMap['depth'] ?? null,
+                  depth_column: mapping['depth'] ?? null,
                   create_new_well: !wellId && createNewWell,
                   trusted_depth_reference: trustedDepthRef,
+                  curve_types: curveTypes,
                 },
           ),
         })
@@ -161,7 +226,7 @@ export function ImportLasDialog({ wells, activeWellId, onClose, onSuccess }: Imp
       }, {
         projectPath,
         activeWellId: useFileWell ? null : (wellId || activeWellId || null),
-        details: { inputPath: nextPath, createNewWell, depthColumn: columnMap['depth'] ?? null },
+        details: { inputPath: nextPath, createNewWell, depthColumn: mapping['depth'] ?? null },
       })
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : 'Failed to import logs')
@@ -180,18 +245,6 @@ export function ImportLasDialog({ wells, activeWellId, onClose, onSuccess }: Imp
     }
   }
 
-  // For CSV: steps are File(0) Preview(1) Mapping(2) Options(3) Import(4)
-  // For LAS: steps are File(0) Preview(1) Options(2) Import(3)
-  const optionsStep = sourceType === 'csv' ? 3 : 2
-  const summaryStep = sourceType === 'csv' ? 4 : 3
-
-  const canAdvanceFromStep = (step: number): boolean => {
-    if (step === 0) return sourceIsValid
-    if (step === 1) return !previewLoading && (previewReady || previewError !== null)
-    if (step === 2 && sourceType === 'csv') return mappingOk
-    return true
-  }
-
   return (
     <ImportWizardShell
       preset={preset}
@@ -200,8 +253,8 @@ export function ImportLasDialog({ wells, activeWellId, onClose, onSuccess }: Imp
       currentStepIndex={currentStepIndex}
       error={error}
       isSubmitting={isSubmitting}
-      canAdvance={canAdvanceFromStep(currentStepIndex)}
-      canSubmit={sourceIsValid && (sourceType === 'las' || mappingOk)}
+      canAdvance={sourceIsValid}
+      canSubmit={canSubmit}
       validationMessages={validationMessages}
       onClose={onClose}
       onSubmit={handleSubmit}
@@ -242,61 +295,98 @@ export function ImportLasDialog({ wells, activeWellId, onClose, onSuccess }: Imp
 
       {currentStepIndex === 1 ? (
         sourceType === 'las' ? (
-          <LasPreviewPane isLoading={previewLoading} error={previewError} preview={lasPreview} />
+          <>
+            <LasPreviewPane
+              isLoading={previewLoading}
+              error={previewError}
+              preview={lasPreview}
+              curveTypes={curveTypes}
+              onCurveTypeChange={(mnemonic, type) => setCurveTypes((prev) => ({ ...prev, [mnemonic]: type }))}
+            />
+            {!previewLoading && (lasPreview !== null || previewError !== null) && (
+              <div className="import-wizard__options">
+                <ImportWizardTargetWellFields
+                  wells={wells}
+                  wellId={wellId}
+                  createNewWell={createNewWell}
+                  emptyLabel="Create or match by LAS well name"
+                  fileWellSource={fileWellSource}
+                  wellPolicy={wellPolicy}
+                  onWellIdChange={setWellId}
+                  onCreateNewWellChange={setCreateNewWell}
+                  onWellPolicyChange={setWellPolicy}
+                />
+                <label className="project-dialog__field">
+                  <span>Depth reference</span>
+                  <select value={trustedDepthRef} onChange={(e) => setTrustedDepthRef(e.target.value as 'MD' | 'TVD' | 'TVDSS')}>
+                    <option value="MD">MD — measured depth</option>
+                    <option value="TVD">TVD — true vertical depth</option>
+                    <option value="TVDSS">TVDSS — TVD subsea</option>
+                  </select>
+                </label>
+              </div>
+            )}
+          </>
         ) : (
-          <TabularPreviewPane
-            isLoading={previewLoading}
-            error={previewError}
-            preview={tabularPreview}
-            settings={parserSettings}
-            onSettingsChange={updateParserSettings}
-          />
+          <>
+            <TabularPreviewPane
+              isLoading={previewLoading}
+              error={previewError}
+              preview={tabularPreview}
+              settings={parserSettings}
+              onSettingsChange={updateParserSettings}
+              depthColumn={mapping['depth'] ?? null}
+            />
+            {!previewLoading && tabularPreview && (
+              <div className="import-wizard__options">
+                <ImportWizardTargetWellFields
+                  wells={wells}
+                  wellId={wellId}
+                  createNewWell={createNewWell}
+                  emptyLabel="Select target well"
+                  onWellIdChange={setWellId}
+                  onCreateNewWellChange={setCreateNewWell}
+                />
+                <div className="project-dialog__field">
+                  <span>Depth column</span>
+                  <span>{mapping['depth'] ?? <em>not detected</em>}</span>
+                </div>
+                <label className="project-dialog__field">
+                  <span>Depth reference</span>
+                  <select value={trustedDepthRef} onChange={(e) => setTrustedDepthRef(e.target.value as 'MD' | 'TVD' | 'TVDSS')}>
+                    <option value="MD">MD — measured depth</option>
+                    <option value="TVD">TVD — true vertical depth</option>
+                    <option value="TVDSS">TVDSS — TVD subsea</option>
+                  </select>
+                </label>
+                {Object.keys(curveTypes).length > 0 && (
+                  <div className="project-dialog__field">
+                    <span>Curve types</span>
+                    <div className="import-wizard__curve-types">
+                      {Object.entries(curveTypes).map(([col, type]) => (
+                        <label key={col} className="import-wizard__curve-type-row">
+                          <span>{col}</span>
+                          <select
+                            value={type}
+                            onChange={(e) => setCurveTypes((prev) => ({ ...prev, [col]: e.target.value as 'continuous' | 'discrete' }))}
+                          >
+                            <option value="continuous">continuous</option>
+                            <option value="discrete">discrete</option>
+                          </select>
+                        </label>
+                      ))}
+                    </div>
+                  </div>
+                )}
+              </div>
+            )}
+            {!previewLoading && tabularPreview && !mapping['depth'] && (
+              <p className="project-dialog__error">
+                No depth column detected. Rename a column to DEPT, DEPTH, MD, TVD, or TVDSS and reload.
+              </p>
+            )}
+          </>
         )
-      ) : null}
-
-      {currentStepIndex === 2 && sourceType === 'csv' ? (
-        <MappingPane
-          columns={tabularPreview?.columns ?? []}
-          fields={LOGS_CSV_FIELDS}
-          mapping={mapping}
-          validationErrors={mappingErrors}
-          onMappingChange={(fieldId, col) => setMapping((prev) => ({ ...prev, [fieldId]: col }))}
-        />
-      ) : null}
-
-      {currentStepIndex === optionsStep ? (
-        <>
-          <ImportWizardTargetWellFields
-            wells={wells}
-            wellId={wellId}
-            createNewWell={createNewWell}
-            emptyLabel={sourceType === 'las' ? 'Create or match by LAS well name' : 'Create or match by CSV well_name'}
-            fileWellSource={fileWellSource}
-            wellPolicy={wellPolicy}
-            onWellIdChange={setWellId}
-            onCreateNewWellChange={setCreateNewWell}
-            onWellPolicyChange={setWellPolicy}
-          />
-          <label className="project-dialog__field">
-            <span>Depth reference</span>
-            <select value={trustedDepthRef} onChange={(e) => setTrustedDepthRef(e.target.value as 'MD' | 'TVD' | 'TVDSS')}>
-              <option value="MD">MD — measured depth (default)</option>
-              <option value="TVD">TVD — true vertical depth</option>
-              <option value="TVDSS">TVDSS — TVD subsea (KB-referenced)</option>
-            </select>
-          </label>
-        </>
-      ) : null}
-
-      {currentStepIndex === summaryStep ? (
-        <div className="project-dialog__validation" aria-label="Import summary">
-          <span>Source: {sourcePath.trim()}</span>
-          <span>Target: {
-            sourceType === 'las' && wellPolicy === 'file'
-              ? `LAS well name: ${fileWellSource}`
-              : (wellId || 'new well')
-          }</span>
-        </div>
       ) : null}
 
       {qcWarnings.length > 0 ? (

@@ -56,6 +56,7 @@ class ImportLasRequest(BaseModel):
     well_id: str | None = None
     create_new_well: bool = False
     trusted_depth_reference: str = 'MD'
+    curve_types: dict[str, str] = {}
 
 
 class ImportLogsCsvRequest(BaseModel):
@@ -64,6 +65,7 @@ class ImportLogsCsvRequest(BaseModel):
     depth_column: str | None = None
     create_new_well: bool = False
     trusted_depth_reference: str = 'MD'
+    curve_types: dict[str, str] = {}
 
 
 class ImportTopsRequest(BaseModel):

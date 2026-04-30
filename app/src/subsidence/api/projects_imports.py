@@ -116,8 +116,13 @@ def import_las(payload: ImportLasRequest, request: Request) -> ImportLasResponse
                     trusted_depth_reference=payload.trusted_depth_reference,
                 )
                 session.flush()
-                command = ImportWell.capture(session, manager.project_path, well.id)
                 well_id = well.id
+                if payload.curve_types:
+                    for curve_row in session.scalars(select(CurveMetadata).where(CurveMetadata.well_id == well_id)):
+                        ct = payload.curve_types.get(curve_row.mnemonic)
+                        if ct in ('continuous', 'discrete'):
+                            curve_row.curve_type = ct
+                command = ImportWell.capture(session, manager.project_path, well.id)
                 well_name = well.name
                 curve_count = len(list(session.scalars(select(CurveMetadata).where(CurveMetadata.well_id == well_id))))
                 session.commit()
@@ -148,8 +153,13 @@ def import_logs_csv_route(payload: ImportLogsCsvRequest, request: Request) -> Im
                     trusted_depth_reference=payload.trusted_depth_reference,
                 )
                 session.flush()
-                command = ImportWell.capture(session, manager.project_path, well.id)
                 well_id = well.id
+                if payload.curve_types:
+                    for curve_row in session.scalars(select(CurveMetadata).where(CurveMetadata.well_id == well_id)):
+                        ct = payload.curve_types.get(curve_row.mnemonic)
+                        if ct in ('continuous', 'discrete'):
+                            curve_row.curve_type = ct
+                command = ImportWell.capture(session, manager.project_path, well.id)
                 well_name = well.name
                 curve_count = len(list(session.scalars(select(CurveMetadata).where(CurveMetadata.well_id == well_id))))
                 session.commit()

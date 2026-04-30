@@ -13,6 +13,7 @@ interface TabularPreviewPaneProps {
   preview: TabularPreviewResponse | null
   settings: TabularParserSettings
   onSettingsChange: (patch: Partial<TabularParserSettings>) => void
+  depthColumn?: string | null
 }
 
 export function TabularPreviewPane({
@@ -21,7 +22,9 @@ export function TabularPreviewPane({
   preview,
   settings,
   onSettingsChange,
+  depthColumn,
 }: TabularPreviewPaneProps) {
+  const depthColIndex = depthColumn != null && preview ? preview.columns.indexOf(depthColumn) : -1
   return (
     <div className="import-preview">
       <div className="import-preview__controls">
@@ -73,7 +76,7 @@ export function TabularPreviewPane({
             <thead>
               <tr>
                 {preview.columns.map((col, i) => (
-                  <th key={i}>{col || <em>empty</em>}</th>
+                  <th key={i} className={i === depthColIndex ? 'import-preview__col--depth' : undefined}>{col || <em>empty</em>}</th>
                 ))}
               </tr>
             </thead>
@@ -81,7 +84,7 @@ export function TabularPreviewPane({
               {preview.rows.map((row, ri) => (
                 <tr key={ri}>
                   {preview.columns.map((_, ci) => (
-                    <td key={ci}>{row[ci] ?? ''}</td>
+                    <td key={ci} className={ci === depthColIndex ? 'import-preview__col--depth' : undefined}>{row[ci] ?? ''}</td>
                   ))}
                 </tr>
               ))}

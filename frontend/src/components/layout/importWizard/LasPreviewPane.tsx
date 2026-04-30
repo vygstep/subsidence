@@ -4,9 +4,13 @@ interface LasPreviewPaneProps {
   isLoading: boolean
   error: string | null
   preview: LasPreviewResponse | null
+  curveTypes?: Record<string, 'continuous' | 'discrete'>
+  onCurveTypeChange?: (mnemonic: string, type: 'continuous' | 'discrete') => void
 }
 
-export function LasPreviewPane({ isLoading, error, preview }: LasPreviewPaneProps) {
+export function LasPreviewPane({ isLoading, error, preview, curveTypes, onCurveTypeChange }: LasPreviewPaneProps) {
+  const showTypeColumn = curveTypes !== undefined && onCurveTypeChange !== undefined
+
   return (
     <div className="import-preview">
       {isLoading && <p className="import-preview__status">Reading LAS file…</p>}
@@ -63,14 +67,30 @@ export function LasPreviewPane({ isLoading, error, preview }: LasPreviewPaneProp
                     <th>Mnemonic</th>
                     <th>Unit</th>
                     <th>Description</th>
+                    {showTypeColumn && <th>Type</th>}
                   </tr>
                 </thead>
                 <tbody>
-                  {preview.curves.map((curve) => (
+                  {preview.curves.map((curve, idx) => (
                     <tr key={curve.mnemonic}>
                       <td>{curve.mnemonic}</td>
                       <td>{curve.unit || '—'}</td>
                       <td>{curve.description ?? ''}</td>
+                      {showTypeColumn && (
+                        <td>
+                          {idx === 0 ? (
+                            <span className="import-preview__depth-label">depth</span>
+                          ) : (
+                            <select
+                              value={curveTypes![curve.mnemonic] ?? 'continuous'}
+                              onChange={(e) => onCurveTypeChange!(curve.mnemonic, e.target.value as 'continuous' | 'discrete')}
+                            >
+                              <option value="continuous">continuous</option>
+                              <option value="discrete">discrete</option>
+                            </select>
+                          )}
+                        </td>
+                      )}
                     </tr>
                   ))}
                 </tbody>

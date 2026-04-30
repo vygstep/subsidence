@@ -35,9 +35,6 @@ export function ImportWizardShell({
           <p className="project-dialog__eyebrow">{preset.eyebrow}</p>
           <h2 id={titleId} className="project-dialog__title">{preset.title}</h2>
         </div>
-        <button type="button" className="project-dialog__link" onClick={onClose}>
-          Close
-        </button>
       </header>
 
       <form className="project-dialog__body" onSubmit={onSubmit}>
