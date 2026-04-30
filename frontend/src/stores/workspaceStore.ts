@@ -20,6 +20,7 @@ export type SelectedObject =
   | { type: 'zone-sets-root' }
   | { type: 'zone-set'; zoneSetId: number; wellId: string }
   | { type: 'zone'; wellId: string; zoneId: number; zoneSetId?: number }
+  | { type: 'strat-charts-root' }
   | { type: 'strat-chart'; chartId: number }
   | { type: 'compaction-presets-root' }
   | { type: 'compaction-preset'; presetId: number }

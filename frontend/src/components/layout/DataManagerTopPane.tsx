@@ -172,7 +172,7 @@ export function DataManagerTopPane({
           className={`sidebar-tab ${activeSidebarTab === 'strat-charts' ? 'sidebar-tab--active' : ''}`}
           onClick={onSelectStratChartsTab}
         >
-          StratCharts
+          Charts
         </button>
         <button
           type="button"

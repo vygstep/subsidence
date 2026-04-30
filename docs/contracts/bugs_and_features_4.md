@@ -78,7 +78,7 @@ line is supposed to stop at the right edge of the tracks, not overflow.
 
 ---
 
-## BF4-003: StratCharts tab restructure (todo)
+## BF4-003: StratCharts tab restructure (done)
 
 ### BF4-003-A: Rename tab label globally
 
@@ -129,6 +129,24 @@ Implementation:
 - `frontend/src/components/layout/DataManagerTopPane.tsx` (tab label)
 - `frontend/src/components/layout/StratChartTab.tsx` (all three sub-items)
 - `frontend/src/components/layout/dataManager/DataManagerContext.tsx` (new expand keys)
+
+**Implemented**:
+- Renamed the visible sidebar tab label from `StratCharts` to `Charts`; internal tab key remains
+  `strat-charts`.
+- `StratChartTab` now renders `STRAT CHARTS` and `SEA LEVEL CURVES` as root nodes with expand
+  toggles.
+- Both roots are expanded by default and use `DataManagerContext` node IDs
+  `strat-charts-root` and `sea-level-curves-root`.
+- Added `strat-charts-root` to `SelectedObject` so clicking the root row can select it.
+- Chart and curve row behavior is preserved: radio activation, selection, built-in badges, and
+  delete buttons remain on the rows.
+
+**Manual check**:
+- Confirm the top sidebar tab now reads `Charts`, while opening it still shows strat charts and
+  sea-level curves.
+- Collapse/expand `STRAT CHARTS` and `SEA LEVEL CURVES`; children should hide/show independently.
+- Select a chart, activate a chart radio, select a sea-level curve, and verify delete buttons/badges
+  still behave as before.
 
 ---
 
