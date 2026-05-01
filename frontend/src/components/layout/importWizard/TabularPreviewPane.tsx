@@ -18,6 +18,8 @@ interface TabularPreviewPaneProps {
   fields?: FieldDefinition[]
   mapping?: ColumnMapping
   onMappingChange?: (fieldId: string, colName: string | null) => void
+  curveTypes?: Record<string, 'continuous' | 'discrete'>
+  onCurveTypeChange?: (col: string, type: 'continuous' | 'discrete') => void
 }
 
 export function TabularPreviewPane({
@@ -30,9 +32,12 @@ export function TabularPreviewPane({
   fields,
   mapping,
   onMappingChange,
+  curveTypes,
+  onCurveTypeChange,
 }: TabularPreviewPaneProps) {
   const depthColIndex = depthColumn != null && preview ? preview.columns.indexOf(depthColumn) : -1
   const showMapping = fields != null && mapping != null && onMappingChange != null && preview != null
+  const showCurveTypes = curveTypes != null && onCurveTypeChange != null && preview != null
   const missingRequired = showMapping ? fields.filter((f) => f.required && !mapping[f.id]) : []
 
   return (
@@ -110,6 +115,26 @@ export function TabularPreviewPane({
                             </option>
                           ))}
                         </select>
+                      </th>
+                    )
+                  })}
+                </tr>
+              )}
+              {showCurveTypes && (
+                <tr className="import-preview__mapping-row">
+                  {preview.columns.map((col, colIdx) => {
+                    const isDepth = colIdx === depthColIndex
+                    return (
+                      <th key={colIdx} className={isDepth ? 'import-preview__col--depth' : undefined}>
+                        {isDepth ? null : (
+                          <select
+                            value={curveTypes[col] ?? 'continuous'}
+                            onChange={(e) => onCurveTypeChange(col, e.target.value as 'continuous' | 'discrete')}
+                          >
+                            <option value="continuous">continuous</option>
+                            <option value="discrete">discrete</option>
+                          </select>
+                        )}
                       </th>
                     )
                   })}

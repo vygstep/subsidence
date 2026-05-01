@@ -367,6 +367,8 @@ export function ImportLasDialog({ wells, activeWellId, onClose, onSuccess }: Imp
               settings={parserSettings}
               onSettingsChange={updateParserSettings}
               depthColumn={mapping['depth'] ?? null}
+              curveTypes={curveTypes}
+              onCurveTypeChange={(col, type) => setCurveTypes((prev) => ({ ...prev, [col]: type }))}
             />
             {!previewLoading && tabularPreview && (
               <div className="import-wizard__options">
@@ -399,25 +401,6 @@ export function ImportLasDialog({ wells, activeWellId, onClose, onSuccess }: Imp
                     <option value="km">km — kilometres</option>
                   </select>
                 </label>
-                {Object.keys(curveTypes).length > 0 && (
-                  <div className="project-dialog__field">
-                    <span>Curve types</span>
-                    <div className="import-wizard__curve-types">
-                      {Object.entries(curveTypes).map(([col, type]) => (
-                        <label key={col} className="import-wizard__curve-type-row">
-                          <span>{col}</span>
-                          <select
-                            value={type}
-                            onChange={(e) => setCurveTypes((prev) => ({ ...prev, [col]: e.target.value as 'continuous' | 'discrete' }))}
-                          >
-                            <option value="continuous">continuous</option>
-                            <option value="discrete">discrete</option>
-                          </select>
-                        </label>
-                      ))}
-                    </div>
-                  </div>
-                )}
               </div>
             )}
             {!previewLoading && tabularPreview && !mapping['depth'] && (
