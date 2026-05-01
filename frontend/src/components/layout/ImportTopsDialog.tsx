@@ -249,20 +249,20 @@ export function ImportTopsDialog({ wells, activeWellId, onClose, onSuccess }: Im
                 onCreateNewWellChange={setCreateNewWell}
                 onWellPolicyChange={setWellPolicy}
               />
-              <label className="project-dialog__field">
+              <label className="project-dialog__field project-dialog__field--inline">
                 <span>Depth reference</span>
                 <select value={depthRef} onChange={(e) => setDepthRef(e.target.value as 'MD' | 'TVD' | 'TVDSS')}>
-                  <option value="MD">MD — measured depth</option>
-                  <option value="TVD">TVD — true vertical depth</option>
-                  <option value="TVDSS">TVDSS — TVD subsea</option>
+                  <option value="MD">MD</option>
+                  <option value="TVD">TVD</option>
+                  <option value="TVDSS">TVDSS</option>
                 </select>
               </label>
-              <label className="project-dialog__field">
-                <span>Depth unit in file</span>
+              <label className="project-dialog__field project-dialog__field--inline">
+                <span>Depth unit</span>
                 <select value={depthUnit} onChange={(e) => setDepthUnit(e.target.value as 'm' | 'ft' | 'km')}>
-                  <option value="m">m — metres</option>
-                  <option value="ft">ft — feet</option>
-                  <option value="km">km — kilometres</option>
+                  <option value="m">m</option>
+                  <option value="ft">ft</option>
+                  <option value="km">km</option>
                 </select>
               </label>
               <div className="project-dialog__field">

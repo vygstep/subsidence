@@ -327,7 +327,7 @@ export function ImportLasDialog({ wells, activeWellId, onClose, onSuccess }: Imp
             />
             {!previewLoading && (lasPreview !== null || previewError !== null) && (
               <div className="import-wizard__options">
-                <label className="project-dialog__field">
+                <label className="project-dialog__field project-dialog__field--inline">
                   <span>Target well</span>
                   <select value={wellSelection} onChange={(e) => setWellSelection(e.target.value)}>
                     {wells.map((w) => (
@@ -339,20 +339,20 @@ export function ImportLasDialog({ wells, activeWellId, onClose, onSuccess }: Imp
                     <option value={CREATE_NEW}>Create new well</option>
                   </select>
                 </label>
-                <label className="project-dialog__field">
+                <label className="project-dialog__field project-dialog__field--inline">
                   <span>Depth reference</span>
                   <select value={trustedDepthRef} onChange={(e) => setTrustedDepthRef(e.target.value as 'MD' | 'TVD' | 'TVDSS')}>
-                    <option value="MD">MD — measured depth</option>
-                    <option value="TVD">TVD — true vertical depth</option>
-                    <option value="TVDSS">TVDSS — TVD subsea</option>
+                    <option value="MD">MD</option>
+                    <option value="TVD">TVD</option>
+                    <option value="TVDSS">TVDSS</option>
                   </select>
                 </label>
-                <label className="project-dialog__field">
+                <label className="project-dialog__field project-dialog__field--inline">
                   <span>Depth unit</span>
                   <select value={depthUnit} onChange={(e) => setDepthUnit(e.target.value as 'm' | 'ft' | 'km')}>
-                    <option value="m">m — metres</option>
-                    <option value="ft">ft — feet</option>
-                    <option value="km">km — kilometres</option>
+                    <option value="m">m</option>
+                    <option value="ft">ft</option>
+                    <option value="km">km</option>
                   </select>
                 </label>
               </div>
@@ -372,7 +372,7 @@ export function ImportLasDialog({ wells, activeWellId, onClose, onSuccess }: Imp
             />
             {!previewLoading && tabularPreview && (
               <div className="import-wizard__options">
-                <label className="project-dialog__field">
+                <label className="project-dialog__field project-dialog__field--inline">
                   <span>Target well</span>
                   <select value={wellSelection} onChange={(e) => setWellSelection(e.target.value)}>
                     {wells.map((w) => (
@@ -381,24 +381,20 @@ export function ImportLasDialog({ wells, activeWellId, onClose, onSuccess }: Imp
                     <option value={CREATE_NEW}>Create new well</option>
                   </select>
                 </label>
-                <div className="project-dialog__field">
-                  <span>Depth column</span>
-                  <span>{mapping['depth'] ?? <em>not detected</em>}</span>
-                </div>
-                <label className="project-dialog__field">
+                <label className="project-dialog__field project-dialog__field--inline">
                   <span>Depth reference</span>
                   <select value={trustedDepthRef} onChange={(e) => setTrustedDepthRef(e.target.value as 'MD' | 'TVD' | 'TVDSS')}>
-                    <option value="MD">MD — measured depth</option>
-                    <option value="TVD">TVD — true vertical depth</option>
-                    <option value="TVDSS">TVDSS — TVD subsea</option>
+                    <option value="MD">MD</option>
+                    <option value="TVD">TVD</option>
+                    <option value="TVDSS">TVDSS</option>
                   </select>
                 </label>
-                <label className="project-dialog__field">
-                  <span>Depth unit in file</span>
+                <label className="project-dialog__field project-dialog__field--inline">
+                  <span>Depth unit</span>
                   <select value={depthUnit} onChange={(e) => setDepthUnit(e.target.value as 'm' | 'ft' | 'km')}>
-                    <option value="m">m — metres</option>
-                    <option value="ft">ft — feet</option>
-                    <option value="km">km — kilometres</option>
+                    <option value="m">m</option>
+                    <option value="ft">ft</option>
+                    <option value="km">km</option>
                   </select>
                 </label>
               </div>

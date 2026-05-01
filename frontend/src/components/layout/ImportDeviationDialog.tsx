@@ -192,12 +192,12 @@ export function ImportDeviationDialog({ wells, activeWellId, onClose, onSuccess 
                 onWellIdChange={setWellId}
                 onCreateNewWellChange={setCreateNewWell}
               />
-              <label className="project-dialog__field">
-                <span>Depth unit in file</span>
+              <label className="project-dialog__field project-dialog__field--inline">
+                <span>Depth unit</span>
                 <select value={depthUnit} onChange={(e) => setDepthUnit(e.target.value as 'm' | 'ft' | 'km')}>
-                  <option value="m">m — metres</option>
-                  <option value="ft">ft — feet</option>
-                  <option value="km">km — kilometres</option>
+                  <option value="m">m</option>
+                  <option value="ft">ft</option>
+                  <option value="km">km</option>
                 </select>
               </label>
             </div>

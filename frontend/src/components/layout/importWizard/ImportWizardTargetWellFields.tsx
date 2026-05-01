@@ -63,7 +63,7 @@ export function ImportWizardTargetWellFields({
           </div>
         </div>
       ) : (
-        <label className="project-dialog__field">
+        <label className="project-dialog__field project-dialog__field--inline">
           <span>Target well</span>
           <select value={wellId} onChange={(event) => onWellIdChange(event.target.value)}>
             <option value="">{emptyLabel}</option>
