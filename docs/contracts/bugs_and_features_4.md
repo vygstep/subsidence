@@ -1916,7 +1916,7 @@ lockstep with the header. Check at both 1× and 2× devicePixelRatio (browser zo
 
 ---
 
-## BF4-019: Delete log curve / delete all logs from Data Manager (todo)
+## BF4-019: Delete log curve / delete all logs from Data Manager (done)
 
 **Problem**: BF4-017 added delete buttons for wells and tops, but log curves still cannot be
 deleted from the Data Manager tree. The Logs group and individual curve rows only support visibility
@@ -2000,9 +2000,22 @@ State cleanup after delete:
 - Delete a lithology curve used for auto zones; manual zone lithology stays, auto aggregation no
   longer uses the deleted curve.
 
+### Implemented
+
+- `DELETE /api/wells/{well_id}/curves/{mnemonic}` — removes the `CurveMetadata` row; deletes the
+  Parquet file only if no other `CurveMetadata` rows share the same `data_uri` (checked via
+  `session.flush()` + existence query).
+- `DELETE /api/wells/{well_id}/curves` — removes all `CurveMetadata` rows for the well with the
+  same shared-Parquet safety check.
+- Frontend: `×` button on the `Logs` group row (shown when curves exist) and on each individual
+  curve row; wired through `dataManagerActions.ts` → `useDataManagerController` →
+  `DataManagerTopPane` → `WellDataPanel`.
+- State cleanup: removes deleted mnemonics from `tracks[].curves` and `hiddenCurveMnemonics` in
+  `workspaceStore`; clears `selectedObject` if it pointed to the deleted curve.
+
 ---
 
-## BF4-020: Delete deviation survey from Data Manager (todo)
+## BF4-020: Delete deviation survey from Data Manager (done)
 
 **Problem**: Deviation/inclinometry can be imported and shown under the `DEV` group, but there is no
 explicit delete action. If a deviation survey is removed, the well must behave as vertical again:
@@ -2064,6 +2077,16 @@ action.
 - Delete DEV from Data Manager; DEV disappears and the well behaves as vertical.
 - Existing tops remain; their TVD/TVDSS values are reset according to the vertical convention.
 - Save/reopen project; deleted deviation does not return.
+
+### Implemented
+
+- `DELETE /api/wells/{well_id}/deviation` — deletes `DeviationSurveyModel` row and its payload
+  file; resets all `FormationTopModel` rows for the well to vertical: `depth_tvd = depth_md`,
+  `depth_tvdss = depth_md - kb_elev`; idempotent (returns `204` when no survey exists).
+- Frontend: `×` button on the `DEV` group row, shown only when `item.deviation` is set; wired
+  through the same handler chain as BF4-019.
+- State cleanup: sets `deviationVisible = false` in `workspaceStore` for that well; refreshes
+  inventory and well detail.
 
 ---
 
@@ -2224,8 +2247,8 @@ name should be displayed.
 | 17 | BF4-010 | M | New side toolbar component |
 | 18 | BF4-007-B | M | Sea level override per top (backend + frontend) |
 | 19 | BF4-011 | M | API audit (research task) |
-| 20 | BF4-019 | M | Delete log curves from Data Manager |
-| 21 | BF4-020 | S/M | Delete deviation survey from Data Manager |
+| 20 | BF4-019 | M | Delete log curves from Data Manager | done |
+| 21 | BF4-020 | S/M | Delete deviation survey from Data Manager | done |
 | 22 | BF4-021 | S/M | Rebuild zones after formation top delete |
 | 23 | BF4-022 | XS | Restore shared Data Manager style primitives |
 | 24 | BF4-023 | S | Separate sea-level compute selector from overlay checkboxes |
