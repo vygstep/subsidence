@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 from enum import Enum
-from typing import Iterable, Mapping, Sequence
+from typing import Iterable, Mapping
 from uuid import uuid4
 
 
@@ -233,34 +233,6 @@ class StratTopPick:
             raise ValueError("well_name is required")
         if not self.top_name.strip():
             raise ValueError("top_name is required")
-
-
-@dataclass(frozen=True)
-class UnconformityPick:
-    well_name: str
-    unc_name: str
-    md: float
-    start_age_ma: float
-    base_age_ma: float
-    kind: TopKind = TopKind.UNCONFORMITY
-
-    def validate(self) -> None:
-        if not self.well_name.strip():
-            raise ValueError("well_name is required")
-        if not self.unc_name.strip():
-            raise ValueError("unc_name is required")
-        if self.base_age_ma < self.start_age_ma:
-            raise ValueError("base_age_ma must be >= start_age_ma")
-
-
-def validate_tops(
-    strat_picks: Sequence[StratTopPick],
-    unconformities: Sequence[UnconformityPick],
-) -> None:
-    for pick in strat_picks:
-        pick.validate()
-    for unconformity in unconformities:
-        unconformity.validate()
 
 
 # ---------------------------------------------------------------------------
