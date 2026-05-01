@@ -2281,6 +2281,7 @@ name should be displayed.
 | 26 | BF4-025 | M/L | Durable curve style settings + dictionary mnemonic assignment |
 | 27 | BF4-005 | L | Lithology discrete/fraction (multi-step) |
 | 28 | BF4-026 | S | Simplify curve_type taxonomy: remove lithology_discrete/fraction types |
+| 29 | BF4-029 | M/L | Edit tops redesign — click-to-place, DM context menu add, cursor tooltip |
 
 ---
 
@@ -2909,3 +2910,89 @@ Resolve the open questions above before starting implementation.
 - `python -m pytest app/tests` (`81 passed`)
 - `npm run build`
 - `npx vitest run` (`48 passed`)
+
+---
+
+## BF4-029: Edit tops redesign — click-to-place, DM context menu add, cursor tooltip (todo)
+
+**Background**: The previous BF4-010 implementation added Add top / Set type / Set age / Link top
+buttons to the side toolbar, but this was wrong. All per-top attribute editing (type, age,
+strat link) already lives in the Settings panel when a top is selected. The "Add top" button's
+direct-add-at-cursor behaviour bypasses the stratigraphy structure. This contract replaces that
+approach with a structure-aware workflow.
+
+### What was removed (done as part of this contract)
+
+- Removed from `WellViewerToolbar`: Add top, Link top, Set age, Set type.
+- `WellViewerToolbar` now contains only view controls (Overview, Tooltip, Edit tops, Fit well,
+  Fit data) and zoom presets (1:200, 1:500, 1:1000).
+
+### New Add top workflow
+
+Tops are created from the Data Manager tree context menu, not from a toolbar button.
+
+**ПКМ on a marker row in the TopSet tree:**
+- "Add top above" — creates a new empty pick (depth_md = null) immediately above the
+  selected marker in sort order; new marker gets an auto-name.
+- "Add top below" — same, immediately below.
+
+**ПКМ on a zone row in the TopSet tree:**
+- "Add top inside" — creates a new empty pick (depth_md = null) that splits the zone;
+  the zone is replaced by two new zones separated by the new marker.
+
+After creation the new pick is automatically selected (becomes the active object in the
+workspace). It has null depth and will not render as a positioned line until depth is assigned.
+
+### Assigning depth to an empty pick via Edit tops mode
+
+When Edit tops mode is active (`interactionMode === 'edit-tops'`):
+
+1. **Click on empty track space** — if there is a currently selected empty pick (depth_md = null),
+   that click assigns depth_md to it at the clicked depth. If no empty pick is selected, a click
+   creates a new pick in the active TopSet at that depth (auto-name "Top N").
+
+2. **Hover over an existing pick line** — cursor becomes ↕ (ns-resize), the pick becomes the
+   active pick. Drag moves it.
+
+3. **Stratigraphic validation on placement**: if the clicked depth would place the new or moved
+   pick outside its valid interval (e.g., below the lower bounding marker of its zone, or above
+   the upper bounding marker), placement is rejected with an inline error toast. Picks without a
+   zone constraint (outermost markers) are not validated against other TopSet markers.
+
+4. **Cursor tooltip**: while Edit tops is active and there is an active (selected) pick, a
+   floating label follows the horizontal depth cursor:
+   - Content: the pick's name.
+   - Style: black text, background = the pick's zone color (or marker color if no zone).
+   - Rendered above the depth cursor line so it is always visible.
+   - Disappears when Edit tops mode is off or no pick is selected.
+
+### Settings panel (no change needed)
+
+Set type, Set age, Link top remain in the Settings panel (TopPickSettings). They are accessible
+by selecting any pick — either via the Data Manager tree or by clicking its line in the track.
+
+### Affected files
+
+- `frontend/src/components/layout/DataManagerPane.tsx` — add ПКМ context menu items for
+  marker and zone rows: "Add top above", "Add top below", "Add top inside"
+- `frontend/src/components/layout/WellDataPanel.tsx` — expose `onContextMenuZone` prop and
+  emit zone context menu events from zone rows
+- `app/src/subsidence/api/top_sets.py` or `formations.py` — new endpoint to create an empty
+  pick in a TopSet: `POST /api/top-sets/{top_set_id}/picks` with `{ well_id, insert_before_horizon_id | insert_after_horizon_id | split_zone_id }`
+- `frontend/src/components/interaction/InteractionOverlay.tsx` — handle click-on-empty-space in
+  edit-tops mode; validate against zone bounds; call add-pick or assign-depth
+- `frontend/src/components/interaction/FormationTopLine.tsx` — render cursor tooltip when edit
+  mode is active and pick is selected
+
+**Complexity**: M/L — new backend endpoint, DM context menu extension, interaction layer changes,
+cursor tooltip rendering.
+
+**Verification**:
+- ПКМ on a marker in the TopSet tree shows "Add top above" / "Add top below"; created pick is
+  selected and has null depth; it does not render a line in the track.
+- ПКМ on a zone in the TopSet tree shows "Add top inside"; zone splits into two; new pick is
+  selected.
+- In Edit tops mode, clicking on the track assigns depth to the selected empty pick; the line
+  appears at the clicked position.
+- Clicking outside the valid zone interval shows an error and does not move the pick.
+- Cursor tooltip appears when Edit tops is active and a pick is selected; it follows the cursor.
