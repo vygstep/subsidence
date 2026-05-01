@@ -15,6 +15,7 @@ Active contract: `docs/contracts/bugs_and_features_4.md`
 | BF4-020 | Delete deviation survey from Data Manager | todo |
 | BF4-021 | Rebuild zones after formation top delete | todo |
 | BF4-025 | Durable per-curve settings and dictionary mnemonic assignment | todo |
+| BF4-027 | Unconformity model redesign — unified picks with hiatus_duration_ma | todo |
 
 ## Implemented contracts
 
