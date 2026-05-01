@@ -111,6 +111,7 @@ def import_las(payload: ImportLasRequest, request: Request) -> ImportLasResponse
                     create_new_well=payload.create_new_well,
                     trusted_depth_reference=payload.trusted_depth_reference,
                 )
+                well.depth_unit = payload.depth_unit
                 session.flush()
                 well_id = well.id
                 if payload.curve_types:
@@ -148,6 +149,7 @@ def import_logs_csv_route(payload: ImportLogsCsvRequest, request: Request) -> Im
                     create_new_well=payload.create_new_well,
                     trusted_depth_reference=payload.trusted_depth_reference,
                 )
+                well.depth_unit = payload.depth_unit
                 session.flush()
                 well_id = well.id
                 if payload.curve_types:
@@ -189,6 +191,7 @@ def import_tops(payload: ImportTopsRequest, request: Request) -> ImportTopsRespo
                     raise HTTPException(status_code=500, detail='Import created no well')
                 well = session.get(WellModel, target_well_id)
                 if well:
+                    well.depth_unit = payload.depth_unit
                     recalculate_picks_tvd(session, manager.project_path, well)
                 formation_count = len(list(session.scalars(select(FormationTopModel).where(FormationTopModel.well_id == target_well_id))))
                 zone_set_id = _resolve_import_top_set(session, payload, target_well_id)
@@ -228,6 +231,7 @@ def import_deviation(payload: ImportDeviationRequest, request: Request) -> Impor
                     column_map=payload.column_map or None,
                     create_new_well=payload.create_new_well,
                 )
+                survey.depth_unit = payload.depth_unit
                 target_well_id = survey.well_id
                 reference = survey.reference
                 mode = survey.mode

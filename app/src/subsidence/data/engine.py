@@ -70,6 +70,9 @@ def migrate_schema(engine: Engine) -> None:
         if 'color_hex' not in well_cols:
             conn.execute(text("ALTER TABLE wells ADD COLUMN color_hex VARCHAR(9)"))
             conn.commit()
+        if 'depth_unit' not in well_cols:
+            conn.execute(text("ALTER TABLE wells ADD COLUMN depth_unit TEXT NOT NULL DEFAULT 'm'"))
+            conn.commit()
         rows = conn.execute(text("SELECT id FROM wells WHERE color_hex IS NULL OR color_hex = '' ORDER BY name, id")).fetchall()
         for index, row in enumerate(rows):
             conn.execute(
@@ -77,6 +80,10 @@ def migrate_schema(engine: Engine) -> None:
                 {'color_hex': default_well_color(str(row[0]), index), 'id': row[0]},
             )
         if rows:
+            conn.commit()
+        deviation_cols = {row[1] for row in conn.execute(text("PRAGMA table_info(deviation_surveys)"))}
+        if 'depth_unit' not in deviation_cols:
+            conn.execute(text("ALTER TABLE deviation_surveys ADD COLUMN depth_unit TEXT NOT NULL DEFAULT 'm'"))
             conn.commit()
         strat_unit_cols = {row[1] for row in conn.execute(text("PRAGMA table_info(strat_units)"))}
         if 'chart_id' not in strat_unit_cols:

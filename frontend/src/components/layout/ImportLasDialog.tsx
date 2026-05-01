@@ -44,6 +44,14 @@ interface ImportLasResponse {
 
 type LogSourceType = 'las' | 'csv'
 
+function normalizeLasDepthUnit(unit: string | null): 'm' | 'ft' | 'km' {
+  if (!unit) return 'm'
+  const u = unit.toLowerCase().trim()
+  if (u === 'ft' || u === 'feet' || u === 'f') return 'ft'
+  if (u === 'km') return 'km'
+  return 'm'
+}
+
 function detectLasDepthRef(mnemonic: string): 'MD' | 'TVD' | 'TVDSS' {
   const m = mnemonic.toUpperCase().trim()
   if (m.startsWith('TVDSS')) return 'TVDSS'
@@ -74,6 +82,7 @@ export function ImportLasDialog({ wells, activeWellId, onClose, onSuccess }: Imp
   const [sourcePath, setSourcePath] = useState(() => getLastImportRoot())
   const [mapping, setMapping] = useState<ColumnMapping>({})
   const [trustedDepthRef, setTrustedDepthRef] = useState<'MD' | 'TVD' | 'TVDSS'>('MD')
+  const [depthUnit, setDepthUnit] = useState<'m' | 'ft' | 'km'>('m')
   const [curveTypes, setCurveTypes] = useState<Record<string, 'continuous' | 'discrete'>>({})
   const [currentStepIndex, setCurrentStepIndex] = useState(0)
   const [error, setError] = useState<string | null>(null)
@@ -102,6 +111,13 @@ export function ImportLasDialog({ wells, activeWellId, onClose, onSuccess }: Imp
       setTrustedDepthRef(detectLasDepthRef(lasPreview.curves[0].mnemonic))
     }
   }, [lasPreview])
+
+  // Auto-detect depth unit from LAS file header
+  useEffect(() => {
+    if (sourceType === 'las' && lasPreview?.depth_unit) {
+      setDepthUnit(normalizeLasDepthUnit(lasPreview.depth_unit))
+    }
+  }, [lasPreview, sourceType])
 
   // Auto-detect CSV depth ref from depth column name
   useEffect(() => {
@@ -198,6 +214,7 @@ export function ImportLasDialog({ wells, activeWellId, onClose, onSuccess }: Imp
                   well_id: resolvedWellId,
                   create_new_well: createNewWell,
                   trusted_depth_reference: trustedDepthRef,
+                  depth_unit: depthUnit,
                   curve_types: curveTypes,
                 }
               : {
@@ -206,6 +223,7 @@ export function ImportLasDialog({ wells, activeWellId, onClose, onSuccess }: Imp
                   depth_column: mapping['depth'] ?? null,
                   create_new_well: createNewWell,
                   trusted_depth_reference: trustedDepthRef,
+                  depth_unit: depthUnit,
                   curve_types: curveTypes,
                 },
           ),
@@ -329,6 +347,14 @@ export function ImportLasDialog({ wells, activeWellId, onClose, onSuccess }: Imp
                     <option value="TVDSS">TVDSS — TVD subsea</option>
                   </select>
                 </label>
+                <label className="project-dialog__field">
+                  <span>Depth unit</span>
+                  <select value={depthUnit} onChange={(e) => setDepthUnit(e.target.value as 'm' | 'ft' | 'km')}>
+                    <option value="m">m — metres</option>
+                    <option value="ft">ft — feet</option>
+                    <option value="km">km — kilometres</option>
+                  </select>
+                </label>
               </div>
             )}
           </>
@@ -363,6 +389,14 @@ export function ImportLasDialog({ wells, activeWellId, onClose, onSuccess }: Imp
                     <option value="MD">MD — measured depth</option>
                     <option value="TVD">TVD — true vertical depth</option>
                     <option value="TVDSS">TVDSS — TVD subsea</option>
+                  </select>
+                </label>
+                <label className="project-dialog__field">
+                  <span>Depth unit in file</span>
+                  <select value={depthUnit} onChange={(e) => setDepthUnit(e.target.value as 'm' | 'ft' | 'km')}>
+                    <option value="m">m — metres</option>
+                    <option value="ft">ft — feet</option>
+                    <option value="km">km — kilometres</option>
                   </select>
                 </label>
                 {Object.keys(curveTypes).length > 0 && (

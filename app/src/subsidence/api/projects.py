@@ -56,6 +56,7 @@ class ImportLasRequest(BaseModel):
     well_id: str | None = None
     create_new_well: bool = False
     trusted_depth_reference: str = 'MD'
+    depth_unit: str = 'm'
     curve_types: dict[str, str] = {}
 
 
@@ -65,6 +66,7 @@ class ImportLogsCsvRequest(BaseModel):
     depth_column: str | None = None
     create_new_well: bool = False
     trusted_depth_reference: str = 'MD'
+    depth_unit: str = 'm'
     curve_types: dict[str, str] = {}
 
 
@@ -72,6 +74,7 @@ class ImportTopsRequest(BaseModel):
     well_id: str | None = None
     csv_path: str
     depth_ref: str = 'MD'
+    depth_unit: str = 'm'
     create_new_well: bool = False
     column_map: dict[str, str] | None = None
     zone_set_id: int | None = None
@@ -82,6 +85,7 @@ class ImportTopsRequest(BaseModel):
 class ImportDeviationRequest(BaseModel):
     well_id: str | None = None
     csv_path: str
+    depth_unit: str = 'm'
     create_new_well: bool = False
     column_map: dict[str, str] | None = None
 

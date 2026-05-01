@@ -7,9 +7,7 @@ import { recordOperation } from '@/utils/diagnostics'
 import {
   ImportWizardShell,
   ImportWizardTargetWellFields,
-  MappingPane,
   TabularPreviewPane,
-  MAPPING_STEP_LABELS,
   buildImportWizardSteps,
   importWizardPresets,
   readImportError,
@@ -23,6 +21,8 @@ import {
 } from './importWizard/mapping'
 import type { ColumnMapping } from './importWizard/mapping'
 import { getLastImportRoot, pickFile, rememberImportPath } from './pathMemory'
+
+const STEP_LABELS = ['File', 'Preview']
 
 interface WellOption {
   well_id: string
@@ -45,6 +45,7 @@ export function ImportDeviationDialog({ wells, activeWellId, onClose, onSuccess 
   const [wellId, setWellId] = useState(activeWellId ?? '')
   const [createNewWell, setCreateNewWell] = useState(false)
   const [csvPath, setCsvPath] = useState(() => getLastImportRoot())
+  const [depthUnit, setDepthUnit] = useState<'m' | 'ft' | 'km'>('m')
   const [mapping, setMapping] = useState<ColumnMapping>({})
   const [currentStepIndex, setCurrentStepIndex] = useState(0)
   const [error, setError] = useState<string | null>(null)
@@ -66,11 +67,10 @@ export function ImportDeviationDialog({ wells, activeWellId, onClose, onSuccess 
     }
   }, [tabularPreview])
 
-  const previewReady = !previewLoading && tabularPreview !== null
   const mappingErrors = validateDeviationMapping(mapping)
   const mappingOk = isMappingValid(mappingErrors)
 
-  const steps = buildImportWizardSteps(currentStepIndex, sourceIsValid, MAPPING_STEP_LABELS)
+  const steps = buildImportWizardSteps(currentStepIndex, sourceIsValid, STEP_LABELS)
   const validationMessages = currentStepIndex === 0 && !sourceIsValid ? ['CSV path is required.'] : []
 
   const handleSubmit = async (event: FormEvent<HTMLFormElement>) => {
@@ -96,6 +96,7 @@ export function ImportDeviationDialog({ wells, activeWellId, onClose, onSuccess 
           body: JSON.stringify({
             well_id: wellId || null,
             csv_path: nextPath,
+            depth_unit: depthUnit,
             create_new_well: !wellId && createNewWell,
             column_map: Object.keys(columnMap).length > 0 ? columnMap : null,
           }),
@@ -111,7 +112,7 @@ export function ImportDeviationDialog({ wells, activeWellId, onClose, onSuccess 
       }, {
         projectPath,
         activeWellId: wellId || activeWellId || null,
-        details: { inputPath: nextPath, createNewWell },
+        details: { inputPath: nextPath, depthUnit, createNewWell },
       })
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : 'Failed to import deviation')
@@ -130,13 +131,6 @@ export function ImportDeviationDialog({ wells, activeWellId, onClose, onSuccess 
     }
   }
 
-  const canAdvanceFromStep = (step: number): boolean => {
-    if (step === 0) return sourceIsValid
-    if (step === 1) return !previewLoading && (previewReady || previewError !== null)
-    if (step === 2) return mappingOk
-    return true
-  }
-
   return (
     <ImportWizardShell
       preset={preset}
@@ -145,7 +139,7 @@ export function ImportDeviationDialog({ wells, activeWellId, onClose, onSuccess 
       currentStepIndex={currentStepIndex}
       error={error}
       isSubmitting={isSubmitting}
-      canAdvance={canAdvanceFromStep(currentStepIndex)}
+      canAdvance={sourceIsValid}
       canSubmit={sourceIsValid && mappingOk}
       validationMessages={validationMessages}
       onClose={onClose}
@@ -176,41 +170,39 @@ export function ImportDeviationDialog({ wells, activeWellId, onClose, onSuccess 
       ) : null}
 
       {currentStepIndex === 1 ? (
-        <TabularPreviewPane
-          isLoading={previewLoading}
-          error={previewError}
-          preview={tabularPreview}
-          settings={parserSettings}
-          onSettingsChange={updateParserSettings}
-        />
-      ) : null}
+        <>
+          <TabularPreviewPane
+            isLoading={previewLoading}
+            error={previewError}
+            preview={tabularPreview}
+            settings={parserSettings}
+            onSettingsChange={updateParserSettings}
+            fields={DEVIATION_FIELDS}
+            mapping={mapping}
+            onMappingChange={(fieldId, col) => setMapping((prev) => ({ ...prev, [fieldId]: col }))}
+          />
 
-      {currentStepIndex === 2 ? (
-        <MappingPane
-          columns={tabularPreview?.columns ?? []}
-          fields={DEVIATION_FIELDS}
-          mapping={mapping}
-          validationErrors={mappingErrors}
-          onMappingChange={(fieldId, col) => setMapping((prev) => ({ ...prev, [fieldId]: col }))}
-        />
-      ) : null}
-
-      {currentStepIndex === 3 ? (
-        <ImportWizardTargetWellFields
-          wells={wells}
-          wellId={wellId}
-          createNewWell={createNewWell}
-          emptyLabel="Reuse by file well_name / create from defaults"
-          onWellIdChange={setWellId}
-          onCreateNewWellChange={setCreateNewWell}
-        />
-      ) : null}
-
-      {currentStepIndex === 4 ? (
-        <div className="project-dialog__validation" aria-label="Import summary">
-          <span>Source: {csvPath.trim()}</span>
-          <span>Target: {wellId || 'file well_name / defaults'}</span>
-        </div>
+          {!previewLoading && tabularPreview && (
+            <div className="import-wizard__options">
+              <ImportWizardTargetWellFields
+                wells={wells}
+                wellId={wellId}
+                createNewWell={createNewWell}
+                emptyLabel="Reuse by file well_name / create from defaults"
+                onWellIdChange={setWellId}
+                onCreateNewWellChange={setCreateNewWell}
+              />
+              <label className="project-dialog__field">
+                <span>Depth unit in file</span>
+                <select value={depthUnit} onChange={(e) => setDepthUnit(e.target.value as 'm' | 'ft' | 'km')}>
+                  <option value="m">m — metres</option>
+                  <option value="ft">ft — feet</option>
+                  <option value="km">km — kilometres</option>
+                </select>
+              </label>
+            </div>
+          )}
+        </>
       ) : null}
     </ImportWizardShell>
   )

@@ -1,7 +1,6 @@
 import type { ImportWizardStep } from './types'
 
-export const DEFAULT_STEP_LABELS = ['File', 'Preview', 'Options', 'Import']
-export const MAPPING_STEP_LABELS = ['File', 'Preview', 'Mapping', 'Options', 'Import']
+const DEFAULT_STEP_LABELS = ['File', 'Preview']
 
 export function buildImportWizardSteps(
   currentStepIndex: number,

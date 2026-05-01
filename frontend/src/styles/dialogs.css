@@ -536,3 +536,15 @@
   white-space: nowrap;
 }
 
+/* ── Inline column mapping row ──────────────────────────────────────────── */
+
+.import-preview__mapping-row th {
+  padding: 2px 4px;
+  vertical-align: bottom;
+  background: #eaf2fb;
+}
+
+.import-preview__mapping-row select {
+  width: 100%;
+  font-size: 11px;
+}

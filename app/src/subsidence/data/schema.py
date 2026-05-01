@@ -85,6 +85,8 @@ class WellModel(Base, AuditMixin):
     color_hex: Mapped[str | None] = mapped_column(String(9), nullable=True)
     source_las_path: Mapped[str | None] = mapped_column(Text, nullable=True)
     extra: Mapped[str | None] = mapped_column(Text, nullable=True)  # JSON blob
+    depth_unit: Mapped[str] = mapped_column(String(4), default='m', server_default='m')
+    # unit of depth values stored for this well: 'm' | 'ft' | 'km'
 
     curve_metadata: Mapped[list[CurveMetadata]] = relationship(
         back_populates="well", cascade="all, delete-orphan"
@@ -166,6 +168,8 @@ class DeviationSurveyModel(Base, AuditMixin):
     mode: Mapped[str] = mapped_column(String(12))        # INCL_AZIM | X_Y | DX_DY
     data_uri: Mapped[str] = mapped_column(Text)
     source_hash: Mapped[str] = mapped_column(String(64))
+    depth_unit: Mapped[str] = mapped_column(String(4), default='m', server_default='m')
+    # unit of depth values stored in the survey: 'm' | 'ft' | 'km'
 
     well: Mapped[WellModel] = relationship(back_populates="deviation_survey")
 
