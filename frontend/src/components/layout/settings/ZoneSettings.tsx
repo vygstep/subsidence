@@ -1,3 +1,5 @@
+import { useState } from 'react'
+
 import { useWellDataStore } from '@/stores'
 import { useWorkspaceStore } from '@/stores/workspaceStore'
 
@@ -9,6 +11,7 @@ interface ZoneSettingsProps {
 }
 
 export function ZoneSettings({ wellId, zoneSetId, onSelectZone, selectedZoneId }: ZoneSettingsProps) {
+  const [objectMode, setObjectMode] = useState<'markers' | 'zones'>('zones')
   const zones = useWellDataStore((state) => state.zones)
   const well = useWellDataStore((state) => state.well)
   const wellInventories = useWellDataStore((state) => state.wellInventories)
@@ -19,6 +22,10 @@ export function ZoneSettings({ wellId, zoneSetId, onSelectZone, selectedZoneId }
   const linkedWells = zoneSetId === undefined
     ? []
     : wellInventories.filter((item) => item.active_top_set_id === zoneSetId)
+  const selectedInventory = wellInventories.find((item) => item.well_id === wellId) ?? null
+  const markerRows = zoneSetId === undefined
+    ? []
+    : (selectedInventory?.formations ?? []).filter((formation) => formation.horizon_id !== null)
   const activeCurveId = wellInventories.find((item) => item.well_id === wellId)?.active_sea_level_curve_id ?? null
   const activeCurveName = seaLevelCurves.find((curve) => curve.id === activeCurveId)?.name ?? null
 
@@ -47,7 +54,7 @@ export function ZoneSettings({ wellId, zoneSetId, onSelectZone, selectedZoneId }
           <span>Eustatic curve</span>
           <span>{activeCurveName ?? 'None'}</span>
         </div>
-        <p className="sidebar-panel__empty">Zone data not loaded yet.</p>
+        <p className="sidebar-panel__empty">TopSet data not loaded yet.</p>
       </div>
     )
   }
@@ -56,7 +63,7 @@ export function ZoneSettings({ wellId, zoneSetId, onSelectZone, selectedZoneId }
     <div className="template-panel">
       <div className="template-panel__group">
         <div className="template-panel__label">Object</div>
-        <div className="template-panel__value">{zoneSetId === undefined ? 'ZONES' : 'ZoneSet'}</div>
+        <div className="template-panel__value">{zoneSetId === undefined ? 'STRATIGRAPHY' : 'TopSet'}</div>
       </div>
       {zoneSetId !== undefined && linkedWells.length > 0 ? (
         <div className="sf-row">
@@ -74,38 +81,68 @@ export function ZoneSettings({ wellId, zoneSetId, onSelectZone, selectedZoneId }
         <span>Eustatic curve</span>
         <span>{activeCurveName ?? 'None'}</span>
       </div>
-      <div className="tree-leaf"><span>Total zones</span><span>{zones.length}</span></div>
-
-      {zones.length === 0 ? (
-        <p className="sidebar-panel__empty">No zones — assign a TopSet with ≥2 horizons to this well.</p>
-      ) : (
-        <div className="zone-settings__list">
-          {zones.map((zone) => {
-            const missingPick = zone.thickness_md === null
-            const thickness = missingPick ? 'missing pick' : `${zone.thickness_md!.toFixed(1)} m`
-            const ageSpan = zone.age_span_ma !== null ? `${zone.age_span_ma.toFixed(1)} Ma` : ''
-            const isSelected = selectedZoneId === zone.zone_id
-            return (
-              <button
-                key={zone.zone_id}
-                type="button"
-                className={`zone-settings__row${isSelected ? ' zone-settings__row--selected' : ''}`}
-                onClick={() => onSelectZone(zone.zone_id)}
-              >
-                <span className="zone-settings__interval">
-                  {zone.upper_horizon.name} → {zone.lower_horizon.name}
-                </span>
-                <span className={`zone-settings__meta${missingPick ? ' zone-settings__meta--missing' : ''}`}>
-                  {thickness}
-                  {!missingPick && ageSpan ? ` · ${ageSpan}` : ''}
-                </span>
-                {zone.lithology_fractions ? (
-                  <LithologyBar fractionsJson={zone.lithology_fractions} />
-                ) : null}
-              </button>
-            )
-          })}
+      {zoneSetId !== undefined ? (
+        <div className="sf-row">
+          <span>View</span>
+          <select value={objectMode} onChange={(event) => setObjectMode(event.target.value as 'markers' | 'zones')}>
+            <option value="markers">markers</option>
+            <option value="zones">zones</option>
+          </select>
         </div>
+      ) : null}
+
+      {objectMode === 'markers' && zoneSetId !== undefined ? (
+        <>
+          <div className="tree-leaf"><span>Total markers</span><span>{markerRows.length}</span></div>
+          {markerRows.length === 0 ? (
+            <p className="sidebar-panel__empty">No markers loaded for this well.</p>
+          ) : (
+            <div className="zone-settings__list">
+              {markerRows.map((marker) => (
+                <div key={marker.id} className="zone-settings__row">
+                  <span className="zone-settings__interval">{marker.name}</span>
+                  <span className="zone-settings__meta">
+                    {marker.depth_md === null ? 'missing pick' : `${marker.depth_md.toFixed(1)} m`}
+                    {marker.kind === 'unconformity' ? ' - unconformity' : ''}
+                  </span>
+                </div>
+              ))}
+            </div>
+          )}
+        </>
+      ) : zones.length === 0 ? (
+        <p className="sidebar-panel__empty">No zones - assign a TopSet with at least 2 horizons to this well.</p>
+      ) : (
+        <>
+          <div className="tree-leaf"><span>Total zones</span><span>{zones.length}</span></div>
+          <div className="zone-settings__list">
+            {zones.map((zone) => {
+              const missingPick = zone.thickness_md === null
+              const thickness = missingPick ? 'missing pick' : `${zone.thickness_md!.toFixed(1)} m`
+              const ageSpan = zone.age_span_ma !== null ? `${zone.age_span_ma.toFixed(1)} Ma` : ''
+              const isSelected = selectedZoneId === zone.zone_id
+              return (
+                <button
+                  key={zone.zone_id}
+                  type="button"
+                  className={`zone-settings__row${isSelected ? ' zone-settings__row--selected' : ''}`}
+                  onClick={() => onSelectZone(zone.zone_id)}
+                >
+                  <span className="zone-settings__interval">
+                    {zone.upper_horizon.name} -&gt; {zone.lower_horizon.name}
+                  </span>
+                  <span className={`zone-settings__meta${missingPick ? ' zone-settings__meta--missing' : ''}`}>
+                    {thickness}
+                    {!missingPick && ageSpan ? ` - ${ageSpan}` : ''}
+                  </span>
+                  {zone.lithology_fractions ? (
+                    <LithologyBar fractionsJson={zone.lithology_fractions} />
+                  ) : null}
+                </button>
+              )
+            })}
+          </div>
+        </>
       )}
     </div>
   )

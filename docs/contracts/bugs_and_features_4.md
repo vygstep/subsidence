@@ -1035,7 +1035,7 @@ ctx.restore()
 
 ---
 
-## BF4-018: Unified 2-step import — inline column mapping in remaining tabular dialogs (todo)
+## BF4-018: Unified 2-step import — inline column mapping in remaining tabular dialogs (done)
 
 **Context**: BF4-016 collapses the LAS and CSV-logs dialogs to 2 steps. This item applies the same
 pattern to the remaining tabular import dialogs (Tops, Deviation) and introduces a
@@ -2759,8 +2759,11 @@ WELLS
 
 STRATIGRAPHY
   └─ Regional Cretaceous     ← TopSet (project-level)
-       ├─ [marker list]      ← shown as flat list of marker names (horizons)
-       └─ Zones              ← sub-level: intervals between adjacent markers (derived, not stored)
+       ├─ Quaternary         ← marker / horizon
+       │  └─ Quaternary -> Paleogene     ← derived zone below this marker
+       ├─ Paleogene
+       │  └─ Paleogene -> Cretaceous
+       └─ Cretaceous
   └─ Local Jurassic          ← another TopSet
 ```
 
@@ -2822,3 +2825,36 @@ The underlying data is the same; the toggle only changes how it is rendered. Def
 
 **Complexity**: XL — touches schema, import logic, data manager UI, settings, and log viewer.
 Resolve the open questions above before starting implementation.
+
+---
+
+### Implemented so far
+
+- Tops import is idempotent when importing into a TopSet:
+  - existing horizons are matched by normalized marker name;
+  - existing picks are matched by `(well_id, horizon_id)`;
+  - repeated import updates depth/age/color/attributes instead of appending duplicate picks.
+- Importing into an existing TopSet can add missing markers as new `TopSetHorizon` rows.
+- Creating a new TopSet during import now creates the TopSet before merge/upsert, instead of
+  inserting all picks first and extracting horizons afterwards.
+- Data Manager now presents project-level stratigraphy as `STRATIGRAPHY -> TopSet -> marker -> zone below`;
+  marker rows show a stratigraphy color marker, and zone rows use the stratigraphy color as their
+  row background. Unconformity markers keep the existing red emphasis.
+- User-facing labels in the import dialog, Data Manager, model settings, and TopSet settings now
+  use `TopSet` wording instead of `ZoneSet`.
+- TopSet settings include a `markers | zones` view selector. The markers view lists the active
+  well's picks linked to the TopSet; the zones view keeps the existing interval list.
+- Added regression coverage for repeated tops import into the same TopSet.
+
+### Remaining
+
+- Wire the `markers | zones` view mode into the log viewer and burial chart render paths. Current
+  rendering still follows the existing app behaviour: active TopSet drives zone-based subsidence,
+  while the well log top track still renders formation picks.
+
+### Verification
+
+- `python -m compileall app/src/subsidence`
+- `python -m pytest app/tests` (`81 passed`)
+- `npm run build`
+- `npx vitest run` (`48 passed`)

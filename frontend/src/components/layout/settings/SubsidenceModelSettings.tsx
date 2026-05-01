@@ -34,7 +34,7 @@ export function SubsidenceModelSettings({ modelType }: SubsidenceModelSettingsPr
       if (w.active_top_set_id !== null && !byId.has(w.active_top_set_id)) {
         byId.set(w.active_top_set_id, {
           id: w.active_top_set_id,
-          name: w.active_top_set_name ?? `ZoneSet ${w.active_top_set_id}`,
+          name: w.active_top_set_name ?? `TopSet ${w.active_top_set_id}`,
         })
       }
     }
@@ -69,7 +69,7 @@ export function SubsidenceModelSettings({ modelType }: SubsidenceModelSettingsPr
       )}
 
       <div className="sf-row">
-        <span>ZoneSet</span>
+        <span>TopSet</span>
         <select
           value={config.zoneSetId ?? ''}
           onChange={(e) => updateConfig(modelType, { zoneSetId: e.target.value === '' ? null : Number(e.target.value) })}

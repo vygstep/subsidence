@@ -52,7 +52,17 @@ interface ZoneSetTreeItem {
   id: number
   name: string
   wells: Array<{ well_id: string; well_name: string }>
+  markers: ZoneSetMarkerTreeItem[]
   zones: FormationZone[]
+}
+
+interface ZoneSetMarkerTreeItem {
+  horizon_id: number | null
+  name: string
+  well_count: number
+  color: string
+  is_unconformity: boolean
+  zone_below: FormationZone | null
 }
 
 const MODEL_NODES: Array<{ type: SubsidenceModelType; label: string; available: boolean }> = [
@@ -72,6 +82,10 @@ function formatNumber(value: number | null | undefined): string {
 
 function topBackgroundColor(formation: FormationInventoryItem): string {
   return formation.active_strat_color ?? '#9ca3af'
+}
+
+function markerTreeKey(horizonId: number | null, name: string): string {
+  return horizonId !== null ? `id:${horizonId}` : `name:${name.toLowerCase()}`
 }
 
 interface TreeToggleButtonProps {
@@ -270,21 +284,41 @@ export function WellDataPanel({
   }
 
   const zoneSets = useMemo<ZoneSetTreeItem[]>(() => {
-    const byId = new Map<number, ZoneSetTreeItem & { zoneIds: Set<number>; wellIds: Set<string> }>()
+    const byId = new Map<number, ZoneSetTreeItem & { zoneIds: Set<number>; wellIds: Set<string>; markerCounts: Map<string, { horizon_id: number | null; name: string; color: string; is_unconformity: boolean; wellIds: Set<string> }> }>()
     for (const item of wells) {
       if (item.active_top_set_id === null) continue
       const existing = byId.get(item.active_top_set_id)
       const entry = existing ?? {
         id: item.active_top_set_id,
-        name: item.active_top_set_name ?? `ZoneSet ${item.active_top_set_id}`,
+        name: item.active_top_set_name ?? `TopSet ${item.active_top_set_id}`,
         wells: [],
+        markers: [],
         zones: [],
         zoneIds: new Set<number>(),
         wellIds: new Set<string>(),
+        markerCounts: new Map<string, { horizon_id: number | null; name: string; color: string; is_unconformity: boolean; wellIds: Set<string> }>(),
       }
       if (!entry.wellIds.has(item.well_id)) {
         entry.wellIds.add(item.well_id)
         entry.wells.push({ well_id: item.well_id, well_name: item.well_name })
+      }
+      for (const formation of item.formations) {
+        const key = formation.horizon_id !== null ? `id:${formation.horizon_id}` : `name:${formation.name.toLowerCase()}`
+        const marker = entry.markerCounts.get(key) ?? {
+          horizon_id: formation.horizon_id,
+          name: formation.name,
+          color: topBackgroundColor(formation),
+          is_unconformity: false,
+          wellIds: new Set<string>(),
+        }
+        marker.color = formation.kind === 'unconformity'
+          ? 'var(--dm-danger-light)'
+          : marker.color === '#9ca3af'
+            ? topBackgroundColor(formation)
+            : marker.color
+        marker.is_unconformity = marker.is_unconformity || formation.kind === 'unconformity'
+        marker.wellIds.add(item.well_id)
+        entry.markerCounts.set(key, marker)
       }
       for (const zone of item.zones) {
         if (!entry.zoneIds.has(zone.zone_id)) {
@@ -295,12 +329,60 @@ export function WellDataPanel({
       byId.set(entry.id, entry)
     }
     return Array.from(byId.values())
-      .map((entry) => ({
-        id: entry.id,
-        name: entry.name,
-        wells: entry.wells,
-        zones: entry.zones,
-      }))
+      .map((entry) => {
+        const sortedZones = [...entry.zones].sort((a, b) => a.sort_order - b.sort_order)
+        const markers: ZoneSetMarkerTreeItem[] = []
+        const seenMarkerKeys = new Set<string>()
+
+        function wellCountForMarker(horizonId: number | null, name: string): number {
+          return entry.markerCounts.get(markerTreeKey(horizonId, name))?.wellIds.size
+            ?? entry.markerCounts.get(markerTreeKey(null, name))?.wellIds.size
+            ?? entry.wells.length
+        }
+
+        function visualForMarker(horizonId: number | null, name: string): { color: string; is_unconformity: boolean } {
+          const marker = entry.markerCounts.get(markerTreeKey(horizonId, name))
+            ?? entry.markerCounts.get(markerTreeKey(null, name))
+          return {
+            color: marker?.is_unconformity ? 'var(--dm-danger-light)' : marker?.color ?? '#9ca3af',
+            is_unconformity: marker?.is_unconformity ?? false,
+          }
+        }
+
+        function addMarker(horizonId: number | null, name: string, zoneBelow: FormationZone | null): void {
+          const key = markerTreeKey(horizonId, name)
+          if (seenMarkerKeys.has(key)) return
+          seenMarkerKeys.add(key)
+          const visual = visualForMarker(horizonId, name)
+          markers.push({
+            horizon_id: horizonId,
+            name,
+            well_count: wellCountForMarker(horizonId, name),
+            color: visual.color,
+            is_unconformity: visual.is_unconformity,
+            zone_below: zoneBelow,
+          })
+        }
+
+        for (const zone of sortedZones) {
+          addMarker(zone.upper_horizon.id, zone.upper_horizon.name, zone)
+        }
+        const lastZone = sortedZones[sortedZones.length - 1]
+        if (lastZone) {
+          addMarker(lastZone.lower_horizon.id, lastZone.lower_horizon.name, null)
+        }
+        for (const marker of Array.from(entry.markerCounts.values()).sort((a, b) => a.name.localeCompare(b.name))) {
+          addMarker(marker.horizon_id, marker.name, null)
+        }
+
+        return {
+          id: entry.id,
+          name: entry.name,
+          wells: entry.wells,
+          markers,
+          zones: entry.zones,
+        }
+      })
       .sort((a, b) => a.name.localeCompare(b.name))
   }, [wells])
 
@@ -561,13 +643,13 @@ export function WellDataPanel({
           >
             <TreeToggleButton isOpen={isOpen('zones-root')} onToggle={() => toggleNode('zones-root')} />
             <button type="button" className="tree-node__label-button">
-              ZONES
+              STRATIGRAPHY
             </button>
           </div>
           {isOpen('zones-root') ? (
             <div className="tree-node__children">
               {zoneSets.length === 0 ? (
-                <p className="sidebar-panel__empty">No ZoneSets assigned.</p>
+                <p className="sidebar-panel__empty">No TopSets assigned.</p>
               ) : zoneSets.map((zoneSet) => {
                 const selectedWellId = zoneSet.wells.find((w) => w.well_id === activeWellId)?.well_id ?? zoneSet.wells[0]?.well_id
                 const isZoneSetSelected = selectedObject?.type === 'zone-set' && selectedZoneSetId === zoneSet.id
@@ -587,20 +669,47 @@ export function WellDataPanel({
                     </div>
                     {isOpen(`zones:${zoneSet.id}`) ? (
                       <div className="tree-node__children">
-                        {zoneSet.zones.length === 0 ? (
-                          <p className="sidebar-panel__empty">No zones loaded.</p>
-                        ) : zoneSet.zones.map((zone) => {
-                          const isZoneSelected = selectedObject?.type === 'zone'
-                            && selectedObject.zoneSetId === zoneSet.id
-                            && selectedZoneId === zone.zone_id
+                        {zoneSet.markers.length === 0 ? (
+                          <p className="sidebar-panel__empty">No markers loaded.</p>
+                        ) : zoneSet.markers.map((marker) => {
+                          const zoneBelow = marker.zone_below
+                          const markerNodeId = `zones:${zoneSet.id}:marker:${markerTreeKey(marker.horizon_id, marker.name)}`
                           return (
-                            <div
-                              key={zone.zone_id}
-                              className={`tree-leaf tree-leaf--clickable${isZoneSelected ? ' tree-leaf--selected' : ''}`}
-                              onClick={() => selectedWellId && onSelectZoneInSet(zoneSet.id, selectedWellId, zone.zone_id)}
-                            >
-                              <span>{zone.upper_horizon.name} -&gt; {zone.lower_horizon.name}</span>
-                              <span>{zoneSet.wells.length} wells</span>
+                            <div key={markerNodeId} className="tree-node">
+                              <div className="tree-node__row">
+                                {zoneBelow ? (
+                                  <TreeToggleButton
+                                    isOpen={isOpen(markerNodeId)}
+                                    onToggle={() => toggleNode(markerNodeId)}
+                                  />
+                                ) : (
+                                  <span className="tree-toggle tree-toggle--spacer" aria-hidden="true">&gt;</span>
+                                )}
+                                <span className="dm-object-color-bar" style={{ ['--dm-object-color' as string]: marker.color }} />
+                                <span className={`tree-node__section-label${marker.is_unconformity ? ' tree-node__section-label--unconformity' : ''}`}>
+                                  {marker.name}
+                                </span>
+                                <span className="tree-node__meta">{marker.well_count} wells</span>
+                              </div>
+                              {zoneBelow && isOpen(markerNodeId) ? (
+                                <div className="tree-node__children">
+                                  {(() => {
+                                    const isZoneSelected = selectedObject?.type === 'zone'
+                                      && selectedObject.zoneSetId === zoneSet.id
+                                      && selectedZoneId === zoneBelow.zone_id
+                                    return (
+                                      <div
+                                        className={`tree-leaf tree-leaf--zone tree-leaf--clickable${isZoneSelected ? ' tree-leaf--selected' : ''}`}
+                                        style={{ ['--tree-zone-color' as string]: marker.color }}
+                                        onClick={() => selectedWellId && onSelectZoneInSet(zoneSet.id, selectedWellId, zoneBelow.zone_id)}
+                                      >
+                                        <span>{zoneBelow.upper_horizon.name} -&gt; {zoneBelow.lower_horizon.name}</span>
+                                        <span>{zoneSet.wells.length} wells</span>
+                                      </div>
+                                    )
+                                  })()}
+                                </div>
+                              ) : null}
                             </div>
                           )
                         })}

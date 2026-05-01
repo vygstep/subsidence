@@ -16,7 +16,6 @@ from subsidence.data.deviation_transform import recalculate_picks_tvd
 from subsidence.data.schema import CurveMetadata, FormationTopModel, FormationZone, TopSet, TopSetHorizon, WellModel
 from subsidence.data.zone_service import (
     activate_top_set_for_well,
-    extract_horizons_from_well_picks,
     rebuild_zones_for_top_set,
 )
 from subsidence.observability import operation_log
@@ -55,16 +54,14 @@ def _resolve_import_top_set(
             raise HTTPException(status_code=404, detail=f'TopSet not found: {payload.zone_set_id}')
         return payload.zone_set_id
 
-    well = session.get(WellModel, target_well_id)
     name = (payload.zone_set_name or '').strip()
     if not name:
+        well = session.get(WellModel, target_well_id)
         name = f'{well.name if well else target_well_id} tops'
 
     top_set = TopSet(name=name, description='Created during tops import')
     session.add(top_set)
     session.flush()
-    extract_horizons_from_well_picks(session, top_set.id, target_well_id)
-    rebuild_zones_for_top_set(session, top_set.id)
     return top_set.id
 
 
@@ -93,7 +90,7 @@ def _zone_set_qc_warnings(
         return []
 
     return [
-        f'{len(unmatched)} imported top(s) were not found in the selected ZoneSet horizons: {", ".join(unmatched[:8])}'
+        f'{len(unmatched)} imported top(s) were not found in the selected TopSet horizons: {", ".join(unmatched[:8])}'
     ]
 
 
@@ -178,6 +175,8 @@ def import_tops(payload: ImportTopsRequest, request: Request) -> ImportTopsRespo
     with operation_log('import.tops', project_path=_manager_project_path(manager), input_path=payload.csv_path, well_id=payload.well_id, depth_ref=payload.depth_ref, create_new_well=payload.create_new_well):
         try:
             with manager.get_session() as session:
+                target_well_id = payload.well_id
+                zone_set_id = _resolve_import_top_set(session, payload, target_well_id) if target_well_id is not None else None
                 imported, qc_warnings = import_tops_csv(
                     session,
                     payload.well_id,
@@ -185,23 +184,40 @@ def import_tops(payload: ImportTopsRequest, request: Request) -> ImportTopsRespo
                     payload.depth_ref,
                     column_map=payload.column_map or None,
                     create_new_well=payload.create_new_well,
+                    top_set_id=zone_set_id,
                 )
-                target_well_id = imported[0].well_id if imported else payload.well_id
+                target_well_id = imported[0].well_id if imported else target_well_id
                 if target_well_id is None:
                     raise HTTPException(status_code=500, detail='Import created no well')
+                if zone_set_id is None:
+                    zone_set_id = _resolve_import_top_set(session, payload, target_well_id)
+                    if zone_set_id is not None:
+                        for pick in imported:
+                            pick.horizon_id = None
+                        session.flush()
+                        # Re-run as an upsert into the newly created/resolved TopSet now that the target well is known.
+                        imported, qc_warnings = import_tops_csv(
+                            session,
+                            target_well_id,
+                            Path(payload.csv_path),
+                            payload.depth_ref,
+                            column_map=payload.column_map or None,
+                            create_new_well=False,
+                            top_set_id=zone_set_id,
+                        )
                 well = session.get(WellModel, target_well_id)
                 if well:
                     well.depth_unit = payload.depth_unit
                     recalculate_picks_tvd(session, manager.project_path, well)
-                formation_count = len(list(session.scalars(select(FormationTopModel).where(FormationTopModel.well_id == target_well_id))))
-                zone_set_id = _resolve_import_top_set(session, payload, target_well_id)
                 horizon_count = 0
                 zone_count = 0
                 if zone_set_id is not None:
+                    rebuild_zones_for_top_set(session, zone_set_id)
                     qc_warnings.extend(_zone_set_qc_warnings(session, zone_set_id, imported, target_well_id))
                     activate_top_set_for_well(session, manager.project_path, target_well_id, zone_set_id)
                     horizon_count = len(list(session.scalars(select(TopSetHorizon).where(TopSetHorizon.top_set_id == zone_set_id))))
                     zone_count = len(list(session.scalars(select(FormationZone).where(FormationZone.top_set_id == zone_set_id))))
+                formation_count = len(list(session.scalars(select(FormationTopModel).where(FormationTopModel.well_id == target_well_id))))
                 session.commit()
             manager.save_project()
         except (ValueError, FileNotFoundError) as error:

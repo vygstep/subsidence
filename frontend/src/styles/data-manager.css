@@ -201,6 +201,11 @@
   transform: rotate(90deg);
 }
 
+.tree-toggle--spacer {
+  visibility: hidden;
+  pointer-events: none;
+}
+
 /* ─── tree labels ────────────────────────────────────────────────────────── */
 
 .tree-node__label-button,
@@ -213,6 +218,18 @@
   padding: 0;
   cursor: pointer;
   text-align: left;
+}
+
+.tree-node__section-label--unconformity {
+  color: var(--dm-danger-light);
+  font-weight: 700;
+}
+
+.tree-node__meta {
+  margin-left: auto;
+  color: var(--dm-fg-muted);
+  font-size: var(--dm-font-sm);
+  white-space: nowrap;
 }
 
 .dm-object-color-bar {
@@ -260,6 +277,24 @@
   border-radius: var(--dm-radius-md);
   padding-left: 2px;
   padding-right: 4px;
+}
+
+.tree-leaf--zone {
+  align-items: center;
+  background: var(--tree-zone-color, #9ca3af);
+  border: 1px solid var(--dm-border-light);
+  border-radius: var(--dm-radius-md);
+  color: var(--dm-fg);
+  padding: 2px 6px;
+}
+
+.tree-leaf--zone span:last-child:not(.tree-leaf__label) {
+  color: var(--dm-fg-3);
+}
+
+.tree-leaf--zone.tree-leaf--selected {
+  outline: 2px solid var(--dm-accent);
+  outline-offset: -1px;
 }
 
 .tree-leaf--muted {

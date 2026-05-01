@@ -43,7 +43,7 @@ interface ImportTopsResponse {
   zone_count?: number
 }
 
-type ZoneSetPolicy = 'create' | 'existing' | 'none'
+type TopSetPolicy = 'create' | 'existing' | 'none'
 
 function fileBaseName(filePath: string): string {
   const name = filePath.split(/[\\/]/).pop() ?? ''
@@ -62,7 +62,7 @@ export function ImportTopsDialog({ wells, activeWellId, onClose, onSuccess }: Im
   const [wellId, setWellId] = useState(activeWellId ?? '')
   const [wellPolicy, setWellPolicy] = useState<'file' | 'override'>('override')
   const [topSets, setTopSets] = useState<TopSetSummary[]>([])
-  const [zoneSetPolicy, setZoneSetPolicy] = useState<ZoneSetPolicy>(() => selectedZoneSetId ? 'existing' : 'create')
+  const [zoneSetPolicy, setZoneSetPolicy] = useState<TopSetPolicy>(() => selectedZoneSetId ? 'existing' : 'create')
   const [zoneSetId, setZoneSetId] = useState(() => selectedZoneSetId ? String(selectedZoneSetId) : '')
   const [csvPath, setCsvPath] = useState(() => getLastImportRoot())
   const [zoneSetName, setZoneSetName] = useState(() => fileBaseName(getLastImportRoot()))
@@ -283,7 +283,7 @@ export function ImportTopsDialog({ wells, activeWellId, onClose, onSuccess }: Im
                 </label>
               </div>
               <label className="project-dialog__field project-dialog__field--inline">
-                <span>ZoneSet</span>
+                <span>TopSet</span>
                 <select
                   value={zoneSetPolicy === 'existing' ? zoneSetId : zoneSetPolicy}
                   onChange={(e) => {
@@ -292,7 +292,7 @@ export function ImportTopsDialog({ wells, activeWellId, onClose, onSuccess }: Im
                     else { setZoneSetPolicy('existing'); setZoneSetId(v) }
                   }}
                 >
-                  <option value="create">Create new ZoneSet</option>
+                  <option value="create">Create new TopSet</option>
                   {topSets.map((ts) => (
                     <option key={ts.id} value={String(ts.id)}>{ts.name}</option>
                   ))}
@@ -301,7 +301,7 @@ export function ImportTopsDialog({ wells, activeWellId, onClose, onSuccess }: Im
               </label>
               {zoneSetPolicy === 'create' && (
                 <label className="project-dialog__field project-dialog__field--inline">
-                  <span>ZoneSet name</span>
+                  <span>TopSet name</span>
                   <input
                     type="text"
                     value={zoneSetName}

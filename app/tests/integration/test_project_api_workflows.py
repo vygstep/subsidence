@@ -16,6 +16,7 @@ from subsidence.data.schema import (
     CurveMnemonicEntry,
     CurveMnemonicSet,
     FormationTopModel,
+    TopSetHorizon,
     LithologyDictEntry,
     LithologyPattern,
     LithologyPatternPalette,
@@ -1439,17 +1440,79 @@ def test_tops_import_can_attach_to_existing_zone_set_by_top_names(api_client: Te
     assert response.status_code == 200, response.text
     payload = response.json()
     assert payload['zone_set_id'] == top_set_id
-    assert payload['horizon_count'] == 3
-    assert payload['zone_count'] == 2
-    assert any('not found in the selected ZoneSet horizons' in warning for warning in payload['qc_warnings'])
+    assert payload['horizon_count'] == 4
+    assert payload['zone_count'] == 3
+    assert payload['qc_warnings'] == []
 
     response = api_client.get('/api/wells/inventory')
     assert response.status_code == 200, response.text
     well = next(w for w in response.json() if w['well_id'] == well_id)
     assert well['active_top_set_id'] == top_set_id
-    assert len(well['zones']) == 2
+    assert len(well['zones']) == 3
     assert well['zones'][0]['thickness_md'] == 150.0
     assert well['zones'][1]['thickness_md'] is None
+    assert well['zones'][2]['thickness_md'] is None
+
+
+def test_tops_import_into_top_set_is_idempotent(api_client: TestClient, tmp_path: Path) -> None:
+    _create_project(api_client, tmp_path, 'tops-idempotent')
+    response = api_client.post('/api/projects/wells', json={
+        'name': 'Repeat Import Well',
+        'x': 0.0,
+        'y': 0.0,
+        'kb': 10.0,
+        'td': 500.0,
+        'crs': 'local',
+    })
+    assert response.status_code == 200, response.text
+    well_id = response.json()['well_id']
+
+    csv_path = tmp_path / 'tops_repeat.csv'
+    csv_path.write_text(
+        'well_name,top_name,depth_md,strat_age_ma,color\n'
+        'Repeat Import Well,H1,100,10,#111111\n'
+        'Repeat Import Well,H2,250,20,#222222\n',
+        encoding='utf-8',
+    )
+
+    first = api_client.post('/api/projects/import-tops', json={
+        'csv_path': str(csv_path),
+        'well_id': well_id,
+        'create_zone_set': True,
+        'zone_set_name': 'Repeat TopSet',
+    })
+    assert first.status_code == 200, first.text
+    top_set_id = first.json()['zone_set_id']
+
+    csv_path.write_text(
+        'well_name,top_name,depth_md,strat_age_ma,color\n'
+        'Repeat Import Well,H1,110,10,#aaaaaa\n'
+        'Repeat Import Well,H2,260,20,#bbbbbb\n',
+        encoding='utf-8',
+    )
+    second = api_client.post('/api/projects/import-tops', json={
+        'csv_path': str(csv_path),
+        'well_id': well_id,
+        'zone_set_id': top_set_id,
+    })
+    assert second.status_code == 200, second.text
+    assert second.json()['formation_count'] == 2
+    assert second.json()['horizon_count'] == 2
+    assert second.json()['zone_count'] == 1
+
+    manager = app.state.project_manager
+    with manager.get_session() as session:
+        picks = session.scalars(
+            sa_select(FormationTopModel)
+            .where(FormationTopModel.well_id == well_id)
+            .order_by(FormationTopModel.name.asc())
+        ).all()
+        horizons = session.scalars(sa_select(TopSetHorizon).where(TopSetHorizon.top_set_id == top_set_id)).all()
+
+    assert len(picks) == 2
+    assert len(horizons) == 2
+    assert [pick.depth_md for pick in picks] == [110.0, 260.0]
+    assert [pick.color for pick in picks] == ['#aaaaaa', '#bbbbbb']
 
 
 def test_deviation_import_with_column_map(api_client: TestClient, tmp_path: Path) -> None:
