@@ -2855,11 +2855,6 @@ Resolve the open questions above before starting implementation.
   linked top picks, horizons, zones, and zone well data.
 - Added regression coverage for repeated tops import into the same TopSet.
 
-### Remaining
-
-- Wire TopSet marker/zone Data Manager visibility into burial chart rendering. Current update
-  targets the log viewer first.
-
 ### Verification
 
 - `python -m compileall app/src/subsidence`
