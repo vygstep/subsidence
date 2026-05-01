@@ -55,6 +55,7 @@ export interface FormationTop {
   horizon_id: number | null
   age_ma?: number
   age_base_ma?: number | null
+  hiatus_duration_ma: number
   color: string
   kind: string
   is_locked: boolean

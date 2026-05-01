@@ -11,8 +11,6 @@ from subsidence.data import (
     import_las_file,
     import_logs_csv,
     import_tops_csv,
-    import_unconformities_csv,
-    link_tops_to_unconformities,
 )
 from subsidence.data.deviation_transform import recalculate_picks_tvd
 from subsidence.data.schema import CurveMetadata, FormationTopModel, FormationZone, TopSet, TopSetHorizon, WellModel
@@ -31,8 +29,6 @@ from .projects import (
     ImportLogsCsvRequest,
     ImportTopsRequest,
     ImportTopsResponse,
-    ImportUnconformitiesRequest,
-    ImportUnconformitiesResponse,
     _manager_project_path,
     _require_open_project,
 )
@@ -191,7 +187,6 @@ def import_tops(payload: ImportTopsRequest, request: Request) -> ImportTopsRespo
                 target_well_id = imported[0].well_id if imported else payload.well_id
                 if target_well_id is None:
                     raise HTTPException(status_code=500, detail='Import created no well')
-                linked = link_tops_to_unconformities(session, target_well_id)
                 well = session.get(WellModel, target_well_id)
                 if well:
                     recalculate_picks_tvd(session, manager.project_path, well)
@@ -211,28 +206,12 @@ def import_tops(payload: ImportTopsRequest, request: Request) -> ImportTopsRespo
         return ImportTopsResponse(
             well_id=target_well_id,
             formation_count=formation_count,
-            linked_count=len(linked),
+            linked_count=0,
             zone_set_id=zone_set_id,
             horizon_count=horizon_count,
             zone_count=zone_count,
             qc_warnings=qc_warnings,
         )
-
-
-@router.post('/import-unconformities', response_model=ImportUnconformitiesResponse)
-def import_unconformities(payload: ImportUnconformitiesRequest, request: Request) -> ImportUnconformitiesResponse:
-    manager = _require_open_project(request)
-    with operation_log('import.unconformities', project_path=_manager_project_path(manager), input_path=payload.csv_path, well_id=payload.well_id):
-        try:
-            with manager.get_session() as session:
-                import_unconformities_csv(session, payload.well_id, Path(payload.csv_path), column_map=payload.column_map or None)
-                linked = link_tops_to_unconformities(session, payload.well_id)
-                formation_count = len(list(session.scalars(select(FormationTopModel).where(FormationTopModel.well_id == payload.well_id))))
-                session.commit()
-            manager.save_project()
-        except (ValueError, FileNotFoundError) as error:
-            raise HTTPException(status_code=400, detail=str(error)) from error
-        return ImportUnconformitiesResponse(well_id=payload.well_id, formation_count=formation_count, linked_count=len(linked))
 
 
 @router.post('/import-deviation', response_model=ImportDeviationResponse)

@@ -19,8 +19,6 @@ from .importers import (
     import_las_file,
     import_logs_csv,
     import_tops_csv,
-    import_unconformities_csv,
-    link_tops_to_unconformities,
 )
 from .loaders import load_curves_from_parquet, load_deviation_from_parquet, load_las_curves
 from .models import DepthReference, LogCurve
@@ -96,8 +94,6 @@ __all__ = [
     "import_las_file",
     "import_logs_csv",
     "import_tops_csv",
-    "import_unconformities_csv",
-    "link_tops_to_unconformities",
     "create_engine_for_project",
     "get_session",
     "load_curves_from_parquet",

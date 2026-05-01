@@ -24,7 +24,7 @@ interface TopPickSettingsProps {
     patch: {
       name?: string
       age_ma?: number
-      age_base_ma?: number
+      hiatus_duration_ma?: number
       kind?: string
       color?: string
       water_depth_m?: number
@@ -94,6 +94,9 @@ export function TopPickSettings({ selectedFormation, onFormationUpdate, onFormat
   }
 
   const isUnconformity = selectedFormation.kind === 'unconformity'
+  const depositionResumedMa = selectedFormation.age_ma != null
+    ? selectedFormation.age_ma - selectedFormation.hiatus_duration_ma
+    : null
 
   return (
     <div className="template-panel">
@@ -149,15 +152,21 @@ export function TopPickSettings({ selectedFormation, onFormationUpdate, onFormat
       </div>
       {isUnconformity && (
         <div className="sf-row">
-          <span>Base age (Ma)</span>
+          <span>Hiatus duration (Ma)</span>
           <input
             type="number"
             step="0.01"
-            value={selectedFormation.age_base_ma ?? ''}
+            value={selectedFormation.hiatus_duration_ma}
             onChange={(event) => void onFormationUpdate(selectedFormation.id, {
-              age_base_ma: event.target.value ? Number(event.target.value) : undefined,
+              hiatus_duration_ma: event.target.value ? Number(event.target.value) : 0,
             })}
           />
+        </div>
+      )}
+      {isUnconformity && depositionResumedMa !== null && (
+        <div className="sf-row">
+          <span>Deposition resumed</span>
+          <span>{depositionResumedMa.toFixed(1)} Ma</span>
         </div>
       )}
       {activeCurveId !== null && (

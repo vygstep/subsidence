@@ -89,6 +89,19 @@ def migrate_schema(engine: Engine) -> None:
         if 'eroded_thickness_m' not in formation_cols:
             conn.execute(text("ALTER TABLE formation_tops ADD COLUMN eroded_thickness_m REAL NOT NULL DEFAULT 0.0"))
             conn.commit()
+        if 'hiatus_duration_ma' not in formation_cols:
+            conn.execute(text("ALTER TABLE formation_tops ADD COLUMN hiatus_duration_ma REAL NOT NULL DEFAULT 0.0"))
+            conn.execute(text("""
+                UPDATE formation_tops
+                SET    hiatus_duration_ma = COALESCE(age_base_ma, age_top_ma) - COALESCE(age_top_ma, 0),
+                       age_top_ma = COALESCE(age_base_ma, age_top_ma),
+                       age_base_ma = NULL
+                WHERE  kind = 'unconformity'
+                  AND  age_top_ma IS NOT NULL
+                  AND  age_base_ma IS NOT NULL
+                  AND  age_base_ma > age_top_ma
+            """))
+            conn.commit()
         if 'lithology' not in formation_cols:
             conn.execute(text("ALTER TABLE formation_tops ADD COLUMN lithology TEXT"))
             conn.commit()

@@ -65,17 +65,4 @@ export const importWizardPresets = {
     executeEndpoint: '/api/projects/import-deviation',
     resultWellField: 'well_id',
   },
-  unconformities: {
-    id: 'unconformities',
-    title: 'Load Unconformities',
-    eyebrow: 'Import Wizard',
-    submitLabel: 'Load unconformities',
-    busyLabel: 'Importing...',
-    previewMode: 'tabular',
-    targetWellPolicy: 'required',
-    acceptedFileFilters: DELIMITED_TEXT_FILTERS,
-    executeOperation: 'import.unconformities',
-    executeEndpoint: '/api/projects/import-unconformities',
-    resultWellField: 'well_id',
-  },
 } satisfies Record<string, ImportWizardPreset>

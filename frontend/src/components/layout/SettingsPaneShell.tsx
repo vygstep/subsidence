@@ -47,7 +47,7 @@ interface SettingsPaneShellProps {
     patch: {
       name?: string
       age_ma?: number
-      age_base_ma?: number
+      hiatus_duration_ma?: number
       kind?: string
       color?: string
       water_depth_m?: number

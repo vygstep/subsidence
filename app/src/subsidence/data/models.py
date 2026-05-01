@@ -227,15 +227,12 @@ class StratTopPick:
     depth_ref: DepthReference
     kind: TopKind = TopKind.STRAT
     boundary_type: BoundaryType = BoundaryType.CONFORMABLE
-    unconformity_ref: str | None = None
 
     def validate(self) -> None:
         if not self.well_name.strip():
             raise ValueError("well_name is required")
         if not self.top_name.strip():
             raise ValueError("top_name is required")
-        if self.boundary_type == BoundaryType.UNCONFORMITY and not self.unconformity_ref:
-            raise ValueError("unconformity_ref is required when boundary_type=unconformity")
 
 
 @dataclass(frozen=True)
@@ -254,16 +251,6 @@ class UnconformityPick:
             raise ValueError("unc_name is required")
         if self.base_age_ma < self.start_age_ma:
             raise ValueError("base_age_ma must be >= start_age_ma")
-
-
-@dataclass(frozen=True)
-class TopUnconformityLink:
-    well_name: str
-    top_name: str
-    unconformity_name: str
-    top_depth: float
-    unconformity_md: float
-    link_method: str
 
 
 def validate_tops(

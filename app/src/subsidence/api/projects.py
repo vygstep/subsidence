@@ -79,12 +79,6 @@ class ImportTopsRequest(BaseModel):
     zone_set_name: str | None = None
 
 
-class ImportUnconformitiesRequest(BaseModel):
-    well_id: str
-    csv_path: str
-    column_map: dict[str, str] | None = None
-
-
 class ImportDeviationRequest(BaseModel):
     well_id: str | None = None
     csv_path: str
@@ -196,12 +190,6 @@ class ImportTopsResponse(BaseModel):
     horizon_count: int = 0
     zone_count: int = 0
     qc_warnings: list[str] = []
-
-
-class ImportUnconformitiesResponse(BaseModel):
-    well_id: str
-    formation_count: int
-    linked_count: int
 
 
 class ImportDeviationResponse(BaseModel):

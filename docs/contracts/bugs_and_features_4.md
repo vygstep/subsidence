@@ -1035,10 +1035,10 @@ ctx.restore()
 
 ---
 
-## BF4-018: Unified 2-step import — inline column mapping in all tabular dialogs (todo)
+## BF4-018: Unified 2-step import — inline column mapping in remaining tabular dialogs (todo)
 
 **Context**: BF4-016 collapses the LAS and CSV-logs dialogs to 2 steps. This item applies the same
-pattern to the remaining tabular import dialogs (Tops, Deviation, Unconformities) and introduces a
+pattern to the remaining tabular import dialogs (Tops, Deviation) and introduces a
 new **inline column-mapping** UI: instead of a separate Mapping step, field-assignment dropdowns
 appear directly above each column in the preview table.
 
@@ -1243,19 +1243,7 @@ file and mapped individually via inline mapping.
 
 ---
 
-### BF4-018-D: Unconformities dialog — 2-step with inline mapping
-
-In `ImportUnconformitiesDialog.tsx`:
-- Same pattern as B/C above
-- Fields: `UNCONFORMITIES_FIELDS`
-- Options: target well (required) + depth unit
-- No depth reference dropdown (unconformities have a fixed depth field)
-
-`canSubmit`: `sourceIsValid && mappingOk && !!wellId`
-
----
-
-### BF4-018-E: Backend — store `depth_unit` as metadata, no conversion on import
+### BF4-018-D: Backend — store `depth_unit` as metadata, no conversion on import
 
 **Important**: data is stored exactly as loaded — **no unit conversion during import**.
 The `depth_unit` field is metadata that tells the engine what unit the stored values are in,
@@ -1264,7 +1252,6 @@ so it can convert correctly at compute time (e.g., ft → m before backstripping
 Add `depth_unit: 'm' | 'ft' | 'km'` (default `'m'`) to the import endpoints:
 - `POST /api/projects/import-tops`
 - `POST /api/projects/import-deviation`
-- `POST /api/projects/import-unconformities`
 - `POST /api/projects/import-logs-csv` (also affects BF4-016-D)
 
 Backend behaviour: store depth values verbatim as received. Persist `depth_unit` in the
@@ -1284,7 +1271,7 @@ and apply the appropriate conversion factor when needed.
 
 ---
 
-### BF4-018-F: Remove `MappingPane` and `MAPPING_STEP_LABELS` after migration
+### BF4-018-E: Remove `MappingPane` and `MAPPING_STEP_LABELS` after migration
 
 Once BF4-016 and BF4-018 are all implemented:
 - Delete `frontend/src/components/layout/importWizard/MappingPane.tsx`
@@ -1300,12 +1287,11 @@ Do this last, as a cleanup step, to avoid blocking the other items.
 - `frontend/src/components/layout/importWizard/TabularPreviewPane.tsx` (BF4-018-A)
 - `frontend/src/components/layout/ImportTopsDialog.tsx` (BF4-018-B)
 - `frontend/src/components/layout/ImportDeviationDialog.tsx` (BF4-018-C)
-- `frontend/src/components/layout/ImportUnconformitiesDialog.tsx` (BF4-018-D)
-- `app/src/subsidence/api/wells.py` + import handlers (BF4-018-E)
-- `frontend/src/components/layout/importWizard/MappingPane.tsx` — delete (BF4-018-F)
-- `frontend/src/components/layout/importWizard/importWizardUtils.ts` — remove constant (BF4-018-F)
+- `app/src/subsidence/api/wells.py` + import handlers (BF4-018-D)
+- `frontend/src/components/layout/importWizard/MappingPane.tsx` — delete (BF4-018-E)
+- `frontend/src/components/layout/importWizard/importWizardUtils.ts` — remove constant (BF4-018-E)
 
-**Complexity**: M — three dialogs + shared component change + backend depth_unit field
+**Complexity**: M — two dialogs + shared component change + backend depth_unit field
 
 ---
 
@@ -2234,7 +2220,7 @@ name should be displayed.
 | 12 | BF4-009 | S | Models computed state + radio |
 | 13 | BF4-004 | S | Curve settings when disabled (investigate first) |
 | 14 | BF4-016 | S | Simplified LAS/CSV import dialog (frontend only) |
-| 15 | BF4-018 | M | Inline column mapping + 2-step for Tops/Deviation/Unconformities |
+| 15 | BF4-018 | M | Inline column mapping + 2-step for Tops/Deviation |
 | 17 | BF4-010 | M | New side toolbar component |
 | 18 | BF4-007-B | M | Sea level override per top (backend + frontend) |
 | 19 | BF4-011 | M | API audit (research task) |
@@ -2317,7 +2303,7 @@ line; no data migration needed in practice (no real data has `lithology_discrete
 
 ---
 
-## BF4-027: Unconformity model redesign — unified picks with hiatus_duration_ma (todo)
+## BF4-027: Unconformity model redesign — unified picks with hiatus_duration_ma (done)
 
 ### Context and motivation
 
@@ -2700,3 +2686,18 @@ unconformities before and after migration to verify burial charts are numericall
 - Unconformity with `hiatus_duration_ma=0` → compute treats it as a zero-gap boundary
   (Paleogene ends at the unconformity surface age, no missing time).
 
+**Implemented**:
+- Added `formation_tops.hiatus_duration_ma` with migration from old inverted
+  `age_top_ma`/`age_base_ma` unconformity semantics.
+- Updated picks-only subsidence age resolution to use unified pick ages and derive the hiatus end
+  from `age_top_ma - hiatus_duration_ma`.
+- Removed the separate unconformities CSV importer, API endpoint, frontend dialog, toolbar button,
+  mapping fields, and note-based top/unconformity linking helpers.
+- Extended standard tops CSV import, formation PATCH/response types, frontend formation types, and
+  TopPickSettings to use `hiatus_duration_ma`.
+- Added backend coverage for importing unconformities through the standard tops CSV path.
+
+**Verified**:
+- `python -m compileall app/src/subsidence`
+- `python -m pytest app/tests` (`80 passed`)
+- `npm run build`

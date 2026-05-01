@@ -53,6 +53,7 @@ interface FormationResponse {
   horizon_id: number | null
   age_ma?: number
   age_base_ma?: number | null
+  hiatus_duration_ma?: number
   color: string
   kind: string
   is_locked: boolean
@@ -84,6 +85,7 @@ interface FormationPatchPayload {
   lithology?: FormationTop['lithology']
   age_ma?: number
   age_base_ma?: number
+  hiatus_duration_ma?: number
   is_locked?: boolean
   water_depth_m?: number
   eroded_thickness_m?: number
@@ -242,6 +244,7 @@ function mapFormation(row: FormationResponse): FormationTop {
     horizon_id: row.horizon_id ?? null,
     age_ma: row.age_ma,
     age_base_ma: row.age_base_ma ?? null,
+    hiatus_duration_ma: row.hiatus_duration_ma ?? 0,
     color: row.color,
     kind: row.kind,
     is_locked: row.is_locked,

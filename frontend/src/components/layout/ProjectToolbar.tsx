@@ -5,7 +5,6 @@ import { FileOpenDialog } from './FileOpenDialog'
 import { ImportDeviationDialog } from './ImportDeviationDialog'
 import { ImportLasDialog } from './ImportLasDialog'
 import { ImportTopsDialog } from './ImportTopsDialog'
-import { ImportUnconformitiesDialog } from './ImportUnconformitiesDialog'
 import { LinkStratChartDialog } from './LinkStratChartDialog'
 import { LoadStratChartDialog } from './LoadStratChartDialog'
 import { NewProjectDialog } from './NewProjectDialog'
@@ -14,7 +13,7 @@ import { useProjectStore, useViewStore, useWellDataStore, useWorkspaceStore } fr
 import type { FormationTop } from '@/types'
 import { buildDiagnosticSnapshot } from '@/utils/diagnostics'
 
-type DialogKind = 'project-open' | 'project-new' | 'create-well' | 'load-las' | 'load-tops' | 'load-deviation' | 'load-unconformities' | 'link-top' | 'load-strat-chart' | 'set-top-type' | null
+type DialogKind = 'project-open' | 'project-new' | 'create-well' | 'load-las' | 'load-tops' | 'load-deviation' | 'link-top' | 'load-strat-chart' | 'set-top-type' | null
 type FormationTypeOption = 'strat' | 'unconformity'
 
 const FORMATION_TYPE_OPTIONS: FormationTypeOption[] = ['strat', 'unconformity']
@@ -349,8 +348,6 @@ export function ProjectToolbar() {
         return <ImportTopsDialog wells={wellOptions} activeWellId={well?.well_id} onClose={() => setActiveDialog(null)} onSuccess={handleWellMutation} />
       case 'load-deviation':
         return <ImportDeviationDialog wells={wellOptions} activeWellId={well?.well_id} onClose={() => setActiveDialog(null)} onSuccess={handleWellMutation} />
-      case 'load-unconformities':
-        return <ImportUnconformitiesDialog wells={wellOptions} activeWellId={well?.well_id} onClose={() => setActiveDialog(null)} onSuccess={handleWellMutation} />
       case 'load-strat-chart':
         return (
           <LoadStratChartDialog
@@ -440,7 +437,6 @@ export function ProjectToolbar() {
   const topsModeActions = (
     <>
       <button type="button" className="app-action-button" onClick={() => setActiveDialog('load-tops')}>Load tops</button>
-      <button type="button" className="app-action-button" onClick={() => setActiveDialog('load-unconformities')}>Load unconformities</button>
       <button type="button" className="app-action-button" onClick={() => void handleAddFormation()} disabled={!well}>Add top</button>
       <button type="button" className="app-action-button" onClick={() => selectedFormation && handleOpenFormationLink(selectedFormation.id)} disabled={!selectedFormation}>Link top</button>
       <button type="button" className="app-action-button" onClick={() => void handleSetFormationAge()} disabled={!selectedFormation}>Set age</button>

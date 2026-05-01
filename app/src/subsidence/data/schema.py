@@ -281,19 +281,21 @@ class FormationTopModel(Base, AuditMixin):
     name: Mapped[str] = mapped_column(String(256))
     kind: Mapped[str] = mapped_column(String(16), default="strat")
     # "strat"        — conformable formation top
-    # "unconformity" — erosional boundary; carries hiatus age bounds
+    # "unconformity" — erosional boundary; carries hiatus duration
     depth_md: Mapped[float | None] = mapped_column(Float, nullable=True)
     depth_tvd: Mapped[float | None] = mapped_column(Float, nullable=True)
     depth_tvdss: Mapped[float | None] = mapped_column(Float, nullable=True)
     age_top_ma: Mapped[float | None] = mapped_column(Float, nullable=True)
-    # strat: age of this pick; unconformity: start of hiatus (younger)
+    # age of this pick; for unconformity this is the erosion surface age
     age_base_ma: Mapped[float | None] = mapped_column(Float, nullable=True)
-    # unconformity only: base of hiatus (older); gap = age_base_ma - age_top_ma
+    # strat only: optional age at interval base; unconformity base age is derived
     confidence: Mapped[float | None] = mapped_column(Float, nullable=True)
     color: Mapped[str] = mapped_column(String(9), default="#90a4ae")
     is_locked: Mapped[bool] = mapped_column(Boolean, default=False)
     water_depth_m: Mapped[float] = mapped_column(Float, default=0.0, server_default='0.0')
     # paleobathymetry + sea level at time of deposition for this interval (m)
+    hiatus_duration_ma: Mapped[float] = mapped_column(Float, default=0.0, server_default='0.0')
+    # unconformity only: missing time at this erosion surface (Ma)
     eroded_thickness_m: Mapped[float] = mapped_column(Float, default=0.0, server_default='0.0')
     # compacted thickness of section eroded above this boundary (unconformity only, m)
     lithology: Mapped[str | None] = mapped_column(String(32), nullable=True)

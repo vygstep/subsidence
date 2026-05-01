@@ -15,6 +15,7 @@ from subsidence.data.schema import (
     CurveMetadata,
     CurveMnemonicEntry,
     CurveMnemonicSet,
+    FormationTopModel,
     LithologyDictEntry,
     LithologyPattern,
     LithologyPatternPalette,
@@ -1311,6 +1312,52 @@ def test_tops_import_with_column_map(api_client: TestClient, tmp_path: Path) -> 
     top_names = [f['name'] for f in well['formations']]
     assert 'Jurassic Top' in top_names
     assert 'Cretaceous Base' in top_names
+
+
+def test_tops_import_accepts_unconformity_rows(api_client: TestClient, tmp_path: Path) -> None:
+    _create_project(api_client, tmp_path, 'tops-unconformity')
+    response = api_client.post('/api/projects/wells', json={
+        'name': 'Unconformity Well',
+        'x': 0.0,
+        'y': 0.0,
+        'kb': 10.0,
+        'td': 500.0,
+        'crs': 'local',
+    })
+    assert response.status_code == 200, response.text
+    well_id = response.json()['well_id']
+
+    csv_path = tmp_path / 'tops_with_unconformity.csv'
+    csv_path.write_text(
+        'well_name,top_name,depth_md,boundary_type,age_ma,hiatus_duration_ma,eroded_thickness_m\n'
+        'Unconformity Well,Paleogene,100,strat,40,,\n'
+        'Unconformity Well,J/K Unconformity,200,unconformity,145,79,120\n',
+        encoding='utf-8',
+    )
+
+    response = api_client.post('/api/projects/import-tops', json={
+        'csv_path': str(csv_path),
+        'well_id': well_id,
+        'depth_ref': 'MD',
+    })
+    assert response.status_code == 200, response.text
+    assert response.json()['formation_count'] == 2
+    assert response.json()['linked_count'] == 0
+
+    manager = app.state.project_manager
+    with manager.get_session() as session:
+        row = session.scalar(
+            sa_select(FormationTopModel).where(
+                FormationTopModel.well_id == well_id,
+                FormationTopModel.kind == 'unconformity',
+            )
+        )
+        assert row is not None
+        assert row.name == 'J/K Unconformity'
+        assert row.age_top_ma == pytest.approx(145)
+        assert row.age_base_ma is None
+        assert row.hiatus_duration_ma == pytest.approx(79)
+        assert row.eroded_thickness_m == pytest.approx(120)
 
 
 def test_tops_import_can_create_zone_set_from_imported_tops(api_client: TestClient, tmp_path: Path) -> None:

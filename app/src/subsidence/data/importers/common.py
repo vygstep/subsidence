@@ -304,29 +304,6 @@ def _resolve_ics_color(age_ma: float | None, units: list[dict[str, object]]) -> 
     return str(matches[0]['color_hex'])
 
 
-def _merge_note(note: str | None, unconformity_ref: str | None) -> str | None:
-    base = (note or '').strip()
-    if not unconformity_ref:
-        return base or None
-    ref_note = f'unconformity_ref={unconformity_ref}'
-    if not base:
-        return ref_note
-    if ref_note in base:
-        return base
-    return f'{base} | {ref_note}'
-
-
-def _extract_note_unconformity_ref(note: str | None) -> str | None:
-    if not note:
-        return None
-    for chunk in note.split('|'):
-        chunk = chunk.strip()
-        if chunk.startswith('unconformity_ref='):
-            value = chunk.split('=', 1)[1].strip()
-            return value or None
-    return None
-
-
 def _ensure_row_targets_well(row: dict[str, str], well: WellModel, csv_path: Path) -> None:
     row_well_name = _normalize_text(row.get('well_name'))
     accepted = {_normalize_text(well.name), _normalize_text(well.uwi)}

@@ -149,30 +149,15 @@ def _compute_subsidence(manager, well_id: str) -> list[SubsidenceResultResponse]
             ).all()
             inputs: list[FormationInput] = []
 
-            def _is_undated_unconformity(pick: FormationTopModel) -> bool:
-                if pick.kind != 'unconformity':
-                    return False
-                if pick.age_top_ma is None or pick.age_base_ma is None:
-                    return True
-                return pick.age_base_ma <= pick.age_top_ma
-
             for idx, f in enumerate(formations):
                 next_f = formations[idx + 1] if idx + 1 < len(formations) else None
                 base_m = next_f.depth_md if next_f is not None else max(td_m, f.depth_md + 1.0)
-
-                if (f.kind == 'unconformity'
-                        and f.age_top_ma is not None
-                        and f.age_base_ma is not None
-                        and f.age_base_ma > f.age_top_ma):
-                    age_top = f.age_base_ma
-                else:
-                    age_top = f.age_top_ma
+                age_top = f.age_top_ma
 
                 if next_f is None:
-                    age_base = f.age_base_ma
-                elif _is_undated_unconformity(next_f):
-                    skip_f = formations[idx + 2] if idx + 2 < len(formations) else None
-                    age_base = skip_f.age_top_ma if skip_f is not None else f.age_base_ma
+                    age_base = None
+                elif next_f.kind == 'unconformity' and next_f.age_top_ma is not None:
+                    age_base = next_f.age_top_ma - (next_f.hiatus_duration_ma or 0.0)
                 else:
                     age_base = next_f.age_top_ma
 

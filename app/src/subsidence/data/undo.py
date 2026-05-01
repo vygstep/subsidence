@@ -376,6 +376,7 @@ class ActivateStratChart(Command):
                 formation.id: {
                     'color': formation.color,
                     'age_top_ma': formation.age_top_ma,
+                    'hiatus_duration_ma': formation.hiatus_duration_ma,
                     'had_link': session.scalar(
                         select(FormationStratLink.id).where(
                             FormationStratLink.formation_id == formation.id,
@@ -403,11 +404,13 @@ class ActivateStratChart(Command):
                     link_created
                     or formation.color != previous['color']
                     or formation.age_top_ma != previous['age_top_ma']
+                    or formation.hiatus_duration_ma != previous['hiatus_duration_ma']
                 ):
                     self._captured_changes.append({
                         'formation_id': formation.id,
                         'old_color': previous['color'],
                         'old_age_top_ma': previous['age_top_ma'],
+                        'old_hiatus_duration_ma': previous['hiatus_duration_ma'],
                         'link_created': link_created,
                     })
             return
@@ -438,6 +441,7 @@ class ActivateStratChart(Command):
                     session.delete(link)
             formation.color = change['old_color']
             formation.age_top_ma = change['old_age_top_ma']
+            formation.hiatus_duration_ma = change.get('old_hiatus_duration_ma', 0.0)
 
 
 class UpdateVisualConfig(Command):
