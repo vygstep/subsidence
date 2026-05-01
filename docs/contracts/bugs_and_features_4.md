@@ -2427,16 +2427,15 @@ for idx, f in enumerate(formations):
     next_f = formations[idx + 1] if idx + 1 < len(formations) else None
     base_m = next_f.depth_md if next_f is not None else max(td_m, f.depth_md + 1.0)
 
-    # age_top of this interval
-    age_top = f.age_top_ma  # same convention for both strat and unconformity
+    # age_top of this interval — same convention for both strat and unconformity
+    age_top = f.age_top_ma
 
     # age_base of this interval = age of the surface below
     if next_f is None:
         age_base = None
     elif next_f.kind == 'unconformity' and next_f.age_top_ma is not None:
-        # The pick above an unconformity ends at:
+        # Pick above an unconformity ends at the age when deposition resumed:
         #   unconformity.age_top_ma − hiatus_duration_ma
-        # (= the age when deposition resumed after the hiatus)
         age_base = next_f.age_top_ma - (next_f.hiatus_duration_ma or 0.0)
     else:
         age_base = next_f.age_top_ma
@@ -2453,10 +2452,15 @@ for idx, f in enumerate(formations):
     ))
 ```
 
-Note: the unconformity pick itself gets `age_top_ma = f.age_top_ma` (no inversion). Its interval
-in `FormationInput` runs from `age_top_ma` down to `next_strat_pick.age_top_ma`, representing the
-eroded/missing section. `eroded_thickness_m` is applied in `ZoneLayerInput` (zone-based path);
-for the picks-only path, eroded thickness is not yet modelled — that is a separate future item.
+No inversion needed: the unconformity's interval in `FormationInput` runs from `age_top_ma`
+down to `next_strat_pick.age_top_ma`, representing the eroded/missing section.
+`eroded_thickness_m` is applied in `ZoneLayerInput` (zone-based path); for the picks-only path
+it is not yet modelled — separate future item.
+
+**Zone-based path** (`build_zone_layer_inputs` in `zone_service.py`): this path reads ages
+directly from `TopSetHorizon.age_ma`, not from `FormationTopModel`. It is **not affected** by
+the unconformity semantic change. Verify after migration that zone-based burial charts produce
+the same output as before.
 
 ---
 
@@ -2475,7 +2479,7 @@ eroded_m = _extract_float(row, 'eroded_thickness_m', 'eroded_m') or 0.0
 top = FormationTopModel(
     ...
     kind='unconformity' if is_unconformity else 'strat',
-    age_top_ma=age_ma,           # same field, same convention for both
+    age_top_ma=age_ma,           # same convention for both
     age_base_ma=None,            # not stored; derived if needed
     hiatus_duration_ma=hiatus_ma if is_unconformity else 0.0,
     eroded_thickness_m=eroded_m if is_unconformity else 0.0,
@@ -2483,7 +2487,25 @@ top = FormationTopModel(
 )
 ```
 
-Remove `import_unconformities_csv` function from `tops.py` entirely.
+Remove `import_unconformities_csv` and `link_tops_to_unconformities` functions from `tops.py`
+entirely.
+
+**`app/src/subsidence/data/importers/common.py`**
+
+Remove two helper functions that only served the note-based linking mechanism:
+- `_merge_note(note, unconformity_ref)` — wrote `unconformity_ref=X` into the note field
+- `_extract_note_unconformity_ref(note)` — parsed that value back out
+
+Also remove their call sites in `tops.py` (`_merge_note`, `_extract_note_unconformity_ref`).
+
+**`app/src/subsidence/data/models.py`**
+
+Remove the following dead models (only used by `link_tops_to_unconformities`):
+- `TopLink` dataclass (fields: `well_name`, `top_name`, `unconformity_name`, `top_depth`,
+  `unconformity_md`, `link_method`)
+- `LinkResult` dataclass (if present)
+- `unconformity_ref: str | None` field from any model that held it
+- `BoundaryType.UNCONFORMITY` validation that required `unconformity_ref`
 
 **`app/src/subsidence/data/importers/__init__.py`**
 
@@ -2523,28 +2545,93 @@ export const TOPS_FIELDS: FieldDefinition[] = [
 
 ---
 
-### BF4-027-E: Frontend UI — TopPickSettings
+### BF4-027-E: Backend PATCH endpoint — `formations.py`
 
-**`frontend/src/components/layout/settings/TopPickSettings.tsx`**
+**`app/src/subsidence/api/formations.py`**
 
-For `kind === 'unconformity'` rows, replace the current `age_base_ma` input with `hiatus_duration_ma`:
+`FormationTopPatch` currently has `age_base_ma: float | None`. Replace with
+`hiatus_duration_ma: float | None = None` for the new field, and keep `age_base_ma` as
+deprecated-but-accepted (or remove it — no frontend will send it after this change).
 
+```python
+class FormationTopPatch(BaseModel):
+    ...
+    age_ma: float | None = None
+    hiatus_duration_ma: float | None = None  # new; replaces age_base_ma for unconformities
+    is_locked: bool | None = None
+    water_depth_m: float | None = None
+    eroded_thickness_m: float | None = None
 ```
-Age (Ma)             [age_top_ma input]     ← same field name as strat, same label
-Hiatus duration (Ma) [hiatus_duration_ma]   ← replaces age_base_ma
-Eroded thickness (m) [eroded_thickness_m]   ← unchanged
+
+Add to the PATCH field map:
+```python
+'hiatus_duration_ma': ('hiatus_duration_ma', body.hiatus_duration_ma),
 ```
 
-The "Base age" input currently shown for unconformities is removed. If the value needs to be
-displayed for reference it can be shown as a read-only derived label:
-`Base age: {(age_top_ma - hiatus_duration_ma).toFixed(1)} Ma`.
+`FormationTopResponse` — add `hiatus_duration_ma: float` (default `0.0`), sourced from
+`row.hiatus_duration_ma`. Keep `age_base_ma` in the response for now (strat tops may use it
+in the future); for unconformities it will be `None` after migration.
 
-PATCH API call sends `{ hiatus_duration_ma: number }` — add this field to the formation PATCH
-endpoint in `api/formations.py` and the frontend fetch.
+**`app/src/subsidence/data/undo.py`**
+
+The undo tracker currently snapshots `age_top_ma` only. Add `hiatus_duration_ma` to the
+captured snapshot and restore it on undo:
+
+```python
+# in capture:
+previous[formation.id] = {
+    'color': formation.color,
+    'age_top_ma': formation.age_top_ma,
+    'hiatus_duration_ma': formation.hiatus_duration_ma,  # new
+    'had_link': ...,
+}
+
+# in apply (undo):
+formation.age_top_ma = change['old_age_top_ma']
+formation.hiatus_duration_ma = change.get('old_hiatus_duration_ma', 0.0)  # new
+```
+
+**`app/src/subsidence/data/strat_link.py`**
+
+`auto_link_to_active_chart` looks up a StratUnit by `formation.age_top_ma`. After migration,
+an unconformity's `age_top_ma` is the **older** surface age (e.g. 145 Ma for J/K boundary)
+instead of the younger bound (66 Ma). The linked StratUnit will now be the Jurassic period
+rather than the Paleogene — which is the geologically correct result. No code change needed,
+but verify with an existing project that unconformity picks receive the right strat unit color.
 
 ---
 
-### BF4-027-F: Frontend UI — remove unconformities import
+### BF4-027-F: Frontend UI — TopPickSettings
+
+**`frontend/src/components/layout/settings/TopPickSettings.tsx`**
+
+For `kind === 'unconformity'` rows, replace the `age_base_ma` input with `hiatus_duration_ma`:
+
+```
+Age (Ma)             [age_top_ma input]       ← label unchanged ("Top age (Ma)")
+Hiatus duration (Ma) [hiatus_duration_ma]     ← replaces "Base age (Ma)"
+Eroded thickness (m) [eroded_thickness_m]     ← unchanged
+```
+
+Optionally show a read-only derived label below:
+`Deposition resumed: {(age_top_ma - hiatus_duration_ma).toFixed(1)} Ma`
+
+Update the `onFormationUpdate` patch interface:
+```ts
+patch: {
+  name?: string
+  age_ma?: number
+  hiatus_duration_ma?: number   // new; replaces age_base_ma
+  kind?: string
+  color?: string
+  water_depth_m?: number
+  eroded_thickness_m?: number
+}
+```
+
+---
+
+### BF4-027-G: Frontend UI — remove unconformities import
 
 **`frontend/src/components/layout/ProjectToolbar.tsx`**
 
@@ -2561,39 +2648,43 @@ endpoint in `api/formations.py` and the frontend fetch.
 
 ---
 
-### BF4-027-G: Frontend types
+### BF4-027-H: Frontend types
 
-**`frontend/src/types/well.ts`** (or wherever `FormationTop` is defined)
+**`frontend/src/types/well.ts`**
 
-Add `hiatus_duration_ma: number` (default `0`) to the `FormationTop` / `FormationTopModel`
-frontend type. Remove `age_base_ma` from unconformity-specific usage notes (field can remain
-on the type as optional for strat tops).
+Add `hiatus_duration_ma: number` to `FormationTop`. Keep `age_base_ma?: number | null` for
+strat tops (sourced from backend response), but it will be `null` for all unconformity rows
+after migration.
 
 ---
 
 ### Affected files summary
 
-| File | Change |
-|---|---|
-| `app/src/subsidence/data/schema.py` | Add `hiatus_duration_ma` column |
-| `app/src/subsidence/data/engine.py` | Migration: add column + convert existing rows |
-| `app/src/subsidence/api/subsidence.py` | New age resolution logic (BF4-027-B) |
-| `app/src/subsidence/data/importers/tops.py` | Read hiatus fields; remove `import_unconformities_csv` |
-| `app/src/subsidence/data/importers/__init__.py` | Remove unconformities exports |
-| `app/src/subsidence/api/projects_imports.py` | Remove unconformities endpoint + link call |
-| `app/src/subsidence/api/projects.py` | Remove unconformities request/response models |
-| `app/src/subsidence/api/formations.py` | Add `hiatus_duration_ma` to PATCH handler |
-| `frontend/src/types/well.ts` | Add `hiatus_duration_ma` field |
-| `frontend/src/components/layout/importWizard/mapping.ts` | Remove UNCONFORMITIES_FIELDS; extend TOPS_FIELDS |
-| `frontend/src/components/layout/settings/TopPickSettings.tsx` | Replace age_base_ma with hiatus_duration_ma in UI |
-| `frontend/src/components/layout/ProjectToolbar.tsx` | Remove unconformities dialog + button |
-| `frontend/src/components/layout/ImportUnconformitiesDialog.tsx` | **Delete** |
-| `frontend/src/components/layout/index.ts` | Remove unconformities dialog export |
-| `frontend/src/components/layout/importWizard/importWizardPresets.ts` | Remove unconformities preset |
+| File | Sub-item | Change |
+|---|---|---|
+| `app/src/subsidence/data/schema.py` | A | Add `hiatus_duration_ma` column |
+| `app/src/subsidence/data/engine.py` | A | Migration: add column + convert existing rows |
+| `app/src/subsidence/api/subsidence.py` | B | New age resolution logic; no change to zone path |
+| `app/src/subsidence/data/importers/tops.py` | C | Read hiatus/eroded fields; remove `import_unconformities_csv`, `link_tops_to_unconformities` |
+| `app/src/subsidence/data/importers/common.py` | C | Remove `_merge_note`, `_extract_note_unconformity_ref` |
+| `app/src/subsidence/data/models.py` | C | Remove `TopLink`, `LinkResult`, `unconformity_ref` |
+| `app/src/subsidence/data/importers/__init__.py` | C | Remove unconformities/link exports |
+| `app/src/subsidence/api/projects_imports.py` | C | Remove unconformities endpoint + link call |
+| `app/src/subsidence/api/projects.py` | C | Remove unconformities request/response models |
+| `app/src/subsidence/api/formations.py` | E | Add `hiatus_duration_ma` to PATCH + response |
+| `app/src/subsidence/data/undo.py` | E | Track `hiatus_duration_ma` in undo snapshots |
+| `app/src/subsidence/data/strat_link.py` | E | No code change; verify strat link behavior |
+| `frontend/src/types/well.ts` | H | Add `hiatus_duration_ma` field to `FormationTop` |
+| `frontend/src/components/layout/importWizard/mapping.ts` | D | Remove `UNCONFORMITIES_FIELDS`; extend `TOPS_FIELDS` |
+| `frontend/src/components/layout/settings/TopPickSettings.tsx` | F | Replace `age_base_ma` with `hiatus_duration_ma` |
+| `frontend/src/components/layout/ProjectToolbar.tsx` | G | Remove unconformities dialog + button |
+| `frontend/src/components/layout/ImportUnconformitiesDialog.tsx` | G | **Delete** |
+| `frontend/src/components/layout/index.ts` | G | Remove unconformities dialog export |
+| `frontend/src/components/layout/importWizard/importWizardPresets.ts` | G | Remove unconformities preset |
 
-**Complexity**: L — schema migration + compute logic change + remove a complete import path.
-Implement in order: A → B → C → D/E/F/G. Test compute on an existing project with unconformities
-before and after migration to verify burial charts are unchanged.
+**Complexity**: L — schema migration + compute change + remove a complete import path.
+Implement in order: A → B → C → E → D/F/G/H. Test compute on an existing project with
+unconformities before and after migration to verify burial charts are numerically identical.
 
 ---
 
