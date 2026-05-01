@@ -44,6 +44,7 @@ export interface WellViewState {
   tracks: TrackConfig[]
   trackOrder: string[]
   visibleFormationIds: string[]
+  hiddenTopSetZoneIds: number[]
   hiddenCurveMnemonics: string[]
   hiddenTopLabelIds: string[]
   topLabelPositions: Record<string, 'left' | 'center' | 'right'>
@@ -82,6 +83,7 @@ export function createDefaultWellView(): WellViewState {
     tracks: [track],
     trackOrder: buildTrackOrder([track.id]),
     visibleFormationIds: [],
+    hiddenTopSetZoneIds: [],
     hiddenCurveMnemonics: [],
     hiddenTopLabelIds: [],
     topLabelPositions: {},
@@ -133,6 +135,9 @@ export function coerceWellViewState(raw: unknown): WellViewState {
   const visibleFormationIds = Array.isArray(value.visibleFormationIds)
     ? value.visibleFormationIds.filter((id): id is string => typeof id === 'string')
     : fallback.visibleFormationIds
+  const hiddenTopSetZoneIds = Array.isArray(value.hiddenTopSetZoneIds)
+    ? value.hiddenTopSetZoneIds.filter((id): id is number => typeof id === 'number' && Number.isFinite(id))
+    : fallback.hiddenTopSetZoneIds
   const hiddenCurveMnemonics = Array.isArray(value.hiddenCurveMnemonics)
     ? value.hiddenCurveMnemonics.filter((mnemonic): mnemonic is string => typeof mnemonic === 'string')
     : fallback.hiddenCurveMnemonics
@@ -158,6 +163,7 @@ export function coerceWellViewState(raw: unknown): WellViewState {
     tracks,
     trackOrder,
     visibleFormationIds,
+    hiddenTopSetZoneIds,
     hiddenCurveMnemonics,
     hiddenTopLabelIds,
     topLabelPositions,

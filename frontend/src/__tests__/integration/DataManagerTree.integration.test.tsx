@@ -61,6 +61,10 @@ function renderPanel(overrides: Partial<React.ComponentProps<typeof WellDataPane
     onSelectWell: vi.fn(),
     onToggleCurve: vi.fn(),
     onToggleFormation: vi.fn(),
+    onToggleTopSetVisibility: vi.fn(),
+    onToggleTopSetMarker: vi.fn(),
+    onToggleTopSetZone: vi.fn(),
+    onDeleteTopSet: vi.fn(),
     onToggleAllFormations: vi.fn(),
     onToggleAllCurves: vi.fn(),
     onToggleDeviation: vi.fn(),
@@ -83,6 +87,7 @@ function renderPanel(overrides: Partial<React.ComponentProps<typeof WellDataPane
     onDeleteWell: vi.fn(),
     onDeleteAllFormations: vi.fn(),
     onDeleteFormation: vi.fn(),
+    onDeleteTopSetMarker: vi.fn(),
     ...overrides,
   }
   return {
@@ -321,7 +326,7 @@ describe('Data Manager well tree', () => {
 
     fireEvent.click(screen.getAllByLabelText('Expand')[0])
     expect(screen.getByText('Logs')).toBeTruthy()
-    expect(screen.getByText('TOPS')).toBeTruthy()
+    expect(screen.queryByText('TOPS')).toBeNull()
 
     fireEvent.click(screen.getByText('Logs'))
     expect(props.onSelectLasGroup).toHaveBeenCalledWith('well-a')
@@ -331,46 +336,75 @@ describe('Data Manager well tree', () => {
     fireEvent.click(logsExpand)
     fireEvent.click(screen.getByText('GR'))
     expect(props.onSelectCurve).toHaveBeenCalledWith('well-a', 'GR')
+  })
 
-    const topsRow = screen.getByText('TOPS').closest('.tree-node__row')
-    const topsExpand = topsRow?.querySelector('button[aria-label="Expand"]') as HTMLButtonElement
-    fireEvent.click(topsExpand)
+  it('uses TopSet tri-state checkbox to toggle stratigraphy markers and zones', () => {
+    const { props } = renderPanel({
+      wells: [
+        createWellInventory({
+          well_id: 'well-a',
+          well_name: 'Well A',
+          active_top_set_id: 10,
+          active_top_set_name: 'Regional',
+          formations: [{ id: 'top-a', name: 'Top A', depth_md: 100, depth_tvd: null, depth_tvdss: null, horizon_id: 100, active_strat_color: '#aaaaaa', kind: 'strat' }],
+        }),
+      ],
+      visibleFormationIdsByWellId: { 'well-a': [], 'well-b': [] },
+    })
+
+    const topSetRow = screen.getByText('Regional').closest('.tree-node__row')
+    const checkbox = topSetRow?.querySelector('input[type="checkbox"]') as HTMLInputElement
+    expect(checkbox).toBeTruthy()
+
+    fireEvent.click(checkbox)
+    expect(props.onToggleTopSetVisibility).toHaveBeenCalledWith(10, true)
+  })
+
+  it('selects a TopSet marker as the active well top pick', () => {
+    const { props } = renderPanel({
+      wells: [
+        createWellInventory({
+          well_id: 'well-a',
+          well_name: 'Well A',
+          active_top_set_id: 10,
+          active_top_set_name: 'Regional',
+          formations: [{ id: 'top-a', name: 'Top A', depth_md: 100, depth_tvd: null, depth_tvdss: null, horizon_id: 100, active_strat_color: '#aaaaaa', kind: 'strat' }],
+        }),
+      ],
+    })
+
+    const topSetRow = screen.getByText('Regional').closest('.tree-node__row')
+    const topSetExpand = topSetRow?.querySelector('button[aria-label="Expand"]') as HTMLButtonElement
+    fireEvent.click(topSetExpand)
+
     fireEvent.click(screen.getByText('Top A'))
     expect(props.onSelectFormation).toHaveBeenCalledWith('well-a', 'top-a')
   })
 
-  it('uses TOPS tri-state checkbox to toggle all tops', () => {
+  it('exposes delete actions for wells and TopSet markers', () => {
     const { props } = renderPanel({
-      visibleFormationIdsByWellId: { 'well-a': [], 'well-b': [] },
+      wells: [
+        createWellInventory({
+          well_id: 'well-a',
+          well_name: 'Well A',
+          active_top_set_id: 10,
+          active_top_set_name: 'Regional',
+          formations: [{ id: 'top-a', name: 'Top A', depth_md: 100, depth_tvd: null, depth_tvdss: null, horizon_id: 100, active_strat_color: '#aaaaaa', kind: 'strat' }],
+        }),
+      ],
     })
-
-    fireEvent.click(screen.getAllByLabelText('Expand')[0])
-    const topsRow = screen.getByText('TOPS').closest('.tree-node__row')
-    const checkbox = topsRow?.querySelector('input[type="checkbox"]') as HTMLInputElement
-    expect(checkbox).toBeTruthy()
-
-    fireEvent.click(checkbox)
-    expect(props.onToggleAllFormations).toHaveBeenCalledWith('well-a', true)
-  })
-
-  it('exposes delete actions in the well tree', () => {
-    const { props } = renderPanel()
 
     fireEvent.click(screen.getAllByLabelText('Expand')[0])
     fireEvent.click(screen.getByLabelText('Delete well "Well A"'))
     expect(props.onDeleteWell).toHaveBeenCalledWith('well-a', 'Well A')
 
-    fireEvent.click(screen.getByLabelText('Delete all tops for "Well A"'))
-    expect(props.onDeleteAllFormations).toHaveBeenCalledWith(
-      'well-a',
-      expect.arrayContaining([expect.objectContaining({ id: 'top-a' })]),
-      'Well A',
-    )
+    const topSetRow = screen.getByText('Regional').closest('.tree-node__row')
+    const topSetExpand = topSetRow?.querySelector('button[aria-label="Expand"]') as HTMLButtonElement
+    fireEvent.click(topSetExpand)
+    fireEvent.click(screen.getByLabelText('Delete TopSet "Regional"'))
+    expect(props.onDeleteTopSet).toHaveBeenCalledWith(10, 'Regional')
 
-    const topsRow = screen.getByText('TOPS').closest('.tree-node__row')
-    const topsExpand = topsRow?.querySelector('button[aria-label="Expand"]') as HTMLButtonElement
-    fireEvent.click(topsExpand)
-    fireEvent.click(screen.getByLabelText('Delete top "Top A"'))
-    expect(props.onDeleteFormation).toHaveBeenCalledWith('well-a', 'top-a', 'Top A')
+    fireEvent.click(screen.getByLabelText('Delete marker "Top A"'))
+    expect(props.onDeleteTopSetMarker).toHaveBeenCalledWith(10, 100, 'Top A')
   })
 })

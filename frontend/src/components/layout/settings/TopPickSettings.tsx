@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react'
 
-import { useViewStore, useWellDataStore, useWorkspaceStore } from '@/stores'
+import { useWellDataStore, useWorkspaceStore } from '@/stores'
 import type { FormationTop, SeaLevelPoint } from '@/types'
 
 function interpolateSeaLevel(points: SeaLevelPoint[], ageMa: number): number | null {
@@ -37,7 +37,6 @@ interface TopPickSettingsProps {
 export function TopPickSettings({ selectedFormation, onFormationUpdate, onFormationMove }: TopPickSettingsProps) {
   const wellId = useWellDataStore((state) => state.well?.well_id)
   const updateWellViewState = useWorkspaceStore((state) => state.updateWellViewState)
-  const globalMarkerPosition = useViewStore((state) => state.formationsTrackConfig.markerLabelPosition)
   const wellInventories = useWellDataStore((state) => state.wellInventories)
   const loadSeaLevelPoints = useWellDataStore((state) => state.loadSeaLevelPoints)
   const seaLevelCurves = useWellDataStore((state) => state.seaLevelCurves)
@@ -65,11 +64,6 @@ export function TopPickSettings({ selectedFormation, onFormationUpdate, onFormat
     return view?.hiddenTopLabelIds?.includes(selectedFormation.id) ?? false
   })
 
-  const perFormationPosition = useWorkspaceStore((state) => {
-    const view = wellId ? state.wellViewStates[wellId] : null
-    return view?.topLabelPositions?.[selectedFormation.id] ?? null
-  })
-
   const handleToggleLabel = (show: boolean) => {
     if (!wellId) return
     updateWellViewState(wellId, (state) => ({
@@ -78,19 +72,6 @@ export function TopPickSettings({ selectedFormation, onFormationUpdate, onFormat
         ? state.hiddenTopLabelIds.filter((id) => id !== selectedFormation.id)
         : [...state.hiddenTopLabelIds, selectedFormation.id],
     }))
-  }
-
-  const handlePositionChange = (value: string) => {
-    if (!wellId) return
-    updateWellViewState(wellId, (state) => {
-      const next = { ...state.topLabelPositions }
-      if (value === '') {
-        delete next[selectedFormation.id]
-      } else {
-        next[selectedFormation.id] = value as 'left' | 'center' | 'right'
-      }
-      return { ...state, topLabelPositions: next }
-    })
   }
 
   const isUnconformity = selectedFormation.kind === 'unconformity'
@@ -204,18 +185,6 @@ export function TopPickSettings({ selectedFormation, onFormationUpdate, onFormat
           onChange={(event) => handleToggleLabel(event.target.checked)}
         />
       </label>
-      <div className="sf-row">
-        <span>Marker position</span>
-        <select
-          value={perFormationPosition ?? ''}
-          onChange={(e) => handlePositionChange(e.target.value)}
-        >
-          <option value="">— global ({globalMarkerPosition})</option>
-          <option value="left">Left</option>
-          <option value="center">Center</option>
-          <option value="right">Right</option>
-        </select>
-      </div>
       <div className="tree-leaf">
         <span>Linked unit</span>
         <span>{selectedFormation.active_strat_unit_name ?? 'Unlinked'}</span>

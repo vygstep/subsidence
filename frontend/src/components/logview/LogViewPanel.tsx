@@ -3,7 +3,7 @@ import { Fragment, useCallback, useEffect, useMemo, useRef, useState } from 'rea
 import { useSynchronizedScroll } from '@/hooks'
 import { useViewStore, useWellDataStore } from '@/stores'
 import { DEPTH_TRACK_ID, FORMATION_TRACK_ID } from '@/stores/workspaceStore'
-import type { CurveData, FormationTop, TrackConfig } from '@/types'
+import type { CurveData, FormationTop, FormationZone, TrackConfig } from '@/types'
 
 import { InteractionOverlay } from '../interaction'
 import { DataTrack } from './DataTrack'
@@ -19,6 +19,8 @@ interface LogViewPanelProps {
   trackOrder: string[]
   curves: CurveData[]
   formations: FormationTop[]
+  zoneFormations: FormationTop[]
+  zones: FormationZone[]
   minDepth: number
   maxDepth: number
 }
@@ -26,7 +28,7 @@ interface LogViewPanelProps {
 const DEFAULT_DEPTH_WIDTH = 60
 const DEFAULT_FORMATION_WIDTH = 80
 
-export function LogViewPanel({ tracks, trackOrder, curves, formations, minDepth, maxDepth }: LogViewPanelProps) {
+export function LogViewPanel({ tracks, trackOrder, curves, formations, zoneFormations, zones, minDepth, maxDepth }: LogViewPanelProps) {
   const containerRef = useRef<HTMLDivElement | null>(null)
   const [trackHeight, setTrackHeight] = useState(600)
 
@@ -194,7 +196,9 @@ export function LogViewPanel({ tracks, trackOrder, curves, formations, minDepth,
                 return (
                   <Fragment key={trackId}>
                     <FormationColumn
-                      formations={formations}
+                      formations={zoneFormations}
+                      visibleMarkerFormations={formations}
+                      zones={zones}
                       height={trackHeight}
                       maxDepth={maxDepth}
                       width={formationWidth}

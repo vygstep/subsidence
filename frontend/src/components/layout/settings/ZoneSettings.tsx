@@ -1,6 +1,6 @@
 import { useState } from 'react'
 
-import { useWellDataStore } from '@/stores'
+import { useViewStore, useWellDataStore } from '@/stores'
 import { useWorkspaceStore } from '@/stores/workspaceStore'
 
 interface ZoneSettingsProps {
@@ -12,11 +12,15 @@ interface ZoneSettingsProps {
 
 export function ZoneSettings({ wellId, zoneSetId, onSelectZone, selectedZoneId }: ZoneSettingsProps) {
   const [objectMode, setObjectMode] = useState<'markers' | 'zones'>('zones')
+  const formationsTrackConfig = useViewStore((state) => state.formationsTrackConfig)
+  const updateFormationsTrackConfig = useViewStore((state) => state.updateFormationsTrackConfig)
   const zones = useWellDataStore((state) => state.zones)
   const well = useWellDataStore((state) => state.well)
   const wellInventories = useWellDataStore((state) => state.wellInventories)
-  const seaLevelCurves = useWellDataStore((state) => state.seaLevelCurves)
   const loadWell = useWellDataStore((state) => state.loadWell)
+  const selectedObject = useWorkspaceStore((state) => state.selectedObject)
+  const setActiveToolbarMode = useWorkspaceStore((state) => state.setActiveToolbarMode)
+  const setSelectedFormationId = useWorkspaceStore((state) => state.setSelectedFormationId)
   const setSelectedObject = useWorkspaceStore((state) => state.setSelectedObject)
 
   const linkedWells = zoneSetId === undefined
@@ -26,13 +30,20 @@ export function ZoneSettings({ wellId, zoneSetId, onSelectZone, selectedZoneId }
   const markerRows = zoneSetId === undefined
     ? []
     : (selectedInventory?.formations ?? []).filter((formation) => formation.horizon_id !== null)
-  const activeCurveId = wellInventories.find((item) => item.well_id === wellId)?.active_sea_level_curve_id ?? null
-  const activeCurveName = seaLevelCurves.find((curve) => curve.id === activeCurveId)?.name ?? null
+  const topSetName = zoneSetId === undefined
+    ? 'STRATIGRAPHY'
+    : linkedWells.find((item) => item.active_top_set_name)?.active_top_set_name ?? `TopSet ${zoneSetId}`
 
   function handleWellChange(nextWellId: string): void {
     if (zoneSetId === undefined || !nextWellId) return
     setSelectedObject({ type: 'zone-set', zoneSetId, wellId: nextWellId })
     void loadWell(nextWellId)
+  }
+
+  function handleMarkerSelect(markerId: string): void {
+    setSelectedFormationId(markerId)
+    setSelectedObject({ type: 'top-pick', wellId, formationId: markerId })
+    setActiveToolbarMode('tops')
   }
 
   if (well?.well_id !== wellId) {
@@ -50,10 +61,6 @@ export function ZoneSettings({ wellId, zoneSetId, onSelectZone, selectedZoneId }
             </select>
           </div>
         ) : null}
-        <div className="sf-row">
-          <span>Eustatic curve</span>
-          <span>{activeCurveName ?? 'None'}</span>
-        </div>
         <p className="sidebar-panel__empty">TopSet data not loaded yet.</p>
       </div>
     )
@@ -63,7 +70,7 @@ export function ZoneSettings({ wellId, zoneSetId, onSelectZone, selectedZoneId }
     <div className="template-panel">
       <div className="template-panel__group">
         <div className="template-panel__label">Object</div>
-        <div className="template-panel__value">{zoneSetId === undefined ? 'STRATIGRAPHY' : 'TopSet'}</div>
+        <div className="template-panel__value">{topSetName}</div>
       </div>
       {zoneSetId !== undefined && linkedWells.length > 0 ? (
         <div className="sf-row">
@@ -77,18 +84,61 @@ export function ZoneSettings({ wellId, zoneSetId, onSelectZone, selectedZoneId }
           </select>
         </div>
       ) : null}
-      <div className="sf-row">
-        <span>Eustatic curve</span>
-        <span>{activeCurveName ?? 'None'}</span>
-      </div>
       {zoneSetId !== undefined ? (
-        <div className="sf-row">
-          <span>View</span>
-          <select value={objectMode} onChange={(event) => setObjectMode(event.target.value as 'markers' | 'zones')}>
-            <option value="markers">markers</option>
-            <option value="zones">zones</option>
-          </select>
-        </div>
+        <>
+          <div className="sf-row">
+            <span>Inspect</span>
+            <select value={objectMode} onChange={(event) => setObjectMode(event.target.value as 'markers' | 'zones')}>
+              <option value="markers">markers</option>
+              <option value="zones">zones</option>
+            </select>
+          </div>
+          {objectMode === 'markers' ? (
+            <>
+              <label className="sf-row">
+                <span>Marker labels</span>
+                <input
+                  type="checkbox"
+                  checked={formationsTrackConfig.showMarkerLabels}
+                  onChange={(event) => updateFormationsTrackConfig({ showMarkerLabels: event.target.checked })}
+                />
+              </label>
+              <div className="sf-row">
+                <span>Marker position</span>
+                <select
+                  value={formationsTrackConfig.markerLabelPosition}
+                  onChange={(event) => updateFormationsTrackConfig({ markerLabelPosition: event.target.value as 'left' | 'center' | 'right' })}
+                >
+                  <option value="left">Left</option>
+                  <option value="center">Center</option>
+                  <option value="right">Right</option>
+                </select>
+              </div>
+            </>
+          ) : (
+            <>
+              <label className="sf-row">
+                <span>Zone labels</span>
+                <input
+                  type="checkbox"
+                  checked={formationsTrackConfig.showLabels}
+                  onChange={(event) => updateFormationsTrackConfig({ showLabels: event.target.checked })}
+                />
+              </label>
+              <div className="sf-row">
+                <span>Zone position</span>
+                <select
+                  value={formationsTrackConfig.zoneLabelPosition}
+                  onChange={(event) => updateFormationsTrackConfig({ zoneLabelPosition: event.target.value as 'left' | 'center' | 'right' })}
+                >
+                  <option value="left">Left</option>
+                  <option value="center">Center</option>
+                  <option value="right">Right</option>
+                </select>
+              </div>
+            </>
+          )}
+        </>
       ) : null}
 
       {objectMode === 'markers' && zoneSetId !== undefined ? (
@@ -98,15 +148,25 @@ export function ZoneSettings({ wellId, zoneSetId, onSelectZone, selectedZoneId }
             <p className="sidebar-panel__empty">No markers loaded for this well.</p>
           ) : (
             <div className="zone-settings__list">
-              {markerRows.map((marker) => (
-                <div key={marker.id} className="zone-settings__row">
-                  <span className="zone-settings__interval">{marker.name}</span>
-                  <span className="zone-settings__meta">
-                    {marker.depth_md === null ? 'missing pick' : `${marker.depth_md.toFixed(1)} m`}
-                    {marker.kind === 'unconformity' ? ' - unconformity' : ''}
-                  </span>
-                </div>
-              ))}
+              {markerRows.map((marker) => {
+                const isSelected = selectedObject?.type === 'top-pick'
+                  && selectedObject.wellId === wellId
+                  && selectedObject.formationId === marker.id
+                return (
+                  <button
+                    key={marker.id}
+                    type="button"
+                    className={`zone-settings__row${isSelected ? ' zone-settings__row--selected' : ''}`}
+                    onClick={() => handleMarkerSelect(marker.id)}
+                  >
+                    <span className="zone-settings__interval">{marker.name}</span>
+                    <span className="zone-settings__meta">
+                      {marker.depth_md === null ? 'missing pick' : `${marker.depth_md.toFixed(1)} m`}
+                      {marker.kind === 'unconformity' ? ' - unconformity' : ''}
+                    </span>
+                  </button>
+                )
+              })}
             </div>
           )}
         </>

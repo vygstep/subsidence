@@ -3,15 +3,27 @@ import { useEffect, useMemo, useState } from 'react'
 import { useCanvasRenderer, useDepthScale } from '@/hooks'
 import { useViewStore, useWellDataStore } from '@/stores'
 import { drawLithologyBlock } from '@/renderers'
-import type { FormationTop, LithologyPatternEntry, LithologyType } from '@/types'
+import type { FormationTop, FormationZone, LithologyPatternEntry, LithologyType } from '@/types'
 import { mdToTvd } from '@/utils/depthTransform'
 
 interface FormationColumnProps {
   formations: FormationTop[]
+  visibleMarkerFormations?: FormationTop[]
+  zones?: FormationZone[] | undefined
   height: number
   maxDepth: number
   width?: number
   isSelected?: boolean
+}
+
+function labelAnchor(position: 'left' | 'center' | 'right', width: number): { x: number; align: CanvasTextAlign; maxWidth: number } {
+  if (position === 'left') {
+    return { x: 5, align: 'left', maxWidth: width - 10 }
+  }
+  if (position === 'right') {
+    return { x: width - 5, align: 'right', maxWidth: width - 10 }
+  }
+  return { x: width / 2, align: 'center', maxWidth: width - 8 }
 }
 
 function toRenderableLithology(lithology: LithologyType | undefined) {
@@ -21,7 +33,7 @@ function toRenderableLithology(lithology: LithologyType | undefined) {
   return lithology
 }
 
-export function FormationColumn({ formations, height, maxDepth, width = 80, isSelected = false }: FormationColumnProps) {
+export function FormationColumn({ formations, visibleMarkerFormations = formations, zones, height, maxDepth, width = 80, isSelected = false }: FormationColumnProps) {
   const visibleDepthRange = useViewStore((state) => state.visibleDepthRange)
   const formationsTrackConfig = useViewStore((state) => state.formationsTrackConfig)
   const tvdTable = useWellDataStore((state) => state.tvdTable)
@@ -53,6 +65,14 @@ export function FormationColumn({ formations, height, maxDepth, width = 80, isSe
     () => [...formations].sort((left, right) => (left.depth_md ?? Infinity) - (right.depth_md ?? Infinity)),
     [formations],
   )
+  const formationByHorizonId = useMemo(
+    () => new Map(formations.filter((formation) => formation.horizon_id !== null).map((formation) => [formation.horizon_id!, formation])),
+    [formations],
+  )
+  const orderedZones = useMemo(
+    () => [...(zones ?? [])].sort((left, right) => left.sort_order - right.sort_order),
+    [zones],
+  )
 
   useEffect(() => {
     let cancelled = false
@@ -81,7 +101,7 @@ export function FormationColumn({ formations, height, maxDepth, width = 80, isSe
 
       // Render "not picked" badges at top for unpicked formations
       let notPickedOffset = 2
-      orderedFormations.forEach((formation) => {
+      visibleMarkerFormations.forEach((formation) => {
         if (formation.depth_md !== null) return
         const color = formation.active_strat_color ?? formation.color
         const badgeH = 16
@@ -99,6 +119,59 @@ export function FormationColumn({ formations, height, maxDepth, width = 80, isSe
         ctx.restore()
         notPickedOffset += badgeH + 1
       })
+
+      if (orderedZones.length > 0) {
+        orderedZones.forEach((zone) => {
+          const formation = formationByHorizonId.get(zone.upper_horizon.id)
+          const lowerFormation = formationByHorizonId.get(zone.lower_horizon.id)
+          if (!formation || !lowerFormation || formation.depth_md === null || lowerFormation.depth_md === null) return
+          const nextDepth = getFormationTopDepth(lowerFormation)
+          const blockTop = Math.max(getFormationTopDepth(formation), visibleDepthRange.min)
+          const blockBottom = Math.min(nextDepth, visibleDepthRange.max)
+
+          if (blockBottom <= blockTop) {
+            return
+          }
+
+          const yTop = depthScale(blockTop)
+          const yBottom = depthScale(blockBottom)
+          const blockHeight = yBottom - yTop
+
+          const lithologyCode = toRenderableLithology(formation.lithology)
+          const pattern = lithologyCode ? patternByCode.get(lithologyCode) : null
+          drawLithologyBlock(
+            ctx,
+            {
+              color: formation.active_strat_color ?? formation.color,
+              patternCode: pattern?.code ?? null,
+              patternSvg: pattern?.svg_content ?? null,
+            },
+            0,
+            yTop,
+            canvasWidth,
+            blockHeight,
+            () => setPatternRenderTick((value) => value + 1),
+          )
+
+          if (blockHeight < 28 || !formationsTrackConfig.showLabels) {
+            return
+          }
+
+          ctx.save()
+          const anchor = labelAnchor(formationsTrackConfig.zoneLabelPosition, canvasWidth)
+          ctx.fillStyle = '#17212b'
+          ctx.font = '600 11px Segoe UI'
+          ctx.textAlign = anchor.align
+          ctx.textBaseline = 'middle'
+          ctx.fillText(`${zone.upper_horizon.name} - ${zone.lower_horizon.name}`, anchor.x, yTop + blockHeight / 2, anchor.maxWidth)
+          ctx.restore()
+        })
+        return
+      }
+
+      if (zones !== undefined) {
+        return
+      }
 
       orderedFormations.forEach((formation, index) => {
         if (formation.depth_md === null) return
@@ -138,14 +211,15 @@ export function FormationColumn({ formations, height, maxDepth, width = 80, isSe
         }
 
         ctx.save()
+        const anchor = labelAnchor(formationsTrackConfig.zoneLabelPosition, canvasWidth)
         ctx.fillStyle = '#17212b'
         ctx.font = '600 11px Segoe UI'
-        ctx.textAlign = 'center'
+        ctx.textAlign = anchor.align
         ctx.textBaseline = 'middle'
         const label = formationsTrackConfig.nameSource === 'linked-strat-unit'
           ? formation.active_strat_unit_name ?? formation.name
           : formation.name
-        ctx.fillText(label, canvasWidth / 2, yTop + blockHeight / 2, canvasWidth - 8)
+        ctx.fillText(label, anchor.x, yTop + blockHeight / 2, anchor.maxWidth)
         ctx.restore()
       })
     },
@@ -154,11 +228,15 @@ export function FormationColumn({ formations, height, maxDepth, width = 80, isSe
       formationsTrackConfig.backgroundColor,
       formationsTrackConfig.nameSource,
       formationsTrackConfig.showLabels,
+      formationsTrackConfig.zoneLabelPosition,
       maxDepth,
+      formationByHorizonId,
       orderedFormations,
+      orderedZones,
       patternByCode,
       patternRenderTick,
       getFormationTopDepth,
+      visibleMarkerFormations,
       visibleDepthRange.max,
       visibleDepthRange.min,
     ],

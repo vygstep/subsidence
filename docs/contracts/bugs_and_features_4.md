@@ -2770,16 +2770,16 @@ STRATIGRAPHY
 Clicking a TopSet in the tree selects it; its markers and derived zones appear in the settings
 panel.
 
-#### Settings panel — markers / zones toggle
+#### Data Manager visibility controls
 
-In the Settings panel, when a TopSet is the active object, the **Object** field shows a
-dropdown: `markers | zones`. This switches which representation is used in the log viewer and
-burial chart for that TopSet:
+The Data Manager tree is the primary visual control surface for TopSet rendering:
 
-- `markers` — depth picks (discrete lines in the log track, age picks in the chart).
-- `zones` — intervals between adjacent markers (colour bands in the log track and chart).
+- TopSet checkbox toggles all child markers and zones.
+- Marker checkbox toggles marker-line rendering.
+- Zone checkbox toggles interval-fill rendering.
 
-The underlying data is the same; the toggle only changes how it is rendered. Default: `zones`.
+The underlying data is the same; these checkboxes only change visibility. Settings panels inspect
+the selected object and should not own this visual mode.
 
 ---
 
@@ -2792,21 +2792,18 @@ The underlying data is the same; the toggle only changes how it is rendered. Def
    per-well. The `stratigraphy` section in the Data Manager tree is simply the grouping label for
    all TopSets in the project (not a stored entity itself).
 
-2. **`markers | zones` toggle in Settings** — the toggle switches the *level* being configured,
-   not the data. `markers` mode: the settings panel shows properties for individual picks (one row
-   per named horizon per well — depth, age, colour, lock). `zones` mode: the settings panel shows
-   properties for intervals (one row per zone between adjacent markers — same well filter). This
-   lets the user configure all markers for a given well at once, or all zones at once, without
-   needing to click each individually in the tree. The active well is the filter; the TopSet is the
-   scope.
+2. **Data Manager owns visibility** — marker and zone visibility is controlled by checkboxes in
+   the TopSet tree. Marker checkboxes affect marker lines; zone checkboxes affect interval fills.
+   Settings panels inspect selected markers/zones but do not own visual mode switching.
 
 3. **Delete behaviour** — deleting a marker from a TopSet removes it for **all wells** in that
    TopSet (the marker is a shared project-level concept). Removing a marker from a single well
    only is done via the Settings panel or the formation-top track in the Well Log view — not via
    the TopSet tree.
 
-4. **`markers | zones` toggle persistence** — UI-only state, not persisted between sessions.
-   Default on open: `zones`.
+4. **TopSet visibility persistence** — marker visibility reuses per-well formation visibility;
+   zone visibility is stored in the per-well visual config. Defaults: markers off unless enabled
+   through `TOPS` / TopSet marker checkboxes, zones on unless hidden.
 
 ---
 
@@ -2820,8 +2817,8 @@ The underlying data is the same; the toggle only changes how it is rendered. Def
 | `api/projects_imports.py` | Update import handler for upsert logic |
 | `WellDataPanel.tsx` | Restructure tree: WELLS section + STRATIGRAPHY section |
 | `ImportTopsDialog.tsx` | "TopSet" label; dropdown options updated |
-| Settings panel | `markers / zones` object toggle for TopSet |
-| Log viewer | Render path switches on `markers | zones` per TopSet |
+| Settings panel | Inspect selected TopSet / marker / zone objects |
+| Log viewer | Marker checkboxes render marker lines; zone checkboxes render interval fills |
 
 **Complexity**: XL — touches schema, import logic, data manager UI, settings, and log viewer.
 Resolve the open questions above before starting implementation.
@@ -2842,15 +2839,26 @@ Resolve the open questions above before starting implementation.
   row background. Unconformity markers keep the existing red emphasis.
 - User-facing labels in the import dialog, Data Manager, model settings, and TopSet settings now
   use `TopSet` wording instead of `ZoneSet`.
-- TopSet settings include a `markers | zones` view selector. The markers view lists the active
-  well's picks linked to the TopSet; the zones view keeps the existing interval list.
+- Data Manager owns TopSet visual control: marker checkboxes toggle marker lines; zone checkboxes
+  toggle interval fills.
+- TopSet settings now own shared label controls for stratigraphy rendering: marker labels,
+  marker label position, zone labels, and zone label position.
+- TopSet marker visibility reuses per-well formation visibility; TopSet zone visibility is stored
+  as `hiddenTopSetZoneIds` in the per-well visual config.
+- The log viewer now renders marker lines and zone fills from separate visibility inputs, so a
+  marker checkbox no longer implicitly controls interval fill visibility.
+- Per-well `WELLS -> TOPS` was removed from the Data Manager tree; TopSet markers are now managed
+  from `STRATIGRAPHY` only.
+- Stratigraphy marker/zone rows no longer show linked-well statistics. Marker rows expose a delete
+  action that removes the shared TopSet marker.
+- TopSet rows expose a delete action that removes the whole TopSet, including active well links,
+  linked top picks, horizons, zones, and zone well data.
 - Added regression coverage for repeated tops import into the same TopSet.
 
 ### Remaining
 
-- Wire the `markers | zones` view mode into the log viewer and burial chart render paths. Current
-  rendering still follows the existing app behaviour: active TopSet drives zone-based subsidence,
-  while the well log top track still renders formation picks.
+- Wire TopSet marker/zone Data Manager visibility into burial chart rendering. Current update
+  targets the log viewer first.
 
 ### Verification
 

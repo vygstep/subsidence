@@ -12,33 +12,39 @@ interface WellDataPanelProps {
   activeWellId: string | null
   visibleCurveMnemonicsByWellId: Record<string, string[]>
   visibleFormationIdsByWellId: Record<string, string[]>
+  hiddenTopSetZoneIdsByWellId?: Record<string, number[]>
   deviationVisibilityByWellId: Record<string, boolean>
-  selectedFormationId: string | null
+  selectedFormationId?: string | null
   onSelectWell: (wellId: string) => void
   onToggleCurve: (wellId: string, mnemonic: string, nextValue: boolean) => void
-  onToggleFormation: (wellId: string, formationId: string, nextValue: boolean) => void
-  onToggleAllFormations: (wellId: string, nextValue: boolean) => void
+  onToggleFormation?: (wellId: string, formationId: string, nextValue: boolean) => void
+  onToggleTopSetVisibility?: (zoneSetId: number, nextValue: boolean) => void
+  onToggleTopSetMarker?: (zoneSetId: number, horizonId: number | null, name: string, nextValue: boolean) => void
+  onToggleTopSetZone?: (zoneSetId: number, zoneId: number, nextValue: boolean) => void
+  onDeleteTopSet?: (zoneSetId: number, name: string) => void
+  onDeleteTopSetMarker?: (zoneSetId: number, horizonId: number, name: string) => void
+  onToggleAllFormations?: (wellId: string, nextValue: boolean) => void
   onToggleAllCurves: (wellId: string, nextValue: boolean) => void
   onToggleDeviation: (wellId: string, nextValue: boolean) => void
   onFocusCurveObject: (wellId: string, mnemonic: string) => void
-  onFocusFormationObject: (wellId: string, formationId: string) => void
+  onFocusFormationObject?: (wellId: string, formationId: string) => void
   onFocusLasGroupObject: (wellId: string) => void
-  onFocusTopsGroupObject: (wellId: string) => void
+  onFocusTopsGroupObject?: (wellId: string) => void
   onFocusWellObject: (wellId: string) => void
-  onSelectFormation: (wellId: string, formationId: string) => void
   selectedObject: { type: string; [key: string]: unknown } | null
   onSelectLasGroup: (wellId: string) => void
   onSelectCurve: (wellId: string, mnemonic: string) => void
-  onSelectTopsGroup: (wellId: string) => void
+  onSelectFormation?: (wellId: string, formationId: string) => void
+  onSelectTopsGroup?: (wellId: string) => void
   onContextMenuCurve: (event: React.MouseEvent, wellId: string, curve: { mnemonic: string; unit: string }) => void
   onContextMenuDeviation: (event: React.MouseEvent, wellId: string) => void
-  onContextMenuFormation: (event: React.MouseEvent, wellId: string, formation: FormationInventoryItem) => void
+  onContextMenuFormation?: (event: React.MouseEvent, wellId: string, formation: FormationInventoryItem) => void
   onContextMenuLasGroup: (event: React.MouseEvent, wellId: string) => void
-  onContextMenuTopsGroup: (event: React.MouseEvent, wellId: string) => void
+  onContextMenuTopsGroup?: (event: React.MouseEvent, wellId: string) => void
   onContextMenuWell: (event: React.MouseEvent, well: WellInventory) => void
   onDeleteWell: (wellId: string, wellName: string) => void
-  onDeleteAllFormations: (wellId: string, formations: FormationInventoryItem[], wellName: string) => void
-  onDeleteFormation: (wellId: string, formationId: string, formationName: string) => void
+  onDeleteAllFormations?: (wellId: string, formations: FormationInventoryItem[], wellName: string) => void
+  onDeleteFormation?: (wellId: string, formationId: string, formationName: string) => void
   onSelectZoneSetsRoot?: () => void
   onSelectZoneSet?: (zoneSetId: number, wellId: string) => void
   onSelectZoneInSet?: (zoneSetId: number, wellId: string, zoneId: number) => void
@@ -59,9 +65,9 @@ interface ZoneSetTreeItem {
 interface ZoneSetMarkerTreeItem {
   horizon_id: number | null
   name: string
-  well_count: number
   color: string
   is_unconformity: boolean
+  formation_ids_by_well_id: Record<string, string[]>
   zone_below: FormationZone | null
 }
 
@@ -72,13 +78,6 @@ const MODEL_NODES: Array<{ type: SubsidenceModelType; label: string; available: 
   { type: 'stepwise', label: 'Stepwise backstripping through time', available: false },
   { type: 'thermal', label: 'Thermal subsidence fitting', available: false },
 ]
-
-function formatNumber(value: number | null | undefined): string {
-  if (value === null || value === undefined || Number.isNaN(value)) {
-    return '-'
-  }
-  return Number.isInteger(value) ? String(value) : value.toFixed(2)
-}
 
 function topBackgroundColor(formation: FormationInventoryItem): string {
   return formation.active_strat_color ?? '#9ca3af'
@@ -232,33 +231,29 @@ export function WellDataPanel({
   activeWellId,
   visibleCurveMnemonicsByWellId,
   visibleFormationIdsByWellId,
+  hiddenTopSetZoneIdsByWellId = {},
   deviationVisibilityByWellId,
-  selectedFormationId,
   onSelectWell,
   onToggleCurve,
-  onToggleFormation,
-  onToggleAllFormations,
+  onToggleTopSetVisibility = () => {},
+  onToggleTopSetMarker = () => {},
+  onToggleTopSetZone = () => {},
+  onDeleteTopSet = () => {},
+  onDeleteTopSetMarker = () => {},
   onToggleAllCurves,
   onToggleDeviation,
   onFocusCurveObject,
-  onFocusFormationObject,
   onFocusLasGroupObject,
-  onFocusTopsGroupObject,
   onFocusWellObject,
-  onSelectFormation,
   selectedObject,
   onSelectLasGroup,
   onSelectCurve,
-  onSelectTopsGroup,
+  onSelectFormation = () => {},
   onContextMenuCurve,
   onContextMenuDeviation,
-  onContextMenuFormation,
   onContextMenuLasGroup,
-  onContextMenuTopsGroup,
   onContextMenuWell,
   onDeleteWell,
-  onDeleteAllFormations,
-  onDeleteFormation,
   onSelectZoneSetsRoot = () => {},
   onSelectZoneSet = () => {},
   onSelectZoneInSet = () => {},
@@ -284,7 +279,7 @@ export function WellDataPanel({
   }
 
   const zoneSets = useMemo<ZoneSetTreeItem[]>(() => {
-    const byId = new Map<number, ZoneSetTreeItem & { zoneIds: Set<number>; wellIds: Set<string>; markerCounts: Map<string, { horizon_id: number | null; name: string; color: string; is_unconformity: boolean; wellIds: Set<string> }> }>()
+    const byId = new Map<number, ZoneSetTreeItem & { zoneIds: Set<number>; wellIds: Set<string>; markerCounts: Map<string, { horizon_id: number | null; name: string; color: string; is_unconformity: boolean; formationIdsByWellId: Map<string, string[]> }> }>()
     for (const item of wells) {
       if (item.active_top_set_id === null) continue
       const existing = byId.get(item.active_top_set_id)
@@ -296,7 +291,7 @@ export function WellDataPanel({
         zones: [],
         zoneIds: new Set<number>(),
         wellIds: new Set<string>(),
-        markerCounts: new Map<string, { horizon_id: number | null; name: string; color: string; is_unconformity: boolean; wellIds: Set<string> }>(),
+        markerCounts: new Map<string, { horizon_id: number | null; name: string; color: string; is_unconformity: boolean; formationIdsByWellId: Map<string, string[]> }>(),
       }
       if (!entry.wellIds.has(item.well_id)) {
         entry.wellIds.add(item.well_id)
@@ -309,15 +304,16 @@ export function WellDataPanel({
           name: formation.name,
           color: topBackgroundColor(formation),
           is_unconformity: false,
-          wellIds: new Set<string>(),
+          formationIdsByWellId: new Map<string, string[]>(),
         }
-        marker.color = formation.kind === 'unconformity'
-          ? 'var(--dm-danger-light)'
-          : marker.color === '#9ca3af'
+        marker.color = formation.kind !== 'unconformity' && marker.color === '#9ca3af'
             ? topBackgroundColor(formation)
             : marker.color
         marker.is_unconformity = marker.is_unconformity || formation.kind === 'unconformity'
-        marker.wellIds.add(item.well_id)
+        marker.formationIdsByWellId.set(item.well_id, [
+          ...(marker.formationIdsByWellId.get(item.well_id) ?? []),
+          formation.id,
+        ])
         entry.markerCounts.set(key, marker)
       }
       for (const zone of item.zones) {
@@ -334,19 +330,19 @@ export function WellDataPanel({
         const markers: ZoneSetMarkerTreeItem[] = []
         const seenMarkerKeys = new Set<string>()
 
-        function wellCountForMarker(horizonId: number | null, name: string): number {
-          return entry.markerCounts.get(markerTreeKey(horizonId, name))?.wellIds.size
-            ?? entry.markerCounts.get(markerTreeKey(null, name))?.wellIds.size
-            ?? entry.wells.length
-        }
-
         function visualForMarker(horizonId: number | null, name: string): { color: string; is_unconformity: boolean } {
           const marker = entry.markerCounts.get(markerTreeKey(horizonId, name))
             ?? entry.markerCounts.get(markerTreeKey(null, name))
           return {
-            color: marker?.is_unconformity ? 'var(--dm-danger-light)' : marker?.color ?? '#9ca3af',
+            color: marker?.color ?? '#9ca3af',
             is_unconformity: marker?.is_unconformity ?? false,
           }
+        }
+
+        function formationIdsByWellForMarker(horizonId: number | null, name: string): Record<string, string[]> {
+          const marker = entry.markerCounts.get(markerTreeKey(horizonId, name))
+            ?? entry.markerCounts.get(markerTreeKey(null, name))
+          return Object.fromEntries(marker?.formationIdsByWellId.entries() ?? [])
         }
 
         function addMarker(horizonId: number | null, name: string, zoneBelow: FormationZone | null): void {
@@ -357,9 +353,9 @@ export function WellDataPanel({
           markers.push({
             horizon_id: horizonId,
             name,
-            well_count: wellCountForMarker(horizonId, name),
             color: visual.color,
             is_unconformity: visual.is_unconformity,
+            formation_ids_by_well_id: formationIdsByWellForMarker(horizonId, name),
             zone_below: zoneBelow,
           })
         }
@@ -405,20 +401,12 @@ export function WellDataPanel({
                 const rootId = `well:${item.well_id}`
                 const showDetails = isOpen(rootId)
                 const visibleCurveMnemonics = visibleCurveMnemonicsByWellId[item.well_id] ?? []
-                const visibleFormationIds = visibleFormationIdsByWellId[item.well_id] ?? []
                 const isDeviationVisible = deviationVisibilityByWellId[item.well_id] ?? false
 
                 const curvesCheckboxState: ToggleState =
                   item.curves.length === 0 || visibleCurveMnemonics.length === 0
                     ? 'none'
                     : visibleCurveMnemonics.length >= item.curves.length
-                      ? 'all'
-                      : 'partial'
-
-                const topsCheckboxState: ToggleState =
-                  item.formations.length === 0 || visibleFormationIds.length === 0
-                    ? 'none'
-                    : visibleFormationIds.length >= item.formations.length
                       ? 'all'
                       : 'partial'
 
@@ -450,16 +438,15 @@ export function WellDataPanel({
                       </button>
                       <button
                         type="button"
-                        className="dm-action dm-action--ghost dm-action--danger"
+                        className="dm-action dm-action--ghost dm-action--danger dm-action--row-end"
                         title={`Delete well "${item.well_name}"`}
                         aria-label={`Delete well "${item.well_name}"`}
-                        style={{ marginLeft: 'auto' }}
                         onClick={(event) => {
                           event.stopPropagation()
                           onDeleteWell(item.well_id, item.well_name)
                         }}
                       >
-                        ✕
+                        x
                       </button>
                     </div>
 
@@ -513,81 +500,6 @@ export function WellDataPanel({
                                 ))
                               ) : (
                                 <p className="sidebar-panel__empty">No logs loaded.</p>
-                              )}
-                            </div>
-                          ) : null}
-                        </div>
-
-                        <div className="tree-node">
-                          <div
-                            className={`tree-node__row ${
-                              selectedObject?.type === 'tops-group' && selectedObject.wellId === item.well_id ? 'tree-node__row--selected' : ''
-                            }`}
-                            onContextMenu={(event) => {
-                              onFocusTopsGroupObject(item.well_id)
-                              onContextMenuTopsGroup(event, item.well_id)
-                            }}
-                          >
-                            <TreeToggleButton
-                              isOpen={isOpen(`${rootId}:tops`)}
-                              onToggle={() => toggleNode(`${rootId}:tops`)}
-                            />
-                            <TriStateCheckbox state={topsCheckboxState} onToggle={(nextValue) => onToggleAllFormations(item.well_id, nextValue)} />
-                            <button type="button" className="tree-node__section-label" onClick={() => onSelectTopsGroup(item.well_id)}>
-                              TOPS
-                            </button>
-                            {item.formations.length > 0 && (
-                              <button
-                                type="button"
-                                className="dm-action dm-action--ghost dm-action--danger"
-                                title={`Delete all tops for "${item.well_name}"`}
-                                aria-label={`Delete all tops for "${item.well_name}"`}
-                                style={{ marginLeft: 'auto' }}
-                                onClick={(event) => {
-                                  event.stopPropagation()
-                                  onDeleteAllFormations(item.well_id, item.formations, item.well_name)
-                                }}
-                              >
-                                ✕
-                              </button>
-                            )}
-                          </div>
-                          {isOpen(`${rootId}:tops`) ? (
-                            <div className="tree-node__children">
-                              {item.formations.length > 0 ? (
-                                item.formations.map((formation) => (
-                                  <div
-                                    key={formation.id}
-                                    className={`top-leaf ${selectedFormationId === formation.id && isActive ? 'top-leaf--selected' : ''} ${formation.kind === 'unconformity' ? 'top-leaf--unconformity' : ''}`}
-                                    style={{ ['--top-leaf-color' as string]: topBackgroundColor(formation) }}
-                                    onClick={() => onSelectFormation(item.well_id, formation.id)}
-                                    onContextMenu={(event) => {
-                                      onFocusFormationObject(item.well_id, formation.id)
-                                      onContextMenuFormation(event, item.well_id, formation)
-                                    }}
-                                  >
-                                    <CheckboxLeaf
-                                      checked={visibleFormationIds.includes(formation.id)}
-                                      label={formation.name}
-                                      secondary={formatNumber(formation.depth_md)}
-                                      onChange={(nextValue) => onToggleFormation(item.well_id, formation.id, nextValue)}
-                                    />
-                                    <button
-                                      type="button"
-                                      className="dm-action dm-action--ghost dm-action--danger"
-                                      title={`Delete top "${formation.name}"`}
-                                      aria-label={`Delete top "${formation.name}"`}
-                                      onClick={(event) => {
-                                        event.stopPropagation()
-                                        onDeleteFormation(item.well_id, formation.id, formation.name)
-                                      }}
-                                    >
-                                      ✕
-                                    </button>
-                                  </div>
-                                ))
-                              ) : (
-                                <p className="sidebar-panel__empty">No tops loaded.</p>
                               )}
                             </div>
                           ) : null}
@@ -653,6 +565,19 @@ export function WellDataPanel({
               ) : zoneSets.map((zoneSet) => {
                 const selectedWellId = zoneSet.wells.find((w) => w.well_id === activeWellId)?.well_id ?? zoneSet.wells[0]?.well_id
                 const isZoneSetSelected = selectedObject?.type === 'zone-set' && selectedZoneSetId === zoneSet.id
+                const selectedVisibleFormationIds = selectedWellId ? visibleFormationIdsByWellId[selectedWellId] ?? [] : []
+                const selectedHiddenZoneIds = selectedWellId ? hiddenTopSetZoneIdsByWellId[selectedWellId] ?? [] : []
+                const markerVisibleStates = zoneSet.markers.map((marker) => {
+                  const ids = selectedWellId ? marker.formation_ids_by_well_id[selectedWellId] ?? [] : []
+                  return ids.length > 0 && ids.every((id) => selectedVisibleFormationIds.includes(id))
+                })
+                const zoneVisibleStates = zoneSet.zones.map((zone) => !selectedHiddenZoneIds.includes(zone.zone_id))
+                const visibleStateItems = [...markerVisibleStates, ...zoneVisibleStates]
+                const topSetCheckboxState: ToggleState = visibleStateItems.length === 0 || visibleStateItems.every((state) => !state)
+                  ? 'none'
+                  : visibleStateItems.every(Boolean)
+                    ? 'all'
+                    : 'partial'
                 return (
                   <div key={zoneSet.id} className="tree-node">
                     <div
@@ -663,8 +588,21 @@ export function WellDataPanel({
                         isOpen={isOpen(`zones:${zoneSet.id}`)}
                         onToggle={() => toggleNode(`zones:${zoneSet.id}`)}
                       />
+                      <TriStateCheckbox state={topSetCheckboxState} onToggle={(nextValue) => onToggleTopSetVisibility(zoneSet.id, nextValue)} />
                       <button type="button" className="tree-node__section-label">
                         {zoneSet.name}
+                      </button>
+                      <button
+                        type="button"
+                        className="dm-action dm-action--ghost dm-action--danger dm-action--row-end"
+                        title={`Delete TopSet "${zoneSet.name}"`}
+                        aria-label={`Delete TopSet "${zoneSet.name}"`}
+                        onClick={(event) => {
+                          event.stopPropagation()
+                          onDeleteTopSet(zoneSet.id, zoneSet.name)
+                        }}
+                      >
+                        x
                       </button>
                     </div>
                     {isOpen(`zones:${zoneSet.id}`) ? (
@@ -674,9 +612,24 @@ export function WellDataPanel({
                         ) : zoneSet.markers.map((marker) => {
                           const zoneBelow = marker.zone_below
                           const markerNodeId = `zones:${zoneSet.id}:marker:${markerTreeKey(marker.horizon_id, marker.name)}`
+                          const markerFormationIds = selectedWellId ? marker.formation_ids_by_well_id[selectedWellId] ?? [] : []
+                          const markerChecked = markerFormationIds.length > 0 && markerFormationIds.every((id) => selectedVisibleFormationIds.includes(id))
+                          const selectedFormationObjectId = selectedObject?.type === 'top-pick' && typeof selectedObject.formationId === 'string'
+                            ? selectedObject.formationId
+                            : null
+                          const selectedMarkerFormationId = selectedFormationObjectId && markerFormationIds.includes(selectedFormationObjectId)
+                            ? selectedFormationObjectId
+                            : null
                           return (
                             <div key={markerNodeId} className="tree-node">
-                              <div className="tree-node__row">
+                              <div
+                                className={`tree-node__row${selectedMarkerFormationId ? ' tree-node__row--selected' : ''}`}
+                                onClick={() => {
+                                  if (selectedWellId && markerFormationIds.length > 0) {
+                                    void onSelectFormation(selectedWellId, markerFormationIds[0])
+                                  }
+                                }}
+                              >
                                 {zoneBelow ? (
                                   <TreeToggleButton
                                     isOpen={isOpen(markerNodeId)}
@@ -685,11 +638,31 @@ export function WellDataPanel({
                                 ) : (
                                   <span className="tree-toggle tree-toggle--spacer" aria-hidden="true">&gt;</span>
                                 )}
+                                <input
+                                  type="checkbox"
+                                  checked={markerChecked}
+                                  disabled={markerFormationIds.length === 0}
+                                  onChange={(event) => onToggleTopSetMarker(zoneSet.id, marker.horizon_id, marker.name, event.target.checked)}
+                                  onClick={(event) => event.stopPropagation()}
+                                />
                                 <span className="dm-object-color-bar" style={{ ['--dm-object-color' as string]: marker.color }} />
                                 <span className={`tree-node__section-label${marker.is_unconformity ? ' tree-node__section-label--unconformity' : ''}`}>
                                   {marker.name}
                                 </span>
-                                <span className="tree-node__meta">{marker.well_count} wells</span>
+                                {marker.horizon_id !== null ? (
+                                  <button
+                                    type="button"
+                                    className="dm-action dm-action--ghost dm-action--danger dm-action--row-end"
+                                    title={`Delete marker "${marker.name}"`}
+                                    aria-label={`Delete marker "${marker.name}"`}
+                                    onClick={(event) => {
+                                      event.stopPropagation()
+                                      onDeleteTopSetMarker(zoneSet.id, marker.horizon_id!, marker.name)
+                                    }}
+                                  >
+                                    x
+                                  </button>
+                                ) : null}
                               </div>
                               {zoneBelow && isOpen(markerNodeId) ? (
                                 <div className="tree-node__children">
@@ -699,12 +672,19 @@ export function WellDataPanel({
                                       && selectedZoneId === zoneBelow.zone_id
                                     return (
                                       <div
-                                        className={`tree-leaf tree-leaf--zone tree-leaf--clickable${isZoneSelected ? ' tree-leaf--selected' : ''}`}
+                                        className={`tree-leaf tree-leaf--zone tree-leaf--clickable${marker.is_unconformity ? ' tree-leaf--zone-unconformity' : ''}${isZoneSelected ? ' tree-leaf--selected' : ''}`}
                                         style={{ ['--tree-zone-color' as string]: marker.color }}
                                         onClick={() => selectedWellId && onSelectZoneInSet(zoneSet.id, selectedWellId, zoneBelow.zone_id)}
                                       >
-                                        <span>{zoneBelow.upper_horizon.name} -&gt; {zoneBelow.lower_horizon.name}</span>
-                                        <span>{zoneSet.wells.length} wells</span>
+                                        <input
+                                          type="checkbox"
+                                          checked={!selectedHiddenZoneIds.includes(zoneBelow.zone_id)}
+                                          onChange={(event) => onToggleTopSetZone(zoneSet.id, zoneBelow.zone_id, event.target.checked)}
+                                          onClick={(event) => event.stopPropagation()}
+                                        />
+                                        <span className="tree-leaf__label tree-leaf__label--zone">
+                                          {zoneBelow.upper_horizon.name} -&gt; {zoneBelow.lower_horizon.name}
+                                        </span>
                                       </div>
                                     )
                                   })()}

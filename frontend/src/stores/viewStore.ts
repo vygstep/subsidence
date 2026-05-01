@@ -62,6 +62,7 @@ export interface FormationsTrackConfig {
   showLabels: boolean
   showMarkerLabels: boolean
   markerLabelPosition: 'left' | 'center' | 'right'
+  zoneLabelPosition: 'left' | 'center' | 'right'
 }
 
 export interface ViewStore {
@@ -159,6 +160,7 @@ const initialFormationsTrackConfig: FormationsTrackConfig = {
   showLabels: true,
   showMarkerLabels: true,
   markerLabelPosition: 'left',
+  zoneLabelPosition: 'center',
 }
 
 const SEA_LEVEL_OVERLAY_PALETTE = ['#0891b2', '#7c3aed', '#ea580c', '#16a34a', '#dc2626', '#2563eb']

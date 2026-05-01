@@ -11,6 +11,7 @@ export function ViewerWorkspace() {
   const lodCurves = useWellDataStore((state) => state.curves)
   const fullCurves = useWellDataStore((state) => state.fullCurves)
   const formations = useWellDataStore((state) => state.formations)
+  const zones = useWellDataStore((state) => state.zones)
   const colorOverrides = useWellDataStore((state) => state.colorOverrides)
   const error = useWellDataStore((state) => state.error)
   const wellViewStates = useWorkspaceStore((state) => state.wellViewStates)
@@ -88,6 +89,9 @@ export function ViewerWorkspace() {
   const visibleFormations = useMemo(() => (
     formations.filter((f) => activeWellView.visibleFormationIds.includes(f.id))
   ), [formations, activeWellView.visibleFormationIds])
+  const visibleZones = useMemo(() => (
+    zones.filter((zone) => !activeWellView.hiddenTopSetZoneIds.includes(zone.zone_id))
+  ), [zones, activeWellView.hiddenTopSetZoneIds])
 
   const trackOrder = useMemo(
     () => buildTrackOrder(tracks.map((track) => track.id), activeWellView.trackOrder),
@@ -114,6 +118,8 @@ export function ViewerWorkspace() {
                 trackOrder={trackOrder}
                 curves={curves}
                 formations={visibleFormations}
+                zoneFormations={formations}
+                zones={visibleZones}
                 minDepth={0}
                 maxDepth={maxDepth}
               />

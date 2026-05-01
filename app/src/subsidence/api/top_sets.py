@@ -2,11 +2,12 @@ from __future__ import annotations
 
 from fastapi import APIRouter, HTTPException, Request
 from pydantic import BaseModel
-from sqlalchemy import func, select
+from sqlalchemy import select
 from sqlalchemy.orm import selectinload
 
 from subsidence.data.deviation_transform import recalculate_picks_tvd
 from subsidence.data.schema import (
+    FormationTopModel,
     TopSet,
     TopSetHorizon,
     WellActiveTopSet,
@@ -226,11 +227,12 @@ def delete_top_set(top_set_id: int, request: Request) -> None:
         ts = session.get(TopSet, top_set_id)
         if ts is None:
             raise HTTPException(status_code=404, detail=f'TopSet not found: {top_set_id}')
-        active_count = session.scalar(
-            select(func.count()).select_from(WellActiveTopSet).where(WellActiveTopSet.top_set_id == top_set_id)
-        )
-        if active_count:
-            raise HTTPException(status_code=409, detail='TopSet is active for one or more wells; deactivate it first')
+        horizon_ids = list(session.scalars(select(TopSetHorizon.id).where(TopSetHorizon.top_set_id == top_set_id)))
+        for link in session.scalars(select(WellActiveTopSet).where(WellActiveTopSet.top_set_id == top_set_id)):
+            session.delete(link)
+        if horizon_ids:
+            for top in session.scalars(select(FormationTopModel).where(FormationTopModel.horizon_id.in_(horizon_ids))):
+                session.delete(top)
         session.delete(ts)
         session.commit()
 

@@ -232,14 +232,6 @@ export function DataManagerPane({ sidebarRef, onInternalSplitterMouseDown }: Dat
             type: 'deviation-group',
             wellId,
           })}
-          onContextMenuFormation={(event, wellId, formation) => openContextMenu(event, {
-            type: 'top-pick',
-            wellId,
-            formationId: formation.id,
-            name: formation.name,
-            depth_md: formation.depth_md,
-            active_strat_color: formation.active_strat_color,
-          })}
           onContextMenuLasGroup={(event, wellId) => openContextMenu(event, {
             type: 'las-group',
             wellId,
@@ -250,18 +242,12 @@ export function DataManagerPane({ sidebarRef, onInternalSplitterMouseDown }: Dat
             name: chart.name,
             isBuiltin: chart.is_builtin,
           })}
-          onContextMenuTopsGroup={(event, wellId) => openContextMenu(event, {
-            type: 'tops-group',
-            wellId,
-          })}
           onContextMenuWell={(event, wellInventory) => openContextMenu(event, {
             type: 'well',
             wellId: wellInventory.well_id,
             name: wellInventory.well_name,
           })}
           onDeleteWell={controller.onDeleteWellById}
-          onDeleteAllFormations={controller.onDeleteAllFormations}
-          onDeleteFormation={controller.onDeleteFormation}
           onDeleteStratChartById={controller.onDeleteStratChartById}
           onFocusCurveObject={controller.handleFocusCurveObject}
           onSelectChart={controller.onSelectChart}
@@ -279,21 +265,22 @@ export function DataManagerPane({ sidebarRef, onInternalSplitterMouseDown }: Dat
           onSelectLithologyPatternPalette={controller.onSelectLithologyPatternPalette}
           onSelectCurve={controller.handleSelectCurve}
           onSelectFormation={controller.handleSelectFormation}
-          onFocusFormationObject={controller.handleFocusFormationObject}
           onFocusLasGroupObject={controller.handleFocusLasGroupObject}
-          onFocusTopsGroupObject={controller.handleFocusTopsGroupObject}
           onFocusWellObject={controller.handleFocusWellObject}
           onSelectLasGroup={controller.handleSelectLasGroup}
           onSelectTemplatesTab={controller.onSelectTemplatesTab}
           onSelectStratChartsTab={controller.onSelectStratChartsTab}
-          onSelectTopsGroup={controller.handleSelectTopsGroup}
           onSelectWell={controller.handleSelectWell}
           onSelectWellsTab={controller.onSelectWellsTab}
           onToggleAllCurves={controller.handleToggleAllCurves}
           onToggleAllFormations={controller.handleToggleAllFormations}
           onToggleCurve={controller.handleToggleCurve}
           onToggleDeviation={controller.handleSetDeviationVisible}
-          onToggleFormation={controller.handleToggleFormation}
+          onToggleTopSetVisibility={controller.handleToggleTopSetVisibility}
+          onToggleTopSetMarker={controller.handleToggleTopSetMarker}
+          onToggleTopSetZone={controller.handleToggleTopSetZone}
+          onDeleteTopSet={controller.handleDeleteTopSet}
+          onDeleteTopSetMarker={controller.handleDeleteTopSetMarker}
           selectedChartId={controller.selectedChartId}
           selectedCompactionPresetId={controller.selectedCompactionPresetId}
           isCompactionPresetsRootSelected={controller.isCompactionPresetsRootSelected}
@@ -303,7 +290,6 @@ export function DataManagerPane({ sidebarRef, onInternalSplitterMouseDown }: Dat
           isPatternPalettesRootSelected={controller.isPatternPalettesRootSelected}
           selectedMnemonicSetId={controller.selectedMnemonicSetId}
           selectedUnitDimensionCode={controller.selectedUnitDimensionCode}
-          selectedFormationId={controller.selectedFormationId}
           selectedLithologySetId={controller.selectedLithologySetId}
           selectedLithologyPatternPaletteId={controller.selectedLithologyPatternPaletteId}
           lithologyPatternPalettes={controller.lithologyPatternPalettes}
@@ -311,6 +297,7 @@ export function DataManagerPane({ sidebarRef, onInternalSplitterMouseDown }: Dat
           stratCharts={controller.stratCharts}
           visibleCurveMnemonicsByWellId={controller.visibleCurveMnemonicsByWellId}
           visibleFormationIdsByWellId={controller.visibleFormationIdsByWellId}
+          hiddenTopSetZoneIdsByWellId={controller.hiddenTopSetZoneIdsByWellId}
           wellInventories={controller.wellInventories}
           onSelectZoneSetsRoot={controller.handleSelectZoneSetsRoot}
           onSelectZoneSet={controller.handleSelectZoneSet}

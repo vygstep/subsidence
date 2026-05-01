@@ -127,6 +127,13 @@ export function useDataManagerController() {
     [wellViewStates],
   )
 
+  const hiddenTopSetZoneIdsByWellId = useMemo(
+    () => Object.fromEntries(
+      Object.entries(wellViewStates).map(([wellId, state]) => [wellId, state.hiddenTopSetZoneIds]),
+    ),
+    [wellViewStates],
+  )
+
   const deviationVisibilityByWellId = useMemo(
     () => Object.fromEntries(
       Object.entries(wellViewStates).map(([wellId, state]) => [wellId, state.deviationVisible]),
@@ -229,6 +236,89 @@ export function useDataManagerController() {
     deleteCompactionModel,
   })
 
+  function markerMatches(formation: { horizon_id: number | null; name: string }, horizonId: number | null, name: string): boolean {
+    return horizonId !== null
+      ? formation.horizon_id === horizonId
+      : formation.name.toLowerCase() === name.toLowerCase()
+  }
+
+  function handleToggleTopSetMarker(zoneSetId: number, horizonId: number | null, name: string, nextValue: boolean): void {
+    for (const inventory of wellInventories) {
+      if (inventory.active_top_set_id !== zoneSetId) continue
+      const formationIds = inventory.formations
+        .filter((formation) => markerMatches(formation, horizonId, name))
+        .map((formation) => formation.id)
+      if (formationIds.length === 0) continue
+      updateWellViewState(inventory.well_id, (state) => ({
+        ...state,
+        visibleFormationIds: nextValue
+          ? Array.from(new Set([...state.visibleFormationIds, ...formationIds]))
+          : state.visibleFormationIds.filter((id) => !formationIds.includes(id)),
+      }))
+    }
+  }
+
+  function handleToggleTopSetZone(zoneSetId: number, zoneId: number, nextValue: boolean): void {
+    for (const inventory of wellInventories) {
+      if (inventory.active_top_set_id !== zoneSetId) continue
+      updateWellViewState(inventory.well_id, (state) => ({
+        ...state,
+        hiddenTopSetZoneIds: nextValue
+          ? (state.hiddenTopSetZoneIds ?? []).filter((id) => id !== zoneId)
+          : Array.from(new Set([...(state.hiddenTopSetZoneIds ?? []), zoneId])),
+      }))
+    }
+  }
+
+  function handleToggleTopSetVisibility(zoneSetId: number, nextValue: boolean): void {
+    const zoneIds = Array.from(new Set(
+      wellInventories
+        .filter((inventory) => inventory.active_top_set_id === zoneSetId)
+        .flatMap((inventory) => inventory.zones.map((zone) => zone.zone_id)),
+    ))
+    for (const inventory of wellInventories) {
+      if (inventory.active_top_set_id !== zoneSetId) continue
+      const formationIds = inventory.formations.map((formation) => formation.id)
+      updateWellViewState(inventory.well_id, (state) => ({
+        ...state,
+        visibleFormationIds: nextValue
+          ? Array.from(new Set([...state.visibleFormationIds, ...formationIds]))
+          : state.visibleFormationIds.filter((id) => !formationIds.includes(id)),
+        hiddenTopSetZoneIds: nextValue
+          ? (state.hiddenTopSetZoneIds ?? []).filter((id) => !zoneIds.includes(id))
+          : Array.from(new Set([...(state.hiddenTopSetZoneIds ?? []), ...zoneIds])),
+      }))
+    }
+  }
+
+  async function handleDeleteTopSetMarker(zoneSetId: number, horizonId: number, name: string): Promise<void> {
+    if (!window.confirm(`Delete marker "${name}" from this TopSet?`)) return
+    const response = await fetch(`/api/top-sets/${zoneSetId}/horizons/${horizonId}`, { method: 'DELETE' })
+    if (!response.ok) {
+      window.alert(`Failed to delete marker (${response.status})`)
+      return
+    }
+    await loadWellInventories()
+    const currentWellId = useWellDataStore.getState().well?.well_id
+    if (currentWellId) {
+      await refreshWell(currentWellId)
+    }
+  }
+
+  async function handleDeleteTopSet(zoneSetId: number, name: string): Promise<void> {
+    if (!window.confirm(`Delete TopSet "${name}" and all linked tops?`)) return
+    const response = await fetch(`/api/top-sets/${zoneSetId}`, { method: 'DELETE' })
+    if (!response.ok) {
+      window.alert(`Failed to delete TopSet (${response.status})`)
+      return
+    }
+    await loadWellInventories()
+    const currentWellId = useWellDataStore.getState().well?.well_id
+    if (currentWellId) {
+      await refreshWell(currentWellId)
+    }
+  }
+
   return {
     activeSidebarTab,
     activeWellId: wellId,
@@ -237,6 +327,7 @@ export function useDataManagerController() {
     compactionPresets,
     curveCount: curves.length,
     deviationVisibilityByWellId,
+    hiddenTopSetZoneIdsByWellId,
     formations,
     lithologyDictionaryEntries,
     lithologyPatternPalettes,
@@ -266,6 +357,11 @@ export function useDataManagerController() {
     handleToggleAllFormations: visibility.handleToggleAllFormations,
     handleToggleCurve: visibility.handleToggleCurve,
     handleToggleFormation: visibility.handleToggleFormation,
+    handleToggleTopSetVisibility,
+    handleToggleTopSetMarker,
+    handleToggleTopSetZone,
+    handleDeleteTopSet,
+    handleDeleteTopSetMarker,
     handleWellInspectorDraftChange: actions.handleWellInspectorDraftChange,
     maxDepth,
     minDepth,

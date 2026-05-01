@@ -5,7 +5,6 @@ import type { SelectedObject } from '@/stores/workspaceStore'
 import type {
   CompactionPresetSummary,
   CurveMnemonicSetSummary,
-  FormationInventoryItem,
   LithologyPatternPaletteSummary,
   LithologySetSummary,
   StratChartInfo,
@@ -25,19 +24,13 @@ interface DataManagerTopPaneProps {
   onActivateChart: (chartId: number) => void
   onContextMenuCurve: (event: React.MouseEvent, wellId: string, curve: { mnemonic: string; unit: string }) => void
   onContextMenuDeviation: (event: React.MouseEvent, wellId: string) => void
-  onContextMenuFormation: (event: React.MouseEvent, wellId: string, formation: FormationInventoryItem) => void
   onContextMenuLasGroup: (event: React.MouseEvent, wellId: string) => void
   onContextMenuStratChart: (event: React.MouseEvent, chart: StratChartInfo) => void
-  onContextMenuTopsGroup: (event: React.MouseEvent, wellId: string) => void
   onContextMenuWell: (event: React.MouseEvent, well: WellInventory) => void
   onDeleteWell: (wellId: string, wellName: string) => void
-  onDeleteAllFormations: (wellId: string, formations: FormationInventoryItem[], wellName: string) => void
-  onDeleteFormation: (wellId: string, formationId: string, formationName: string) => void
   onDeleteStratChartById: (chartId: number, name: string, isBuiltin: boolean) => void
   onFocusCurveObject: (wellId: string, mnemonic: string) => void
-  onFocusFormationObject: (wellId: string, formationId: string) => void
   onFocusLasGroupObject: (wellId: string) => void
-  onFocusTopsGroupObject: (wellId: string) => void
   onFocusWellObject: (wellId: string) => void
   onSelectChart: (chartId: number) => void
   onCreateCompactionPresetDraft: () => void
@@ -57,14 +50,12 @@ interface DataManagerTopPaneProps {
   onSelectLasGroup: (wellId: string) => void | Promise<void>
   onSelectTemplatesTab: () => void
   onSelectStratChartsTab: () => void
-  onSelectTopsGroup: (wellId: string) => void | Promise<void>
   onSelectWell: (wellId: string) => void
   onSelectWellsTab: () => void
   onToggleAllCurves: (wellId: string, nextValue: boolean) => void | Promise<void>
   onToggleAllFormations: (wellId: string, nextValue: boolean) => void | Promise<void>
   onToggleCurve: (wellId: string, mnemonic: string, nextValue: boolean) => void | Promise<void>
   onToggleDeviation: (wellId: string, nextValue: boolean) => void | Promise<void>
-  onToggleFormation: (wellId: string, formationId: string, nextValue: boolean) => void | Promise<void>
   selectedChartId: number | null
   selectedCompactionPresetId: number | null
   isCompactionPresetsRootSelected: boolean
@@ -74,17 +65,22 @@ interface DataManagerTopPaneProps {
   isMeasurementUnitsRootSelected: boolean
   selectedMnemonicSetId: number | null
   selectedUnitDimensionCode: string | null
-  selectedFormationId: string | null
   selectedLithologySetId: number | null
   selectedLithologyPatternPaletteId: number | null
   selectedObject: SelectedObject | null
   stratCharts: StratChartInfo[]
   visibleCurveMnemonicsByWellId: Record<string, string[]>
   visibleFormationIdsByWellId: Record<string, string[]>
+  hiddenTopSetZoneIdsByWellId: Record<string, number[]>
   wellInventories: WellInventory[]
   onSelectZoneSetsRoot: () => void
   onSelectZoneSet: (zoneSetId: number, wellId: string) => void
   onSelectZoneInSet: (zoneSetId: number, wellId: string, zoneId: number) => void
+  onToggleTopSetVisibility: (zoneSetId: number, nextValue: boolean) => void
+  onToggleTopSetMarker: (zoneSetId: number, horizonId: number | null, name: string, nextValue: boolean) => void
+  onToggleTopSetZone: (zoneSetId: number, zoneId: number, nextValue: boolean) => void
+  onDeleteTopSet: (zoneSetId: number, name: string) => void
+  onDeleteTopSetMarker: (zoneSetId: number, horizonId: number, name: string) => void
   selectedZoneId: number | null
   selectedZoneSetId: number | null
 }
@@ -101,19 +97,13 @@ export function DataManagerTopPane({
   onActivateChart,
   onContextMenuCurve,
   onContextMenuDeviation,
-  onContextMenuFormation,
   onContextMenuLasGroup,
   onContextMenuStratChart,
-  onContextMenuTopsGroup,
   onContextMenuWell,
   onDeleteWell,
-  onDeleteAllFormations,
-  onDeleteFormation,
   onDeleteStratChartById,
   onFocusCurveObject,
-  onFocusFormationObject,
   onFocusLasGroupObject,
-  onFocusTopsGroupObject,
   onFocusWellObject,
   onSelectChart,
   onCreateCompactionPresetDraft,
@@ -133,14 +123,12 @@ export function DataManagerTopPane({
   onSelectLasGroup,
   onSelectTemplatesTab,
   onSelectStratChartsTab,
-  onSelectTopsGroup,
   onSelectWell,
   onSelectWellsTab,
   onToggleAllCurves,
   onToggleAllFormations,
   onToggleCurve,
   onToggleDeviation,
-  onToggleFormation,
   selectedChartId,
   selectedCompactionPresetId,
   isCompactionPresetsRootSelected,
@@ -150,17 +138,22 @@ export function DataManagerTopPane({
   isMeasurementUnitsRootSelected,
   selectedMnemonicSetId,
   selectedUnitDimensionCode,
-  selectedFormationId,
   selectedLithologySetId,
   selectedLithologyPatternPaletteId,
   selectedObject,
   stratCharts,
   visibleCurveMnemonicsByWellId,
   visibleFormationIdsByWellId,
+  hiddenTopSetZoneIdsByWellId,
   wellInventories,
   onSelectZoneSetsRoot,
   onSelectZoneSet,
   onSelectZoneInSet,
+  onToggleTopSetVisibility,
+  onToggleTopSetMarker,
+  onToggleTopSetZone,
+  onDeleteTopSet,
+  onDeleteTopSetMarker,
   selectedZoneId,
   selectedZoneSetId,
 }: DataManagerTopPaneProps) {
@@ -205,33 +198,30 @@ export function DataManagerTopPane({
           activeWellId={activeWellId}
           visibleCurveMnemonicsByWellId={visibleCurveMnemonicsByWellId}
           visibleFormationIdsByWellId={visibleFormationIdsByWellId}
+          hiddenTopSetZoneIdsByWellId={hiddenTopSetZoneIdsByWellId}
           deviationVisibilityByWellId={deviationVisibilityByWellId}
-          selectedFormationId={selectedFormationId}
           onSelectWell={onSelectWell}
           onToggleCurve={onToggleCurve}
-          onToggleFormation={onToggleFormation}
+          onToggleTopSetVisibility={onToggleTopSetVisibility}
+          onToggleTopSetMarker={onToggleTopSetMarker}
+          onToggleTopSetZone={onToggleTopSetZone}
+          onDeleteTopSet={onDeleteTopSet}
+          onDeleteTopSetMarker={onDeleteTopSetMarker}
           onToggleAllFormations={onToggleAllFormations}
           onToggleAllCurves={onToggleAllCurves}
           onToggleDeviation={onToggleDeviation}
           onFocusCurveObject={onFocusCurveObject}
-          onSelectFormation={onSelectFormation}
-          onFocusFormationObject={onFocusFormationObject}
           onFocusLasGroupObject={onFocusLasGroupObject}
-          onFocusTopsGroupObject={onFocusTopsGroupObject}
           onFocusWellObject={onFocusWellObject}
           selectedObject={selectedObject}
           onSelectLasGroup={onSelectLasGroup}
           onSelectCurve={onSelectCurve}
-          onSelectTopsGroup={onSelectTopsGroup}
+          onSelectFormation={onSelectFormation}
           onContextMenuCurve={onContextMenuCurve}
           onContextMenuDeviation={onContextMenuDeviation}
-          onContextMenuFormation={onContextMenuFormation}
           onContextMenuLasGroup={onContextMenuLasGroup}
-          onContextMenuTopsGroup={onContextMenuTopsGroup}
           onContextMenuWell={onContextMenuWell}
           onDeleteWell={onDeleteWell}
-          onDeleteAllFormations={onDeleteAllFormations}
-          onDeleteFormation={onDeleteFormation}
           onSelectZoneSetsRoot={onSelectZoneSetsRoot}
           onSelectZoneSet={onSelectZoneSet}
           onSelectZoneInSet={onSelectZoneInSet}
