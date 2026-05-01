@@ -2701,3 +2701,124 @@ unconformities before and after migration to verify burial charts are numericall
 - `python -m compileall app/src/subsidence`
 - `python -m pytest app/tests` (`80 passed`)
 - `npm run build`
+
+---
+
+## BF4-028: Stratigraphy model redesign — TopSet as primary object, merge-by-marker-name import (todo)
+
+### Bug that triggered this
+
+Loading tops twice into the same well created duplicate records even when "Create new ZoneSet" was
+selected — the second import appended rather than merged. Loading a third time with a new name
+renamed the existing set rather than creating a new one. Result: three copies of every marker at
+slightly different depths.
+
+Root cause: `import_tops_csv` always inserts new `FormationTopModel` rows; there is no
+deduplication by marker name within a TopSet. The "create new ZoneSet" option creates a new set
+but the insert loop still appends without checking for existing rows with the same `top_name`.
+
+---
+
+### Proposed redesign
+
+#### Naming
+
+Rename the primary stratigraphy collection from **ZoneSet** → **TopSet** everywhere (schema
+column names, API fields, frontend labels). TopSet better reflects the source of truth: it is a
+named set of formation tops (markers). Zones are derived from the intervals between markers and
+are not stored independently.
+
+#### Data model (project-level vs per-well)
+
+A `TopSet` is a **project-level** object. It defines a list of named markers (horizons)
+that may appear in multiple wells. Each well has its own depth value per marker, stored in
+`FormationTopModel` (one row per well × marker × TopSet).
+
+This is close to the current `TopSet` / `TopSetHorizon` / `FormationTop` structure in the
+zone-based path. The redesign unifies both paths (direct pick workflow + zone workflow) under
+this single model.
+
+#### Import behaviour — merge by marker name
+
+When importing a tops CSV into a TopSet:
+
+- Match existing rows by `(well_id, zone_set_id, top_name)` (or `well_name` when using file well).
+- If a matching row exists → **update** its depth and attributes (overwrite, no duplicate).
+- If no matching row exists → **insert** as a new marker.
+- The "Create new TopSet" option in the import dialog creates a brand-new TopSet first, then
+  merges into it (so importing into an empty set is always clean).
+
+This makes re-importing idempotent: running the same file twice produces the same state.
+
+#### Data Manager tree structure
+
+```
+WELLS
+  └─ Well A
+  └─ Well B
+
+STRATIGRAPHY
+  └─ Regional Cretaceous     ← TopSet (project-level)
+       ├─ [marker list]      ← shown as flat list of marker names (horizons)
+       └─ Zones              ← sub-level: intervals between adjacent markers (derived, not stored)
+  └─ Local Jurassic          ← another TopSet
+```
+
+Clicking a TopSet in the tree selects it; its markers and derived zones appear in the settings
+panel.
+
+#### Settings panel — markers / zones toggle
+
+In the Settings panel, when a TopSet is the active object, the **Object** field shows a
+dropdown: `markers | zones`. This switches which representation is used in the log viewer and
+burial chart for that TopSet:
+
+- `markers` — depth picks (discrete lines in the log track, age picks in the chart).
+- `zones` — intervals between adjacent markers (colour bands in the log track and chart).
+
+The underlying data is the same; the toggle only changes how it is rendered. Default: `zones`.
+
+---
+
+### Design decisions
+
+1. **TopSet scope** — a TopSet is a **project-level** named object (e.g. "my_strat"). It holds a
+   list of markers (named horizons: "Cretaceous", "Paleogene", "Quaternary") and depth values for
+   those markers per well. Multiple wells can belong to the same TopSet: loading tops from Well B
+   into "my_strat" adds Well B's depths alongside Well A's. Markers are shared by name; depths are
+   per-well. The `stratigraphy` section in the Data Manager tree is simply the grouping label for
+   all TopSets in the project (not a stored entity itself).
+
+2. **`markers | zones` toggle in Settings** — the toggle switches the *level* being configured,
+   not the data. `markers` mode: the settings panel shows properties for individual picks (one row
+   per named horizon per well — depth, age, colour, lock). `zones` mode: the settings panel shows
+   properties for intervals (one row per zone between adjacent markers — same well filter). This
+   lets the user configure all markers for a given well at once, or all zones at once, without
+   needing to click each individually in the tree. The active well is the filter; the TopSet is the
+   scope.
+
+3. **Delete behaviour** — deleting a marker from a TopSet removes it for **all wells** in that
+   TopSet (the marker is a shared project-level concept). Removing a marker from a single well
+   only is done via the Settings panel or the formation-top track in the Well Log view — not via
+   the TopSet tree.
+
+4. **`markers | zones` toggle persistence** — UI-only state, not persisted between sessions.
+   Default on open: `zones`.
+
+---
+
+### Affected areas (preliminary)
+
+| Area | Change |
+|---|---|
+| `schema.py` | Rename `zone_set_*` columns/tables to `top_set_*`; confirm Zone table fate |
+| `engine.py` | Migration: rename columns; no data loss |
+| `importers/tops.py` | Replace insert-only with upsert-by-marker-name |
+| `api/projects_imports.py` | Update import handler for upsert logic |
+| `WellDataPanel.tsx` | Restructure tree: WELLS section + STRATIGRAPHY section |
+| `ImportTopsDialog.tsx` | "TopSet" label; dropdown options updated |
+| Settings panel | `markers / zones` object toggle for TopSet |
+| Log viewer | Render path switches on `markers | zones` per TopSet |
+
+**Complexity**: XL — touches schema, import logic, data manager UI, settings, and log viewer.
+Resolve the open questions above before starting implementation.
