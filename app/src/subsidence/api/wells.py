@@ -880,3 +880,78 @@ def get_deviation(well_id: str, request: Request) -> DeviationSurveyResponse:
         inclination_deg=frame['incl_deg'].tolist(),
         azimuth_deg=frame['azim_deg'].tolist(),
     )
+
+
+@router.delete('/wells/{well_id}/curves/{mnemonic}', status_code=204)
+def delete_curve(well_id: str, mnemonic: str, request: Request) -> None:
+    manager = _require_open_project(request)
+    parquet_to_delete: str | None = None
+    with manager.get_session() as session:
+        if session.get(WellModel, well_id) is None:
+            raise HTTPException(status_code=404, detail=f'Well not found: {well_id}')
+        row = session.scalar(
+            select(CurveMetadata).where(CurveMetadata.well_id == well_id, CurveMetadata.mnemonic == mnemonic)
+        )
+        if row is None:
+            raise HTTPException(status_code=404, detail=f'Curve not found: {mnemonic}')
+        data_uri = row.data_uri
+        session.delete(row)
+        session.flush()
+        if not session.scalar(select(CurveMetadata).where(CurveMetadata.data_uri == data_uri).limit(1)):
+            parquet_to_delete = data_uri
+        session.commit()
+    if parquet_to_delete:
+        path = manager.project_path / parquet_to_delete
+        if path.exists():
+            path.unlink()
+    manager.save_project()
+
+
+@router.delete('/wells/{well_id}/curves', status_code=204)
+def delete_all_curves(well_id: str, request: Request) -> None:
+    manager = _require_open_project(request)
+    parquets_to_delete: list[str] = []
+    with manager.get_session() as session:
+        if session.get(WellModel, well_id) is None:
+            raise HTTPException(status_code=404, detail=f'Well not found: {well_id}')
+        rows = list(session.scalars(select(CurveMetadata).where(CurveMetadata.well_id == well_id)))
+        data_uris = list(dict.fromkeys(row.data_uri for row in rows))
+        for row in rows:
+            session.delete(row)
+        session.flush()
+        for data_uri in data_uris:
+            if not session.scalar(select(CurveMetadata).where(CurveMetadata.data_uri == data_uri).limit(1)):
+                parquets_to_delete.append(data_uri)
+        session.commit()
+    for data_uri in parquets_to_delete:
+        path = manager.project_path / data_uri
+        if path.exists():
+            path.unlink()
+    manager.save_project()
+
+
+@router.delete('/wells/{well_id}/deviation', status_code=204)
+def delete_deviation_survey(well_id: str, request: Request) -> None:
+    manager = _require_open_project(request)
+    with manager.get_session() as session:
+        well = session.get(WellModel, well_id)
+        if well is None:
+            raise HTTPException(status_code=404, detail=f'Well not found: {well_id}')
+        survey = session.scalar(select(DeviationSurveyModel).where(DeviationSurveyModel.well_id == well_id))
+        if survey is None:
+            return
+        data_uri = survey.data_uri
+        kb_elev = well.kb_elev or 0.0
+        session.delete(survey)
+        session.flush()
+        formations = list(session.scalars(select(FormationTopModel).where(FormationTopModel.well_id == well_id)))
+        for f in formations:
+            if f.depth_md is not None:
+                f.depth_tvd = f.depth_md
+                f.depth_tvdss = f.depth_md - kb_elev
+        session.commit()
+    if data_uri:
+        path = manager.project_path / data_uri
+        if path.exists():
+            path.unlink()
+    manager.save_project()

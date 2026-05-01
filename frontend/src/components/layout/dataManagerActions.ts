@@ -212,6 +212,60 @@ export function makeActionHandlers(deps: ActionDeps) {
     }
   }
 
+  async function handleDeleteCurve(wellId: string, mnemonic: string): Promise<void> {
+    if (!window.confirm(`Delete log curve "${mnemonic}"?`)) return
+    const response = await fetch(`/api/wells/${wellId}/curves/${encodeURIComponent(mnemonic)}`, { method: 'DELETE' })
+    if (!response.ok) {
+      window.alert(await readError(response, `Failed to delete curve '${mnemonic}' (${response.status})`))
+      return
+    }
+    updateWellViewState(wellId, (state) => ({
+      ...state,
+      tracks: state.tracks.map((track) => ({
+        ...track,
+        curves: track.curves.filter((c) => c.mnemonic !== mnemonic),
+      })),
+      hiddenCurveMnemonics: state.hiddenCurveMnemonics.filter((m) => m !== mnemonic),
+    }))
+    if (selectedObject?.type === 'curve' && (selectedObject as { wellId?: string }).wellId === wellId
+        && (selectedObject as { mnemonic?: string }).mnemonic === mnemonic) {
+      setSelectedObject(null)
+    }
+    await loadWellInventories()
+    if (well?.well_id === wellId) await refreshWell(wellId)
+  }
+
+  async function handleDeleteAllCurves(wellId: string, wellName: string, curveCount: number): Promise<void> {
+    if (!window.confirm(`Delete all ${curveCount} log curves for "${wellName}"?`)) return
+    const response = await fetch(`/api/wells/${wellId}/curves`, { method: 'DELETE' })
+    if (!response.ok) {
+      window.alert(await readError(response, `Failed to delete curves (${response.status})`))
+      return
+    }
+    updateWellViewState(wellId, (state) => ({
+      ...state,
+      tracks: state.tracks.map((track) => ({ ...track, curves: [] })),
+      hiddenCurveMnemonics: [],
+    }))
+    if (selectedObject?.type === 'curve' && (selectedObject as { wellId?: string }).wellId === wellId) {
+      setSelectedObject(null)
+    }
+    await loadWellInventories()
+    if (well?.well_id === wellId) await refreshWell(wellId)
+  }
+
+  async function handleDeleteDeviation(wellId: string, wellName: string): Promise<void> {
+    if (!window.confirm(`Delete deviation survey for "${wellName}"?`)) return
+    const response = await fetch(`/api/wells/${wellId}/deviation`, { method: 'DELETE' })
+    if (!response.ok) {
+      window.alert(await readError(response, `Failed to delete deviation survey (${response.status})`))
+      return
+    }
+    updateWellViewState(wellId, (state) => ({ ...state, deviationVisible: false }))
+    await loadWellInventories()
+    if (well?.well_id === wellId) await refreshWell(wellId)
+  }
+
   async function handleDeleteAllFormations(
     wellId: string,
     formations: Array<{ id: string; name: string }>,
@@ -322,5 +376,8 @@ export function makeActionHandlers(deps: ActionDeps) {
     handleDeleteCompactionModelById,
     handleWellInspectorDraftChange,
     handleCreateCompactionModel,
+    handleDeleteCurve,
+    handleDeleteAllCurves,
+    handleDeleteDeviation,
   }
 }

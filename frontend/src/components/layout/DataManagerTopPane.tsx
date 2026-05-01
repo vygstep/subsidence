@@ -81,6 +81,9 @@ interface DataManagerTopPaneProps {
   onToggleTopSetZone: (zoneSetId: number, zoneId: number, nextValue: boolean) => void
   onDeleteTopSet: (zoneSetId: number, name: string) => void
   onDeleteTopSetMarker: (zoneSetId: number, horizonId: number, name: string) => void
+  onDeleteCurve?: (wellId: string, mnemonic: string) => void
+  onDeleteAllCurves?: (wellId: string, wellName: string, curveCount: number) => void
+  onDeleteDeviation?: (wellId: string, wellName: string) => void
   selectedZoneId: number | null
   selectedZoneSetId: number | null
 }
@@ -154,6 +157,9 @@ export function DataManagerTopPane({
   onToggleTopSetZone,
   onDeleteTopSet,
   onDeleteTopSetMarker,
+  onDeleteCurve,
+  onDeleteAllCurves,
+  onDeleteDeviation,
   selectedZoneId,
   selectedZoneSetId,
 }: DataManagerTopPaneProps) {
@@ -222,6 +228,9 @@ export function DataManagerTopPane({
           onContextMenuLasGroup={onContextMenuLasGroup}
           onContextMenuWell={onContextMenuWell}
           onDeleteWell={onDeleteWell}
+          onDeleteCurve={onDeleteCurve}
+          onDeleteAllCurves={onDeleteAllCurves}
+          onDeleteDeviation={onDeleteDeviation}
           onSelectZoneSetsRoot={onSelectZoneSetsRoot}
           onSelectZoneSet={onSelectZoneSet}
           onSelectZoneInSet={onSelectZoneInSet}

@@ -382,6 +382,9 @@ export function useDataManagerController() {
     onDeleteFormation: (wellId: string, formationId: string, name: string) => void actions.handleDeleteFormation(wellId, formationId, name),
     onDeleteAllFormations: (wellId: string, formations: Array<{ id: string; name: string }>, wellName: string) =>
       void actions.handleDeleteAllFormations(wellId, formations, wellName),
+    onDeleteCurve: (wellId: string, mnemonic: string) => void actions.handleDeleteCurve(wellId, mnemonic),
+    onDeleteAllCurves: (wellId: string, wellName: string, curveCount: number) => void actions.handleDeleteAllCurves(wellId, wellName, curveCount),
+    onDeleteDeviation: (wellId: string, wellName: string) => void actions.handleDeleteDeviation(wellId, wellName),
     onDeleteStratChartById: (chartId: number, name: string, isBuiltin: boolean) => void actions.handleDeleteChartById(chartId, name, isBuiltin),
     onDeleteWellById: (wellId: string, wellName: string) => void actions.handleDeleteWell(wellId, wellName),
     onDuplicateCompactionModel: (id: number, name: string) => void actions.handleDuplicateCompactionModel(id, name),

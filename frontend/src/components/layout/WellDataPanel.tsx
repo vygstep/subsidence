@@ -45,6 +45,9 @@ interface WellDataPanelProps {
   onDeleteWell: (wellId: string, wellName: string) => void
   onDeleteAllFormations?: (wellId: string, formations: FormationInventoryItem[], wellName: string) => void
   onDeleteFormation?: (wellId: string, formationId: string, formationName: string) => void
+  onDeleteCurve?: (wellId: string, mnemonic: string) => void
+  onDeleteAllCurves?: (wellId: string, wellName: string, curveCount: number) => void
+  onDeleteDeviation?: (wellId: string, wellName: string) => void
   onSelectZoneSetsRoot?: () => void
   onSelectZoneSet?: (zoneSetId: number, wellId: string) => void
   onSelectZoneInSet?: (zoneSetId: number, wellId: string, zoneId: number) => void
@@ -259,6 +262,9 @@ export function WellDataPanel({
   onSelectZoneInSet = () => {},
   selectedZoneId = null,
   selectedZoneSetId = null,
+  onDeleteCurve,
+  onDeleteAllCurves,
+  onDeleteDeviation,
 }: WellDataPanelProps) {
   const { isExpanded, toggleExpanded, setExpanded } = useDataManager()
   const didInitializeExpanded = useRef(false)
@@ -470,6 +476,16 @@ export function WellDataPanel({
                             <button type="button" className="tree-node__section-label" onClick={() => onSelectLasGroup(item.well_id)}>
                               Logs
                             </button>
+                            {item.curves.length > 0 && onDeleteAllCurves && (
+                              <button
+                                type="button"
+                                className="dm-action dm-action--ghost dm-action--danger dm-action--row-end"
+                                title={`Delete all ${item.curves.length} log curves`}
+                                onClick={(e) => { e.stopPropagation(); onDeleteAllCurves(item.well_id, item.well_name, item.curves.length) }}
+                              >
+                                x
+                              </button>
+                            )}
                           </div>
                           {isOpen(`${rootId}:las`) ? (
                             <div className="tree-node__children">
@@ -477,13 +493,13 @@ export function WellDataPanel({
                                 item.curves.map((curve) => (
                                   <div
                                     key={`${item.well_id}:${curve.mnemonic}`}
-                                    className={
+                                    className={`tree-node__row${
                                       selectedObject?.type === 'curve'
                                       && selectedObject.wellId === item.well_id
                                       && selectedObject.mnemonic === curve.mnemonic
-                                        ? 'tree-node__item-selected'
+                                        ? ' tree-node__item-selected'
                                         : ''
-                                    }
+                                    }`}
                                     onClick={() => onSelectCurve(item.well_id, curve.mnemonic)}
                                     onContextMenu={(event) => {
                                       onFocusCurveObject(item.well_id, curve.mnemonic)
@@ -496,6 +512,16 @@ export function WellDataPanel({
                                       secondary={curve.unit || '-'}
                                       onChange={(nextValue) => onToggleCurve(item.well_id, curve.mnemonic, nextValue)}
                                     />
+                                    {onDeleteCurve && (
+                                      <button
+                                        type="button"
+                                        className="dm-action dm-action--ghost dm-action--danger dm-action--row-end"
+                                        title={`Delete curve "${curve.mnemonic}"`}
+                                        onClick={(e) => { e.stopPropagation(); onDeleteCurve(item.well_id, curve.mnemonic) }}
+                                      >
+                                        x
+                                      </button>
+                                    )}
                                   </div>
                                 ))
                               ) : (
@@ -519,6 +545,16 @@ export function WellDataPanel({
                             <button type="button" className="tree-node__section-label">
                               DEV
                             </button>
+                            {item.deviation && onDeleteDeviation && (
+                              <button
+                                type="button"
+                                className="dm-action dm-action--ghost dm-action--danger dm-action--row-end"
+                                title="Delete deviation survey"
+                                onClick={(e) => { e.stopPropagation(); onDeleteDeviation(item.well_id, item.well_name) }}
+                              >
+                                x
+                              </button>
+                            )}
                           </div>
                           {isOpen(`${rootId}:dev`) ? (
                             <div className="tree-node__children">
