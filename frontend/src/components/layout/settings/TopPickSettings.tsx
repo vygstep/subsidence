@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react'
 
-import { useWellDataStore, useWorkspaceStore } from '@/stores'
+import { useWellDataStore } from '@/stores'
 import type { FormationTop, SeaLevelPoint } from '@/types'
 
 function interpolateSeaLevel(points: SeaLevelPoint[], ageMa: number): number | null {
@@ -36,7 +36,6 @@ interface TopPickSettingsProps {
 
 export function TopPickSettings({ selectedFormation, onFormationUpdate, onFormationMove }: TopPickSettingsProps) {
   const wellId = useWellDataStore((state) => state.well?.well_id)
-  const updateWellViewState = useWorkspaceStore((state) => state.updateWellViewState)
   const wellInventories = useWellDataStore((state) => state.wellInventories)
   const loadSeaLevelPoints = useWellDataStore((state) => state.loadSeaLevelPoints)
   const seaLevelCurves = useWellDataStore((state) => state.seaLevelCurves)
@@ -58,21 +57,6 @@ export function TopPickSettings({ selectedFormation, onFormationUpdate, onFormat
     if (selectedFormation.age_ma == null || !activeCurveId) return null
     return interpolateSeaLevel(seaLevelPoints, selectedFormation.age_ma)
   }, [seaLevelPoints, selectedFormation.age_ma, activeCurveId])
-
-  const labelHidden = useWorkspaceStore((state) => {
-    const view = wellId ? state.wellViewStates[wellId] : null
-    return view?.hiddenTopLabelIds?.includes(selectedFormation.id) ?? false
-  })
-
-  const handleToggleLabel = (show: boolean) => {
-    if (!wellId) return
-    updateWellViewState(wellId, (state) => ({
-      ...state,
-      hiddenTopLabelIds: show
-        ? state.hiddenTopLabelIds.filter((id) => id !== selectedFormation.id)
-        : [...state.hiddenTopLabelIds, selectedFormation.id],
-    }))
-  }
 
   const isUnconformity = selectedFormation.kind === 'unconformity'
   const depositionResumedMa = selectedFormation.age_ma != null
@@ -177,14 +161,6 @@ export function TopPickSettings({ selectedFormation, onFormationUpdate, onFormat
           />
         </div>
       )}
-      <label className="sf-row">
-        <span>Marker label</span>
-        <input
-          type="checkbox"
-          checked={!labelHidden}
-          onChange={(event) => handleToggleLabel(event.target.checked)}
-        />
-      </label>
       <div className="tree-leaf">
         <span>Linked unit</span>
         <span>{selectedFormation.active_strat_unit_name ?? 'Unlinked'}</span>

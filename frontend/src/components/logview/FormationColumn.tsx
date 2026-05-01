@@ -163,7 +163,7 @@ export function FormationColumn({ formations, visibleMarkerFormations = formatio
           ctx.font = '600 11px Segoe UI'
           ctx.textAlign = anchor.align
           ctx.textBaseline = 'middle'
-          ctx.fillText(`${zone.upper_horizon.name} - ${zone.lower_horizon.name}`, anchor.x, yTop + blockHeight / 2, anchor.maxWidth)
+          ctx.fillText(formation.name, anchor.x, yTop + blockHeight / 2, anchor.maxWidth)
           ctx.restore()
         })
         return

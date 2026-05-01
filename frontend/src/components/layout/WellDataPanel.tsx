@@ -729,7 +729,7 @@ export function WellDataPanel({
                                           zoneSetId: zoneSet.id,
                                           wellId: selectedWellId,
                                           zoneId: zoneBelow.zone_id,
-                                          name: `${zoneBelow.upper_horizon.name} -> ${zoneBelow.lower_horizon.name}`,
+                                          name: `zone: ${marker.name}`,
                                         })}
                                       >
                                         <input
@@ -739,7 +739,7 @@ export function WellDataPanel({
                                           onClick={(event) => event.stopPropagation()}
                                         />
                                         <span className="tree-leaf__label tree-leaf__label--zone">
-                                          {zoneBelow.upper_horizon.name} -&gt; {zoneBelow.lower_horizon.name}
+                                          zone: {marker.name}
                                         </span>
                                       </div>
                                     )
