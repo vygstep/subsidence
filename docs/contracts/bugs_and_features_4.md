@@ -1492,7 +1492,7 @@ well delete and single formation delete; only "delete all" needs a new controlle
 
 ---
 
-## BF4-021: Rebuild zones after formation top delete (todo)
+## BF4-021: Rebuild zones after formation top delete (done)
 
 **Problem**: BF4-017 moved top deletion into the Data Manager tree, but deleting a formation top
 through `DELETE /api/wells/{well_id}/formations/{formation_id}` can leave zone data stale. ZoneSets
@@ -1550,6 +1550,18 @@ Frontend fallback if backend cannot own it cleanly:
 - ZoneSettings should no longer show stale thickness/lithology for zones that require the deleted
   pick.
 - Delete all tops; zones remain as ZoneSet definitions, but per-well zone values are empty/null.
+
+### Implemented
+
+- After `RemoveFormation` executes in `DELETE /api/wells/{well_id}/formations/{formation_id}`,
+  a second session block looks up the well's active `top_set_id`, then calls
+  `recalculate_zone_thickness` and `aggregate_zone_lithology_from_curve` for that well.
+- Zones whose upper/lower pick no longer exists (deleted or depth_md is None) get
+  `thickness_md = None` and `thickness_tvd = None`; auto lithology is unchanged (no valid slice
+  to aggregate from, so the previous value persists until next import or manual override).
+- All three zone-service helpers were already imported in `formations.py` — no new imports needed.
+- Delete-all-tops in the frontend loops over individual delete calls, so each call triggers a
+  recalculation; after the last one all zone thicknesses for that well are null.
 
 ---
 
@@ -2249,7 +2261,7 @@ name should be displayed.
 | 19 | BF4-011 | M | API audit (research task) |
 | 20 | BF4-019 | M | Delete log curves from Data Manager | done |
 | 21 | BF4-020 | S/M | Delete deviation survey from Data Manager | done |
-| 22 | BF4-021 | S/M | Rebuild zones after formation top delete |
+| 22 | BF4-021 | S/M | Rebuild zones after formation top delete | done |
 | 23 | BF4-022 | XS | Restore shared Data Manager style primitives |
 | 24 | BF4-023 | S | Separate sea-level compute selector from overlay checkboxes |
 | 25 | BF4-024 | XS | Single-well labels show upper marker only |

@@ -366,4 +366,12 @@ def delete_formation(well_id: str, formation_id: int, request: Request) -> None:
         snapshot = _model_to_dict(row)
 
     manager.execute_command(RemoveFormation(snapshot))
+
+    with manager.get_session() as session:
+        top_set_id = get_well_active_top_set_id(session, well_id)
+        if top_set_id is not None:
+            recalculate_zone_thickness(session, top_set_id, well_id)
+            aggregate_zone_lithology_from_curve(session, manager.project_path, well_id)
+            session.commit()
+
     manager.save_project()
