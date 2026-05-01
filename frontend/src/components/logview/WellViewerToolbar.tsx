@@ -150,15 +150,6 @@ export function WellViewerToolbar() {
     setActiveDialog('set-top-type')
   }
 
-  async function handleMoveSelectedFormation(): Promise<void> {
-    if (!selectedFormation) return
-    const value = window.prompt('Move top to depth (MD)', selectedFormation.depth_md?.toString() ?? '')
-    if (value === null) return
-    const nextDepth = Number(value.trim())
-    if (!Number.isFinite(nextDepth)) return
-    void useWellDataStore.getState().updateFormationDepth(selectedFormation.id, nextDepth)
-  }
-
   function handleOpenFormationLink(formationId: string): void {
     const formation = formations.find((f) => f.id === formationId) ?? null
     setFormationLinkTarget(formation)
@@ -312,15 +303,6 @@ export function WellViewerToolbar() {
           title="Set type of selected top"
         >
           <span className="well-viewer-toolbar__button-label">Set type</span>
-        </button>
-        <button
-          type="button"
-          className="well-viewer-toolbar__button"
-          disabled={selectedFormation === null}
-          onClick={() => void handleMoveSelectedFormation()}
-          title="Move selected top to a new depth"
-        >
-          <span className="well-viewer-toolbar__button-label">Move top</span>
         </button>
       </div>
 
