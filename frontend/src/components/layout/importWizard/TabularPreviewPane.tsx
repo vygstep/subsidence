@@ -91,6 +91,7 @@ export function TabularPreviewPane({
             <thead>
               {showMapping && (
                 <tr className="import-preview__mapping-row">
+                  <th className="import-preview__row-num" />
                   {preview.columns.map((col, colIdx) => {
                     const assignedFieldId = Object.entries(mapping).find(([, v]) => v === col)?.[0] ?? ''
                     return (
@@ -122,6 +123,7 @@ export function TabularPreviewPane({
               )}
               {showCurveTypes && (
                 <tr className="import-preview__mapping-row">
+                  <th className="import-preview__row-num" />
                   {preview.columns.map((col, colIdx) => {
                     const isDepth = colIdx === depthColIndex
                     return (
@@ -141,6 +143,7 @@ export function TabularPreviewPane({
                 </tr>
               )}
               <tr>
+                <th className="import-preview__row-num">{settings.headerRow}</th>
                 {preview.columns.map((col, i) => (
                   <th key={i} className={i === depthColIndex ? 'import-preview__col--depth' : undefined}>{col || <em>empty</em>}</th>
                 ))}
@@ -149,6 +152,7 @@ export function TabularPreviewPane({
             <tbody>
               {preview.rows.map((row, ri) => (
                 <tr key={ri}>
+                  <td className="import-preview__row-num">{settings.headerRow + ri + 1}</td>
                   {preview.columns.map((_, ci) => (
                     <td key={ci} className={ci === depthColIndex ? 'import-preview__col--depth' : undefined}>{row[ci] ?? ''}</td>
                   ))}

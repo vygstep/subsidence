@@ -7,7 +7,6 @@ import { recordOperation } from '@/utils/diagnostics'
 
 import {
   ImportWizardShell,
-  ImportWizardTargetWellFields,
   TabularPreviewPane,
   buildImportWizardSteps,
   importWizardPresets,
@@ -46,6 +45,11 @@ interface ImportTopsResponse {
 
 type ZoneSetPolicy = 'create' | 'existing' | 'none'
 
+function fileBaseName(filePath: string): string {
+  const name = filePath.split(/[\\/]/).pop() ?? ''
+  return name.replace(/\.[^.]+$/, '')
+}
+
 export function ImportTopsDialog({ wells, activeWellId, onClose, onSuccess }: ImportTopsDialogProps) {
   const projectPath = useProjectStore((state) => state.projectPath)
   const addQcWarnings = useNotificationStore((state) => state.addQcWarnings)
@@ -56,13 +60,12 @@ export function ImportTopsDialog({ wells, activeWellId, onClose, onSuccess }: Im
       ? selectedObject.zoneSetId
       : null
   const [wellId, setWellId] = useState(activeWellId ?? '')
-  const [createNewWell, setCreateNewWell] = useState(false)
   const [wellPolicy, setWellPolicy] = useState<'file' | 'override'>('override')
   const [topSets, setTopSets] = useState<TopSetSummary[]>([])
   const [zoneSetPolicy, setZoneSetPolicy] = useState<ZoneSetPolicy>(() => selectedZoneSetId ? 'existing' : 'create')
   const [zoneSetId, setZoneSetId] = useState(() => selectedZoneSetId ? String(selectedZoneSetId) : '')
-  const [zoneSetName, setZoneSetName] = useState('')
   const [csvPath, setCsvPath] = useState(() => getLastImportRoot())
+  const [zoneSetName, setZoneSetName] = useState(() => fileBaseName(getLastImportRoot()))
   const [depthRef, setDepthRef] = useState<'MD' | 'TVD' | 'TVDSS'>('MD')
   const [depthUnit, setDepthUnit] = useState<'m' | 'ft' | 'km'>('m')
   const [mapping, setMapping] = useState<ColumnMapping>({})
@@ -85,6 +88,10 @@ export function ImportTopsDialog({ wells, activeWellId, onClose, onSuccess }: Im
       setMapping(autoMap(tabularPreview.columns, TOPS_FIELDS))
     }
   }, [tabularPreview])
+
+  useEffect(() => {
+    setZoneSetName(fileBaseName(csvPath))
+  }, [csvPath])
 
   useEffect(() => {
     let cancelled = false
@@ -144,7 +151,7 @@ export function ImportTopsDialog({ wells, activeWellId, onClose, onSuccess }: Im
             csv_path: nextPath,
             depth_ref: depthRef,
             depth_unit: depthUnit,
-            create_new_well: useFileWell ? false : (!wellId && createNewWell),
+            create_new_well: false,
             column_map: Object.keys(columnMap).length > 0 ? columnMap : null,
             zone_set_id: zoneSetPolicy === 'existing' ? Number(zoneSetId) : null,
             create_zone_set: zoneSetPolicy === 'create',
@@ -166,7 +173,7 @@ export function ImportTopsDialog({ wells, activeWellId, onClose, onSuccess }: Im
       }, {
         projectPath,
         activeWellId: useFileWell ? null : (wellId || activeWellId || null),
-        details: { inputPath: nextPath, depthRef, depthUnit, createNewWell: useFileWell ? false : createNewWell, zoneSetPolicy },
+        details: { inputPath: nextPath, depthRef, depthUnit, zoneSetPolicy },
       })
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : 'Failed to import tops')
@@ -238,91 +245,70 @@ export function ImportTopsDialog({ wells, activeWellId, onClose, onSuccess }: Im
 
           {!previewLoading && tabularPreview && (
             <div className="import-wizard__options">
-              <ImportWizardTargetWellFields
-                wells={wells}
-                wellId={wellId}
-                createNewWell={createNewWell}
-                emptyLabel="Create or match by file well_name"
-                fileWellSource={fileWellSource}
-                wellPolicy={wellPolicy}
-                onWellIdChange={setWellId}
-                onCreateNewWellChange={setCreateNewWell}
-                onWellPolicyChange={setWellPolicy}
-              />
               <label className="project-dialog__field project-dialog__field--inline">
-                <span>Depth reference</span>
-                <select value={depthRef} onChange={(e) => setDepthRef(e.target.value as 'MD' | 'TVD' | 'TVDSS')}>
-                  <option value="MD">MD</option>
-                  <option value="TVD">TVD</option>
-                  <option value="TVDSS">TVDSS</option>
+                <span>Target well</span>
+                <select
+                  value={wellPolicy === 'file' ? '__file__' : wellId}
+                  onChange={(e) => {
+                    const v = e.target.value
+                    if (v === '__file__') { setWellPolicy('file'); setWellId('') }
+                    else { setWellPolicy('override'); setWellId(v) }
+                  }}
+                >
+                  {fileWellSource
+                    ? <option value="__file__">Use file well name: {fileWellSource}</option>
+                    : <option value="">Match or create by file well_name</option>
+                  }
+                  {wells.map((w) => (
+                    <option key={w.well_id} value={w.well_id}>{w.well_name}</option>
+                  ))}
                 </select>
               </label>
-              <label className="project-dialog__field project-dialog__field--inline">
-                <span>Depth unit</span>
-                <select value={depthUnit} onChange={(e) => setDepthUnit(e.target.value as 'm' | 'ft' | 'km')}>
-                  <option value="m">m</option>
-                  <option value="ft">ft</option>
-                  <option value="km">km</option>
-                </select>
-              </label>
-              <div className="project-dialog__field">
-                <span>ZoneSet</span>
-                <div className="import-well-policy">
-                  <label className="project-dialog__checkbox">
-                    <input
-                      type="radio"
-                      name="zone-set-policy"
-                      value="create"
-                      checked={zoneSetPolicy === 'create'}
-                      onChange={() => setZoneSetPolicy('create')}
-                    />
-                    <span>Create new ZoneSet from imported tops</span>
-                  </label>
-                  {zoneSetPolicy === 'create' ? (
-                    <input
-                      type="text"
-                      aria-label="ZoneSet name"
-                      value={zoneSetName}
-                      onChange={(event) => setZoneSetName(event.target.value)}
-                      placeholder="Uses target well name if empty"
-                    />
-                  ) : null}
-                  <label className="project-dialog__checkbox">
-                    <input
-                      type="radio"
-                      name="zone-set-policy"
-                      value="existing"
-                      checked={zoneSetPolicy === 'existing'}
-                      disabled={topSets.length === 0}
-                      onChange={() => {
-                        setZoneSetPolicy('existing')
-                        if (!zoneSetId && topSets[0]) setZoneSetId(String(topSets[0].id))
-                      }}
-                    />
-                    <span>Load tops into existing ZoneSet</span>
-                  </label>
-                  {zoneSetPolicy === 'existing' ? (
-                    <select aria-label="ZoneSet" value={zoneSetId} onChange={(event) => setZoneSetId(event.target.value)}>
-                      <option value="">Select ZoneSet</option>
-                      {topSets.map((topSet) => (
-                        <option key={topSet.id} value={topSet.id}>
-                          {topSet.name} ({topSet.horizon_count} horizons)
-                        </option>
-                      ))}
-                    </select>
-                  ) : null}
-                  <label className="project-dialog__checkbox">
-                    <input
-                      type="radio"
-                      name="zone-set-policy"
-                      value="none"
-                      checked={zoneSetPolicy === 'none'}
-                      onChange={() => setZoneSetPolicy('none')}
-                    />
-                    <span>Do not assign imported tops to a ZoneSet</span>
-                  </label>
-                </div>
+              <div className="import-wizard__options-row">
+                <label className="project-dialog__field project-dialog__field--inline">
+                  <span>Depth reference</span>
+                  <select value={depthRef} onChange={(e) => setDepthRef(e.target.value as 'MD' | 'TVD' | 'TVDSS')}>
+                    <option value="MD">MD</option>
+                    <option value="TVD">TVD</option>
+                    <option value="TVDSS">TVDSS</option>
+                  </select>
+                </label>
+                <label className="project-dialog__field project-dialog__field--inline">
+                  <span>Depth unit</span>
+                  <select value={depthUnit} onChange={(e) => setDepthUnit(e.target.value as 'm' | 'ft' | 'km')}>
+                    <option value="m">m</option>
+                    <option value="ft">ft</option>
+                    <option value="km">km</option>
+                  </select>
+                </label>
               </div>
+              <label className="project-dialog__field project-dialog__field--inline">
+                <span>ZoneSet</span>
+                <select
+                  value={zoneSetPolicy === 'existing' ? zoneSetId : zoneSetPolicy}
+                  onChange={(e) => {
+                    const v = e.target.value
+                    if (v === 'create' || v === 'none') { setZoneSetPolicy(v) }
+                    else { setZoneSetPolicy('existing'); setZoneSetId(v) }
+                  }}
+                >
+                  <option value="create">Create new ZoneSet</option>
+                  {topSets.map((ts) => (
+                    <option key={ts.id} value={String(ts.id)}>{ts.name}</option>
+                  ))}
+                  <option value="none">None</option>
+                </select>
+              </label>
+              {zoneSetPolicy === 'create' && (
+                <label className="project-dialog__field project-dialog__field--inline">
+                  <span>ZoneSet name</span>
+                  <input
+                    type="text"
+                    value={zoneSetName}
+                    onChange={(e) => setZoneSetName(e.target.value)}
+                  />
+                </label>
+              )}
             </div>
           )}
         </>

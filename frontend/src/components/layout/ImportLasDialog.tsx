@@ -339,22 +339,24 @@ export function ImportLasDialog({ wells, activeWellId, onClose, onSuccess }: Imp
                     <option value={CREATE_NEW}>Create new well</option>
                   </select>
                 </label>
-                <label className="project-dialog__field project-dialog__field--inline">
-                  <span>Depth reference</span>
-                  <select value={trustedDepthRef} onChange={(e) => setTrustedDepthRef(e.target.value as 'MD' | 'TVD' | 'TVDSS')}>
-                    <option value="MD">MD</option>
-                    <option value="TVD">TVD</option>
-                    <option value="TVDSS">TVDSS</option>
-                  </select>
-                </label>
-                <label className="project-dialog__field project-dialog__field--inline">
-                  <span>Depth unit</span>
-                  <select value={depthUnit} onChange={(e) => setDepthUnit(e.target.value as 'm' | 'ft' | 'km')}>
-                    <option value="m">m</option>
-                    <option value="ft">ft</option>
-                    <option value="km">km</option>
-                  </select>
-                </label>
+                <div className="import-wizard__options-row">
+                  <label className="project-dialog__field project-dialog__field--inline">
+                    <span>Depth reference</span>
+                    <select value={trustedDepthRef} onChange={(e) => setTrustedDepthRef(e.target.value as 'MD' | 'TVD' | 'TVDSS')}>
+                      <option value="MD">MD</option>
+                      <option value="TVD">TVD</option>
+                      <option value="TVDSS">TVDSS</option>
+                    </select>
+                  </label>
+                  <label className="project-dialog__field project-dialog__field--inline">
+                    <span>Depth unit</span>
+                    <select value={depthUnit} onChange={(e) => setDepthUnit(e.target.value as 'm' | 'ft' | 'km')}>
+                      <option value="m">m</option>
+                      <option value="ft">ft</option>
+                      <option value="km">km</option>
+                    </select>
+                  </label>
+                </div>
               </div>
             )}
           </>
@@ -381,22 +383,24 @@ export function ImportLasDialog({ wells, activeWellId, onClose, onSuccess }: Imp
                     <option value={CREATE_NEW}>Create new well</option>
                   </select>
                 </label>
-                <label className="project-dialog__field project-dialog__field--inline">
-                  <span>Depth reference</span>
-                  <select value={trustedDepthRef} onChange={(e) => setTrustedDepthRef(e.target.value as 'MD' | 'TVD' | 'TVDSS')}>
-                    <option value="MD">MD</option>
-                    <option value="TVD">TVD</option>
-                    <option value="TVDSS">TVDSS</option>
-                  </select>
-                </label>
-                <label className="project-dialog__field project-dialog__field--inline">
-                  <span>Depth unit</span>
-                  <select value={depthUnit} onChange={(e) => setDepthUnit(e.target.value as 'm' | 'ft' | 'km')}>
-                    <option value="m">m</option>
-                    <option value="ft">ft</option>
-                    <option value="km">km</option>
-                  </select>
-                </label>
+                <div className="import-wizard__options-row">
+                  <label className="project-dialog__field project-dialog__field--inline">
+                    <span>Depth reference</span>
+                    <select value={trustedDepthRef} onChange={(e) => setTrustedDepthRef(e.target.value as 'MD' | 'TVD' | 'TVDSS')}>
+                      <option value="MD">MD</option>
+                      <option value="TVD">TVD</option>
+                      <option value="TVDSS">TVDSS</option>
+                    </select>
+                  </label>
+                  <label className="project-dialog__field project-dialog__field--inline">
+                    <span>Depth unit</span>
+                    <select value={depthUnit} onChange={(e) => setDepthUnit(e.target.value as 'm' | 'ft' | 'km')}>
+                      <option value="m">m</option>
+                      <option value="ft">ft</option>
+                      <option value="km">km</option>
+                    </select>
+                  </label>
+                </div>
               </div>
             )}
             {!previewLoading && tabularPreview && !mapping['depth'] && (

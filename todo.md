@@ -7,7 +7,7 @@ Active contract: `docs/contracts/bugs_and_features_4.md`
 | Item | Title | Status |
 |---|---|---|
 | BF4-016 | Simplified LAS/CSV import — options on preview, direct Load | done |
-| BF4-018 | Unified 2-step import — inline column mapping (Tops/Dev) | todo |
+| BF4-018 | Unified 2-step import — inline column mapping (Tops/Dev) | done |
 | BF4-010 | Move top-management buttons to side track toolbar | todo |
 | BF4-007-B | Sea level value override per top (backend + UI) | todo |
 | BF4-011 | Backend API audit — frontend coverage | todo |

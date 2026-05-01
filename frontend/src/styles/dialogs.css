@@ -548,3 +548,19 @@
   width: 100%;
   font-size: 11px;
 }
+
+.import-preview__row-num {
+  text-align: right;
+  color: #8fa0b0;
+  font-size: 0.7rem;
+  min-width: 24px;
+  padding-right: 6px !important;
+  user-select: none;
+}
+
+.import-wizard__options-row {
+  display: flex;
+  gap: 12px;
+  align-items: center;
+  flex-wrap: wrap;
+}
