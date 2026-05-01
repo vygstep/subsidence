@@ -261,6 +261,19 @@
   color: #1d4ed8;
 }
 
+.well-viewer-toolbar__button:disabled {
+  opacity: 0.38;
+  cursor: default;
+  pointer-events: none;
+}
+
+.well-viewer-toolbar__divider {
+  width: 16px;
+  height: 1px;
+  background: #d9e2ec;
+  flex-shrink: 0;
+}
+
 .log-view-panel__body {
   display: flex;
   flex-direction: row;

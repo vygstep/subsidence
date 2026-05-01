@@ -758,7 +758,7 @@ Show the radio span only for computed models (hide for planned).
 
 ---
 
-## BF4-010: Move top-management buttons to side track toolbar (todo)
+## BF4-010: Move top-management buttons to side track toolbar (done)
 
 **Problem**: Toolbar buttons for zoom presets (1:200, 1:500, 1:1000) and top management
 (Add top, Link top, Set age, Set type, Move top) are located in
@@ -811,6 +811,19 @@ of the well track container). Confirm with user if positioning is unclear.
 - `frontend/src/components/layout/ProjectToolbar.tsx` (remove moved buttons)
 - `frontend/src/components/layout/WellTrackSideToolbar.tsx` (new file)
 - Parent layout component that renders the well track area (add `WellTrackSideToolbar` to layout)
+
+### Implemented
+
+- Added zoom presets (1:200, 1:500, 1:1000), Add top, Link top, Set age, Set type, Move top
+  buttons to the existing `WellViewerToolbar` component rather than creating a new file — the
+  component already provided the vertical side toolbar pattern with identical CSS.
+- `SetFormationTypeDialog` and `LinkStratChartDialog` handling moved from `ProjectToolbar` into
+  `WellViewerToolbar` with local `activeDialog` / `formationLinkTarget` state; dialogs render
+  via an inline `project-dialog-overlay`.
+- `ProjectToolbar` secondary toolbar row now only shows file-import actions (Create well, Load
+  logs, Load tops, Load deviation) with no top-management or zoom buttons.
+- `ZoomControl` import removed from `ProjectToolbar`; zoom logic inlined in `WellViewerToolbar`.
+- Added `.well-viewer-toolbar__divider` and `:disabled` opacity rule to `log-view.css`.
 
 ---
 
@@ -2256,7 +2269,7 @@ name should be displayed.
 | 13 | BF4-004 | S | Curve settings when disabled (investigate first) |
 | 14 | BF4-016 | S | Simplified LAS/CSV import dialog (frontend only) |
 | 15 | BF4-018 | M | Inline column mapping + 2-step for Tops/Deviation |
-| 17 | BF4-010 | M | New side toolbar component |
+| 17 | BF4-010 | M | New side toolbar component | done |
 | 18 | BF4-007-B | M | Sea level override per top (backend + frontend) |
 | 19 | BF4-011 | M | API audit (research task) |
 | 20 | BF4-019 | M | Delete log curves from Data Manager | done |

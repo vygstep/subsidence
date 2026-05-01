@@ -5,18 +5,12 @@ import { FileOpenDialog } from './FileOpenDialog'
 import { ImportDeviationDialog } from './ImportDeviationDialog'
 import { ImportLasDialog } from './ImportLasDialog'
 import { ImportTopsDialog } from './ImportTopsDialog'
-import { LinkStratChartDialog } from './LinkStratChartDialog'
 import { LoadStratChartDialog } from './LoadStratChartDialog'
 import { NewProjectDialog } from './NewProjectDialog'
-import { ZoomControl } from './ZoomControl'
 import { useProjectStore, useViewStore, useWellDataStore, useWorkspaceStore } from '@/stores'
-import type { FormationTop } from '@/types'
 import { buildDiagnosticSnapshot } from '@/utils/diagnostics'
 
-type DialogKind = 'project-open' | 'project-new' | 'create-well' | 'load-las' | 'load-tops' | 'load-deviation' | 'link-top' | 'load-strat-chart' | 'set-top-type' | null
-type FormationTypeOption = 'strat' | 'unconformity'
-
-const FORMATION_TYPE_OPTIONS: FormationTypeOption[] = ['strat', 'unconformity']
+type DialogKind = 'project-open' | 'project-new' | 'create-well' | 'load-las' | 'load-tops' | 'load-deviation' | 'load-strat-chart' | null
 
 interface UnsavedChangesDialogProps {
   projectName: string | null
@@ -45,75 +39,21 @@ function UnsavedChangesDialog({ projectName, onSave, onDiscard, onCancel }: Unsa
   )
 }
 
-interface SetFormationTypeDialogProps {
-  formationName: string
-  initialType: FormationTypeOption
-  onClose: () => void
-  onConfirm: (nextType: FormationTypeOption) => void | Promise<void>
-}
-
-function SetFormationTypeDialog({
-  formationName,
-  initialType,
-  onClose,
-  onConfirm,
-}: SetFormationTypeDialogProps) {
-  const [nextType, setNextType] = useState<FormationTypeOption>(initialType)
-
-  return (
-    <div className="project-dialog">
-      <header className="project-dialog__header">
-        <div>
-          <p className="project-dialog__eyebrow">Top type</p>
-          <h2 className="project-dialog__title">{formationName}</h2>
-        </div>
-        <button type="button" className="project-dialog__link" onClick={onClose}>Close</button>
-      </header>
-
-      <div className="project-dialog__body">
-        <label className="project-dialog__field">
-          <span>Type</span>
-          <select value={nextType} onChange={(event) => setNextType(event.target.value as FormationTypeOption)}>
-            {FORMATION_TYPE_OPTIONS.map((option) => (
-              <option key={option} value={option}>{option}</option>
-            ))}
-          </select>
-        </label>
-
-        <div className="project-dialog__actions" style={{ gap: 8 }}>
-          <button type="button" className="project-dialog__button" onClick={onClose}>Cancel</button>
-          <button
-            type="button"
-            className="project-dialog__button project-dialog__button--primary"
-            onClick={() => void onConfirm(nextType)}
-          >
-            Set type
-          </button>
-        </div>
-      </div>
-    </div>
-  )
-}
-
 export function ProjectToolbar() {
   const [activeDialog, setActiveDialog] = useState<DialogKind>(() =>
     useProjectStore.getState().isOpen ? null : 'project-open',
   )
-  const [formationLinkTarget, setFormationLinkTarget] = useState<FormationTop | null>(null)
   const [projectMenuOpen, setProjectMenuOpen] = useState(false)
   const [pendingAction, setPendingAction] = useState<'new-project' | 'open-project' | 'close-project' | null>(null)
   const projectMenuRef = useRef<HTMLDivElement | null>(null)
 
   const well = useWellDataStore((state) => state.well)
-  const formations = useWellDataStore((state) => state.formations)
   const curves = useWellDataStore((state) => state.curves)
   const stratCharts = useWellDataStore((state) => state.stratCharts)
   const wellInventories = useWellDataStore((state) => state.wellInventories)
   const isLoading = useWellDataStore((state) => state.isLoading)
   const cancelLoading = useWellDataStore((state) => state.cancelLoading)
   const error = useWellDataStore((state) => state.error)
-  const addFormation = useWellDataStore((state) => state.addFormation)
-  const linkFormationToChart = useWellDataStore((state) => state.linkFormationToChart)
   const loadWell = useWellDataStore((state) => state.loadWell)
   const loadStratCharts = useWellDataStore((state) => state.loadStratCharts)
   const deleteChart = useWellDataStore((state) => state.deleteChart)
@@ -133,20 +73,12 @@ export function ProjectToolbar() {
   const redoProject = useProjectStore((state) => state.redo)
 
   const activeSidebarTab = useWorkspaceStore((state) => state.activeSidebarTab)
-  const selectedFormationId = useWorkspaceStore((state) => state.selectedFormationId)
-  const setSelectedFormationId = useWorkspaceStore((state) => state.setSelectedFormationId)
-  const updateWellViewState = useWorkspaceStore((state) => state.updateWellViewState)
   const lodEnabled = useViewStore((state) => state.lodEnabled)
   const setLodEnabled = useViewStore((state) => state.setLodEnabled)
 
   const wellOptions = useMemo(
     () => wellInventories.map((item) => ({ well_id: item.well_id, well_name: item.well_name })),
     [wellInventories],
-  )
-
-  const selectedFormation = useMemo(
-    () => formations.find((f) => f.id === selectedFormationId) ?? null,
-    [formations, selectedFormationId],
   )
 
   const topbarTitle = !isProjectOpen
@@ -271,65 +203,6 @@ export function ProjectToolbar() {
     }
   }
 
-  async function handleAddFormation(): Promise<void> {
-    if (!well?.well_id) return
-    const vs = useViewStore.getState()
-    const referenceDepth = vs.cursorDepth ?? vs.visibleDepthRange.min
-    await addFormation({
-      name: `Top ${formations.length + 1}`,
-      depth_md: Number(referenceDepth.toFixed(1)),
-      color: '#9ca3af',
-    })
-    const latest = useWellDataStore.getState().formations.at(-1)
-    if (latest) {
-      setSelectedFormationId(latest.id)
-      updateWellViewState(well.well_id, (state) => ({
-        ...state,
-        visibleFormationIds: Array.from(new Set([...state.visibleFormationIds, latest.id])),
-      }))
-    }
-  }
-
-  async function handleSetFormationAge(): Promise<void> {
-    if (!selectedFormation) return
-    const value = window.prompt('Set top age (Ma)', selectedFormation.age_ma?.toString() ?? '')
-    if (value === null) return
-    const trimmed = value.trim()
-    const age = trimmed ? Number(trimmed) : undefined
-    if (trimmed && !Number.isFinite(age)) return
-    await useWellDataStore.getState().updateFormation(selectedFormation.id, { age_ma: age })
-  }
-
-  async function handleSetFormationType(): Promise<void> {
-    if (!selectedFormation) return
-    setActiveDialog('set-top-type')
-  }
-
-  async function handleMoveSelectedFormation(): Promise<void> {
-    if (!selectedFormation) return
-    const value = window.prompt('Move top to depth (MD)', selectedFormation.depth_md?.toString() ?? '')
-    if (value === null) return
-    const nextDepth = Number(value.trim())
-    if (!Number.isFinite(nextDepth)) return
-    void useWellDataStore.getState().updateFormationDepth(selectedFormation.id, nextDepth)
-  }
-
-  function handleOpenFormationLink(formationId: string): void {
-    const formation = formations.find((f) => f.id === formationId) ?? null
-    setFormationLinkTarget(formation)
-    setActiveDialog('link-top')
-  }
-
-  async function handleLinkFormation(stratUnitId: number | null): Promise<void> {
-    if (!formationLinkTarget) return
-    const activeChart = stratCharts.find((c) => c.is_active) ?? null
-    if (activeChart) {
-      await linkFormationToChart(formationLinkTarget.id, activeChart.id, stratUnitId)
-    }
-    setFormationLinkTarget(null)
-    setActiveDialog(null)
-  }
-
   async function handleWellMutation(wellId: string): Promise<void> {
     await refreshWell(wellId)
   }
@@ -359,37 +232,6 @@ export function ProjectToolbar() {
             }}
           />
         )
-      case 'link-top': {
-        const activeChart = stratCharts.find((c) => c.is_active) ?? null
-        const currentUnitId = formationLinkTarget
-          ? formationLinkTarget.strat_links.find((l) => l.chart_id === activeChart?.id)?.strat_unit_id
-          : undefined
-        return formationLinkTarget ? (
-          <LinkStratChartDialog
-            formationName={formationLinkTarget.name}
-            activeChartId={activeChart?.id ?? null}
-            currentUnitId={currentUnitId}
-            onClose={() => { setFormationLinkTarget(null); setActiveDialog(null) }}
-            onSelect={handleLinkFormation}
-          />
-        ) : null
-      }
-      case 'set-top-type':
-        return selectedFormation ? (
-          <SetFormationTypeDialog
-            formationName={selectedFormation.name}
-            initialType={
-              FORMATION_TYPE_OPTIONS.includes(selectedFormation.kind as FormationTypeOption)
-                ? selectedFormation.kind as FormationTypeOption
-                : 'strat'
-            }
-            onClose={() => setActiveDialog(null)}
-            onConfirm={async (nextType) => {
-              await useWellDataStore.getState().updateFormation(selectedFormation.id, { kind: nextType })
-              setActiveDialog(null)
-            }}
-          />
-        ) : null
       default:
         return null
     }
@@ -431,17 +273,6 @@ export function ProjectToolbar() {
       <button type="button" className="app-action-button" onClick={() => setActiveDialog('load-las')}>Load logs</button>
       <button type="button" className="app-action-button" onClick={() => setActiveDialog('load-tops')}>Load tops</button>
       <button type="button" className="app-action-button" onClick={() => setActiveDialog('load-deviation')}>Load deviation</button>
-    </>
-  )
-
-  const topsModeActions = (
-    <>
-      <button type="button" className="app-action-button" onClick={() => setActiveDialog('load-tops')}>Load tops</button>
-      <button type="button" className="app-action-button" onClick={() => void handleAddFormation()} disabled={!well}>Add top</button>
-      <button type="button" className="app-action-button" onClick={() => selectedFormation && handleOpenFormationLink(selectedFormation.id)} disabled={!selectedFormation}>Link top</button>
-      <button type="button" className="app-action-button" onClick={() => void handleSetFormationAge()} disabled={!selectedFormation}>Set age</button>
-      <button type="button" className="app-action-button" onClick={() => void handleSetFormationType()} disabled={!selectedFormation}>Set type</button>
-      <button type="button" className="app-action-button" onClick={() => void handleMoveSelectedFormation()} disabled={!selectedFormation}>Move top</button>
     </>
   )
 
@@ -490,15 +321,8 @@ export function ProjectToolbar() {
           <div className="app-topbar__row app-topbar__row--secondary">
             <div className="app-topbar__actions">
               {activeSidebarTab === 'strat-charts' ? stratChartModeActions : null}
-              {activeSidebarTab === 'wells' ? (
-                <>
-                  {wellsModeActions}
-                  <span className="app-topbar__divider" />
-                  {topsModeActions}
-                </>
-              ) : null}
+              {activeSidebarTab === 'wells' ? wellsModeActions : null}
             </div>
-            <ZoomControl />
           </div>
         )}
       </header>
