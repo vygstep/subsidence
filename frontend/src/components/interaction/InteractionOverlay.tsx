@@ -1,6 +1,6 @@
 import { useId } from 'react'
 
-import { useViewStore } from '@/stores'
+import { useViewStore, useWorkspaceStore } from '@/stores'
 import type { CurveData, FormationTop } from '@/types'
 
 import { CurveTooltip } from './CurveTooltip'
@@ -31,11 +31,16 @@ export function InteractionOverlay({
   topsEditable,
 }: InteractionOverlayProps) {
   const activePickId = useViewStore((state) => state.activePickId)
+  const selectedFormationId = useWorkspaceStore((state) => state.selectedFormationId)
   const setActivePickId = useViewStore((state) => state.setActivePickId)
+  const effectiveActivePickId = activePickId ?? selectedFormationId
   const clipPathId = `${useId().replace(/:/g, '')}-track-bounds`
 
   // Collect not-picked formations for indicator strip at top
   const notPickedFormations = formations.filter((f) => f.depth_md === null)
+  const activePick = effectiveActivePickId === null ? null : formations.find((f) => f.id === effectiveActivePickId) ?? null
+  const cursorY = cursorDepth === null ? null : depthToPixel(cursorDepth)
+  const activePickColor = activePick?.active_strat_color ?? activePick?.color ?? '#9ca3af'
 
   return (
     <>
@@ -68,24 +73,20 @@ export function InteractionOverlay({
               formation={formation}
               yPosition={y}
               editable={topsEditable}
-              isActivePick={activePickId === formation.id}
+              isActivePick={effectiveActivePickId === formation.id}
               onSetActivePick={setActivePickId}
               lineClipPathId={clipPathId}
             />
           )
         })}
         {/* Ghost line at cursor when a pick (including not-picked) is active */}
-        {topsEditable && activePickId !== null && cursorDepth !== null && (
+        {topsEditable && effectiveActivePickId !== null && cursorDepth !== null && (
           <line
             x1={0}
-            y1={depthToPixel(cursorDepth)}
+            y1={cursorY ?? 0}
             x2="100%"
-            y2={depthToPixel(cursorDepth)}
-            stroke={
-              formations.find((f) => f.id === activePickId)?.active_strat_color ??
-              formations.find((f) => f.id === activePickId)?.color ??
-              '#9ca3af'
-            }
+            y2={cursorY ?? 0}
+            stroke={activePickColor}
             strokeWidth={1.5}
             strokeDasharray="4 4"
             strokeOpacity={0.5}
@@ -93,18 +94,37 @@ export function InteractionOverlay({
             style={{ pointerEvents: 'none' }}
           />
         )}
-        {cursorDepth !== null && <DepthCursor yPosition={depthToPixel(cursorDepth)} depth={cursorDepth} />}
+        {topsEditable && activePick && cursorY !== null ? (
+          <g style={{ pointerEvents: 'none' }}>
+            <rect x={4} y={Math.max(2, cursorY - 24)} width={120} height={18} fill={activePickColor} opacity={0.85} rx={2} />
+            <text
+              x={9}
+              y={Math.max(2, cursorY - 24) + 9}
+              dominantBaseline="middle"
+              fill="#111827"
+              fontSize={11}
+              fontWeight={700}
+              style={{ userSelect: 'none' }}
+            >
+              {activePick.name}
+            </text>
+          </g>
+        ) : null}
+        {cursorDepth !== null && <DepthCursor yPosition={cursorY ?? depthToPixel(cursorDepth)} depth={cursorDepth} />}
         {/* Not-picked formation tap targets near the top */}
         {topsEditable && notPickedFormations.map((formation, i) => {
           const color = formation.active_strat_color ?? formation.color
-          const isActive = activePickId === formation.id
+          const isActive = effectiveActivePickId === formation.id
           const rowH = 18
           const rowY = i * (rowH + 2) + 2
           return (
             <g
               key={formation.id}
               style={{ pointerEvents: 'auto', cursor: 'crosshair' }}
-              onClick={() => setActivePickId(isActive ? null : formation.id)}
+              onClick={(event) => {
+                event.stopPropagation()
+                setActivePickId(formation.id)
+              }}
             >
               <rect x={2} y={rowY} width={120} height={rowH} fill={color} opacity={isActive ? 1 : 0.6} rx={2} />
               <text

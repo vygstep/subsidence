@@ -26,6 +26,8 @@ interface DataManagerTopPaneProps {
   onContextMenuDeviation: (event: React.MouseEvent, wellId: string) => void
   onContextMenuLasGroup: (event: React.MouseEvent, wellId: string) => void
   onContextMenuStratChart: (event: React.MouseEvent, chart: StratChartInfo) => void
+  onContextMenuTopSetMarker: (event: React.MouseEvent, target: { zoneSetId: number; wellId: string; horizonId: number; name: string }) => void
+  onContextMenuTopSetZone: (event: React.MouseEvent, target: { zoneSetId: number; wellId: string; zoneId: number; name: string }) => void
   onContextMenuWell: (event: React.MouseEvent, well: WellInventory) => void
   onDeleteWell: (wellId: string, wellName: string) => void
   onDeleteStratChartById: (chartId: number, name: string, isBuiltin: boolean) => void
@@ -102,6 +104,8 @@ export function DataManagerTopPane({
   onContextMenuDeviation,
   onContextMenuLasGroup,
   onContextMenuStratChart,
+  onContextMenuTopSetMarker,
+  onContextMenuTopSetZone,
   onContextMenuWell,
   onDeleteWell,
   onDeleteStratChartById,
@@ -226,6 +230,8 @@ export function DataManagerTopPane({
           onContextMenuCurve={onContextMenuCurve}
           onContextMenuDeviation={onContextMenuDeviation}
           onContextMenuLasGroup={onContextMenuLasGroup}
+          onContextMenuTopSetMarker={onContextMenuTopSetMarker}
+          onContextMenuTopSetZone={onContextMenuTopSetZone}
           onContextMenuWell={onContextMenuWell}
           onDeleteWell={onDeleteWell}
           onDeleteCurve={onDeleteCurve}

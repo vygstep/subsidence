@@ -58,6 +58,8 @@ export function useDataManagerController() {
 
   const selectedTrackId = useViewStore((state) => state.selectedTrackId)
   const selectTrack = useViewStore((state) => state.selectTrack)
+  const activePickId = useViewStore((state) => state.activePickId)
+  const setActivePickId = useViewStore((state) => state.setActivePickId)
   const wellId = well?.well_id ?? null
 
   useEffect(() => {
@@ -205,6 +207,7 @@ export function useDataManagerController() {
     setSelectedObject,
     setSelectedFormationId,
     setActiveToolbarMode,
+    setActivePickId,
     loadWell,
   })
 
@@ -293,10 +296,35 @@ export function useDataManagerController() {
 
   async function handleDeleteTopSetMarker(zoneSetId: number, horizonId: number, name: string): Promise<void> {
     if (!window.confirm(`Delete marker "${name}" from this TopSet?`)) return
+    const deletedFormationIdsByWell = wellInventories
+      .filter((inventory) => inventory.active_top_set_id === zoneSetId)
+      .map((inventory) => ({
+        wellId: inventory.well_id,
+        ids: inventory.formations
+          .filter((formation) => markerMatches(formation, horizonId, name))
+          .map((formation) => formation.id),
+      }))
+      .filter((entry) => entry.ids.length > 0)
+    const deletedFormationIds = new Set(deletedFormationIdsByWell.flatMap((entry) => entry.ids))
     const response = await fetch(`/api/top-sets/${zoneSetId}/horizons/${horizonId}`, { method: 'DELETE' })
     if (!response.ok) {
       window.alert(`Failed to delete marker (${response.status})`)
       return
+    }
+    for (const entry of deletedFormationIdsByWell) {
+      updateWellViewState(entry.wellId, (state) => ({
+        ...state,
+        visibleFormationIds: state.visibleFormationIds.filter((id) => !entry.ids.includes(id)),
+      }))
+    }
+    if (activePickId !== null && deletedFormationIds.has(activePickId)) {
+      setActivePickId(null)
+    }
+    if (selectedFormationId !== null && deletedFormationIds.has(selectedFormationId)) {
+      setSelectedFormationId(null)
+    }
+    if (selectedObject?.type === 'top-pick' && deletedFormationIds.has(selectedObject.formationId)) {
+      setSelectedObject(null)
     }
     await loadWellInventories()
     const currentWellId = useWellDataStore.getState().well?.well_id
@@ -317,6 +345,50 @@ export function useDataManagerController() {
     if (currentWellId) {
       await refreshWell(currentWellId)
     }
+  }
+
+  async function handleCreateTopSetPick(
+    zoneSetId: number,
+    body: {
+      well_id: string
+      depth_md?: number | null
+      insert_before_horizon_id?: number
+      insert_after_horizon_id?: number
+      split_zone_id?: number
+    },
+  ): Promise<{ formation_id: string; horizon_id: number; name: string; depth_md: number | null } | null> {
+    const response = await fetch(`/api/top-sets/${zoneSetId}/picks`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(body),
+    })
+    if (!response.ok) {
+      let message = `Failed to add top (${response.status})`
+      const text = await response.text()
+      try {
+        const payload = JSON.parse(text) as { detail?: string }
+        if (payload.detail) message = payload.detail
+      } catch {
+        if (text) message = text
+      }
+      window.alert(message)
+      return null
+    }
+    const created = await response.json() as { formation_id: string; horizon_id: number; name: string; depth_md: number | null }
+    updateWellViewState(body.well_id, (state) => ({
+      ...state,
+      visibleFormationIds: Array.from(new Set([...state.visibleFormationIds, created.formation_id])),
+    }))
+    await loadWellInventories()
+    const currentWellId = useWellDataStore.getState().well?.well_id
+    if (currentWellId) {
+      await refreshWell(currentWellId)
+    }
+    setSelectedFormationId(created.formation_id)
+    setSelectedObject({ type: 'top-pick', wellId: body.well_id, formationId: created.formation_id })
+    setActivePickId(created.formation_id)
+    setActiveToolbarMode('tops')
+    return created
   }
 
   return {
@@ -362,6 +434,7 @@ export function useDataManagerController() {
     handleToggleTopSetZone,
     handleDeleteTopSet,
     handleDeleteTopSetMarker,
+    handleCreateTopSetPick,
     handleWellInspectorDraftChange: actions.handleWellInspectorDraftChange,
     maxDepth,
     minDepth,

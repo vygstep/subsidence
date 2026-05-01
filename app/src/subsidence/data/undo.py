@@ -183,8 +183,8 @@ class UpdateFormationDepth(Command):
     def __init__(
         self,
         top_id: int,
-        old_depth: float,
-        new_depth: float,
+        old_depth: float | None,
+        new_depth: float | None,
         project_path: Path | str | None = None,
     ) -> None:
         self.top_id = top_id
@@ -196,14 +196,17 @@ class UpdateFormationDepth(Command):
     def description(self) -> str:
         return f'Update formation top {self.top_id} depth'
 
-    def _set_depth(self, session: Session, depth_md: float) -> None:
+    def _set_depth(self, session: Session, depth_md: float | None) -> None:
         from .deviation_transform import compute_tvd_tvdss
         from .zone_service import aggregate_zone_lithology_from_curve, get_well_active_top_set_id, recalculate_zone_thickness
         top = session.get(FormationTopModel, self.top_id)
         if top is None:
             raise ValueError(f'Formation top not found: {self.top_id}')
         top.depth_md = depth_md
-        if self.project_path is not None and top.well is not None:
+        if depth_md is None:
+            top.depth_tvd = None
+            top.depth_tvdss = None
+        elif self.project_path is not None and top.well is not None:
             tvd, tvdss = compute_tvd_tvdss(self.project_path, top.well, depth_md)
             top.depth_tvd = tvd
             top.depth_tvdss = tvdss

@@ -1706,6 +1706,54 @@ def test_zone_lifecycle_four_horizons_create_three_zones(api_client: TestClient,
     assert len(inv['zones']) == 3
 
 
+def test_top_set_pick_insert_endpoint_adds_marker_from_data_manager(api_client: TestClient, tmp_path: Path):
+    """Data Manager can insert a new TopSet marker above/below an existing marker."""
+    well_id, top_set_id = _create_well_with_top_set(api_client, tmp_path)
+
+    resp = api_client.get(f'/api/top-sets/{top_set_id}')
+    assert resp.status_code == 200, resp.text
+    horizons = resp.json()['horizons']
+    h2_id = next(h['id'] for h in horizons if h['name'] == 'H2')
+
+    resp = api_client.post(
+        f'/api/top-sets/{top_set_id}/picks',
+        json={'well_id': well_id, 'insert_before_horizon_id': h2_id},
+    )
+    assert resp.status_code == 201, resp.text
+    created = resp.json()
+    assert created['well_id'] == well_id
+    assert created['horizon_id'] != h2_id
+    assert created['name'].startswith('Top ')
+    assert created['depth_md'] is None
+
+    resp = api_client.get(f'/api/top-sets/{top_set_id}')
+    assert resp.status_code == 200, resp.text
+    ordered_names = [h['name'] for h in resp.json()['horizons']]
+    assert ordered_names == ['H1', created['name'], 'H2', 'H3', 'H4']
+
+    resp = api_client.patch(
+        f'/api/wells/{well_id}/formations/{created["formation_id"]}',
+        json={'depth_md': 200.0},
+    )
+    assert resp.status_code == 200, resp.text
+    assert resp.json()['depth_md'] == pytest.approx(200.0)
+
+    resp = api_client.get(f'/api/wells/{well_id}/zones')
+    assert resp.status_code == 200, resp.text
+    assert len(resp.json()) == 4
+
+    resp = api_client.delete(f'/api/top-sets/{top_set_id}/horizons/{created["horizon_id"]}')
+    assert resp.status_code == 204, resp.text
+
+    resp = api_client.get(f'/api/wells/{well_id}/formations')
+    assert resp.status_code == 200, resp.text
+    assert all(top['id'] != created['formation_id'] for top in resp.json())
+
+    resp = api_client.get(f'/api/wells/{well_id}/zones')
+    assert resp.status_code == 200, resp.text
+    assert len(resp.json()) == 3
+
+
 def test_zone_lifecycle_delete_middle_horizon_merges_zones(api_client: TestClient, tmp_path: Path):
     """Deleting a middle horizon merges adjacent zones; lithology cleared."""
     well_id, top_set_id = _create_well_with_top_set(api_client, tmp_path)

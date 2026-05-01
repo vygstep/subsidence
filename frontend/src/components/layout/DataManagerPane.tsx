@@ -16,6 +16,8 @@ type ContextMenuTarget =
   | { type: 'curve'; wellId: string; mnemonic: string; unit: string }
   | { type: 'tops-group'; wellId: string }
   | { type: 'top-pick'; wellId: string; formationId: string; name: string; depth_md: number | null; active_strat_color: string | null }
+  | { type: 'top-set-marker'; zoneSetId: number; wellId: string; horizonId: number; name: string }
+  | { type: 'top-set-zone'; zoneSetId: number; wellId: string; zoneId: number; name: string }
   | { type: 'deviation-group'; wellId: string }
   | { type: 'strat-chart'; chartId: number; name: string; isBuiltin: boolean }
   | { type: 'compaction-model'; modelId: number; name: string; isBuiltin: boolean; isActive: boolean }
@@ -149,6 +151,49 @@ export function DataManagerPane({ sidebarRef, onInternalSplitterMouseDown }: Dat
           },
         ]
       }
+      case 'top-set-marker': {
+        const target = contextMenu.target
+        return [
+          {
+            label: 'Add top above',
+            disabled: false,
+            onClick: () => {
+              close()
+              void controller.handleCreateTopSetPick(target.zoneSetId, {
+                well_id: target.wellId,
+                insert_before_horizon_id: target.horizonId,
+              })
+            },
+          },
+          {
+            label: 'Add top below',
+            disabled: false,
+            onClick: () => {
+              close()
+              void controller.handleCreateTopSetPick(target.zoneSetId, {
+                well_id: target.wellId,
+                insert_after_horizon_id: target.horizonId,
+              })
+            },
+          },
+        ]
+      }
+      case 'top-set-zone': {
+        const target = contextMenu.target
+        return [
+          {
+            label: 'Add top inside',
+            disabled: false,
+            onClick: () => {
+              close()
+              void controller.handleCreateTopSetPick(target.zoneSetId, {
+                well_id: target.wellId,
+                split_zone_id: target.zoneId,
+              })
+            },
+          },
+        ]
+      }
       case 'strat-chart': {
         const target = contextMenu.target
         return [
@@ -235,6 +280,14 @@ export function DataManagerPane({ sidebarRef, onInternalSplitterMouseDown }: Dat
           onContextMenuLasGroup={(event, wellId) => openContextMenu(event, {
             type: 'las-group',
             wellId,
+          })}
+          onContextMenuTopSetMarker={(event, target) => openContextMenu(event, {
+            type: 'top-set-marker',
+            ...target,
+          })}
+          onContextMenuTopSetZone={(event, target) => openContextMenu(event, {
+            type: 'top-set-zone',
+            ...target,
           })}
           onContextMenuStratChart={(event, chart) => openContextMenu(event, {
             type: 'strat-chart',

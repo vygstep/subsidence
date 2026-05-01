@@ -18,6 +18,7 @@ export function ZoneSettings({ wellId, zoneSetId, onSelectZone, selectedZoneId }
   const well = useWellDataStore((state) => state.well)
   const wellInventories = useWellDataStore((state) => state.wellInventories)
   const loadWell = useWellDataStore((state) => state.loadWell)
+  const setActivePickId = useViewStore((state) => state.setActivePickId)
   const selectedObject = useWorkspaceStore((state) => state.selectedObject)
   const setActiveToolbarMode = useWorkspaceStore((state) => state.setActiveToolbarMode)
   const setSelectedFormationId = useWorkspaceStore((state) => state.setSelectedFormationId)
@@ -43,6 +44,7 @@ export function ZoneSettings({ wellId, zoneSetId, onSelectZone, selectedZoneId }
   function handleMarkerSelect(markerId: string): void {
     setSelectedFormationId(markerId)
     setSelectedObject({ type: 'top-pick', wellId, formationId: markerId })
+    setActivePickId(markerId)
     setActiveToolbarMode('tops')
   }
 

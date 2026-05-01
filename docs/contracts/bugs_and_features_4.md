@@ -2949,7 +2949,12 @@ When Edit tops mode is active (`interactionMode === 'edit-tops'`):
 
 1. **Click on empty track space** — if there is a currently selected empty pick (depth_md = null),
    that click assigns depth_md to it at the clicked depth. If no empty pick is selected, a click
-   creates a new pick in the active TopSet at that depth (auto-name "Top N").
+   creates a new pick in the active TopSet at that depth (auto-name "Top N"). If the current well
+   has no active TopSet, show an inline error/toast telling the user to choose an active TopSet.
+   If no marker is selected and the click is inside an existing zone, insert the new marker inside
+   that zone and split it. If a marker is selected but this well has no pick for that marker, a
+   valid click between its bounding markers creates the missing pick and splits the zone
+   consistently with wells that already have that marker.
 
 2. **Hover over an existing pick line** — cursor becomes ↕ (ns-resize), the pick becomes the
    active pick. Drag moves it.
@@ -2957,7 +2962,10 @@ When Edit tops mode is active (`interactionMode === 'edit-tops'`):
 3. **Stratigraphic validation on placement**: if the clicked depth would place the new or moved
    pick outside its valid interval (e.g., below the lower bounding marker of its zone, or above
    the upper bounding marker), placement is rejected with an inline error toast. Picks without a
-   zone constraint (outermost markers) are not validated against other TopSet markers.
+   zone constraint (outermost markers) are not validated against other TopSet markers. Validation
+   is based on the nearest TopSet marker above and below the target marker/zone. If only one bound
+   exists, validate against that single bound and still allow creating the corresponding zone. If
+   both bounds are absent, allow placement.
 
 4. **Cursor tooltip**: while Edit tops is active and there is an active (selected) pick, a
    floating label follows the horizontal depth cursor:
@@ -2996,3 +3004,16 @@ cursor tooltip rendering.
   appears at the clicked position.
 - Clicking outside the valid zone interval shows an error and does not move the pick.
 - Cursor tooltip appears when Edit tops is active and a pick is selected; it follows the cursor.
+
+### Implemented so far
+
+- Added `POST /api/top-sets/{top_set_id}/picks` for structure-aware TopSet pick creation:
+  insert above marker, insert below marker, split zone, or append to active TopSet.
+- Data Manager TopSet marker rows expose context menu actions `Add top above` / `Add top below`.
+- Data Manager TopSet zone rows expose context menu action `Add top inside`.
+- Created picks are selected immediately and made visible in the active well view.
+- Edit tops mode can assign depth to the selected pick; placement is constrained by nearest
+  TopSet markers above/below when available.
+- Edit tops mode can create a new top by clicking inside an existing zone of the active TopSet.
+- Clicking an existing top line now selects the same `top-pick` object used by the Settings panel.
+- Cursor tooltip/ghost line now follows the depth cursor for the active pick in edit-tops mode.

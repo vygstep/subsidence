@@ -49,6 +49,7 @@ export function ProjectToolbar() {
 
   const well = useWellDataStore((state) => state.well)
   const curves = useWellDataStore((state) => state.curves)
+  const formations = useWellDataStore((state) => state.formations)
   const stratCharts = useWellDataStore((state) => state.stratCharts)
   const wellInventories = useWellDataStore((state) => state.wellInventories)
   const isLoading = useWellDataStore((state) => state.isLoading)
@@ -73,6 +74,7 @@ export function ProjectToolbar() {
   const redoProject = useProjectStore((state) => state.redo)
 
   const activeSidebarTab = useWorkspaceStore((state) => state.activeSidebarTab)
+  const selectedFormationId = useWorkspaceStore((state) => state.selectedFormationId)
   const lodEnabled = useViewStore((state) => state.lodEnabled)
   const setLodEnabled = useViewStore((state) => state.setLodEnabled)
 

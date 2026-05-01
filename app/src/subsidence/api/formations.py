@@ -291,7 +291,14 @@ def update_formation(well_id: str, formation_id: int, body: FormationTopPatch, r
 
     if set(new_values) == {'depth_md'}:
         # UpdateFormationDepth handles zone recalculation internally via _set_depth
-        manager.execute_command(UpdateFormationDepth(formation_id, float(old_values['depth_md']), float(new_values['depth_md']), project_path=manager.project_path))
+        old_depth = old_values['depth_md']
+        new_depth = new_values['depth_md']
+        manager.execute_command(UpdateFormationDepth(
+            formation_id,
+            float(old_depth) if old_depth is not None else None,
+            float(new_depth) if new_depth is not None else None,
+            project_path=manager.project_path,
+        ))
     else:
         manager.execute_command(UpdateFormation(formation_id, old_values, new_values))
         if 'depth_md' in new_values:

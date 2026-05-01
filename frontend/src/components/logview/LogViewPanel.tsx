@@ -2,7 +2,7 @@ import { Fragment, useCallback, useEffect, useMemo, useRef, useState } from 'rea
 
 import { useSynchronizedScroll } from '@/hooks'
 import { useViewStore, useWellDataStore } from '@/stores'
-import { DEPTH_TRACK_ID, FORMATION_TRACK_ID } from '@/stores/workspaceStore'
+import { DEPTH_TRACK_ID, FORMATION_TRACK_ID, useWorkspaceStore } from '@/stores/workspaceStore'
 import type { CurveData, FormationTop, FormationZone, TrackConfig } from '@/types'
 
 import { InteractionOverlay } from '../interaction'
@@ -47,6 +47,14 @@ export function LogViewPanel({ tracks, trackOrder, curves, formations, zoneForma
   const lodEnabled = useViewStore((state) => state.lodEnabled)
   const depthType = useViewStore((state) => state.depthType)
   const updateFormationDepth = useWellDataStore((state) => state.updateFormationDepth)
+  const well = useWellDataStore((state) => state.well)
+  const wellInventories = useWellDataStore((state) => state.wellInventories)
+  const loadWellInventories = useWellDataStore((state) => state.loadWellInventories)
+  const refreshWell = useWellDataStore((state) => state.refreshWell)
+  const selectedFormationId = useWorkspaceStore((state) => state.selectedFormationId)
+  const setSelectedFormationId = useWorkspaceStore((state) => state.setSelectedFormationId)
+  const setSelectedObject = useWorkspaceStore((state) => state.setSelectedObject)
+  const updateWellViewState = useWorkspaceStore((state) => state.updateWellViewState)
 
   const depthWidth = trackWidths[DEPTH_TRACK_ID] ?? DEFAULT_DEPTH_WIDTH
   const formationWidth = trackWidths[FORMATION_TRACK_ID] ?? DEFAULT_FORMATION_WIDTH
@@ -112,15 +120,107 @@ export function LogViewPanel({ tracks, trackOrder, curves, formations, zoneForma
   }, [setCursorDepth])
 
   const handleTracksClick = useCallback(
-    (e: React.MouseEvent<HTMLDivElement>) => {
-      if (interactionMode !== 'edit-tops' || activePickId === null) return
+    async (e: React.MouseEvent<HTMLDivElement>) => {
+      if (interactionMode !== 'edit-tops') return
       const rect = e.currentTarget.getBoundingClientRect()
       const y = e.clientY - rect.top
       const depth = scrollDepth + y * depthPerPixel
-      void updateFormationDepth(activePickId, depth)
-      setActivePickId(null)
+      const selectedPick = selectedFormationId === null
+        ? null
+        : zoneFormations.find((formation) => formation.id === selectedFormationId) ?? null
+      const targetPickId = activePickId ?? selectedPick?.id ?? null
+      const formationByHorizonId = new Map(zoneFormations.filter((f) => f.horizon_id !== null).map((f) => [f.horizon_id!, f]))
+      const validateDepth = (formation: FormationTop, candidateDepth: number): boolean => {
+        if (formation.horizon_id === null) return true
+        const upperZone = zones.find((zone) => zone.lower_horizon.id === formation.horizon_id)
+        const lowerZone = zones.find((zone) => zone.upper_horizon.id === formation.horizon_id)
+        const upperFormation = upperZone ? formationByHorizonId.get(upperZone.upper_horizon.id) : null
+        const lowerFormation = lowerZone ? formationByHorizonId.get(lowerZone.lower_horizon.id) : null
+        if (upperFormation?.depth_md !== null && upperFormation?.depth_md !== undefined && candidateDepth <= upperFormation.depth_md) {
+          return false
+        }
+        if (lowerFormation?.depth_md !== null && lowerFormation?.depth_md !== undefined && candidateDepth >= lowerFormation.depth_md) {
+          return false
+        }
+        return true
+      }
+
+      if (targetPickId !== null) {
+        const target = zoneFormations.find((formation) => formation.id === targetPickId)
+        if (!target) return
+        if (!validateDepth(target, depth)) {
+          window.alert('Cannot place top outside its stratigraphic interval.')
+          return
+        }
+        setActivePickId(targetPickId)
+        await updateFormationDepth(targetPickId, depth)
+        return
+      }
+
+      if (!well) return
+      const inventory = wellInventories.find((item) => item.well_id === well.well_id)
+      if (!inventory?.active_top_set_id) {
+        window.alert('Choose an active TopSet first.')
+        return
+      }
+      const clickedZone = zones.find((zone) => {
+        const upper = formationByHorizonId.get(zone.upper_horizon.id)
+        const lower = formationByHorizonId.get(zone.lower_horizon.id)
+        if (upper?.depth_md === null || upper?.depth_md === undefined || lower?.depth_md === null || lower?.depth_md === undefined) {
+          return false
+        }
+        return depth > upper.depth_md && depth < lower.depth_md
+      })
+      if (!clickedZone) {
+        window.alert('Click inside an existing zone to add a top. To extend below/above the current markers, select an existing marker or add the marker manually in the TopSet.')
+        return
+      }
+      const response = await fetch(`/api/top-sets/${inventory.active_top_set_id}/picks`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ well_id: well.well_id, split_zone_id: clickedZone.zone_id, depth_md: depth }),
+      })
+      if (!response.ok) {
+        let message = `Failed to add top (${response.status})`
+        const text = await response.text()
+        try {
+          const payload = JSON.parse(text) as { detail?: string }
+          if (payload.detail) message = payload.detail
+        } catch {
+          if (text) message = text
+        }
+        window.alert(message)
+        return
+      }
+      const created = await response.json() as { formation_id: string }
+      updateWellViewState(well.well_id, (state) => ({
+        ...state,
+        visibleFormationIds: Array.from(new Set([...state.visibleFormationIds, created.formation_id])),
+      }))
+      await loadWellInventories()
+      await refreshWell(well.well_id)
+      setSelectedFormationId(created.formation_id)
+      setSelectedObject({ type: 'top-pick', wellId: well.well_id, formationId: created.formation_id })
+      setActivePickId(created.formation_id)
     },
-    [interactionMode, activePickId, scrollDepth, depthPerPixel, updateFormationDepth, setActivePickId],
+    [
+      interactionMode,
+      activePickId,
+      selectedFormationId,
+      scrollDepth,
+      depthPerPixel,
+      zoneFormations,
+      zones,
+      well,
+      wellInventories,
+      updateFormationDepth,
+      setActivePickId,
+      updateWellViewState,
+      loadWellInventories,
+      refreshWell,
+      setSelectedFormationId,
+      setSelectedObject,
+    ],
   )
 
   const tooltipCurves = useMemo(() => {

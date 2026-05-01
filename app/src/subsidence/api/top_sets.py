@@ -5,9 +5,10 @@ from pydantic import BaseModel
 from sqlalchemy import select
 from sqlalchemy.orm import selectinload
 
-from subsidence.data.deviation_transform import recalculate_picks_tvd
+from subsidence.data.deviation_transform import compute_tvd_tvdss, recalculate_picks_tvd
 from subsidence.data.schema import (
     FormationTopModel,
+    FormationZone,
     TopSet,
     TopSetHorizon,
     WellActiveTopSet,
@@ -49,6 +50,22 @@ class HorizonPatch(BaseModel):
     age_ma: float | None = None
     color: str | None = None
     note: str | None = None
+
+
+class TopSetPickCreate(BaseModel):
+    well_id: str
+    depth_md: float | None = None
+    insert_before_horizon_id: int | None = None
+    insert_after_horizon_id: int | None = None
+    split_zone_id: int | None = None
+
+
+class TopSetPickCreateResponse(BaseModel):
+    well_id: str
+    formation_id: str
+    horizon_id: int
+    name: str
+    depth_md: float | None
 
 
 class HorizonReorderRequest(BaseModel):
@@ -146,6 +163,44 @@ def _require_top_set(session, top_set_id: int) -> TopSet:
     if ts is None:
         raise HTTPException(status_code=404, detail=f'TopSet not found: {top_set_id}')
     return ts
+
+
+def _next_auto_top_name(session, top_set_id: int) -> str:
+    existing = {
+        name.lower()
+        for name in session.scalars(
+            select(TopSetHorizon.name).where(TopSetHorizon.top_set_id == top_set_id)
+        )
+    }
+    index = len(existing) + 1
+    while f'Top {index}'.lower() in existing:
+        index += 1
+    return f'Top {index}'
+
+
+def _insert_horizon_at(
+    session,
+    top_set_id: int,
+    sort_order: int,
+    *,
+    name: str | None = None,
+) -> TopSetHorizon:
+    for horizon in session.scalars(
+        select(TopSetHorizon)
+        .where(TopSetHorizon.top_set_id == top_set_id, TopSetHorizon.sort_order >= sort_order)
+        .order_by(TopSetHorizon.sort_order.desc())
+    ):
+        horizon.sort_order += 1
+    horizon = TopSetHorizon(
+        top_set_id=top_set_id,
+        name=name or _next_auto_top_name(session, top_set_id),
+        kind='strat',
+        color='#90a4ae',
+        sort_order=sort_order,
+    )
+    session.add(horizon)
+    session.flush()
+    return horizon
 
 
 def _require_well(session, well_id: str) -> WellModel:
@@ -305,6 +360,11 @@ def delete_horizon(top_set_id: int, horizon_id: int, request: Request) -> None:
             raise HTTPException(status_code=404, detail=f'Horizon not found: {horizon_id}')
         well_ids = _linked_well_ids(session, top_set_id)
         merge_zones_on_horizon_delete(session, top_set_id, horizon_id)
+        linked_picks = session.scalars(
+            select(FormationTopModel).where(FormationTopModel.horizon_id == horizon_id)
+        ).all()
+        for pick in linked_picks:
+            session.delete(pick)
         session.delete(horizon)
         session.flush()
         for wid in well_ids:
@@ -336,6 +396,96 @@ def reorder_horizons(top_set_id: int, body: HorizonReorderRequest, request: Requ
         session.commit()
         loaded = _load_top_set(session, top_set_id)
         return _top_set_detail(loaded)
+
+
+@router.post('/top-sets/{top_set_id}/picks', response_model=TopSetPickCreateResponse, status_code=201)
+def create_top_set_pick(top_set_id: int, body: TopSetPickCreate, request: Request) -> TopSetPickCreateResponse:
+    manager = _require_open_project(request)
+    targets = [
+        body.insert_before_horizon_id is not None,
+        body.insert_after_horizon_id is not None,
+        body.split_zone_id is not None,
+    ]
+    if sum(targets) > 1:
+        raise HTTPException(status_code=400, detail='Choose only one insert target')
+
+    with manager.get_session() as session:
+        _require_top_set(session, top_set_id)
+        well = _require_well(session, body.well_id)
+        active_link = session.scalar(
+            select(WellActiveTopSet).where(
+                WellActiveTopSet.well_id == body.well_id,
+                WellActiveTopSet.top_set_id == top_set_id,
+            )
+        )
+        if active_link is None:
+            raise HTTPException(status_code=400, detail='Choose an active TopSet for this well first')
+
+        if body.split_zone_id is not None:
+            zone = session.get(FormationZone, body.split_zone_id)
+            if zone is None or zone.top_set_id != top_set_id:
+                raise HTTPException(status_code=404, detail=f'Zone not found: {body.split_zone_id}')
+            upper = session.get(TopSetHorizon, zone.upper_horizon_id)
+            sort_order = (upper.sort_order if upper is not None else zone.sort_order) + 1
+        elif body.insert_before_horizon_id is not None:
+            target = session.get(TopSetHorizon, body.insert_before_horizon_id)
+            if target is None or target.top_set_id != top_set_id:
+                raise HTTPException(status_code=404, detail=f'Horizon not found: {body.insert_before_horizon_id}')
+            sort_order = target.sort_order
+        elif body.insert_after_horizon_id is not None:
+            target = session.get(TopSetHorizon, body.insert_after_horizon_id)
+            if target is None or target.top_set_id != top_set_id:
+                raise HTTPException(status_code=404, detail=f'Horizon not found: {body.insert_after_horizon_id}')
+            sort_order = target.sort_order + 1
+        else:
+            max_sort_order = session.scalar(
+                select(TopSetHorizon.sort_order)
+                .where(TopSetHorizon.top_set_id == top_set_id)
+                .order_by(TopSetHorizon.sort_order.desc())
+            )
+            sort_order = (max_sort_order if max_sort_order is not None else -1) + 1
+
+        horizon = _insert_horizon_at(session, top_set_id, sort_order)
+        rebuild_zones_for_top_set(session, top_set_id)
+        well_ids = _linked_well_ids(session, top_set_id)
+        for wid in well_ids:
+            activate_top_set_for_well(session, manager.project_path, wid, top_set_id)
+
+        pick = session.scalar(
+            select(FormationTopModel).where(
+                FormationTopModel.well_id == body.well_id,
+                FormationTopModel.horizon_id == horizon.id,
+            )
+        )
+        if pick is None:
+            pick = FormationTopModel(
+                well_id=body.well_id,
+                horizon_id=horizon.id,
+                name=horizon.name,
+                kind=horizon.kind,
+                depth_md=None,
+                color=horizon.color,
+                age_top_ma=horizon.age_ma,
+                is_locked=False,
+            )
+            session.add(pick)
+            session.flush()
+        if body.depth_md is not None:
+            tvd, tvdss = compute_tvd_tvdss(manager.project_path, well, body.depth_md)
+            pick.depth_md = body.depth_md
+            pick.depth_tvd = tvd
+            pick.depth_tvdss = tvdss
+
+        recalculate_zone_thickness(session, top_set_id, body.well_id)
+        aggregate_zone_lithology_from_curve(session, manager.project_path, body.well_id)
+        session.commit()
+        return TopSetPickCreateResponse(
+            well_id=body.well_id,
+            formation_id=str(pick.id),
+            horizon_id=horizon.id,
+            name=pick.name,
+            depth_md=pick.depth_md,
+        )
 
 
 # ---------------------------------------------------------------------------

@@ -40,6 +40,8 @@ interface WellDataPanelProps {
   onContextMenuDeviation: (event: React.MouseEvent, wellId: string) => void
   onContextMenuFormation?: (event: React.MouseEvent, wellId: string, formation: FormationInventoryItem) => void
   onContextMenuLasGroup: (event: React.MouseEvent, wellId: string) => void
+  onContextMenuTopSetMarker?: (event: React.MouseEvent, target: { zoneSetId: number; wellId: string; horizonId: number; name: string }) => void
+  onContextMenuTopSetZone?: (event: React.MouseEvent, target: { zoneSetId: number; wellId: string; zoneId: number; name: string }) => void
   onContextMenuTopsGroup?: (event: React.MouseEvent, wellId: string) => void
   onContextMenuWell: (event: React.MouseEvent, well: WellInventory) => void
   onDeleteWell: (wellId: string, wellName: string) => void
@@ -255,6 +257,8 @@ export function WellDataPanel({
   onContextMenuCurve,
   onContextMenuDeviation,
   onContextMenuLasGroup,
+  onContextMenuTopSetMarker = () => {},
+  onContextMenuTopSetZone = () => {},
   onContextMenuWell,
   onDeleteWell,
   onSelectZoneSetsRoot = () => {},
@@ -660,6 +664,16 @@ export function WellDataPanel({
                             <div key={markerNodeId} className="tree-node">
                               <div
                                 className={`tree-node__row${selectedMarkerFormationId ? ' tree-node__row--selected' : ''}`}
+                                onContextMenu={(event) => {
+                                  if (selectedWellId && marker.horizon_id !== null) {
+                                    onContextMenuTopSetMarker(event, {
+                                      zoneSetId: zoneSet.id,
+                                      wellId: selectedWellId,
+                                      horizonId: marker.horizon_id,
+                                      name: marker.name,
+                                    })
+                                  }
+                                }}
                                 onClick={() => {
                                   if (selectedWellId && markerFormationIds.length > 0) {
                                     void onSelectFormation(selectedWellId, markerFormationIds[0])
@@ -711,6 +725,12 @@ export function WellDataPanel({
                                         className={`tree-leaf tree-leaf--zone tree-leaf--clickable${marker.is_unconformity ? ' tree-leaf--zone-unconformity' : ''}${isZoneSelected ? ' tree-leaf--selected' : ''}`}
                                         style={{ ['--tree-zone-color' as string]: marker.color }}
                                         onClick={() => selectedWellId && onSelectZoneInSet(zoneSet.id, selectedWellId, zoneBelow.zone_id)}
+                                        onContextMenu={(event) => selectedWellId && onContextMenuTopSetZone(event, {
+                                          zoneSetId: zoneSet.id,
+                                          wellId: selectedWellId,
+                                          zoneId: zoneBelow.zone_id,
+                                          name: `${zoneBelow.upper_horizon.name} -> ${zoneBelow.lower_horizon.name}`,
+                                        })}
                                       >
                                         <input
                                           type="checkbox"

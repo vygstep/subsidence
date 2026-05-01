@@ -15,8 +15,10 @@ export function ViewerWorkspace() {
   const colorOverrides = useWellDataStore((state) => state.colorOverrides)
   const error = useWellDataStore((state) => state.error)
   const wellViewStates = useWorkspaceStore((state) => state.wellViewStates)
+  const selectedFormationId = useWorkspaceStore((state) => state.selectedFormationId)
   const lodEnabled = useViewStore((state) => state.lodEnabled)
   const depthType = useViewStore((state) => state.depthType)
+  const activePickId = useViewStore((state) => state.activePickId)
   const subsidenceWidth = useViewStore((state) => state.subsidenceWidth)
   const setSubsidenceWidth = useViewStore((state) => state.setSubsidenceWidth)
   const tvdTable = useWellDataStore((state) => state.tvdTable)
@@ -87,8 +89,12 @@ export function ViewerWorkspace() {
   ), [activeWellView, colorOverrides])
 
   const visibleFormations = useMemo(() => (
-    formations.filter((f) => activeWellView.visibleFormationIds.includes(f.id))
-  ), [formations, activeWellView.visibleFormationIds])
+    formations.filter((f) => (
+      activeWellView.visibleFormationIds.includes(f.id)
+      || f.id === activePickId
+      || f.id === selectedFormationId
+    ))
+  ), [formations, activeWellView.visibleFormationIds, activePickId, selectedFormationId])
   const visibleZones = useMemo(() => (
     zones.filter((zone) => !activeWellView.hiddenTopSetZoneIds.includes(zone.zone_id))
   ), [zones, activeWellView.hiddenTopSetZoneIds])

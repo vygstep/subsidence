@@ -7,11 +7,12 @@ interface SelectionDeps {
   setSelectedObject: (obj: SelectedObject | null) => void
   setSelectedFormationId: (id: string | null) => void
   setActiveToolbarMode: (mode: ToolbarMode) => void
+  setActivePickId: (id: string | null) => void
   loadWell: (wellId: string) => Promise<void>
 }
 
 export function makeSelectionHandlers(deps: SelectionDeps) {
-  const { well, selectedObject, setSelectedObject, setSelectedFormationId, setActiveToolbarMode, loadWell } = deps
+  const { well, selectedObject, setSelectedObject, setSelectedFormationId, setActiveToolbarMode, setActivePickId, loadWell } = deps
 
   function loadWellInBackground(wellId: string): void {
     if (wellId !== well?.well_id) {
@@ -100,10 +101,12 @@ export function makeSelectionHandlers(deps: SelectionDeps) {
     if (selectedObject?.type === 'top-pick' && selectedObject.wellId === wellId && selectedObject.formationId === formationId) {
       setSelectedObject(null)
       setSelectedFormationId(null)
+      setActivePickId(null)
     } else {
       setSelectedFormationId(formationId)
       setSelectedObject({ type: 'top-pick', wellId, formationId })
       setActiveToolbarMode('tops')
+      setActivePickId(formationId)
     }
     loadWellInBackground(wellId)
   }
@@ -111,6 +114,7 @@ export function makeSelectionHandlers(deps: SelectionDeps) {
   function handleFocusFormationObject(wellId: string, formationId: string): void {
     setSelectedFormationId(formationId)
     setSelectedObject({ type: 'top-pick', wellId, formationId })
+    setActivePickId(formationId)
   }
 
   return {

@@ -71,16 +71,21 @@ export function FormationTopLine({
     onDragEnd: handleDragEnd,
   })
 
-  const handleClick = useCallback(() => {
+  const handleClick = useCallback((e: React.MouseEvent) => {
+    e.stopPropagation()
     if (didDragRef.current) return
     if (!editable) return
-    onSetActivePick?.(isActivePick ? null : formation.id)
-  }, [editable, formation.id, isActivePick, onSetActivePick])
+    if (!wellId) return
+    onSetActivePick?.(formation.id)
+    setSelectedFormationId(formation.id)
+    setSelectedObject({ type: 'top-pick', wellId, formationId: formation.id })
+  }, [editable, formation.id, onSetActivePick, setSelectedFormationId, setSelectedObject, wellId])
 
   const handleContextMenu = useCallback(
     (e: React.MouseEvent) => {
       if (!editable) return
       e.preventDefault()
+      e.stopPropagation()
       const currentVal =
         depthType === 'TVD'
           ? formation.depth_tvd
