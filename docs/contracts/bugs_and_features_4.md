@@ -2753,7 +2753,7 @@ unconformities before and after migration to verify burial charts are numericall
 
 ---
 
-## BF4-028: Stratigraphy model redesign — TopSet as primary object, merge-by-marker-name import (todo)
+## BF4-028: Stratigraphy model redesign — TopSet as primary object, merge-by-marker-name import (done)
 
 ### Bug that triggered this
 
@@ -2913,7 +2913,7 @@ Resolve the open questions above before starting implementation.
 
 ---
 
-## BF4-029: Edit tops redesign — click-to-place, DM context menu add, cursor tooltip (todo)
+## BF4-029: Edit tops redesign — click-to-place, DM context menu add, cursor tooltip (done)
 
 **Background**: The previous BF4-010 implementation added Add top / Set type / Set age / Link top
 buttons to the side toolbar, but this was wrong. All per-top attribute editing (type, age,
