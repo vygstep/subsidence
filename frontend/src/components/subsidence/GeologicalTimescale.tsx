@@ -83,7 +83,7 @@ export function GeologicalTimescale({
   paddingRight = 0,
 }: GeologicalTimescaleProps) {
   const { min_ma, max_ma } = timeRange
-  const eraRowH = Math.round(height * 0.38)
+  const eraRowH = Math.round(height / 2)
   const periodRowH = height - eraRowH
 
   return (

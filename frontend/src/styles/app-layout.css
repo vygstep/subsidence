@@ -283,18 +283,21 @@
 .app-sidebar__splitter,
 .app-workspace__splitter {
   flex-shrink: 0;
-  border-radius: 999px;
-  background: #d6e0eb;
+  background: #c4d0dc;
 }
 
 .app-sidebar__splitter {
-  height: 8px;
-  margin: 6px 0;
+  height: 4px;
   cursor: row-resize;
 }
 
+.app-sidebar__splitter:hover,
+.app-workspace__splitter:hover {
+  background: #7cb8e8;
+}
+
 .app-workspace__splitter {
-  width: 8px;
+  width: 4px;
   cursor: col-resize;
 }
 

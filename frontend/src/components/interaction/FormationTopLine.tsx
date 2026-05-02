@@ -174,11 +174,20 @@ export function FormationTopLine({
           y1={displayY}
           x2="100%"
           y2={displayY}
+          stroke="transparent"
+          strokeWidth={5}
+        />
+        <line
+          x1={0}
+          y1={displayY}
+          x2="100%"
+          y2={displayY}
           stroke={color}
           strokeWidth={strokeWidth}
           strokeDasharray={strokeDasharray}
           strokeOpacity={strokeOpacity}
           clipPath={lineClipPathId ? `url(#${lineClipPathId})` : undefined}
+          style={{ pointerEvents: 'none' }}
         />
         {isActivePick && (
           <circle cx={8} cy={displayY} r={5} fill={color} strokeWidth={0} />
