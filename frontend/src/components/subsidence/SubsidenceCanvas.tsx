@@ -410,7 +410,7 @@ export function SubsidenceCanvas() {
       let started = false
       for (const pt of slPoints) {
         const x = timeToX(pt.age_ma)
-        const y = depthToY(pt.sea_level_m)
+        const y = depthToY(-pt.sea_level_m)  // sl convention: + = above modern datum
         if (!started) { ctx.moveTo(x, y); started = true }
         else ctx.lineTo(x, y)
       }

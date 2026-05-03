@@ -220,11 +220,12 @@ def backstrip(
             paleo_tops[i] = z_top
             z_top += thickness
 
-        # Depth offset: water depth of shallowest active layer + eustatic sea level
+        # Depth offset: seafloor depth below modern datum.
+        # sl > 0 means sea surface was above modern datum → datum is shallower → subtract.
         shallowest = valid[active_indices[-1]]
         wd = shallowest.water_depth_m
         sl = _sea_level_at(t_ma, sea_level_curve) if sea_level_curve else 0.0
-        offset = wd + sl
+        offset = wd - sl
 
         for i in active_indices:
             results[i].burial_path.append(BurialPoint(age_ma=t_ma, depth_m=paleo_tops[i] + offset))
