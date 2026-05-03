@@ -37,6 +37,7 @@ export type SelectedObject =
   | { type: 'mnemonic-set'; setId: number }
   | { type: 'subsidence-chart'; chartType: 'single' | 'multi' }
   | { type: 'subsidence-model'; modelType: 'total' | 'decompaction' | 'airy' | 'stepwise' | 'thermal' }
+  | { type: 'models-root' }
   | { type: 'sea-level-curves-root' }
   | { type: 'sea-level-curve'; curveId: number }
 

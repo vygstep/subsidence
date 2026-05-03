@@ -184,7 +184,10 @@ function ModelsRoot() {
 
   return (
     <div className="tree-node tree-node--root">
-      <div className="tree-node__row tree-node__row--root">
+      <div
+        className={`tree-node__row tree-node__row--root${selectedObject?.type === 'models-root' ? ' tree-node__row--selected' : ''}`}
+        onClick={() => setSelectedObject({ type: 'models-root' })}
+      >
         <button
           type="button"
           className={`tree-toggle ${isExpanded('models-root') ? 'tree-toggle--open' : ''}`}
@@ -193,9 +196,7 @@ function ModelsRoot() {
         >
           &gt;
         </button>
-        <button type="button" className="tree-node__label-button">
-          Models
-        </button>
+        <span className="tree-node__label">MODELS</span>
       </div>
       {isExpanded('models-root') ? (
         <div className="tree-node__children">
