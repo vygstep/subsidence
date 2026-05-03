@@ -503,7 +503,7 @@ CSS update in `data-manager.css` (or whichever file defines `.tree-node__color-s
 
 ---
 
-## BF4-007: Tops settings — dropdown arrow overlap + sea level override (todo)
+## BF4-007: Tops settings — dropdown arrow overlap + sea level override (done)
 
 ### BF4-007-A: Select dropdown arrow overlaps text (done)
 
@@ -2423,7 +2423,7 @@ name should be displayed.
 
 ---
 
-## BF4-026: Simplify curve_type taxonomy (todo)
+## BF4-026: Simplify curve_type taxonomy (done)
 
 **Context**: BF4-005 introduced `lithology_discrete` and `lithology_fraction` as explicit
 `curve_type` values. After review, the simpler two-type taxonomy is sufficient and cleaner.
