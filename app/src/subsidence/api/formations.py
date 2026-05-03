@@ -49,6 +49,7 @@ class FormationTopPatch(BaseModel):
     is_locked: bool | None = None
     water_depth_m: float | None = None
     eroded_thickness_m: float | None = None
+    sea_level_m_override: float | None = None
 
 
 class FormationStratLinkResponse(BaseModel):
@@ -75,6 +76,7 @@ class FormationTopResponse(BaseModel):
     is_locked: bool
     water_depth_m: float
     eroded_thickness_m: float
+    sea_level_m_override: float | None
     strat_links: list[FormationStratLinkResponse]
     active_strat_color: str | None
     active_strat_unit_name: str | None
@@ -155,6 +157,7 @@ def _to_response(row: FormationTopModel) -> FormationTopResponse:
         is_locked=row.is_locked,
         water_depth_m=row.water_depth_m,
         eroded_thickness_m=row.eroded_thickness_m,
+        sea_level_m_override=row.sea_level_m_override,
         strat_links=links,
         active_strat_color=active_link.strat_unit.color_hex if active_link else None,
         active_strat_unit_name=active_link.strat_unit.name if active_link else None,
@@ -281,6 +284,13 @@ def update_formation(well_id: str, formation_id: int, body: FormationTopPatch, r
                 continue
             old_values[model_field] = current_value
             new_values[model_field] = value
+
+        if 'sea_level_m_override' in body.model_fields_set:
+            current = row.sea_level_m_override
+            next_val = body.sea_level_m_override
+            if current != next_val:
+                old_values['sea_level_m_override'] = current
+                new_values['sea_level_m_override'] = next_val
 
     if not new_values:
         with manager.get_session() as session:

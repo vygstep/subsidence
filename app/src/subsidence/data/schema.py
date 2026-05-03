@@ -294,7 +294,9 @@ class FormationTopModel(Base, AuditMixin):
     color: Mapped[str] = mapped_column(String(9), default="#90a4ae")
     is_locked: Mapped[bool] = mapped_column(Boolean, default=False)
     water_depth_m: Mapped[float] = mapped_column(Float, default=0.0, server_default='0.0')
-    # paleobathymetry + sea level at time of deposition for this interval (m)
+    # paleobathymetry at time of deposition for this interval (m)
+    sea_level_m_override: Mapped[float | None] = mapped_column(Float, nullable=True)
+    # user-specified sea level override; if set, replaces curve-interpolated value in backstrip
     hiatus_duration_ma: Mapped[float] = mapped_column(Float, default=0.0, server_default='0.0')
     # unconformity only: missing time at this erosion surface (Ma)
     eroded_thickness_m: Mapped[float] = mapped_column(Float, default=0.0, server_default='0.0')

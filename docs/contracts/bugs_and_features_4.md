@@ -827,40 +827,178 @@ of the well track container). Confirm with user if positioning is unclear.
 
 ---
 
-## BF4-011: Backend API audit — frontend coverage (todo)
+## BF4-011: Backend API audit — frontend coverage (done)
 
 **Goal**: Review all backend API endpoints and identify which ones have corresponding frontend UI
-actions, which are accessible only via the backend CLI, and which may be dead code. Produce a
-reference table in the contract update.
+actions, which are accessible only via the backend CLI, and which may be dead code.
 
-**Scope**: All `@router` route declarations in `app/src/subsidence/api/`.
+**Status legend**: `ui` · `internal` · `dev-only` · `unreachable`
 
-**Audit method**:
-1. List all routes (method + path) from each API file.
-2. For each route, search `frontend/src/` for a `fetch` call or store action that calls it.
-3. Mark as:
-   - `ui` — reachable from a frontend user action or store effect.
-   - `internal` — called by backend, tests, or app lifecycle but not directly by a visible UI button.
-   - `dev-only` — useful for scripts/manual debugging but not part of current UI.
-   - `unreachable` — no known caller and no clear current purpose.
+### projects.py
+| Method | Path | Status | Notes |
+|--------|------|--------|-------|
+| POST | /api/projects | ui | projectStore createProject |
+| GET | /api/projects/recent | ui | projectStore listRecentProjects |
+| POST | /api/projects/wells | ui | dataManagerActions createWell |
+| DELETE | /api/projects/wells/{well_id} | ui | dataManagerActions deleteWell |
+| POST | /api/projects/open | ui | projectStore openProject |
+| POST | /api/projects/close | ui | projectStore closeProject |
+| POST | /api/projects/save | ui | projectStore saveProject |
+| GET | /api/projects/status | ui | projectStore loadProjectStatus |
+| POST | /api/projects/pick-folder | dev-only | pathMemory native folder picker |
+| POST | /api/projects/pick-file | dev-only | pathMemory native file picker |
+| POST | /api/projects/reveal-path | dev-only | pathMemory reveal in explorer |
 
-**Files to audit**:
-- `app/src/subsidence/api/projects.py`
-- `app/src/subsidence/api/projects_config.py`
-- `app/src/subsidence/api/projects_imports.py`
-- `app/src/subsidence/api/projects_export.py`
-- `app/src/subsidence/api/import_preview.py`
-- `app/src/subsidence/api/wells.py`
-- `app/src/subsidence/api/formations.py`
-- `app/src/subsidence/api/sea_level.py`
-- `app/src/subsidence/api/strat_chart.py`
-- `app/src/subsidence/api/lithology_patterns.py`
-- `app/src/subsidence/api/compaction.py` (compaction presets, mnemonic sets, lithology sets,
-  measurement units, legacy compaction models)
-- `app/src/subsidence/api/top_sets.py`
-- `app/src/subsidence/api/subsidence.py`
+### projects_config.py
+| Method | Path | Status | Notes |
+|--------|------|--------|-------|
+| POST | /api/projects/undo | ui | projectStore undo |
+| POST | /api/projects/redo | ui | projectStore redo |
+| POST | /api/projects/checkpoints | ui | projectStore createCheckpoint |
+| GET | /api/projects/checkpoints | internal | no direct frontend call |
+| POST | /api/projects/checkpoints/{id}/restore | ui | projectStore restoreCheckpoint |
+| DELETE | /api/projects/checkpoints/{id} | ui | projectStore deleteCheckpoint |
+| GET | /api/projects/dictionary/curves | internal | curve alias infrastructure |
+| GET | /api/projects/dictionary/curves/match | ui | CurveSettings matchCurve |
+| POST | /api/projects/dictionary/curves | dev-only | project dict mgmt, no UI button |
+| GET | /api/projects/dictionary/lithology | ui | wellDataStore loadLithologyDictionary |
+| PUT | /api/projects/dictionary/lithology/{code} | dev-only | no UI button |
+| GET | /api/projects/visual-config | ui | projectStore getVisualConfig |
+| PATCH | /api/projects/visual-config | ui | projectStore patchVisualConfig |
 
-**Deliverable**: Update this section with a table of all endpoints + coverage status after audit.
+### projects_imports.py
+| Method | Path | Status | Notes |
+|--------|------|--------|-------|
+| POST | /api/projects/import-las | ui | ImportLasDialog |
+| POST | /api/projects/import-logs-csv | ui | ImportLasDialog |
+| POST | /api/projects/import-tops | ui | ImportTopsDialog |
+| POST | /api/projects/import-deviation | ui | ImportDeviationDialog |
+
+### projects_export.py
+| Method | Path | Status | Notes |
+|--------|------|--------|-------|
+| POST | /api/projects/export/las | **unreachable** | no frontend button or store action |
+| POST | /api/projects/export/csv | **unreachable** | no frontend button or store action |
+
+### import_preview.py
+| Method | Path | Status | Notes |
+|--------|------|--------|-------|
+| POST | /api/import-preview/tabular | ui | useImportPreview |
+| POST | /api/import-preview/las | ui | useImportPreview |
+
+### wells.py
+| Method | Path | Status | Notes |
+|--------|------|--------|-------|
+| GET | /api/wells | internal | multiWellStore inventory |
+| GET | /api/wells/inventory | ui | wellDataStore loadWellInventories |
+| GET | /api/wells/{well_id} | ui | wellDataStore loadWellData |
+| PATCH | /api/wells/{well_id} | ui | dataManagerActions updateWell |
+| GET | /api/wells/{well_id}/curves | ui | wellDataStore loadCurvesLod |
+| GET | /api/wells/{well_id}/curves/full | ui | wellDataStore loadCurvesFull |
+| PATCH | /api/wells/{well_id}/curves/{mnemonic} | ui | CurveSettings updateCurveMetadata |
+| DELETE | /api/wells/{well_id}/curves/{mnemonic} | ui | dataManagerActions deleteCurve |
+| DELETE | /api/wells/{well_id}/curves | ui | dataManagerActions deleteAllCurves |
+| GET | /api/wells/{well_id}/zones | ui | wellDataStore loadWellZones |
+| PATCH | /api/wells/{well_id}/zones/{zone_id} | ui | dataManagerActions updateZone |
+| POST | /api/wells/{well_id}/zones/recalculate-lithology | internal | backend lifecycle |
+| GET | /api/wells/{well_id}/deviation | ui | wellDataStore loadDeviation |
+| DELETE | /api/wells/{well_id}/deviation | ui | dataManagerActions deleteDeviation |
+
+### formations.py
+| Method | Path | Status | Notes |
+|--------|------|--------|-------|
+| GET | /api/strat-units | ui | LinkStratChartDialog |
+| GET | /api/wells/{well_id}/formations | ui | wellDataStore loadFormations |
+| POST | /api/wells/{well_id}/formations | ui | dataManagerActions createFormation |
+| PATCH | /api/wells/{well_id}/formations/{id} | ui | wellDataStore updateFormation |
+| PUT | /api/wells/{well_id}/formations/{id}/strat-link | ui | wellDataStore upsertStratLink |
+| DELETE | /api/wells/{well_id}/formations/{id} | ui | dataManagerActions deleteFormation |
+
+### sea_level.py
+| Method | Path | Status | Notes |
+|--------|------|--------|-------|
+| GET | /api/sea-level-curves | ui | wellDataStore loadSeaLevelCurves |
+| POST | /api/sea-level-curves | dev-only | no UI button |
+| POST | /api/sea-level-curves/{id}/points | dev-only | no UI button |
+| GET | /api/sea-level-curves/{id}/points | internal | not called directly |
+| DELETE | /api/sea-level-curves/{id} | **unreachable** | no UI button |
+| PUT | /api/wells/{well_id}/active-sea-level-curve | ui | wellDataStore setActiveSeaLevelCurve |
+
+### strat_chart.py
+| Method | Path | Status | Notes |
+|--------|------|--------|-------|
+| GET | /api/strat-charts | ui | wellDataStore loadStratCharts |
+| PATCH | /api/strat-charts/{id}/activate | ui | wellDataStore activateStratChart |
+| DELETE | /api/strat-charts/{id} | ui | wellDataStore deleteStratChart |
+| POST | /api/strat-charts/import | ui | LoadStratChartDialog |
+
+### lithology_patterns.py
+| Method | Path | Status | Notes |
+|--------|------|--------|-------|
+| GET | /api/lithology-pattern-palettes | ui | wellDataStore loadLithologyPatternPalettes |
+| GET | /api/lithology-pattern-palettes/{id} | ui | wellDataStore getLithologyPatternPalette |
+| POST | /api/lithology-pattern-palettes | ui | wellDataStore createLithologyPatternPalette |
+| PATCH | /api/lithology-pattern-palettes/{id} | ui | wellDataStore patchLithologyPatternPalette |
+| DELETE | /api/lithology-pattern-palettes/{id} | ui | wellDataStore deleteLithologyPatternPalette |
+| POST | /api/lithology-pattern-palettes/{id}/patterns | **unreachable** | use /import instead |
+| POST | /api/lithology-pattern-palettes/{id}/patterns/import | ui | wellDataStore importLithologyPattern |
+| PATCH | /api/lithology-pattern-palettes/{id}/patterns/{pid} | **unreachable** | no UI button |
+| DELETE | /api/lithology-pattern-palettes/{id}/patterns/{pid} | ui | wellDataStore deleteLithologyPattern |
+
+### compaction.py
+| Method | Path | Status | Notes |
+|--------|------|--------|-------|
+| GET | /api/unit-dimensions | ui | wellDataStore loadUnitDimensions |
+| GET | /api/unit-dimensions/{code} | ui | wellDataStore getUnitDimension |
+| GET | /api/measurement-units | ui | wellDataStore listMeasurementUnits |
+| GET | /api/measurement-unit-aliases | internal | not called in UI |
+| GET | /api/curve-dictionary | internal | not called in UI |
+| GET/POST/PATCH/DELETE | /api/compaction-presets... | ui | wellDataStore |
+| GET/POST/PATCH/DELETE | /api/mnemonic-sets... | ui | wellDataStore |
+| GET/POST/PATCH/DELETE | /api/lithology-sets... | ui | wellDataStore |
+| GET/POST/PATCH/DELETE | /api/lithology-dictionary... | ui | wellDataStore |
+| GET/POST/PATCH/DELETE | /api/compaction-models... | ui | wellDataStore |
+
+### top_sets.py
+| Method | Path | Status | Notes |
+|--------|------|--------|-------|
+| GET | /api/top-sets | ui | ImportTopsDialog |
+| POST | /api/top-sets | ui | dataManagerActions |
+| GET | /api/top-sets/{id} | internal | not called directly |
+| PATCH | /api/top-sets/{id} | internal | not called directly |
+| DELETE | /api/top-sets/{id} | ui | useDataManagerController |
+| POST | /api/top-sets/{id}/horizons | ui | useDataManagerController |
+| PATCH | /api/top-sets/{id}/horizons/{hid} | internal | not called directly |
+| DELETE | /api/top-sets/{id}/horizons/{hid} | ui | useDataManagerController |
+| POST | /api/top-sets/{id}/horizons/reorder | internal | not called directly |
+| POST | /api/top-sets/{id}/picks | ui | LogViewPanel, useDataManagerController |
+| PUT | /api/wells/{well_id}/active-top-set | internal | import/zone lifecycle |
+| DELETE | /api/wells/{well_id}/active-top-set | **unreachable** | no caller |
+| POST | /api/top-sets/{id}/extract-from-well/{wid} | internal | not called from visible UI |
+| POST | /api/wells/{well_id}/recalculate-tvd | internal | import lifecycle |
+
+### subsidence.py
+| Method | Path | Status | Notes |
+|--------|------|--------|-------|
+| GET | /api/subsidence/stored-results | ui | multiWellStore loadStoredSubsidenceResults |
+| POST | /api/wells/{well_id}/subsidence | ui | SubsidenceControls calculateSubsidence |
+| WS | /api/ws/recalculate | ui | subsidenceSocket real-time recalculation |
+
+### Итог
+
+| Статус | Кол-во | Действие |
+|--------|--------|----------|
+| ui | ~109 | всё ок |
+| internal | ~15 | всё ок |
+| dev-only | ~6 | оставить, не трогать |
+| **unreachable** | **6** | **кандидаты на удаление** |
+
+**Unreachable кандидаты на удаление**:
+- `POST /api/projects/export/las` + `POST /api/projects/export/csv` — `projects_export.py` целиком
+- `DELETE /api/sea-level-curves/{id}` — в `sea_level.py`
+- `POST /api/lithology-pattern-palettes/{id}/patterns` — дублируется `/import`
+- `PATCH /api/lithology-pattern-palettes/{id}/patterns/{pid}` — в `lithology_patterns.py`
+- `DELETE /api/wells/{well_id}/active-top-set` — в `top_sets.py`
 
 ---
 

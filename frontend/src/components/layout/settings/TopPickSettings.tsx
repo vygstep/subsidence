@@ -29,6 +29,7 @@ interface TopPickSettingsProps {
       color?: string
       water_depth_m?: number
       eroded_thickness_m?: number
+      sea_level_m_override?: number | null
     },
   ) => void | Promise<void>
   onFormationMove: (formationId: string, depth: number) => void
@@ -57,6 +58,31 @@ export function TopPickSettings({ selectedFormation, onFormationUpdate, onFormat
     if (selectedFormation.age_ma == null || !activeCurveId) return null
     return interpolateSeaLevel(seaLevelPoints, selectedFormation.age_ma)
   }, [seaLevelPoints, selectedFormation.age_ma, activeCurveId])
+
+  const hasOverride = selectedFormation.sea_level_m_override != null
+  const effectiveSeaLevel = selectedFormation.sea_level_m_override ?? seaLevelAtAge
+
+  const [draftSeaLevel, setDraftSeaLevel] = useState<string>(() =>
+    selectedFormation.sea_level_m_override != null
+      ? String(selectedFormation.sea_level_m_override)
+      : seaLevelAtAge != null
+        ? seaLevelAtAge.toFixed(1)
+        : '',
+  )
+
+  useEffect(() => {
+    setDraftSeaLevel(
+      selectedFormation.sea_level_m_override != null
+        ? String(selectedFormation.sea_level_m_override)
+        : seaLevelAtAge != null
+          ? seaLevelAtAge.toFixed(1)
+          : '',
+    )
+  }, [selectedFormation.id, selectedFormation.sea_level_m_override, seaLevelAtAge])
+
+  const depositionalElevation = effectiveSeaLevel != null
+    ? effectiveSeaLevel - selectedFormation.water_depth_m
+    : null
 
   const isUnconformity = selectedFormation.kind === 'unconformity'
   const depositionResumedMa = selectedFormation.age_ma != null
@@ -136,8 +162,37 @@ export function TopPickSettings({ selectedFormation, onFormationUpdate, onFormat
       )}
       {activeCurveId !== null && (
         <div className="sf-row">
-          <span title={activeCurveName ?? undefined}>Sea level (m)</span>
-          <span>{seaLevelAtAge != null ? seaLevelAtAge.toFixed(1) : '—'}</span>
+          <span title={`${activeCurveName ?? 'Sea level curve'}${hasOverride ? ' (overridden)' : ''}`}>
+            Sea level (m){hasOverride ? ' *' : ''}
+          </span>
+          <span className="sf-inline-control">
+            <input
+              type="number"
+              step="0.1"
+              value={draftSeaLevel}
+              onChange={(e) => setDraftSeaLevel(e.target.value)}
+              onBlur={() => {
+                if (draftSeaLevel !== '') {
+                  void onFormationUpdate(selectedFormation.id, { sea_level_m_override: Number(draftSeaLevel) })
+                }
+              }}
+            />
+            {hasOverride && (
+              <button
+                className="sf-reset-btn"
+                title="Reset to curve value"
+                onClick={() => void onFormationUpdate(selectedFormation.id, { sea_level_m_override: null })}
+              >
+                ↺
+              </button>
+            )}
+          </span>
+        </div>
+      )}
+      {depositionalElevation != null && (
+        <div className="sf-row sf-row--hint">
+          <span>Depositional elev. (m)</span>
+          <span>{depositionalElevation.toFixed(1)}</span>
         </div>
       )}
       <div className="sf-row">

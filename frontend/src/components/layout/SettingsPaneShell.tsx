@@ -52,6 +52,7 @@ interface SettingsPaneShellProps {
       color?: string
       water_depth_m?: number
       eroded_thickness_m?: number
+      sea_level_m_override?: number | null
     },
   ) => void | Promise<void>
   onFormationMove: (formationId: string, depth: number) => void

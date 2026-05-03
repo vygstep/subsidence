@@ -59,6 +59,7 @@ interface FormationResponse {
   is_locked: boolean
   water_depth_m: number
   eroded_thickness_m: number
+  sea_level_m_override: number | null
   lithology?: FormationTop['lithology']
   strat_links: FormationTop['strat_links']
   active_strat_color: string | null
@@ -250,6 +251,7 @@ function mapFormation(row: FormationResponse): FormationTop {
     is_locked: row.is_locked,
     water_depth_m: row.water_depth_m ?? 0,
     eroded_thickness_m: row.eroded_thickness_m ?? 0,
+    sea_level_m_override: row.sea_level_m_override ?? null,
     lithology: row.lithology,
     strat_links: row.strat_links ?? [],
     active_strat_color: row.active_strat_color,

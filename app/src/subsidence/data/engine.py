@@ -93,6 +93,9 @@ def migrate_schema(engine: Engine) -> None:
         if 'water_depth_m' not in formation_cols:
             conn.execute(text("ALTER TABLE formation_tops ADD COLUMN water_depth_m REAL NOT NULL DEFAULT 0.0"))
             conn.commit()
+        if 'sea_level_m_override' not in formation_cols:
+            conn.execute(text("ALTER TABLE formation_tops ADD COLUMN sea_level_m_override REAL"))
+            conn.commit()
         if 'eroded_thickness_m' not in formation_cols:
             conn.execute(text("ALTER TABLE formation_tops ADD COLUMN eroded_thickness_m REAL NOT NULL DEFAULT 0.0"))
             conn.commit()

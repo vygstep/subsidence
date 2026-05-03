@@ -136,6 +136,23 @@ def _compute_subsidence(manager, well_id: str) -> list[SubsidenceResultResponse]
             ).all()
             sea_level_curve = [(p.age_ma, p.sea_level_m) for p in pts] or None
 
+        overrides = [
+            (f.age_top_ma, f.sea_level_m_override)
+            for f in session.scalars(
+                select(FormationTopModel).where(
+                    FormationTopModel.well_id == well_id,
+                    FormationTopModel.sea_level_m_override.is_not(None),
+                    FormationTopModel.age_top_ma.is_not(None),
+                )
+            ).all()
+        ]
+        if overrides:
+            override_ages = {age for age, _ in overrides}
+            base = [(age, sl) for age, sl in (sea_level_curve or [])] if sea_level_curve else []
+            base = [(age, sl) for age, sl in base if age not in override_ages]
+            base.extend(overrides)
+            sea_level_curve = sorted(base, key=lambda x: -x[0]) or None
+
         top_set_id = get_well_active_top_set_id(session, well_id)
         if top_set_id is not None:
             zone_inputs = build_zone_layer_inputs(session, well_id, litho_params)
