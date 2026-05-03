@@ -929,6 +929,19 @@ def list_mnemonic_sets(request: Request) -> list[CurveMnemonicSetSummary]:
         ]
 
 
+@router.get('/mnemonic-entries', response_model=list[CurveMnemonicEntryItem])
+def list_all_mnemonic_entries(request: Request) -> list[CurveMnemonicEntryItem]:
+    manager = _require_open_project(request)
+    _ensure_mnemonic_sets(manager)
+    with manager.get_session() as session:
+        rows = session.scalars(
+            select(CurveMnemonicEntry)
+            .where(CurveMnemonicEntry.is_active == True)  # noqa: E712
+            .order_by(CurveMnemonicEntry.priority.desc(), CurveMnemonicEntry.pattern.asc())
+        ).all()
+        return [_mnemonic_entry_to_item(row) for row in rows]
+
+
 @router.get('/mnemonic-sets/{set_id}', response_model=CurveMnemonicSetDetail)
 def get_mnemonic_set(set_id: int, request: Request) -> CurveMnemonicSetDetail:
     manager = _require_open_project(request)

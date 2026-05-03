@@ -5,6 +5,7 @@ import type {
   CompactionPresetDetail,
   CompactionPresetSummary,
   CurveData,
+  CurveInventoryItem,
   CurveMnemonicEntryItem,
   CurveMnemonicSetDetail,
   CurveMnemonicSetSummary,
@@ -208,6 +209,7 @@ export interface WellDataStore {
   fetchCurvesLOD: (depthMin: number, depthMax: number, resolution: number) => Promise<void>
   reloadCurvesForDepthBasis: (depthBasis: 'MD' | 'TVD' | 'TVDSS') => Promise<void>
   patchCurveDiscreteCodeMap: (mnemonic: string, map: Record<string, string>) => void
+  patchCurveInventoryItem: (wellId: string, mnemonic: string, patch: Partial<CurveInventoryItem>) => void
   updateZoneLithology: (zoneId: number, lithologyFractions: string | null, lithologySource: 'manual' | 'auto') => Promise<void>
   loadSeaLevelCurves: () => Promise<SeaLevelCurve[]>
   loadSeaLevelPoints: (curveId: number) => Promise<SeaLevelPoint[]>
@@ -1102,6 +1104,16 @@ export const useWellDataStore = create<WellDataStore>((set, get) => ({
     set((state) => ({
       curves: state.curves.map((c) => c.mnemonic === mnemonic ? { ...c, discrete_code_map: map } : c),
       fullCurves: state.fullCurves.map((c) => c.mnemonic === mnemonic ? { ...c, discrete_code_map: map } : c),
+    }))
+  },
+  patchCurveInventoryItem(wellId, mnemonic, patch) {
+    set((state) => ({
+      wellInventories: state.wellInventories.map((inv) =>
+        inv.well_id !== wellId ? inv : {
+          ...inv,
+          curves: inv.curves.map((c) => c.mnemonic === mnemonic ? { ...c, ...patch } : c),
+        },
+      ),
     }))
   },
   async linkFormationToChart(formationId, chartId, stratUnitId) {

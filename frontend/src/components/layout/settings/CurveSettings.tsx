@@ -1,8 +1,9 @@
 import { useEffect, useMemo, useState } from 'react'
 
 import { useWellDataStore, useWorkspaceStore } from '@/stores'
-import type { TrackConfig } from '@/types'
+import type { CurveMnemonicEntryItem, TrackConfig } from '@/types'
 import { type CurveType, CURVE_TYPES } from '@/utils/curveTypes'
+import { buildCurveDefaults } from '@/utils/curvePresets'
 
 interface CurveMatchResult {
   family_code: string | null
@@ -18,11 +19,15 @@ interface CurveSettingsProps {
 export function CurveSettings({ selectedCurveConfig, onCurveSettingUpdate }: CurveSettingsProps) {
   const curves = useWellDataStore((state) => state.curves)
   const well = useWellDataStore((state) => state.well)
+  const wellInventories = useWellDataStore((state) => state.wellInventories)
+  const patchCurveInventoryItem = useWellDataStore((state) => state.patchCurveInventoryItem)
   const lithologyDictionaryEntries = useWellDataStore((state) => state.lithologyDictionaryEntries)
   const patchCurveDiscreteCodeMap = useWellDataStore((state) => state.patchCurveDiscreteCodeMap)
   const wellViewStates = useWorkspaceStore((state) => state.wellViewStates)
   const updateWellViewState = useWorkspaceStore((state) => state.updateWellViewState)
   const [dictMatch, setDictMatch] = useState<CurveMatchResult | null>(null)
+  const [mnemonicEntries, setMnemonicEntries] = useState<CurveMnemonicEntryItem[]>([])
+  const [assignedMnemonic, setAssignedMnemonic] = useState<string>('')
 
   const wellId = well?.well_id ?? ''
   const viewState = wellViewStates[wellId]
@@ -36,6 +41,18 @@ export function CurveSettings({ selectedCurveConfig, onCurveSettingUpdate }: Cur
       .then((r) => r.ok ? r.json() as Promise<CurveMatchResult> : null)
       .then((data) => setDictMatch(data))
   }, [selectedCurveConfig.mnemonic])
+
+  useEffect(() => {
+    void fetch('/api/mnemonic-entries')
+      .then((r) => r.ok ? r.json() as Promise<CurveMnemonicEntryItem[]> : [])
+      .then((data) => setMnemonicEntries(data))
+  }, [])
+
+  useEffect(() => {
+    const inv = wellInventories.find((w) => w.well_id === wellId)
+    const curveInv = inv?.curves.find((c) => c.mnemonic === selectedCurveConfig.mnemonic)
+    setAssignedMnemonic(curveInv?.canonical_mnemonic ?? '')
+  }, [wellInventories, wellId, selectedCurveConfig.mnemonic])
 
   const rawType = selectedCurveConfig.curve_type ?? 'continuous'
   const curveType: CurveType = (CURVE_TYPES as readonly string[]).includes(rawType) ? rawType as CurveType : 'continuous'
@@ -89,6 +106,38 @@ export function CurveSettings({ selectedCurveConfig, onCurveSettingUpdate }: Cur
     })
   }
 
+  function applyPreset(curve: typeof curves[number], canonicalMnemonic?: string) {
+    if (!well?.well_id) return
+    const { curveConfig } = buildCurveDefaults(curve, 0, canonicalMnemonic)
+    updateWellViewState(well.well_id, (state) => ({
+      ...state,
+      curveSettingsByMnemonic: { ...state.curveSettingsByMnemonic, [curve.mnemonic]: curveConfig },
+      tracks: state.tracks.map((track) => ({
+        ...track,
+        curves: track.curves.map((c) => (c.mnemonic === curve.mnemonic ? curveConfig : c)),
+      })),
+    }))
+  }
+
+  function handleCanonicalMnemonicChange(value: string) {
+    if (!well) return
+    setAssignedMnemonic(value)
+    patchCurveInventoryItem(well.well_id, selectedCurveConfig.mnemonic, { canonical_mnemonic: value || null })
+    const curve = curves.find((c) => c.mnemonic === selectedCurveConfig.mnemonic)
+    if (curve) applyPreset(curve, value || undefined)
+    void fetch(`/api/wells/${well.well_id}/curves/${encodeURIComponent(selectedCurveConfig.mnemonic)}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ canonical_mnemonic: value || null }),
+    })
+  }
+
+  function handleRestoreDefaults() {
+    const curve = curves.find((c) => c.mnemonic === selectedCurveConfig.mnemonic)
+    if (!curve) return
+    applyPreset(curve, assignedMnemonic || undefined)
+  }
+
   function applyDataDefaults() {
     const curve = curves.find((c) => c.mnemonic === selectedCurveConfig.mnemonic)
     if (!curve) return
@@ -105,6 +154,18 @@ export function CurveSettings({ selectedCurveConfig, onCurveSettingUpdate }: Cur
     onCurveSettingUpdate(selectedCurveConfig.mnemonic, { scaleMin: min, scaleMax: max })
   }
 
+  const uniqueMnemonicOptions = useMemo(() => {
+    const seen = new Set<string>()
+    const result: { value: string; label: string }[] = []
+    for (const entry of mnemonicEntries) {
+      const value = entry.canonical_mnemonic
+      if (!value || seen.has(value)) continue
+      seen.add(value)
+      result.push({ value, label: value })
+    }
+    return result.sort((a, b) => a.label.localeCompare(b.label))
+  }, [mnemonicEntries])
+
   const curveData = curves.find((c) => c.mnemonic === selectedCurveConfig.mnemonic)
   const discreteCodeMap = curveData?.discrete_code_map ?? null
   const uniqueCodes = curveData
@@ -120,6 +181,20 @@ export function CurveSettings({ selectedCurveConfig, onCurveSettingUpdate }: Cur
       <div className="tree-leaf"><span>Unit</span><span>{selectedCurveConfig.unit || '-'}</span></div>
       {dictMatch?.matched && (
         <div className="tree-leaf"><span>Family</span><span>{dictMatch.family_code ?? '-'}</span></div>
+      )}
+      {uniqueMnemonicOptions.length > 0 && (
+        <div className="sf-row">
+          <span>Dictionary mnemonic</span>
+          <select
+            value={assignedMnemonic}
+            onChange={(e) => handleCanonicalMnemonicChange(e.target.value)}
+          >
+            <option value="">— none —</option>
+            {uniqueMnemonicOptions.map((opt) => (
+              <option key={opt.value} value={opt.value}>{opt.label}</option>
+            ))}
+          </select>
+        </div>
       )}
       <div className="sf-row">
         <span>Rendering</span>
@@ -185,6 +260,13 @@ export function CurveSettings({ selectedCurveConfig, onCurveSettingUpdate }: Cur
               onClick={applyDataDefaults}
             >
               Reset scale to data range
+            </button>
+            <button
+              type="button"
+              className="project-dialog__button"
+              onClick={handleRestoreDefaults}
+            >
+              Restore defaults
             </button>
           </div>
         </>

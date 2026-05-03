@@ -146,6 +146,8 @@ class CurveMetadata(Base, AuditMixin):
     # "OK" | "WARNING" | "ERROR"
     qc_summary: Mapped[str | None] = mapped_column(Text, nullable=True)
     # JSON blob: {flags, messages, stats}
+    canonical_mnemonic: Mapped[str | None] = mapped_column(String(64), nullable=True)
+    # Explicit user assignment to a dictionary mnemonic (overrides auto-matched family/canonical)
 
     well: Mapped[WellModel] = relationship(back_populates="curve_metadata")
 

@@ -122,8 +122,9 @@ function presetForMnemonic(mnemonic: string): CurveVisualPreset | null {
 export function buildCurveDefaults(
   curve: CurveData,
   fallbackIndex = 0,
+  overrideMnemonic?: string,
 ): { curveConfig: CurveConfig; scaleType: CurveScaleType } {
-  const preset = presetForMnemonic(curve.mnemonic)
+  const preset = presetForMnemonic(overrideMnemonic ?? curve.mnemonic)
   const bounds = computeCurveBounds(curve.values, curve.null_value)
 
   const scaleMin = preset?.scaleMin ?? bounds.min
