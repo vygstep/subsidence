@@ -89,10 +89,6 @@ aggregate_zone_lithology_from_curve(session, path, well_id)  # 3. литолог
 
 ---
 
-## Известные баги (todo)
-
-- **BF4-007**: в `TopsSettings.tsx` — dropdown arrow перекрывает текст + sea level override не работает. См. `docs/contracts/bugs_and_features_4.md` BF4-007.
-
 ---
 
 ## Куда смотреть по симптому
