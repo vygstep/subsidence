@@ -153,10 +153,17 @@ def _compute_subsidence(manager, well_id: str) -> list[SubsidenceResultResponse]
             base.extend(overrides)
             sea_level_curve = sorted(base, key=lambda x: -x[0]) or None
 
+        kb_elev = well.kb_elev or 0.0
+
         top_set_id = get_well_active_top_set_id(session, well_id)
         if top_set_id is not None:
             zone_inputs = build_zone_layer_inputs(session, well_id, litho_params)
             results = backstrip(zone_inputs, litho_params, sea_level_curve=sea_level_curve)
+            # depth_tvdss of shallowest pick ≈ depth_md - kb_elev (valid for vertical wells)
+            tvdss_correction = (
+                (zone_inputs[0].current_top_m - kb_elev) - zone_inputs[0].water_depth_m
+                if zone_inputs else 0.0
+            )
         else:
             td_m = well.td_md if well.td_md is not None else 0.0
             formations = session.scalars(
@@ -190,6 +197,24 @@ def _compute_subsidence(manager, well_id: str) -> list[SubsidenceResultResponse]
                 ))
 
             results = backstrip(inputs, litho_params, sea_level_curve=sea_level_curve)
+            if inputs and formations:
+                f0 = formations[0]
+                tvdss_top = (
+                    f0.depth_tvdss
+                    if f0.depth_tvdss is not None
+                    else (f0.depth_md or 0.0) - kb_elev
+                )
+                tvdss_correction = tvdss_top - inputs[0].water_depth_m
+            else:
+                tvdss_correction = 0.0
+
+        # Shift burial depths to TVDSS (depth below modern sea level).
+        # Backstrip places the shallowest pick at z=0; tvdss_correction shifts it
+        # to its actual depth below sea level so the chart aligns with log TVDSS.
+        if tvdss_correction:
+            for r in results:
+                for p in r.burial_path:
+                    p.depth_m += tvdss_correction
 
     return [
         SubsidenceResultResponse(
