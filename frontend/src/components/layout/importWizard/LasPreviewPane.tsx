@@ -1,11 +1,12 @@
+import { type CurveType, CURVE_TYPES } from '@/utils/curveTypes'
 import type { LasPreviewResponse } from './types'
 
 interface LasPreviewPaneProps {
   isLoading: boolean
   error: string | null
   preview: LasPreviewResponse | null
-  curveTypes?: Record<string, 'continuous' | 'discrete'>
-  onCurveTypeChange?: (mnemonic: string, type: 'continuous' | 'discrete') => void
+  curveTypes?: Record<string, CurveType>
+  onCurveTypeChange?: (mnemonic: string, type: CurveType) => void
 }
 
 export function LasPreviewPane({ isLoading, error, preview, curveTypes, onCurveTypeChange }: LasPreviewPaneProps) {
@@ -83,10 +84,9 @@ export function LasPreviewPane({ isLoading, error, preview, curveTypes, onCurveT
                           ) : (
                             <select
                               value={curveTypes![curve.mnemonic] ?? 'continuous'}
-                              onChange={(e) => onCurveTypeChange!(curve.mnemonic, e.target.value as 'continuous' | 'discrete')}
+                              onChange={(e) => onCurveTypeChange!(curve.mnemonic, e.target.value as CurveType)}
                             >
-                              <option value="continuous">continuous</option>
-                              <option value="discrete">discrete</option>
+                              {CURVE_TYPES.map((t) => <option key={t} value={t}>{t}</option>)}
                             </select>
                           )}
                         </td>

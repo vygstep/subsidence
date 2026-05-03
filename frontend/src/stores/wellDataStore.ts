@@ -34,7 +34,7 @@ interface CurveResponse {
   depths: number[]
   values: number[]
   null_value: number
-  curve_type?: 'continuous' | 'discrete' | 'lithology_discrete' | 'lithology_fraction'
+  curve_type?: 'continuous' | 'discrete'
   discrete_code_map?: Record<string, string> | null
   lithology_set_id?: number | null
 }

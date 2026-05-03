@@ -2,8 +2,7 @@ import { useEffect, useMemo, useState } from 'react'
 
 import { useWellDataStore, useWorkspaceStore } from '@/stores'
 import type { TrackConfig } from '@/types'
-
-type CurveType = 'continuous' | 'discrete' | 'lithology_discrete' | 'lithology_fraction'
+import { type CurveType, CURVE_TYPES } from '@/utils/curveTypes'
 
 interface CurveMatchResult {
   family_code: string | null
@@ -38,10 +37,9 @@ export function CurveSettings({ selectedCurveConfig, onCurveSettingUpdate }: Cur
       .then((data) => setDictMatch(data))
   }, [selectedCurveConfig.mnemonic])
 
-  const curveType = (selectedCurveConfig.curve_type ?? 'continuous') as CurveType
+  const rawType = selectedCurveConfig.curve_type ?? 'continuous'
+  const curveType: CurveType = (CURVE_TYPES as readonly string[]).includes(rawType) ? rawType as CurveType : 'continuous'
   const isDiscrete = curveType === 'discrete'
-  const isLithologyDiscrete = curveType === 'lithology_discrete'
-  const isLithologyFraction = curveType === 'lithology_fraction'
   const isContinuous = curveType === 'continuous'
   const isLithologyTrack = containingTrack?.track_type === 'lithology'
 
@@ -129,10 +127,9 @@ export function CurveSettings({ selectedCurveConfig, onCurveSettingUpdate }: Cur
           value={curveType}
           onChange={(event) => handleRenderingModeChange(event.target.value as CurveType)}
         >
-          <option value="continuous">Line</option>
-          <option value="discrete">Blocks</option>
-          <option value="lithology_fraction">Lithology fraction</option>
-          <option value="lithology_discrete">Lithology discrete</option>
+          {CURVE_TYPES.map((t) => (
+            <option key={t} value={t}>{t === 'continuous' ? 'Line' : 'Blocks'}</option>
+          ))}
         </select>
       </div>
 
@@ -208,7 +205,7 @@ export function CurveSettings({ selectedCurveConfig, onCurveSettingUpdate }: Cur
         </div>
       )}
 
-      {isLithologyDiscrete && (
+      {isDiscrete && !!curveData?.lithology_set_id && (
         <>
           <div className="template-panel__section-header">Discrete lithology mapping</div>
           {uniqueCodes.length === 0 ? (
@@ -232,7 +229,7 @@ export function CurveSettings({ selectedCurveConfig, onCurveSettingUpdate }: Cur
         </>
       )}
 
-      {isLithologyFraction && (
+      {isContinuous && (isLithologyTrack || !!selectedCurveConfig.lithology_code) && (
         <>
           <div className="template-panel__section-header">Lithology composition</div>
           <div className="sf-row">

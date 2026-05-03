@@ -140,6 +140,13 @@ def migrate_schema(engine: Engine) -> None:
         if 'base_lithology_code' not in pattern_cols:
             conn.execute(text("ALTER TABLE lithology_patterns ADD COLUMN base_lithology_code VARCHAR(64)"))
             conn.commit()
+        conn.execute(text(
+            "UPDATE curve_metadata SET curve_type = 'continuous' WHERE curve_type = 'lithology_fraction'"
+        ))
+        conn.execute(text(
+            "UPDATE curve_metadata SET curve_type = 'discrete' WHERE curve_type = 'lithology_discrete'"
+        ))
+        conn.commit()
         if 'sea_level_curves' not in table_names:
             conn.execute(text(
                 "CREATE TABLE sea_level_curves ("

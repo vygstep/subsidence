@@ -655,8 +655,8 @@ def patch_curve_metadata(
         if row is None:
             raise HTTPException(status_code=404, detail=f'Curve not found: {mnemonic}')
         if body.curve_type is not None:
-            if body.curve_type not in ('continuous', 'discrete', 'lithology_discrete', 'lithology_fraction'):
-                raise HTTPException(status_code=422, detail="curve_type must be 'continuous', 'discrete', 'lithology_discrete', or 'lithology_fraction'")
+            if body.curve_type not in ('continuous', 'discrete'):
+                raise HTTPException(status_code=422, detail="curve_type must be 'continuous' or 'discrete'")
             row.curve_type = body.curve_type
         if body.discrete_code_map is not None:
             row.discrete_code_map = body.discrete_code_map

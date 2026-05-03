@@ -1,3 +1,4 @@
+import { type CurveType, CURVE_TYPES } from '@/utils/curveTypes'
 import type { FieldDefinition, ColumnMapping } from './mapping'
 import type { TabularDelimiter, TabularParserSettings, TabularPreviewResponse } from './types'
 
@@ -18,8 +19,8 @@ interface TabularPreviewPaneProps {
   fields?: FieldDefinition[]
   mapping?: ColumnMapping
   onMappingChange?: (fieldId: string, colName: string | null) => void
-  curveTypes?: Record<string, 'continuous' | 'discrete'>
-  onCurveTypeChange?: (col: string, type: 'continuous' | 'discrete') => void
+  curveTypes?: Record<string, CurveType>
+  onCurveTypeChange?: (col: string, type: CurveType) => void
 }
 
 export function TabularPreviewPane({
@@ -131,10 +132,9 @@ export function TabularPreviewPane({
                         {isDepth ? null : (
                           <select
                             value={curveTypes[col] ?? 'continuous'}
-                            onChange={(e) => onCurveTypeChange(col, e.target.value as 'continuous' | 'discrete')}
+                            onChange={(e) => onCurveTypeChange(col, e.target.value as CurveType)}
                           >
-                            <option value="continuous">continuous</option>
-                            <option value="discrete">discrete</option>
+                            {CURVE_TYPES.map((t) => <option key={t} value={t}>{t}</option>)}
                           </select>
                         )}
                       </th>

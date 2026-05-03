@@ -30,7 +30,7 @@ export interface CurveConfig {
   scaleMax: number
   scaleReversed: boolean
   fill?: CurveFillConfig
-  curve_type?: 'continuous' | 'discrete' | 'lithology_discrete' | 'lithology_fraction'
+  curve_type?: 'continuous' | 'discrete'
   lithology_code?: string
   lithology_set_id?: number | null
 }

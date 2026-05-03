@@ -122,10 +122,8 @@ class CurveMetadata(Base, AuditMixin):
     unit: Mapped[str] = mapped_column(String(32), default="")
     original_unit: Mapped[str | None] = mapped_column(String(32), nullable=True)
     curve_type: Mapped[str] = mapped_column(String(24), default="continuous")
-    # "continuous"          — float measurements (GR, ILD, RHOB, …)
-    # "discrete"            — integer codes with label map (lithofacies flags, zone IDs)
-    # "lithology_fraction"  — v/v fraction for one lithology component (used in composition bands)
-    # "lithology_discrete"  — integer source code → lithology code via discrete_code_map
+    # "continuous" — float measurements (GR, ILD, RHOB, …)
+    # "discrete"   — integer codes with label map; if lithology_set_id is set, renders as lithology blocks
     depth_min: Mapped[float] = mapped_column(Float)
     depth_max: Mapped[float] = mapped_column(Float)
     n_samples: Mapped[int] = mapped_column(Integer)
@@ -133,8 +131,7 @@ class CurveMetadata(Base, AuditMixin):
     source_hash: Mapped[str] = mapped_column(String(64))  # sha256 of source file
     null_value: Mapped[float] = mapped_column(Float, default=-999.25)
     discrete_code_map: Mapped[str | None] = mapped_column(Text, nullable=True)
-    # curve_type='discrete':            JSON {"1": "Sandstone", "2": "Shale"}  (int → display label)
-    # curve_type='lithology_discrete':  JSON {"1": "sandstone", "2": "shale"}  (int → lithology_code)
+    # curve_type='discrete': JSON {"1": "Sandstone", "2": "Shale"}  (int → display label or lithology_code)
     lithology_set_id: Mapped[int | None] = mapped_column(
         Integer, ForeignKey("lithology_sets.id"), nullable=True
     )

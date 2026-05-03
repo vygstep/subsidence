@@ -295,7 +295,7 @@ export function DataTrack({ config, curves, width, height }: DataTrackProps) {
       })
 
       clippedCurves.forEach(({ curve, style }) => {
-        if (style.curve_type === 'lithology_discrete') {
+        if (style.curve_type === 'discrete' && !!curve.lithology_set_id) {
           drawLithologyDiscrete(
             ctx,
             curve.depths,
