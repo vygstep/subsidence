@@ -201,7 +201,7 @@ from the track config when unchecking, or merely hides it. If it removes the con
 
 ---
 
-## BF4-025: Durable per-curve settings and dictionary mnemonic assignment (todo)
+## BF4-025: Durable per-curve settings and dictionary mnemonic assignment (done)
 
 **Problem**: BF4-004 preserves curve settings when a curve is hidden, but viewer settings are still
 owned by `TrackConfig.curves[*]`. If the user deletes a track, every curve placement inside that
@@ -2416,7 +2416,7 @@ name should be displayed.
 | 23 | BF4-022 | XS | Restore shared Data Manager style primitives |
 | 24 | BF4-023 | S | Separate sea-level compute selector from overlay checkboxes |
 | 25 | BF4-024 | XS | Single-well labels show upper marker only |
-| 26 | BF4-025 | M/L | Durable curve style settings + dictionary mnemonic assignment |
+| 26 | BF4-025 | M/L | Durable curve style settings + dictionary mnemonic assignment | done |
 | 27 | BF4-005 | L | Lithology discrete/fraction (multi-step) |
 | 28 | BF4-026 | S | Simplify curve_type taxonomy: remove lithology_discrete/fraction types |
 | 29 | BF4-029 | M/L | Edit tops redesign — click-to-place, DM context menu add, cursor tooltip |

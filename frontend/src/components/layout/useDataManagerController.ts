@@ -150,11 +150,13 @@ export function useDataManagerController() {
 
   const selectedCurveConfig = useMemo(() => {
     if (selectedObject?.type !== 'curve') return null
-    const existing = activeWellView.tracks.flatMap((t) => t.curves).find((c) => c.mnemonic === selectedObject.mnemonic)
-    if (existing) return existing
+    const fromSettings = activeWellView.curveSettingsByMnemonic[selectedObject.mnemonic]
+    if (fromSettings) return fromSettings
+    const fromTrack = activeWellView.tracks.flatMap((t) => t.curves).find((c) => c.mnemonic === selectedObject.mnemonic)
+    if (fromTrack) return fromTrack
     const curve = curves.find((item) => item.mnemonic === selectedObject.mnemonic)
     return curve ? buildCurveDefaults(curve, activeWellView.tracks.flatMap((track) => track.curves).length).curveConfig : null
-  }, [activeWellView.tracks, curves, selectedObject])
+  }, [activeWellView, curves, selectedObject])
 
   const selectedCurveTrack = useMemo(() => {
     if (selectedObject?.type !== 'curve-track') return null

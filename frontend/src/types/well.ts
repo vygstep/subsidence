@@ -36,6 +36,7 @@ export interface CurveInventoryItem {
   curve_type?: 'continuous' | 'discrete'
   discrete_code_map?: Record<string, string> | null
   lithology_set_id?: number | null
+  canonical_mnemonic?: string | null
 }
 
 export interface FormationStratLink {

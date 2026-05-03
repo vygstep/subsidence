@@ -68,12 +68,17 @@ export function makeVisibilityHandlers(deps: VisibilityDeps) {
       }
 
       const existingCount = state.tracks.reduce((n, t) => n + t.curves.length, 0)
-      const { curveConfig, scaleType } = buildCurveDefaults(curve, existingCount)
+      const savedSettings = state.curveSettingsByMnemonic[curve.mnemonic]
+      const { curveConfig, scaleType } = savedSettings
+        ? { curveConfig: savedSettings, scaleType: 'linear' as const }
+        : buildCurveDefaults(curve, existingCount)
+      const nextCurveSettings = { ...state.curveSettingsByMnemonic, [curve.mnemonic]: curveConfig }
 
       if (selectedTrackId && state.tracks.some((t) => t.id === selectedTrackId)) {
         return {
           ...state,
           hiddenCurveMnemonics: state.hiddenCurveMnemonics.filter((item) => item !== mnemonic),
+          curveSettingsByMnemonic: nextCurveSettings,
           tracks: state.tracks.map((track) =>
             track.id !== selectedTrackId ? track : { ...track, curves: [...track.curves, curveConfig] },
           ),
@@ -84,6 +89,7 @@ export function makeVisibilityHandlers(deps: VisibilityDeps) {
       return {
         ...state,
         hiddenCurveMnemonics: state.hiddenCurveMnemonics.filter((item) => item !== mnemonic),
+        curveSettingsByMnemonic: nextCurveSettings,
         tracks: [
           ...state.tracks,
           {
@@ -123,33 +129,24 @@ export function makeVisibilityHandlers(deps: VisibilityDeps) {
 
   function handleCurveSettingUpdate(mnemonic: string, patch: Partial<TrackConfig['curves'][number]>): void {
     if (!well?.well_id) return
-    updateWellViewState(well.well_id, (state) => ({
-      ...state,
-      tracks: state.tracks.some((track) => track.curves.some((curve) => curve.mnemonic === mnemonic))
-        ? state.tracks.map((track) => ({
-            ...track,
-            curves: track.curves.map((curve) => (curve.mnemonic === mnemonic ? { ...curve, ...patch } : curve)),
-          }))
-        : (() => {
-            const curve = useWellDataStore.getState().curves.find((item) => item.mnemonic === mnemonic)
-            if (!curve) return state.tracks
-            const existingCount = state.tracks.reduce((n, t) => n + t.curves.length, 0)
-            const { curveConfig } = buildCurveDefaults(curve, existingCount)
-            const nextCurveConfig = { ...curveConfig, ...patch }
-            const targetTrackId = selectedTrackId && state.tracks.some((track) => track.id === selectedTrackId)
-              ? selectedTrackId
-              : state.tracks[0]?.id
-            if (targetTrackId) {
-              return state.tracks.map((track) =>
-                track.id === targetTrackId
-                  ? { ...track, curves: [...track.curves, nextCurveConfig] }
-                  : track,
-              )
-            }
-            const track = createEmptyTrack()
-            return [{ ...track, curves: [nextCurveConfig] }]
-          })(),
-    }))
+    updateWellViewState(well.well_id, (state) => {
+      const base = state.curveSettingsByMnemonic[mnemonic]
+        ?? state.tracks.flatMap((t) => t.curves).find((c) => c.mnemonic === mnemonic)
+        ?? (() => {
+          const curveData = useWellDataStore.getState().curves.find((item) => item.mnemonic === mnemonic)
+          return curveData ? buildCurveDefaults(curveData, 0).curveConfig : null
+        })()
+      if (!base) return state
+      const updated = { ...base, ...patch }
+      return {
+        ...state,
+        curveSettingsByMnemonic: { ...state.curveSettingsByMnemonic, [mnemonic]: updated },
+        tracks: state.tracks.map((track) => ({
+          ...track,
+          curves: track.curves.map((curve) => (curve.mnemonic === mnemonic ? updated : curve)),
+        })),
+      }
+    })
   }
 
   function handleTrackSettingUpdate(trackId: string, patch: Partial<TrackConfig>): void {

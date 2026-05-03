@@ -1,6 +1,6 @@
 import { create } from 'zustand'
 
-import type { TrackConfig } from '@/types'
+import type { CurveConfig, TrackConfig } from '@/types'
 
 export const DEPTH_TRACK_ID = 'depth'
 export const FORMATION_TRACK_ID = 'formations'
@@ -50,6 +50,7 @@ export interface WellViewState {
   topLabelPositions: Record<string, 'left' | 'center' | 'right'>
   deviationVisible: boolean
   hiddenTrackIds: string[]
+  curveSettingsByMnemonic: Record<string, CurveConfig>
 }
 
 const DEFAULT_SIDEBAR_WIDTH = 320
@@ -89,6 +90,7 @@ export function createDefaultWellView(): WellViewState {
     topLabelPositions: {},
     deviationVisible: false,
     hiddenTrackIds: [],
+    curveSettingsByMnemonic: {},
   }
 }
 
@@ -159,6 +161,23 @@ export function coerceWellViewState(raw: unknown): WellViewState {
     ? value.deviationVisible
     : fallback.deviationVisible
 
+  // Populate curveSettingsByMnemonic: validate stored value or migrate from tracks.
+  // First occurrence in trackOrder wins on migration (matches what the user saw).
+  const curveSettingsByMnemonic: Record<string, CurveConfig> = {}
+  if (value.curveSettingsByMnemonic && typeof value.curveSettingsByMnemonic === 'object' && !Array.isArray(value.curveSettingsByMnemonic)) {
+    for (const [mnemonic, config] of Object.entries(value.curveSettingsByMnemonic as Record<string, unknown>)) {
+      if (isCurveConfig(config)) curveSettingsByMnemonic[mnemonic] = config as CurveConfig
+    }
+  } else {
+    for (const trackId of trackOrder) {
+      const track = tracks.find((t) => t.id === trackId)
+      if (!track) continue
+      for (const curve of track.curves) {
+        if (!curveSettingsByMnemonic[curve.mnemonic]) curveSettingsByMnemonic[curve.mnemonic] = { ...curve }
+      }
+    }
+  }
+
   return {
     tracks,
     trackOrder,
@@ -169,6 +188,7 @@ export function coerceWellViewState(raw: unknown): WellViewState {
     topLabelPositions,
     deviationVisible,
     hiddenTrackIds,
+    curveSettingsByMnemonic,
   }
 }
 

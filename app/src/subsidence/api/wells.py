@@ -32,6 +32,7 @@ class CurveInventoryItem(BaseModel):
     curve_type: str = 'continuous'
     discrete_code_map: str | None = None
     lithology_set_id: int | None = None
+    canonical_mnemonic: str | None = None
 
 
 class CurvePatchRequest(BaseModel):
@@ -39,6 +40,7 @@ class CurvePatchRequest(BaseModel):
     discrete_code_map: str | None = None
     family_code: str | None = None
     lithology_set_id: int | None = None
+    canonical_mnemonic: str | None = None
 
 
 class FormationInventoryItem(BaseModel):
@@ -383,6 +385,7 @@ def list_well_inventories(request: Request) -> list[WellInventoryResponse]:
                             curve_type=row.curve_type,
                             discrete_code_map=row.discrete_code_map,
                             lithology_set_id=row.lithology_set_id,
+                            canonical_mnemonic=row.canonical_mnemonic,
                         )
                         for row in curve_rows
                     ],
@@ -664,6 +667,8 @@ def patch_curve_metadata(
             row.family_code = body.family_code
         if body.lithology_set_id is not None:
             row.lithology_set_id = body.lithology_set_id
+        if 'canonical_mnemonic' in body.model_fields_set:
+            row.canonical_mnemonic = body.canonical_mnemonic or None
         session.commit()
         return CurveInventoryItem(
             mnemonic=row.mnemonic,
@@ -672,6 +677,7 @@ def patch_curve_metadata(
             curve_type=row.curve_type,
             discrete_code_map=row.discrete_code_map,
             lithology_set_id=row.lithology_set_id,
+            canonical_mnemonic=row.canonical_mnemonic,
         )
 
 
