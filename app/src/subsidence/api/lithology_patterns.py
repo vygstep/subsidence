@@ -55,20 +55,6 @@ class LithologyPatternPalettePatch(BaseModel):
     description: str | None = None
 
 
-class LithologyPatternCreate(BaseModel):
-    code: str | None = None
-    display_name: str | None = None
-    svg_content: str
-    description: str | None = None
-
-
-class LithologyPatternPatch(BaseModel):
-    code: str | None = None
-    display_name: str | None = None
-    svg_content: str | None = None
-    description: str | None = None
-
-
 class LithologyPatternImportRequest(BaseModel):
     path: str
     code: str | None = None
@@ -329,37 +315,6 @@ def delete_lithology_pattern_palette(palette_id: int, request: Request) -> None:
         session.commit()
 
 
-@router.post('/lithology-pattern-palettes/{palette_id}/patterns', response_model=LithologyPatternItem, status_code=201)
-def create_lithology_pattern(
-    palette_id: int,
-    payload: LithologyPatternCreate,
-    request: Request,
-) -> LithologyPatternItem:
-    manager = _require_open_project(request)
-    _ensure_pattern_palettes(manager)
-    with manager.get_session() as session:
-        _require_user_palette(session, palette_id)
-        code = _normalize_code(payload.code or payload.display_name)
-        _ensure_unique_code(session, code)
-        try:
-            svg_content, tile_width, tile_height = sanitize_svg_content(payload.svg_content)
-        except SvgValidationError as exc:
-            raise HTTPException(status_code=400, detail=str(exc)) from exc
-        row = _create_pattern_row(
-            palette_id=palette_id,
-            code=code,
-            display_name=_normalize_name(payload.display_name or code, 'Pattern display name'),
-            svg_content=svg_content,
-            tile_width=tile_width,
-            tile_height=tile_height,
-            sort_order=_next_sort_order(session, palette_id),
-            description=payload.description,
-        )
-        session.add(row)
-        session.commit()
-        session.refresh(row)
-        return _pattern_to_item(row)
-
 
 @router.post('/lithology-pattern-palettes/{palette_id}/patterns/import', response_model=LithologyPatternItem, status_code=201)
 def import_lithology_pattern(
@@ -394,36 +349,6 @@ def import_lithology_pattern(
         session.refresh(row)
         return _pattern_to_item(row)
 
-
-@router.patch('/lithology-pattern-palettes/{palette_id}/patterns/{pattern_id}', response_model=LithologyPatternItem)
-def patch_lithology_pattern(
-    palette_id: int,
-    pattern_id: int,
-    payload: LithologyPatternPatch,
-    request: Request,
-) -> LithologyPatternItem:
-    manager = _require_open_project(request)
-    _ensure_pattern_palettes(manager)
-    with manager.get_session() as session:
-        _require_user_palette(session, palette_id)
-        row = _require_pattern(session, palette_id, pattern_id)
-        if payload.code is not None:
-            next_code = _normalize_code(payload.code)
-            _ensure_unique_code(session, next_code, exclude_pattern_id=row.id)
-            _ensure_pattern_not_referenced(session, row.code)
-            row.code = next_code
-        if payload.display_name is not None:
-            row.display_name = _normalize_name(payload.display_name, 'Pattern display name')
-        if payload.svg_content is not None:
-            try:
-                row.svg_content, row.tile_width, row.tile_height = sanitize_svg_content(payload.svg_content)
-            except SvgValidationError as exc:
-                raise HTTPException(status_code=400, detail=str(exc)) from exc
-        if payload.description is not None:
-            row.description = payload.description.strip() or None
-        session.commit()
-        session.refresh(row)
-        return _pattern_to_item(row)
 
 
 @router.delete('/lithology-pattern-palettes/{palette_id}/patterns/{pattern_id}', status_code=204)

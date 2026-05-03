@@ -17,7 +17,6 @@ from subsidence.data.schema import (
 from subsidence.data.zone_service import (
     activate_top_set_for_well,
     aggregate_zone_lithology_from_curve,
-    extract_horizons_from_well_picks,
     merge_zones_on_horizon_delete,
     rebuild_zones_for_top_set,
     recalculate_zone_thickness,
@@ -66,10 +65,6 @@ class TopSetPickCreateResponse(BaseModel):
     horizon_id: int
     name: str
     depth_md: float | None
-
-
-class HorizonReorderRequest(BaseModel):
-    horizon_ids: list[int]
 
 
 class ActiveTopSetRequest(BaseModel):
@@ -373,30 +368,6 @@ def delete_horizon(top_set_id: int, horizon_id: int, request: Request) -> None:
         session.commit()
 
 
-@router.post('/top-sets/{top_set_id}/horizons/reorder', response_model=TopSetDetail)
-def reorder_horizons(top_set_id: int, body: HorizonReorderRequest, request: Request) -> TopSetDetail:
-    manager = _require_open_project(request)
-    with manager.get_session() as session:
-        if session.get(TopSet, top_set_id) is None:
-            raise HTTPException(status_code=404, detail=f'TopSet not found: {top_set_id}')
-        existing_ids = {
-            h.id
-            for h in session.scalars(
-                select(TopSetHorizon).where(TopSetHorizon.top_set_id == top_set_id)
-            ).all()
-        }
-        if set(body.horizon_ids) != existing_ids:
-            raise HTTPException(status_code=400, detail='horizon_ids must be exactly the set of horizon IDs for this TopSet')
-        for i, hid in enumerate(body.horizon_ids):
-            h = session.get(TopSetHorizon, hid)
-            if h is not None:
-                h.sort_order = i
-        session.flush()
-        rebuild_zones_for_top_set(session, top_set_id)
-        session.commit()
-        loaded = _load_top_set(session, top_set_id)
-        return _top_set_detail(loaded)
-
 
 @router.post('/top-sets/{top_set_id}/picks', response_model=TopSetPickCreateResponse, status_code=201)
 def create_top_set_pick(top_set_id: int, body: TopSetPickCreate, request: Request) -> TopSetPickCreateResponse:
@@ -510,42 +481,6 @@ def set_active_top_set(well_id: str, body: ActiveTopSetRequest, request: Request
 
     return ActiveTopSetResponse(well_id=well_id, top_set_id=body.top_set_id)
 
-
-@router.delete('/wells/{well_id}/active-top-set', status_code=204)
-def clear_active_top_set(well_id: str, request: Request) -> None:
-    manager = _require_open_project(request)
-    with manager.get_session() as session:
-        _require_well(session, well_id)
-        link = session.scalar(
-            select(WellActiveTopSet).where(WellActiveTopSet.well_id == well_id)
-        )
-        if link is not None:
-            session.delete(link)
-            session.commit()
-
-
-# ---------------------------------------------------------------------------
-# Extract horizons from a well's picks
-# ---------------------------------------------------------------------------
-
-@router.post('/top-sets/{top_set_id}/extract-from-well/{well_id}', response_model=TopSetDetail)
-def extract_from_well(top_set_id: int, well_id: str, request: Request) -> TopSetDetail:
-    """Create horizons in a TopSet from a well's unique formation names.
-
-    Picks are ordered by depth_md; the first occurrence of each name sets sort_order.
-    Existing horizons with matching names are updated. Picks are linked via horizon_id.
-    """
-    manager = _require_open_project(request)
-    with manager.get_session() as session:
-        _require_top_set(session, top_set_id)
-        _require_well(session, well_id)
-
-        extract_horizons_from_well_picks(session, top_set_id, well_id)
-        rebuild_zones_for_top_set(session, top_set_id)
-        activate_top_set_for_well(session, manager.project_path, well_id, top_set_id)
-        session.commit()
-        loaded = _load_top_set(session, top_set_id)
-        return _top_set_detail(loaded)
 
 
 # ---------------------------------------------------------------------------

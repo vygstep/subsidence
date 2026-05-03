@@ -15,7 +15,6 @@ from .import_preview import router as import_preview_router
 from .lithology_patterns import router as lithology_patterns_router
 from .projects import router as projects_router
 from .projects_config import router as projects_config_router
-from .projects_export import router as projects_export_router
 from .projects_imports import router as projects_imports_router
 from .strat_chart import router as strat_chart_router
 from .subsidence import router as subsidence_router
@@ -104,7 +103,6 @@ app.include_router(import_preview_router, prefix="/api/import-preview")
 app.include_router(projects_router, prefix="/api/projects")
 app.include_router(projects_imports_router, prefix="/api/projects")
 app.include_router(projects_config_router, prefix="/api/projects")
-app.include_router(projects_export_router, prefix="/api/projects")
 
 
 @app.get("/health")

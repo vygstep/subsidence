@@ -116,10 +116,6 @@ class VisualConfigPatchRequest(BaseModel):
     config: dict
 
 
-class ExportRequest(BaseModel):
-    well_id: str | None = None
-
-
 class ProjectStatusResponse(BaseModel):
     is_open: bool
     is_dirty: bool
