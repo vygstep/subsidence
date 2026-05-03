@@ -193,7 +193,11 @@ function ModelsRoot() {
         >
           &gt;
         </button>
-        <button type="button" className="tree-node__label-button">
+        <button
+          type="button"
+          className={`tree-node__label-button${selectedObject?.type === 'models-root' ? ' tree-node__label-button--selected' : ''}`}
+          onClick={() => setSelectedObject({ type: 'models-root' })}
+        >
           Models
         </button>
       </div>

@@ -215,6 +215,7 @@ export interface WellDataStore {
   loadSeaLevelPoints: (curveId: number) => Promise<SeaLevelPoint[]>
   deleteSeaLevelCurve: (curveId: number) => Promise<void>
   setWellActiveSeaLevelCurve: (wellId: string, curveId: number | null) => Promise<void>
+  setWellActiveTopSet: (wellId: string, topSetId: number) => Promise<void>
 }
 
 function toFloat32Array(values: number[]): Float32Array {
@@ -1177,6 +1178,20 @@ export const useWellDataStore = create<WellDataStore>((set, get) => ({
       body: JSON.stringify({ curve_id: curveId }),
     })
     if (!response.ok) throw new Error(await readError(response, `Failed to set sea level curve (${response.status})`))
+    await get().loadWellInventories()
+    const activeWellId = get().well?.well_id
+    if (activeWellId === wellId) {
+      const { useComputedStore } = await import('./computedStore')
+      useComputedStore.getState().triggerRecalculation()
+    }
+  },
+  async setWellActiveTopSet(wellId, topSetId) {
+    const response = await fetch(`/api/wells/${wellId}/active-top-set`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ top_set_id: topSetId }),
+    })
+    if (!response.ok) throw new Error(await readError(response, `Failed to set active top set (${response.status})`))
     await get().loadWellInventories()
     const activeWellId = get().well?.well_id
     if (activeWellId === wellId) {

@@ -34,6 +34,7 @@ import { DepthTrackSettings } from './settings/DepthTrackSettings'
 import { FormationsTrackSettings } from './settings/FormationsTrackSettings'
 import { LasSettings } from './settings/LasSettings'
 import { ModelSettings } from './settings/ModelSettings'
+import { ModelsRootSettings } from './settings/ModelsRootSettings'
 import { StratChartSettings } from './settings/StratChartSettings'
 import { TopPickSettings } from './settings/TopPickSettings'
 import { TopsSettings } from './settings/TopsSettings'
@@ -335,6 +336,10 @@ export function SettingsInspector({
 
   if (selectedObject.type === 'subsidence-chart') {
     return <SubsidenceChartSettings chartType={selectedObject.chartType} />
+  }
+
+  if (selectedObject.type === 'models-root') {
+    return <ModelsRootSettings />
   }
 
   if (selectedObject.type === 'subsidence-model') {

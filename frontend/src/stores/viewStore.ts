@@ -15,11 +15,9 @@ export interface SeaLevelOverlayStyle {
   lineStyle: SeaLevelOverlayLineStyle
 }
 
-export interface SubsidenceModelConfig {
-  zoneSetId: number | null
-}
+export type SubsidenceModelConfig = Record<string, never>
 
-const DEFAULT_MODEL_CONFIG: SubsidenceModelConfig = { zoneSetId: null }
+const DEFAULT_MODEL_CONFIG: SubsidenceModelConfig = {}
 
 const ALL_MODEL_TYPES: SubsidenceModelType[] = ['total', 'decompaction', 'airy', 'stepwise', 'thermal']
 
@@ -387,17 +385,7 @@ export const useViewStore = create<ViewStore>((set) => ({
       const nextDepthPerPixel = config.depthPerPixel ?? state.depthPerPixel
       const rawWidth = config.subsidenceWidth ?? state.subsidenceWidth
       const mergedModelConfigs = { ...state.subsidenceModelConfigs }
-      if (config.subsidenceModelConfigs) {
-        for (const [key, val] of Object.entries(config.subsidenceModelConfigs)) {
-          if (val && key in mergedModelConfigs) {
-            const modelType = key as SubsidenceModelType
-            mergedModelConfigs[modelType] = {
-              ...mergedModelConfigs[modelType],
-              zoneSetId: val.zoneSetId ?? mergedModelConfigs[modelType].zoneSetId,
-            }
-          }
-        }
-      }
+      // subsidenceModelConfigs has no user-editable fields currently; kept for future use
       return {
         depthPerPixel: nextDepthPerPixel,
         trackWidths: normalizeTrackWidths(config.trackWidths),
