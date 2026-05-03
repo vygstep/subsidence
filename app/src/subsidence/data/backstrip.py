@@ -84,6 +84,7 @@ class FormationInput:
     current_top_m: float
     current_base_m: float
     water_depth_m: float = 0.0
+    current_top_tvdss: float | None = field(default=None)
 
 
 @dataclass
@@ -98,6 +99,7 @@ class ZoneLayerInput:
     current_base_m: float
     water_depth_m: float = 0.0
     eroded_thickness_m: float = 0.0
+    current_top_tvdss: float | None = field(default=None)
 
 
 @dataclass
@@ -229,6 +231,13 @@ def backstrip(
 
         for i in active_indices:
             results[i].burial_path.append(BurialPoint(age_ma=t_ma, depth_m=paleo_tops[i] + offset))
+
+    # Append present-time (age_ma=0) anchor from actual TVDSS well data.
+    # This grounds each burial curve at its real measured depth, independent of
+    # the paleobathymetry-based offset that governs the rest of the history.
+    for i, f in enumerate(valid):
+        if f.current_top_tvdss is not None:
+            results[i].burial_path.append(BurialPoint(age_ma=0, depth_m=f.current_top_tvdss))
 
     # Sort burial paths chronologically (oldest → present)
     for r in results:

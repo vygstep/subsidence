@@ -377,6 +377,7 @@ def build_zone_layer_inputs(
     session: Session,
     well_id: str,
     litho_params: dict[str, LithologyParam],
+    kb_elev: float = 0.0,
 ) -> list[ZoneLayerInput]:
     top_set_id = get_well_active_top_set_id(session, well_id)
     if top_set_id is None:
@@ -438,6 +439,11 @@ def build_zone_layer_inputs(
             fractions = {upper_pick.lithology: 1.0}
 
         dominant = max(fractions, key=lambda c: fractions[c]) if fractions else (upper_pick.lithology or '')
+        top_tvdss = (
+            upper_pick.depth_tvdss
+            if upper_pick.depth_tvdss is not None
+            else upper_pick.depth_md - kb_elev
+        )
         result.append(ZoneLayerInput(
             name=f'{upper.name} → {lower.name}',
             color=upper.color,
@@ -449,6 +455,7 @@ def build_zone_layer_inputs(
             current_base_m=lower_pick.depth_md,
             water_depth_m=upper_pick.water_depth_m,
             eroded_thickness_m=upper_pick.eroded_thickness_m,
+            current_top_tvdss=top_tvdss,
         ))
 
     return result
