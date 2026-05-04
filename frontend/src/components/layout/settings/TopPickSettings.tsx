@@ -27,6 +27,8 @@ interface TopPickSettingsProps {
       hiatus_duration_ma?: number
       kind?: string
       color?: string
+      color_source?: string
+      reset_color?: boolean
       water_depth_m?: number
       eroded_thickness_m?: number
       sea_level_m_override?: number | null
@@ -40,6 +42,7 @@ export function TopPickSettings({ selectedFormation, onFormationUpdate, onFormat
   const wellInventories = useWellDataStore((state) => state.wellInventories)
   const loadSeaLevelPoints = useWellDataStore((state) => state.loadSeaLevelPoints)
   const seaLevelCurves = useWellDataStore((state) => state.seaLevelCurves)
+  const formations = useWellDataStore((state) => state.formations)
 
   const activeCurveId = wellInventories.find((w) => w.well_id === wellId)?.active_sea_level_curve_id ?? null
   const activeCurveName = seaLevelCurves.find((c) => c.id === activeCurveId)?.name ?? null
@@ -89,6 +92,19 @@ export function TopPickSettings({ selectedFormation, onFormationUpdate, onFormat
     ? selectedFormation.age_ma - selectedFormation.hiatus_duration_ma
     : null
 
+  // Neighbor age bounds for clamping the age input
+  const { minAgeMa, maxAgeMa } = useMemo(() => {
+    const sorted = [...formations].sort((a, b) => (a.depth_md ?? Infinity) - (b.depth_md ?? Infinity))
+    const idx = sorted.findIndex((f) => f.id === selectedFormation.id)
+    const aboveAge = idx > 0
+      ? sorted.slice(0, idx).reverse().find((f) => f.age_ma != null)?.age_ma
+      : undefined
+    const belowAge = idx >= 0 && idx < sorted.length - 1
+      ? sorted.slice(idx + 1).find((f) => f.age_ma != null)?.age_ma
+      : undefined
+    return { minAgeMa: aboveAge, maxAgeMa: belowAge }
+  }, [formations, selectedFormation.id])
+
   return (
     <div className="template-panel">
       <div className="template-panel__group">
@@ -127,14 +143,28 @@ export function TopPickSettings({ selectedFormation, onFormationUpdate, onFormat
           type="color"
           className="sf-swatch"
           value={selectedFormation.color}
-          onChange={(event) => void onFormationUpdate(selectedFormation.id, { color: event.target.value })}
+          onChange={(event) => void onFormationUpdate(selectedFormation.id, {
+            color: event.target.value,
+            color_source: 'user',
+          })}
         />
+        {selectedFormation.color_source === 'user' && (
+          <button
+            className="sf-btn-inline"
+            title="Reset to horizon color"
+            onClick={() => void onFormationUpdate(selectedFormation.id, { reset_color: true })}
+          >
+            Reset
+          </button>
+        )}
       </div>
       <div className="sf-row">
         <span>{isUnconformity ? 'Top age (Ma)' : 'Age (Ma)'}</span>
         <input
           type="number"
           step="0.01"
+          min={minAgeMa}
+          max={maxAgeMa}
           value={selectedFormation.age_ma ?? ''}
           onChange={(event) => void onFormationUpdate(selectedFormation.id, {
             age_ma: event.target.value ? Number(event.target.value) : undefined,
@@ -218,7 +248,7 @@ export function TopPickSettings({ selectedFormation, onFormationUpdate, onFormat
       )}
       <div className="tree-leaf">
         <span>Linked unit</span>
-        <span>{selectedFormation.active_strat_unit_name ?? 'Unlinked'}</span>
+        <span>{selectedFormation.horizon_name ?? '—'}</span>
       </div>
     </div>
   )

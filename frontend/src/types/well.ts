@@ -54,10 +54,13 @@ export interface FormationTop {
   depth_tvd: number | null
   depth_tvdss: number | null
   horizon_id: number | null
+  horizon_name: string | null
+  horizon_color: string | null
   age_ma?: number
   age_base_ma?: number | null
   hiatus_duration_ma: number
   color: string
+  color_source: string
   kind: string
   is_locked: boolean
   water_depth_m: number

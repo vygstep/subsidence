@@ -72,6 +72,8 @@ interface SettingsInspectorProps {
       hiatus_duration_ma?: number
       kind?: string
       color?: string
+      color_source?: string
+      reset_color?: boolean
       water_depth_m?: number
       eroded_thickness_m?: number
       sea_level_m_override?: number | null
