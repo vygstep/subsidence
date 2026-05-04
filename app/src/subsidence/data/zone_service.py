@@ -80,43 +80,64 @@ def extract_horizons_from_well_picks(
     return created
 
 
+def _floor_match_horizon(horizons: list[TopSetHorizon], age_top_ma: float | None) -> TopSetHorizon | None:
+    """Return horizon with max age_ma <= age_top_ma (floor-match), or None."""
+    if age_top_ma is None:
+        return None
+    matched: TopSetHorizon | None = None
+    for h in sorted(horizons, key=lambda h: h.age_ma if h.age_ma is not None else -1):
+        if h.age_ma is not None and h.age_ma <= age_top_ma:
+            matched = h
+        elif h.age_ma is not None and h.age_ma > age_top_ma:
+            break
+    return matched
+
+
 def link_picks_to_horizons(session: Session, well_id: str, top_set_id: int) -> int:
-    """Link a well's picks to TopSet horizons by normalized marker name."""
-    horizons = session.scalars(
+    """Link a well's picks to TopSet horizons by age floor-match."""
+    horizons = list(session.scalars(
         select(TopSetHorizon).where(TopSetHorizon.top_set_id == top_set_id)
-    ).all()
-    horizon_by_name = {_top_name_key(h.name): h for h in horizons}
-    if not horizon_by_name:
+    ).all())
+    if not horizons:
         return 0
 
     linked = 0
     for pick in session.scalars(
         select(FormationTopModel).where(FormationTopModel.well_id == well_id)
     ).all():
-        horizon = horizon_by_name.get(_top_name_key(pick.name))
-        if horizon is not None and pick.horizon_id != horizon.id:
-            pick.horizon_id = horizon.id
+        matched = _floor_match_horizon(horizons, pick.age_top_ma)
+        new_horizon_id = matched.id if matched else None
+        if pick.horizon_id != new_horizon_id:
+            pick.horizon_id = new_horizon_id
             linked += 1
+        if pick.color_source == 'auto':
+            pick.color = matched.color if matched else '#9ca3af'
 
     session.flush()
     return linked
 
 
 def create_ghost_picks(session: Session, well_id: str, top_set_id: int) -> int:
-    """Create unset picks for TopSet horizons that are absent in a linked well."""
-    horizons = session.scalars(
+    """Create unset picks for TopSet horizons not covered by any age-matched pick."""
+    horizons = list(session.scalars(
         select(TopSetHorizon).where(TopSetHorizon.top_set_id == top_set_id)
+    ).all())
+    if not horizons:
+        return 0
+
+    real_picks = session.scalars(
+        select(FormationTopModel).where(FormationTopModel.well_id == well_id)
     ).all()
-    existing_names = {
-        _top_name_key(pick.name)
-        for pick in session.scalars(
-            select(FormationTopModel).where(FormationTopModel.well_id == well_id)
-        ).all()
-    }
+
+    covered_ids: set[int] = set()
+    for pick in real_picks:
+        matched = _floor_match_horizon(horizons, pick.age_top_ma)
+        if matched is not None:
+            covered_ids.add(matched.id)
 
     created = 0
     for horizon in horizons:
-        if _top_name_key(horizon.name) in existing_names:
+        if horizon.id in covered_ids:
             continue
         session.add(FormationTopModel(
             well_id=well_id,
@@ -127,6 +148,7 @@ def create_ghost_picks(session: Session, well_id: str, top_set_id: int) -> int:
             depth_tvd=None,
             depth_tvdss=None,
             color=horizon.color,
+            color_source='auto',
             age_top_ma=horizon.age_ma,
             is_locked=False,
         ))

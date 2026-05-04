@@ -15,9 +15,15 @@ from subsidence.data import (
 )
 from subsidence.data.deviation_transform import compute_tvd_tvdss, tvd_to_md
 from subsidence.data.undo import _model_to_dict
-from subsidence.data.schema import FormationStratLink, FormationTopModel, StratChart, StratUnit, WellModel
+from subsidence.data.schema import FormationStratLink, FormationTopModel, StratChart, StratUnit, TopSetHorizon, WellModel
 from subsidence.data.strat_link import auto_link_to_active_chart, find_strat_unit_by_name
-from subsidence.data.zone_service import aggregate_zone_lithology_from_curve, get_well_active_top_set_id, recalculate_zone_thickness
+from subsidence.data.zone_service import (
+    _floor_match_horizon,
+    aggregate_zone_lithology_from_curve,
+    get_well_active_top_set_id,
+    link_picks_to_horizons,
+    recalculate_zone_thickness,
+)
 
 router = APIRouter(tags=['formations'])
 
@@ -50,6 +56,7 @@ class FormationTopPatch(BaseModel):
     water_depth_m: float | None = None
     eroded_thickness_m: float | None = None
     sea_level_m_override: float | None = None
+    reset_color: bool = False
 
 
 class FormationStratLinkResponse(BaseModel):
@@ -67,7 +74,10 @@ class FormationTopResponse(BaseModel):
     depth_tvd: float | None
     depth_tvdss: float | None
     horizon_id: int | None
+    horizon_name: str | None
+    horizon_color: str | None
     color: str
+    color_source: str
     kind: str
     lithology: str | None
     age_ma: float | None
@@ -117,7 +127,8 @@ def _load_options():
         selectinload(FormationTopModel.strat_links).options(
             selectinload(FormationStratLink.strat_unit),
             selectinload(FormationStratLink.chart),
-        )
+        ),
+        selectinload(FormationTopModel.horizon),
     ]
 
 
@@ -148,7 +159,10 @@ def _to_response(row: FormationTopModel) -> FormationTopResponse:
         depth_tvd=row.depth_tvd,
         depth_tvdss=row.depth_tvdss,
         horizon_id=row.horizon_id,
+        horizon_name=row.horizon.name if row.horizon else None,
+        horizon_color=row.horizon.color if row.horizon else None,
         color=row.color,
+        color_source=row.color_source,
         kind=row.kind,
         lithology=row.lithology,
         age_ma=row.age_top_ma,
@@ -292,6 +306,47 @@ def update_formation(well_id: str, formation_id: int, body: FormationTopPatch, r
                 old_values['sea_level_m_override'] = current
                 new_values['sea_level_m_override'] = next_val
 
+        # color → mark as user-overridden
+        if 'color' in new_values:
+            old_values['color_source'] = row.color_source
+            new_values['color_source'] = 'user'
+
+        # reset_color: compute from linked horizon or use grey, mark auto
+        if body.reset_color:
+            horizons = list(session.scalars(
+                select(TopSetHorizon).where(
+                    TopSetHorizon.top_set_id == (
+                        select(TopSetHorizon.top_set_id)
+                        .where(TopSetHorizon.id == row.horizon_id)
+                        .scalar_subquery()
+                    )
+                )
+            ).all()) if row.horizon_id else []
+            matched = _floor_match_horizon(horizons, row.age_top_ma) if horizons else None
+            reset_color_val = matched.color if matched else (row.horizon.color if row.horizon else '#9ca3af')
+            old_values['color'] = row.color
+            new_values['color'] = reset_color_val
+            old_values['color_source'] = row.color_source
+            new_values['color_source'] = 'auto'
+
+        # age_top_ma: validate depth-order constraint
+        if 'age_top_ma' in new_values:
+            new_age = new_values['age_top_ma']
+            if new_age is not None:
+                ordered = session.scalars(
+                    select(FormationTopModel)
+                    .where(FormationTopModel.well_id == well_id)
+                    .order_by(FormationTopModel.depth_md.asc().nulls_last(), FormationTopModel.id.asc())
+                ).all()
+                idx = next((i for i, p in enumerate(ordered) if p.id == formation_id), None)
+                if idx is not None:
+                    above_age = next((p.age_top_ma for p in reversed(ordered[:idx]) if p.age_top_ma is not None), None)
+                    below_age = next((p.age_top_ma for p in ordered[idx + 1:] if p.age_top_ma is not None), None)
+                    invalid = (above_age is not None and new_age < above_age) or \
+                              (below_age is not None and new_age > below_age)
+                    if invalid:
+                        new_values['age_top_ma'] = None
+
     if not new_values:
         with manager.get_session() as session:
             existing = _load_formation(session, formation_id)
@@ -311,14 +366,19 @@ def update_formation(well_id: str, formation_id: int, body: FormationTopPatch, r
         ))
     else:
         manager.execute_command(UpdateFormation(formation_id, old_values, new_values))
-        if 'depth_md' in new_values:
+        needs_relink = 'age_top_ma' in new_values
+        needs_thickness = 'depth_md' in new_values or needs_relink
+        if needs_thickness or needs_relink:
             with manager.get_session() as session:
                 top = session.get(FormationTopModel, formation_id)
                 if top is not None:
                     top_set_id = get_well_active_top_set_id(session, top.well_id)
                     if top_set_id is not None:
-                        recalculate_zone_thickness(session, top_set_id, top.well_id)
-                        aggregate_zone_lithology_from_curve(session, manager.project_path, top.well_id)
+                        if needs_relink:
+                            link_picks_to_horizons(session, top.well_id, top_set_id)
+                        if needs_thickness:
+                            recalculate_zone_thickness(session, top_set_id, top.well_id)
+                            aggregate_zone_lithology_from_curve(session, manager.project_path, top.well_id)
                         session.commit()
 
     with manager.get_session() as session:

@@ -1419,16 +1419,16 @@ def test_tops_import_can_attach_to_existing_zone_set_by_top_names(api_client: Te
     response = api_client.post('/api/top-sets', json={'name': 'Regional ZoneSet'})
     assert response.status_code == 201, response.text
     top_set_id = response.json()['id']
-    for name in ['H1', 'H2', 'H3']:
-        response = api_client.post(f'/api/top-sets/{top_set_id}/horizons', json={'name': name})
+    for name, age in [('H1', 10.0), ('H2', 20.0), ('H3', 30.0)]:
+        response = api_client.post(f'/api/top-sets/{top_set_id}/horizons', json={'name': name, 'age_ma': age})
         assert response.status_code == 201, response.text
 
     csv_path = tmp_path / 'tops_existing_zone_set.csv'
     csv_path.write_text(
-        'well_name,top_name,depth_md\n'
-        'Existing ZoneSet Well,H1,100\n'
-        'Existing ZoneSet Well,H2,250\n'
-        'Existing ZoneSet Well,HX,300\n',
+        'well_name,top_name,depth_md,strat_age_ma\n'
+        'Existing ZoneSet Well,H1,100,10\n'
+        'Existing ZoneSet Well,H2,250,20\n'
+        'Existing ZoneSet Well,HX,300,25\n',
         encoding='utf-8',
     )
 
@@ -1659,21 +1659,21 @@ def _create_well_with_top_set(client, tmp_path: Path):
     assert resp.status_code == 200, resp.text
     well_id = resp.json()['well_id']
 
-    # Create 4 picks with known depths
-    pick_depths = {'H1': 100.0, 'H2': 300.0, 'H3': 600.0, 'H4': 900.0}
-    for name, depth in pick_depths.items():
+    # Create 4 picks with known depths and ages (deeper = older = larger Ma)
+    picks = [('H1', 100.0, 10.0), ('H2', 300.0, 20.0), ('H3', 600.0, 30.0), ('H4', 900.0, 40.0)]
+    for name, depth, age in picks:
         resp = client.post(f'/api/wells/{well_id}/formations', json={
-            'name': name, 'depth_md': depth, 'color': '#aaaaaa',
+            'name': name, 'depth_md': depth, 'color': '#aaaaaa', 'age_ma': age,
         })
         assert resp.status_code == 201, resp.text
 
-    # Create TopSet with 4 horizons
+    # Create TopSet with 4 horizons with matching ages
     resp = client.post('/api/top-sets', json={'name': 'Main Set'})
     assert resp.status_code == 201, resp.text
     top_set_id = resp.json()['id']
 
-    for name in ['H1', 'H2', 'H3', 'H4']:
-        resp = client.post(f'/api/top-sets/{top_set_id}/horizons', json={'name': name})
+    for name, age in [('H1', 10.0), ('H2', 20.0), ('H3', 30.0), ('H4', 40.0)]:
+        resp = client.post(f'/api/top-sets/{top_set_id}/horizons', json={'name': name, 'age_ma': age})
         assert resp.status_code == 201, resp.text
 
     # Link well to TopSet

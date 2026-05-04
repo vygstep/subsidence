@@ -309,10 +309,15 @@ class FormationTopModel(Base, AuditMixin):
     # "OK" | "WARNING" | "ERROR"
     qc_summary: Mapped[str | None] = mapped_column(Text, nullable=True)
     # JSON blob: {flags, messages}
+    color_source: Mapped[str] = mapped_column(String(4), nullable=False, server_default='auto')
+    # 'auto' = follows linked horizon color; 'user' = manually overridden
 
     well: Mapped[WellModel] = relationship(back_populates="formation_tops")
     strat_links: Mapped[list["FormationStratLink"]] = relationship(
         back_populates="formation", cascade="all, delete-orphan"
+    )
+    horizon: Mapped[TopSetHorizon | None] = relationship(
+        foreign_keys=[horizon_id], viewonly=True
     )
 
 
