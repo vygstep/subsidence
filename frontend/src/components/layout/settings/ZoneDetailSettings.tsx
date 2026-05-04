@@ -170,6 +170,7 @@ export function ZoneDetailSettings({ zone }: ZoneDetailSettingsProps) {
           step="1"
           value={waterDepth}
           onChange={(e) => setWaterDepth(e.target.value)}
+          onKeyDown={(e) => { if (e.key === 'Enter') e.currentTarget.blur() }}
           onBlur={() => void handleWaterDepthSave()}
           disabled={isSavingWd || upperPick === null}
         />

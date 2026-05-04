@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from 'react'
 
 import { useWellDataStore } from '@/stores'
+import { formationDisplayColor } from '@/types'
 import type { FormationTop, SeaLevelPoint } from '@/types'
 
 function interpolateSeaLevel(points: SeaLevelPoint[], ageMa: number): number | null {
@@ -158,6 +159,7 @@ export function TopPickSettings({ selectedFormation, onFormationUpdate, onFormat
           step="0.1"
           value={draftDepthMd}
           onChange={(e) => setDraftDepthMd(e.target.value)}
+          onKeyDown={(e) => { if (e.key === 'Enter') e.currentTarget.blur() }}
           onBlur={() => {
             const parsed = Number(draftDepthMd)
             if (draftDepthMd !== '' && !isNaN(parsed)) {
@@ -183,7 +185,7 @@ export function TopPickSettings({ selectedFormation, onFormationUpdate, onFormat
         <input
           type="color"
           className="sf-swatch"
-          value={selectedFormation.color}
+          value={formationDisplayColor(selectedFormation)}
           onChange={(event) => void onFormationUpdate(selectedFormation.id, {
             color: event.target.value,
             color_source: 'user',
@@ -208,6 +210,7 @@ export function TopPickSettings({ selectedFormation, onFormationUpdate, onFormat
           max={maxAgeMa}
           value={draftAgeMa}
           onChange={(e) => setDraftAgeMa(e.target.value)}
+          onKeyDown={(e) => { if (e.key === 'Enter') e.currentTarget.blur() }}
           onBlur={() => {
             const parsed = Number(draftAgeMa)
             if (draftAgeMa !== '' && !isNaN(parsed)) {
@@ -226,6 +229,7 @@ export function TopPickSettings({ selectedFormation, onFormationUpdate, onFormat
             step="0.01"
             value={draftHiatus}
             onChange={(e) => setDraftHiatus(e.target.value)}
+            onKeyDown={(e) => { if (e.key === 'Enter') e.currentTarget.blur() }}
             onBlur={() => {
               const parsed = Number(draftHiatus)
               if (draftHiatus !== '' && !isNaN(parsed)) {
@@ -254,6 +258,7 @@ export function TopPickSettings({ selectedFormation, onFormationUpdate, onFormat
               step="0.1"
               value={draftSeaLevel}
               onChange={(e) => setDraftSeaLevel(e.target.value)}
+              onKeyDown={(e) => { if (e.key === 'Enter') e.currentTarget.blur() }}
               onBlur={() => {
                 if (draftSeaLevel !== '') {
                   void onFormationUpdate(selectedFormation.id, { sea_level_m_override: Number(draftSeaLevel) })
@@ -285,6 +290,7 @@ export function TopPickSettings({ selectedFormation, onFormationUpdate, onFormat
           step="1"
           value={draftWaterDepth}
           onChange={(e) => setDraftWaterDepth(e.target.value)}
+          onKeyDown={(e) => { if (e.key === 'Enter') e.currentTarget.blur() }}
           onBlur={() => {
             const parsed = Number(draftWaterDepth)
             if (draftWaterDepth !== '' && !isNaN(parsed)) {
@@ -304,6 +310,7 @@ export function TopPickSettings({ selectedFormation, onFormationUpdate, onFormat
             step="1"
             value={draftErodedThickness}
             onChange={(e) => setDraftErodedThickness(e.target.value)}
+            onKeyDown={(e) => { if (e.key === 'Enter') e.currentTarget.blur() }}
             onBlur={() => {
               const parsed = Number(draftErodedThickness)
               if (draftErodedThickness !== '' && !isNaN(parsed)) {

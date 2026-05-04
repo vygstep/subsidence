@@ -5,6 +5,7 @@ import { drawBurialCurves, drawFormationFills } from '@/renderers/subsidenceRend
 import { defaultSeaLevelOverlayStyle, useComputedStore, useViewStore, type SeaLevelOverlayLineStyle } from '@/stores'
 import { useWorkspaceStore } from '@/stores/workspaceStore'
 import { useWellDataStore } from '@/stores/wellDataStore'
+import { formationDisplayColor } from '@/types'
 import type { SeaLevelPoint } from '@/types'
 import type { SubsidenceResult } from '@/types/subsidence'
 import { GeologicalTimescale } from './GeologicalTimescale'
@@ -202,6 +203,19 @@ export function SubsidenceCanvas() {
   const well = useWellDataStore((s) => s.well)
   const loadSeaLevelPoints = useWellDataStore((s) => s.loadSeaLevelPoints)
 
+  const formationColorByName = useMemo(
+    () => new Map(formations.map((f) => [f.name, formationDisplayColor(f)])),
+    [formations],
+  )
+
+  const coloredCurves = useMemo(
+    () => subsidenceCurves.map((c) => ({
+      ...c,
+      color: formationColorByName.get(c.formation_name) ?? c.color,
+    })),
+    [subsidenceCurves, formationColorByName],
+  )
+
   const selectedObject = useWorkspaceStore((s) => s.selectedObject)
   const setSelectedObject = useWorkspaceStore((s) => s.setSelectedObject)
 
@@ -266,13 +280,13 @@ export function SubsidenceCanvas() {
   // Y axis auto range: fit to burial data (no tdMd padding)
   const autoMaxDepthM = useMemo(() => {
     let max = 0
-    for (const c of subsidenceCurves) {
+    for (const c of coloredCurves) {
       for (const pt of c.burial_path) {
         if (pt.depth_m > max) max = pt.depth_m
       }
     }
     return max > 0 ? max : 3000
-  }, [subsidenceCurves])
+  }, [coloredCurves])
 
   const effectiveMinDepthM = subsidenceDepthMinM ?? 0
   const effectiveMaxDepthM = subsidenceDepthMaxM ?? autoMaxDepthM
@@ -393,8 +407,8 @@ export function SubsidenceCanvas() {
     ctx.clip()
 
     drawKmGridlines(ctx, pad.left, plotW, effectiveMinDepthM, effectiveMaxDepthM, depthToY)
-    if (showFormationFills) drawFormationFills(ctx, subsidenceCurves, timeToX, depthToY)
-    if (showBurialCurves) drawBurialCurves(ctx, subsidenceCurves, timeToX, depthToY)
+    if (showFormationFills) drawFormationFills(ctx, coloredCurves, timeToX, depthToY)
+    if (showBurialCurves) drawBurialCurves(ctx, coloredCurves, timeToX, depthToY)
 
     // Sea-level overlay lines (inside clip). These are display-only curves.
     seaLevelOverlays.forEach((overlay) => {
@@ -420,8 +434,8 @@ export function SubsidenceCanvas() {
 
     ctx.restore()
 
-    drawFormationLabels(ctx, subsidenceCurves, pad.left + plotW, depthToY)
-  }, [subsidenceCurves, maxAge, effectiveMinDepthM, effectiveMaxDepthM, showFormationFills, showBurialCurves, seaLevelOverlays])
+    drawFormationLabels(ctx, coloredCurves, pad.left + plotW, depthToY)
+  }, [coloredCurves, maxAge, effectiveMinDepthM, effectiveMaxDepthM, showFormationFills, showBurialCurves, seaLevelOverlays])
 
   const canvasRef = useCanvasRenderer(draw, [draw])
 

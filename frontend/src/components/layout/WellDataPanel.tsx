@@ -4,6 +4,7 @@ import { useDataManager } from './dataManager/DataManagerContext'
 import { useWorkspaceStore } from '@/stores/workspaceStore'
 import { useViewStore, type SubsidenceModelType } from '@/stores/viewStore'
 import { useWellDataStore } from '@/stores/wellDataStore'
+import { formationDisplayColor } from '@/types'
 import type { FormationInventoryItem, WellInventory } from '@/types'
 import type { FormationZone } from '@/types'
 
@@ -85,7 +86,7 @@ const MODEL_NODES: Array<{ type: SubsidenceModelType; label: string; available: 
 ]
 
 function topBackgroundColor(formation: FormationInventoryItem): string {
-  return formation.active_strat_color ?? '#9ca3af'
+  return formationDisplayColor(formation)
 }
 
 function markerTreeKey(horizonId: number | null, name: string): string {
