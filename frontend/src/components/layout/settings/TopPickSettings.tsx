@@ -118,9 +118,7 @@ export function TopPickSettings({ selectedFormation, onFormationUpdate, onFormat
     setDraftWaterDepth(String(selectedFormation.water_depth_m))
   }, [selectedFormation.id, selectedFormation.water_depth_m])
 
-  const depositionalElevation = effectiveSeaLevel != null
-    ? effectiveSeaLevel - selectedFormation.water_depth_m
-    : null
+  const depositionalElevation = (effectiveSeaLevel ?? 0) - selectedFormation.water_depth_m
 
   const isUnconformity = selectedFormation.kind === 'unconformity'
   const depositionResumedMa = selectedFormation.age_ma != null
