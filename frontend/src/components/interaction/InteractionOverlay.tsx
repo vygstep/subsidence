@@ -1,6 +1,7 @@
 import { useId } from 'react'
 
 import { useViewStore, useWorkspaceStore } from '@/stores'
+import { formationDisplayColor } from '@/types'
 import type { CurveData, FormationTop } from '@/types'
 
 import { CurveTooltip } from './CurveTooltip'
@@ -40,7 +41,7 @@ export function InteractionOverlay({
   const notPickedFormations = formations.filter((f) => f.depth_md === null)
   const activePick = effectiveActivePickId === null ? null : formations.find((f) => f.id === effectiveActivePickId) ?? null
   const cursorY = cursorDepth === null ? null : depthToPixel(cursorDepth)
-  const activePickColor = activePick?.active_strat_color ?? activePick?.color ?? '#9ca3af'
+  const activePickColor = activePick != null ? formationDisplayColor(activePick) : '#9ca3af'
 
   return (
     <>
@@ -113,7 +114,7 @@ export function InteractionOverlay({
         {cursorDepth !== null && <DepthCursor yPosition={cursorY ?? depthToPixel(cursorDepth)} depth={cursorDepth} />}
         {/* Not-picked formation tap targets near the top */}
         {topsEditable && notPickedFormations.map((formation, i) => {
-          const color = formation.active_strat_color ?? formation.color
+          const color = formationDisplayColor(formation)
           const isActive = effectiveActivePickId === formation.id
           const rowH = 18
           const rowY = i * (rowH + 2) + 2

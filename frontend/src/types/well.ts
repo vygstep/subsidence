@@ -72,6 +72,11 @@ export interface FormationTop {
   active_strat_unit_name: string | null
 }
 
+export function formationDisplayColor(f: Pick<FormationTop, 'color' | 'color_source' | 'active_strat_color'>): string {
+  if (f.color_source === 'user') return f.color
+  return f.active_strat_color ?? f.color
+}
+
 export interface FormationInventoryItem {
   id: string
   name: string

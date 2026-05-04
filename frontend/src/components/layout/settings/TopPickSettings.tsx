@@ -83,6 +83,41 @@ export function TopPickSettings({ selectedFormation, onFormationUpdate, onFormat
     )
   }, [selectedFormation.id, selectedFormation.sea_level_m_override, seaLevelAtAge])
 
+  const [draftDepthMd, setDraftDepthMd] = useState<string>(
+    () => selectedFormation.depth_md != null ? String(selectedFormation.depth_md) : '',
+  )
+  useEffect(() => {
+    setDraftDepthMd(selectedFormation.depth_md != null ? String(selectedFormation.depth_md) : '')
+  }, [selectedFormation.id, selectedFormation.depth_md])
+
+  const [draftAgeMa, setDraftAgeMa] = useState<string>(
+    () => selectedFormation.age_ma != null ? String(selectedFormation.age_ma) : '',
+  )
+  useEffect(() => {
+    setDraftAgeMa(selectedFormation.age_ma != null ? String(selectedFormation.age_ma) : '')
+  }, [selectedFormation.id, selectedFormation.age_ma])
+
+  const [draftHiatus, setDraftHiatus] = useState<string>(
+    () => String(selectedFormation.hiatus_duration_ma),
+  )
+  useEffect(() => {
+    setDraftHiatus(String(selectedFormation.hiatus_duration_ma))
+  }, [selectedFormation.id, selectedFormation.hiatus_duration_ma])
+
+  const [draftErodedThickness, setDraftErodedThickness] = useState<string>(
+    () => String(selectedFormation.eroded_thickness_m),
+  )
+  useEffect(() => {
+    setDraftErodedThickness(String(selectedFormation.eroded_thickness_m))
+  }, [selectedFormation.id, selectedFormation.eroded_thickness_m])
+
+  const [draftWaterDepth, setDraftWaterDepth] = useState<string>(
+    () => String(selectedFormation.water_depth_m),
+  )
+  useEffect(() => {
+    setDraftWaterDepth(String(selectedFormation.water_depth_m))
+  }, [selectedFormation.id, selectedFormation.water_depth_m])
+
   const depositionalElevation = effectiveSeaLevel != null
     ? effectiveSeaLevel - selectedFormation.water_depth_m
     : null
@@ -123,8 +158,16 @@ export function TopPickSettings({ selectedFormation, onFormationUpdate, onFormat
         <input
           type="number"
           step="0.1"
-          value={selectedFormation.depth_md ?? ''}
-          onChange={(event) => onFormationMove(selectedFormation.id, Number(event.target.value))}
+          value={draftDepthMd}
+          onChange={(e) => setDraftDepthMd(e.target.value)}
+          onBlur={() => {
+            const parsed = Number(draftDepthMd)
+            if (draftDepthMd !== '' && !isNaN(parsed)) {
+              onFormationMove(selectedFormation.id, parsed)
+            } else {
+              setDraftDepthMd(selectedFormation.depth_md != null ? String(selectedFormation.depth_md) : '')
+            }
+          }}
         />
       </div>
       <div className="sf-row">
@@ -165,10 +208,16 @@ export function TopPickSettings({ selectedFormation, onFormationUpdate, onFormat
           step="0.01"
           min={minAgeMa}
           max={maxAgeMa}
-          value={selectedFormation.age_ma ?? ''}
-          onChange={(event) => void onFormationUpdate(selectedFormation.id, {
-            age_ma: event.target.value ? Number(event.target.value) : undefined,
-          })}
+          value={draftAgeMa}
+          onChange={(e) => setDraftAgeMa(e.target.value)}
+          onBlur={() => {
+            const parsed = Number(draftAgeMa)
+            if (draftAgeMa !== '' && !isNaN(parsed)) {
+              void onFormationUpdate(selectedFormation.id, { age_ma: parsed })
+            } else {
+              setDraftAgeMa(selectedFormation.age_ma != null ? String(selectedFormation.age_ma) : '')
+            }
+          }}
         />
       </div>
       {isUnconformity && (
@@ -177,10 +226,16 @@ export function TopPickSettings({ selectedFormation, onFormationUpdate, onFormat
           <input
             type="number"
             step="0.01"
-            value={selectedFormation.hiatus_duration_ma}
-            onChange={(event) => void onFormationUpdate(selectedFormation.id, {
-              hiatus_duration_ma: event.target.value ? Number(event.target.value) : 0,
-            })}
+            value={draftHiatus}
+            onChange={(e) => setDraftHiatus(e.target.value)}
+            onBlur={() => {
+              const parsed = Number(draftHiatus)
+              if (draftHiatus !== '' && !isNaN(parsed)) {
+                void onFormationUpdate(selectedFormation.id, { hiatus_duration_ma: parsed })
+              } else {
+                setDraftHiatus(String(selectedFormation.hiatus_duration_ma))
+              }
+            }}
           />
         </div>
       )}
@@ -230,8 +285,16 @@ export function TopPickSettings({ selectedFormation, onFormationUpdate, onFormat
         <input
           type="number"
           step="1"
-          value={selectedFormation.water_depth_m}
-          onChange={(event) => void onFormationUpdate(selectedFormation.id, { water_depth_m: Number(event.target.value) })}
+          value={draftWaterDepth}
+          onChange={(e) => setDraftWaterDepth(e.target.value)}
+          onBlur={() => {
+            const parsed = Number(draftWaterDepth)
+            if (draftWaterDepth !== '' && !isNaN(parsed)) {
+              void onFormationUpdate(selectedFormation.id, { water_depth_m: parsed })
+            } else {
+              setDraftWaterDepth(String(selectedFormation.water_depth_m))
+            }
+          }}
         />
       </div>
       {isUnconformity && (
@@ -241,8 +304,16 @@ export function TopPickSettings({ selectedFormation, onFormationUpdate, onFormat
             type="number"
             min="0"
             step="1"
-            value={selectedFormation.eroded_thickness_m}
-            onChange={(event) => void onFormationUpdate(selectedFormation.id, { eroded_thickness_m: Number(event.target.value) })}
+            value={draftErodedThickness}
+            onChange={(e) => setDraftErodedThickness(e.target.value)}
+            onBlur={() => {
+              const parsed = Number(draftErodedThickness)
+              if (draftErodedThickness !== '' && !isNaN(parsed)) {
+                void onFormationUpdate(selectedFormation.id, { eroded_thickness_m: parsed })
+              } else {
+                setDraftErodedThickness(String(selectedFormation.eroded_thickness_m))
+              }
+            }}
           />
         </div>
       )}

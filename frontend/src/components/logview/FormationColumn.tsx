@@ -3,6 +3,7 @@ import { useEffect, useMemo, useState } from 'react'
 import { useCanvasRenderer, useDepthScale } from '@/hooks'
 import { useViewStore, useWellDataStore } from '@/stores'
 import { drawLithologyBlock } from '@/renderers'
+import { formationDisplayColor } from '@/types'
 import type { FormationTop, FormationZone, LithologyPatternEntry, LithologyType } from '@/types'
 import { mdToTvd } from '@/utils/depthTransform'
 
@@ -103,7 +104,7 @@ export function FormationColumn({ formations, visibleMarkerFormations = formatio
       let notPickedOffset = 2
       visibleMarkerFormations.forEach((formation) => {
         if (formation.depth_md !== null) return
-        const color = formation.active_strat_color ?? formation.color
+        const color = formationDisplayColor(formation)
         const badgeH = 16
         ctx.save()
         ctx.fillStyle = color
@@ -142,7 +143,7 @@ export function FormationColumn({ formations, visibleMarkerFormations = formatio
           drawLithologyBlock(
             ctx,
             {
-              color: formation.active_strat_color ?? formation.color,
+              color: formationDisplayColor(formation),
               patternCode: pattern?.code ?? null,
               patternSvg: pattern?.svg_content ?? null,
             },
@@ -195,7 +196,7 @@ export function FormationColumn({ formations, visibleMarkerFormations = formatio
         drawLithologyBlock(
           ctx,
           {
-            color: formation.active_strat_color ?? formation.color,
+            color: formationDisplayColor(formation),
             patternCode: pattern?.code ?? null,
             patternSvg: pattern?.svg_content ?? null,
           },

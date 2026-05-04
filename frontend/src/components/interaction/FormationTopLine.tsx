@@ -2,6 +2,7 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 
 import { useFormationDrag } from '@/hooks'
 import { useViewStore, useWellDataStore, useWorkspaceStore } from '@/stores'
+import { formationDisplayColor } from '@/types'
 import type { FormationTop } from '@/types'
 
 interface FormationTopLineProps {
@@ -152,7 +153,7 @@ export function FormationTopLine({
   })
 
   const isUnconformity = formation.kind === 'unconformity'
-  const color = isUnconformity ? '#ef4444' : (formation.active_strat_color ?? formation.color)
+  const color = isUnconformity ? '#ef4444' : formationDisplayColor(formation)
   const displayY = localY !== null ? localY : yPosition
   const cursor = !editable ? 'default' : formation.is_locked ? 'not-allowed' : isActivePick ? 'crosshair' : 'ns-resize'
   const strokeOpacity = isDragging || isActivePick ? 1.0 : 0.75

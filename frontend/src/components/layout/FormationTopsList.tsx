@@ -1,6 +1,7 @@
 import { useRef, useState } from 'react'
 
 import { useComputedStore, useViewStore, useWellDataStore } from '@/stores'
+import { formationDisplayColor } from '@/types'
 import type { FormationTop } from '@/types'
 
 export function FormationTopsList() {
@@ -98,7 +99,7 @@ export function FormationTopsList() {
             <li key={f.id} className="formations-list__row" onClick={() => handleRowClick(f.id, f.depth_md)}>
               <span
                 className="formations-list__swatch"
-                style={{ background: f.active_strat_color ?? f.color }}
+                style={{ background: formationDisplayColor(f) }}
               />
               {editingDepthId === f.id ? (
                 <input
