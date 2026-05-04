@@ -491,8 +491,8 @@ def test_tops_deviation_and_strat_chart_workflows(api_client: TestClient, tmp_pa
     chart_csv = tmp_path / 'custom_chart.csv'
     chart_csv.write_text(
         'unit_id,parent_unit_id,unit_name,rank_name,start_age_ma,end_age_ma,html_rgb_hash\n'
-        '1,,System A,system,0,50,#123456\n'
-        '2,1,Stage A,stage,0,25,#abcdef\n',
+        '1,,System A,system,50,0,#123456\n'
+        '2,1,Stage A,stage,25,0,#abcdef\n',
         encoding='utf-8',
     )
     response = api_client.post('/api/strat-charts/import', json={'csv_path': str(chart_csv)})

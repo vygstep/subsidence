@@ -101,6 +101,9 @@ def link_picks_to_horizons(session: Session, well_id: str, top_set_id: int) -> i
     if not horizons:
         return 0
 
+    horizons_with_age = [h for h in horizons if h.age_ma is not None]
+    youngest_color = min(horizons_with_age, key=lambda h: h.age_ma).color if horizons_with_age else '#9ca3af'
+
     linked = 0
     for pick in session.scalars(
         select(FormationTopModel).where(FormationTopModel.well_id == well_id)
@@ -111,7 +114,7 @@ def link_picks_to_horizons(session: Session, well_id: str, top_set_id: int) -> i
             pick.horizon_id = new_horizon_id
             linked += 1
         if pick.color_source == 'auto':
-            pick.color = matched.color if matched else '#9ca3af'
+            pick.color = matched.color if matched else youngest_color
 
     session.flush()
     return linked

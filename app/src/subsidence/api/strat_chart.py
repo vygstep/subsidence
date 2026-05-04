@@ -93,8 +93,10 @@ def _import_ics_csv(session, csv_path: Path) -> tuple[StratChart, int]:
             parent_csv_id_raw = (row.get('parent_unit_id') or '').strip()
             parent_csv_id = int(parent_csv_id_raw) if parent_csv_id_raw else None
             parent_db_id = csv_id_to_unit[parent_csv_id].id if parent_csv_id is not None else None
-            age_top_raw = (row.get('start_age_ma') or '').strip()
-            age_base_raw = (row.get('end_age_ma') or '').strip()
+            age_top_raw = (row.get('end_age_ma') or '').strip()
+            age_base_raw = (row.get('start_age_ma') or '').strip()
+            if age_top_raw and age_base_raw and float(age_top_raw) > float(age_base_raw):
+                raise HTTPException(status_code=400, detail=f"end_age_ma must be <= start_age_ma (got end={age_top_raw}, start={age_base_raw})")
             unit = StratUnit(
                 name=(row.get('unit_name') or '').strip(),
                 rank=(row.get('rank_name') or '').strip() or None,
