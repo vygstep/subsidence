@@ -2147,7 +2147,11 @@ def test_zone003_no_curve_returns_zero_updates(api_client: TestClient, tmp_path:
 # ---------------------------------------------------------------------------
 
 def test_bstrip001_water_depth_shifts_burial_deeper(api_client: TestClient, tmp_path: Path):
-    """Per-zone water_depth_m = 50 shifts all burial depths 50 m deeper than water_depth_m = 0."""
+    """Per-zone water_depth_m = 50 shifts all paleo burial depths 50 m deeper than water_depth_m = 0.
+
+    The present-day anchor (age_ma=0, from actual TVDSS) is excluded — it does not shift
+    with paleobathymetry since it is grounded to the measured well depth.
+    """
     well_id, _ = _create_well_with_zone_subsidence(api_client, tmp_path)
 
     # Base calculation with default water_depth_m = 0
@@ -2167,11 +2171,18 @@ def test_bstrip001_water_depth_shifts_burial_deeper(api_client: TestClient, tmp_
 
     for name in base_results:
         for bp_base, bp_shifted in zip(base_results[name], shifted[name]):
+            if bp_base['age_ma'] == 0:
+                continue  # present-day TVDSS anchor is not affected by paleobathymetry
             assert bp_shifted['depth_m'] == pytest.approx(bp_base['depth_m'] + 50.0, abs=0.1)
 
 
 def test_bstrip001_sea_level_curve_shifts_burial(api_client: TestClient, tmp_path: Path):
-    """Assigning a sea level curve with constant +30 m shifts burial depths by +30 m."""
+    """Sea level curve with constant +30 m shifts paleo burial depths by -30 m (shallower).
+
+    sign convention: sea_level_m > 0 means sea surface was above the modern datum.
+    offset = water_depth - sea_level, so a higher sea level reduces burial depth.
+    Present-day anchors (age_ma=0) are excluded from comparison.
+    """
     well_id, _ = _create_well_with_zone_subsidence(api_client, tmp_path)
 
     resp = api_client.post(f'/api/wells/{well_id}/subsidence')
@@ -2197,7 +2208,9 @@ def test_bstrip001_sea_level_curve_shifts_burial(api_client: TestClient, tmp_pat
 
     for name in base_results:
         for bp_base, bp_shifted in zip(base_results[name], shifted[name]):
-            assert bp_shifted['depth_m'] == pytest.approx(bp_base['depth_m'] + 30.0, abs=0.1)
+            if bp_base['age_ma'] == 0:
+                continue  # present-day TVDSS anchor is not affected by sea level correction
+            assert bp_shifted['depth_m'] == pytest.approx(bp_base['depth_m'] - 30.0, abs=0.1)
 
     # Removing the curve restores original depths
     api_client.put(f'/api/wells/{well_id}/active-sea-level-curve', json={'curve_id': None})
@@ -2206,6 +2219,8 @@ def test_bstrip001_sea_level_curve_shifts_burial(api_client: TestClient, tmp_pat
     restored = {r['formation_name']: r['burial_path'] for r in resp.json()}
     for name in base_results:
         for bp_base, bp_restored in zip(base_results[name], restored[name]):
+            if bp_base['age_ma'] == 0:
+                continue
             assert bp_restored['depth_m'] == pytest.approx(bp_base['depth_m'], abs=0.1)
 
 

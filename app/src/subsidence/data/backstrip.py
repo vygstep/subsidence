@@ -188,7 +188,7 @@ def backstrip(
 
     # Time steps: all formation top ages + 0 (present), oldest first
     time_steps = sorted(
-        {f.age_top_ma for f in valid} | {0.0},
+        {f.age_top_ma for f in valid},
         reverse=True,
     )
 
