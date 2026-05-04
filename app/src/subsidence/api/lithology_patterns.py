@@ -62,6 +62,13 @@ class LithologyPatternImportRequest(BaseModel):
     description: str | None = None
 
 
+class LithologyPatternCreateRequest(BaseModel):
+    code: str
+    display_name: str
+    svg_content: str
+    description: str | None = None
+
+
 def _require_open_project(request: Request):
     manager = request.app.state.project_manager
     if not manager.is_open:
@@ -314,6 +321,38 @@ def delete_lithology_pattern_palette(palette_id: int, request: Request) -> None:
         session.delete(row)
         session.commit()
 
+
+
+@router.post('/lithology-pattern-palettes/{palette_id}/patterns', response_model=LithologyPatternItem, status_code=201)
+def create_lithology_pattern(
+    palette_id: int,
+    payload: LithologyPatternCreateRequest,
+    request: Request,
+) -> LithologyPatternItem:
+    manager = _require_open_project(request)
+    _ensure_pattern_palettes(manager)
+    with manager.get_session() as session:
+        _require_user_palette(session, palette_id)
+        code = _normalize_code(payload.code)
+        _ensure_unique_code(session, code)
+        try:
+            svg_content, tile_width, tile_height = sanitize_svg_content(payload.svg_content)
+        except SvgValidationError as exc:
+            raise HTTPException(status_code=400, detail=str(exc)) from exc
+        row = _create_pattern_row(
+            palette_id=palette_id,
+            code=code,
+            display_name=_normalize_name(payload.display_name, 'Pattern display name'),
+            svg_content=svg_content,
+            tile_width=tile_width,
+            tile_height=tile_height,
+            sort_order=_next_sort_order(session, palette_id),
+            description=payload.description,
+        )
+        session.add(row)
+        session.commit()
+        session.refresh(row)
+        return _pattern_to_item(row)
 
 
 @router.post('/lithology-pattern-palettes/{palette_id}/patterns/import', response_model=LithologyPatternItem, status_code=201)
