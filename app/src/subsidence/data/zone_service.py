@@ -136,20 +136,36 @@ def link_picks_to_horizons(session: Session, well_id: str, top_set_id: int) -> i
     horizons_with_age = [h for h in horizons if h.age_ma is not None]
     youngest_color = min(horizons_with_age, key=lambda h: h.age_ma).color if horizons_with_age else '#9ca3af'
 
+    all_picks = list(session.scalars(
+        select(FormationTopModel).where(FormationTopModel.well_id == well_id)
+    ).all())
+
+    # Phase 1: record horizons claimed by name-match so floor-match cannot steal them.
+    name_claimed_horizon_ids: set[int] = set()
+    for pick in all_picks:
+        h = horizon_by_name.get(_top_name_key(pick.name))
+        if h is not None:
+            name_claimed_horizon_ids.add(h.id)
+
     _log.info('link_picks.start', extra={'event': {
         'operation': 'link_picks_to_horizons', 'phase': 'start',
         'well_id': well_id, 'top_set_id': top_set_id,
         'horizon_count': len(horizons),
+        'name_claimed_count': len(name_claimed_horizon_ids),
         'horizons': [{'name': h.name, 'age_ma': h.age_ma, 'id': h.id} for h in horizons],
     }})
 
     linked = 0
     unmatched = []
     color_log = []
-    for pick in session.scalars(
-        select(FormationTopModel).where(FormationTopModel.well_id == well_id)
-    ).all():
-        matched = horizon_by_name.get(_top_name_key(pick.name)) or _floor_match_horizon(horizons, pick.age_top_ma)
+    for pick in all_picks:
+        name_matched = horizon_by_name.get(_top_name_key(pick.name))
+        if name_matched is not None:
+            matched = name_matched
+        else:
+            floor_matched = _floor_match_horizon(horizons, pick.age_top_ma)
+            # Don't steal a horizon that is already claimed by a name-matched pick.
+            matched = floor_matched if (floor_matched is None or floor_matched.id not in name_claimed_horizon_ids) else None
         new_horizon_id = matched.id if matched else None
         if pick.horizon_id != new_horizon_id:
             pick.horizon_id = new_horizon_id
@@ -157,13 +173,16 @@ def link_picks_to_horizons(session: Session, well_id: str, top_set_id: int) -> i
         old_color = pick.color
         color_updated = False
         if pick.color_source == 'auto':
-            horizon_color = matched.color if matched else youngest_color
-            if horizon_color.lower() in _FALLBACK_COLORS:
-                strat_color = _strat_color_for_age(session, matched.age_ma if matched else pick.age_top_ma)
-                if strat_color:
-                    if matched:
+            if matched is not None:
+                horizon_color = matched.color
+                if horizon_color.lower() in _FALLBACK_COLORS:
+                    strat_color = _strat_color_for_age(session, matched.age_ma)
+                    if strat_color:
                         matched.color = strat_color
-                    horizon_color = strat_color
+                        horizon_color = strat_color
+            else:
+                strat_color = _strat_color_for_age(session, pick.age_top_ma)
+                horizon_color = strat_color if strat_color else youngest_color
             new_color = horizon_color
             pick.color = new_color
             color_updated = old_color != new_color
@@ -174,6 +193,7 @@ def link_picks_to_horizons(session: Session, well_id: str, top_set_id: int) -> i
             'new_color': pick.color,
             'color_updated': color_updated,
             'horizon_matched': matched.name if matched else None,
+            'floor_blocked_by_name_claim': name_matched is None and matched is None and pick.age_top_ma is not None,
         })
         if matched is None:
             unmatched.append({'name': pick.name, 'age_top_ma': pick.age_top_ma, 'depth_md': pick.depth_md})
