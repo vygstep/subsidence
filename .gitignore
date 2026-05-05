@@ -8,3 +8,6 @@ __pycache__/
 
 # Runtime lock files
 *.subsidence.lock
+
+# Log files
+logs/

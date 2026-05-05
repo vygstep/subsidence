@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import logging
 from pathlib import Path
 
 from sqlalchemy import select
@@ -7,6 +8,8 @@ from sqlalchemy.orm import Session
 
 from ..schema import FormationTopModel, TopSetHorizon
 from ..strat_link import auto_link_to_active_chart
+
+_log = logging.getLogger('subsidence.import.tops')
 from .common import (
     DEFAULT_WELL_KB,
     DEFAULT_WELL_NAME,
@@ -108,10 +111,25 @@ def import_tops_csv(
     missing = required.difference(set(fieldnames))
     if missing:
         raise ValueError(f'{path}: missing required columns: {sorted(missing)}')
+
+    _log.info('csv_parsed', extra={'event': {
+        'operation': 'import_tops', 'phase': 'csv_parsed',
+        'path': str(path), 'row_count': len(rows),
+        'columns': fieldnames,
+        'has_age_column': any(c in fieldnames for c in ('age_ma', 'strat_age_ma', 'age')),
+        'top_set_id': top_set_id,
+        'well_id': well_id,
+    }})
+
     well = _resolve_or_create_well_for_tops(session, rows, well_id, create_new_well=create_new_well)
     max_depth = max((_extract_float(row, 'depth_md', 'depth') or 0.0) for row in rows) if rows else None
     if max_depth is not None:
         apply_imported_well_metadata(well, td=max_depth)
+
+    _log.info('well_resolved', extra={'event': {
+        'operation': 'import_tops', 'phase': 'well_resolved',
+        'well_id': well.id, 'well_name': well.name, 'kb_elev': well.kb_elev,
+    }})
 
     ics_units = _load_ics_units(Path(strat_units_path) if strat_units_path else None, Path(strat_ranks_path) if strat_ranks_path else None)
     horizon_by_name: dict[str, TopSetHorizon] = {}
@@ -137,6 +155,20 @@ def import_tops_csv(
             for pick in existing_picks
             if pick.horizon_id is None and _top_name_key(pick.name)
         }
+        _log.info('topset_context', extra={'event': {
+            'operation': 'import_tops', 'phase': 'topset_context',
+            'top_set_id': top_set_id,
+            'existing_horizon_count': len(existing_horizons),
+            'existing_horizon_names': [h.name for h in existing_horizons],
+            'existing_horizon_ages': [h.age_ma for h in existing_horizons],
+            'existing_picks_count': len(existing_picks),
+        }})
+    else:
+        _log.info('topset_context', extra={'event': {
+            'operation': 'import_tops', 'phase': 'topset_context',
+            'top_set_id': None,
+            'note': 'no top_set_id — picks will not be linked to horizons',
+        }})
 
     imported: list[FormationTopModel] = []
     for row_index, row in enumerate(rows):
@@ -184,6 +216,7 @@ def import_tops_csv(
                 age_base_ma=None,
                 confidence=None,
                 color=color,
+                color_source='auto',
                 is_locked=False,
             )
             session.add(top)
@@ -202,10 +235,30 @@ def import_tops_csv(
         top.note = note
         top.qc_status = str(qc['qc_status'])
         top.qc_summary = str(qc['qc_summary']) if qc.get('qc_summary') else None
+        _log.debug('pick_row', extra={'event': {
+            'operation': 'import_tops', 'phase': 'pick_row',
+            'name': top_name, 'depth_md': depth_md, 'age_ma': age_ma,
+            'horizon_id': top.horizon_id,
+            'qc_status': qc['qc_status'],
+        }})
         auto_link_to_active_chart(session, top)
         imported.append(top)
 
     session.flush()
+
+    ages_present = sum(1 for t in imported if t.age_top_ma is not None)
+    ages_null = len(imported) - ages_present
+    _log.info('picks_imported', extra={'event': {
+        'operation': 'import_tops', 'phase': 'picks_imported',
+        'total': len(imported),
+        'with_age': ages_present,
+        'without_age': ages_null,
+        'with_horizon_id': sum(1 for t in imported if t.horizon_id is not None),
+        'without_horizon_id': sum(1 for t in imported if t.horizon_id is None),
+        'names': [t.name for t in imported],
+        'ages': [t.age_top_ma for t in imported],
+        'horizon_ids': [t.horizon_id for t in imported],
+    }})
 
     # Collect QC warning messages
     import json as _json
@@ -214,5 +267,11 @@ def import_tops_csv(
         if top.qc_summary:
             summary = _json.loads(top.qc_summary)
             qc_warnings.extend(summary.get('messages', []))
+
+    if qc_warnings:
+        _log.warning('qc_warnings', extra={'event': {
+            'operation': 'import_tops', 'phase': 'qc_warnings',
+            'warnings': qc_warnings,
+        }})
 
     return imported, qc_warnings
