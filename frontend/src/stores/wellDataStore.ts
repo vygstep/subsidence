@@ -1,4 +1,5 @@
 import { create } from 'zustand'
+import { useNotificationStore } from './notificationStore'
 
 import type {
   CompactionModel,
@@ -68,6 +69,7 @@ interface FormationResponse {
   strat_links: FormationTop['strat_links']
   active_strat_color: string | null
   active_strat_unit_name: string | null
+  warnings?: string[]
 }
 
 interface FormationCreatePayload {
@@ -462,7 +464,11 @@ export const useWellDataStore = create<WellDataStore>((set, get) => ({
       throw new Error(await readError(response, `Failed to update formation '${formationId}' (${response.status})`))
     }
 
-    const updated = mapFormation((await response.json()) as FormationResponse)
+    const data = (await response.json()) as FormationResponse
+    if (data.warnings && data.warnings.length > 0) {
+      useNotificationStore.getState().addQcWarnings(data.warnings)
+    }
+    const updated = mapFormation(data)
     set((state) => ({
       formations: sortFormations(
         state.formations.map((formation) => (

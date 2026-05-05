@@ -94,6 +94,7 @@ class FormationTopResponse(BaseModel):
     strat_links: list[FormationStratLinkResponse]
     active_strat_color: str | None
     active_strat_unit_name: str | None
+    warnings: list[str] = []
 
 
 class StratUnitLookupResponse(BaseModel):
@@ -144,7 +145,7 @@ def _load_formation(session, formation_id: int) -> FormationTopModel | None:
     )
 
 
-def _to_response(row: FormationTopModel) -> FormationTopResponse:
+def _to_response(row: FormationTopModel, warnings: list[str] | None = None) -> FormationTopResponse:
     links = [
         FormationStratLinkResponse(
             chart_id=link.chart_id,
@@ -179,6 +180,7 @@ def _to_response(row: FormationTopModel) -> FormationTopResponse:
         strat_links=links,
         active_strat_color=active_link.strat_unit.color_hex if active_link else None,
         active_strat_unit_name=active_link.strat_unit.name if active_link else None,
+        warnings=warnings or [],
     )
 
 
@@ -295,6 +297,7 @@ def update_formation(well_id: str, formation_id: int, body: FormationTopPatch, r
 
         old_values: dict[str, object] = {}
         new_values: dict[str, object] = {}
+        validation_warnings: list[str] = []
 
         patch_map = {
             'name': ('name', body.name),
@@ -366,6 +369,13 @@ def update_formation(well_id: str, formation_id: int, body: FormationTopPatch, r
                               (below_age is not None and new_age > below_age)
                     if invalid:
                         new_values['age_top_ma'] = None
+                        msg = f'Age {new_age} Ma violates depth order — cleared'
+                        validation_warnings.append(msg)
+                        _log.warning('age_validation_failed', extra={'event': {
+                            'operation': 'update_formation', 'phase': 'age_validation_failed',
+                            'formation_id': formation_id, 'name': row.name,
+                            'new_age': new_age, 'above_age': above_age, 'below_age': below_age,
+                        }})
 
         # age=0: auto-set water_depth_m = TVDSS (depth_md - kb_elev) if not explicitly provided
         if new_values.get('age_top_ma') == 0.0 and 'water_depth_m' not in new_values:
@@ -434,7 +444,7 @@ def update_formation(well_id: str, formation_id: int, body: FormationTopPatch, r
         updated = _load_formation(session, formation_id)
         if updated is None:
             raise HTTPException(status_code=404, detail=f'Formation not found: {formation_id}')
-        return _to_response(updated)
+        return _to_response(updated, warnings=validation_warnings)
 
 
 @router.put('/wells/{well_id}/formations/{formation_id}/strat-link', response_model=FormationTopResponse)
