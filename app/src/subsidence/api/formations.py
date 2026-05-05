@@ -415,13 +415,26 @@ def update_formation(well_id: str, formation_id: int, body: FormationTopPatch, r
         manager.execute_command(UpdateFormation(formation_id, old_values, new_values))
         needs_relink = 'age_top_ma' in new_values
         needs_thickness = 'depth_md' in new_values or needs_relink
-        if needs_thickness or needs_relink:
+        needs_horizon_name_sync = 'name' in new_values
+        if needs_thickness or needs_relink or needs_horizon_name_sync:
             with manager.get_session() as session:
                 top = session.get(FormationTopModel, formation_id)
                 if top is not None:
+                    # Sync horizon name when pick is renamed so the pick stays name-matched.
+                    if needs_horizon_name_sync and top.horizon_id is not None:
+                        horizon = session.get(TopSetHorizon, top.horizon_id)
+                        if horizon is not None and horizon.name != top.name:
+                            old_horizon_name = horizon.name
+                            horizon.name = top.name
+                            session.flush()
+                            _log.info('horizon_name_synced', extra={'event': {
+                                'operation': 'update_formation', 'phase': 'horizon_name_synced',
+                                'formation_id': formation_id, 'new_name': top.name,
+                                'horizon_id': top.horizon_id, 'old_horizon_name': old_horizon_name,
+                            }})
                     top_set_id = get_well_active_top_set_id(session, top.well_id)
                     if top_set_id is not None:
-                        if needs_relink:
+                        if needs_relink or needs_horizon_name_sync:
                             link_picks_to_horizons(session, top.well_id, top_set_id)
                             auto_link_to_active_chart(session, top)
                             if top.horizon_id is not None and top.age_top_ma is not None:

@@ -198,10 +198,26 @@ def link_picks_to_horizons(session: Session, well_id: str, top_set_id: int) -> i
         if matched is None:
             unmatched.append({'name': pick.name, 'age_top_ma': pick.age_top_ma, 'depth_md': pick.depth_md})
 
+    # Delete orphan ghost picks: depth_md=None in all coordinates AND no horizon link.
+    # These were ghost picks for a horizon that no longer needs them (e.g. after rename).
+    orphans_deleted = 0
+    for pick in all_picks:
+        if (
+            pick.depth_md is None and pick.depth_tvd is None and pick.depth_tvdss is None
+            and pick.horizon_id is None
+        ):
+            _log.info('orphan_ghost_deleted', extra={'event': {
+                'operation': 'link_picks_to_horizons', 'phase': 'orphan_ghost_deleted',
+                'well_id': well_id, 'pick_id': pick.id, 'name': pick.name, 'age_top_ma': pick.age_top_ma,
+            }})
+            session.delete(pick)
+            orphans_deleted += 1
+
     _log.info('link_picks.done', extra={'event': {
         'operation': 'link_picks_to_horizons', 'phase': 'done',
         'well_id': well_id, 'top_set_id': top_set_id,
         'linked': linked,
+        'orphans_deleted': orphans_deleted,
         'unmatched_count': len(unmatched),
         'unmatched': unmatched,
         'colors': color_log,
