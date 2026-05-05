@@ -367,6 +367,23 @@ def update_formation(well_id: str, formation_id: int, body: FormationTopPatch, r
                     if invalid:
                         new_values['age_top_ma'] = None
 
+        # age=0: auto-set water_depth_m = TVDSS (depth_md - kb_elev) if not explicitly provided
+        if new_values.get('age_top_ma') == 0.0 and 'water_depth_m' not in new_values:
+            tvdss = row.depth_tvdss
+            effective_depth = new_values.get('depth_md', row.depth_md)
+            if tvdss is None and effective_depth is not None:
+                well_obj = session.get(WellModel, well_id)
+                tvdss = effective_depth - (well_obj.kb_elev or 0.0) if well_obj else None
+            if tvdss is not None:
+                old_values['water_depth_m'] = row.water_depth_m
+                new_values['water_depth_m'] = tvdss
+                _log.info('water_depth_auto_set', extra={'event': {
+                    'operation': 'update_formation', 'phase': 'water_depth_auto_set',
+                    'formation_id': formation_id, 'name': row.name,
+                    'depth_md': effective_depth, 'tvdss': tvdss,
+                    'old_water_depth_m': row.water_depth_m, 'new_water_depth_m': tvdss,
+                }})
+
     if not new_values:
         with manager.get_session() as session:
             existing = _load_formation(session, formation_id)
@@ -397,6 +414,17 @@ def update_formation(well_id: str, formation_id: int, body: FormationTopPatch, r
                         if needs_relink:
                             link_picks_to_horizons(session, top.well_id, top_set_id)
                             auto_link_to_active_chart(session, top)
+                            if top.horizon_id is not None and top.age_top_ma is not None:
+                                horizon = session.get(TopSetHorizon, top.horizon_id)
+                                if horizon is not None and horizon.age_ma != top.age_top_ma:
+                                    old_horizon_age = horizon.age_ma
+                                    horizon.age_ma = top.age_top_ma
+                                    _log.info('horizon_age_synced', extra={'event': {
+                                        'operation': 'update_formation', 'phase': 'horizon_age_synced',
+                                        'formation_id': formation_id, 'name': top.name,
+                                        'horizon_id': top.horizon_id, 'horizon_name': horizon.name,
+                                        'old_age_ma': old_horizon_age, 'new_age_ma': top.age_top_ma,
+                                    }})
                         if needs_thickness:
                             recalculate_zone_thickness(session, top_set_id, top.well_id)
                             aggregate_zone_lithology_from_curve(session, manager.project_path, top.well_id)

@@ -246,6 +246,18 @@ def import_tops_csv(
 
     session.flush()
 
+    water_depth_set: list[dict] = []
+    for top in imported:
+        if top.age_top_ma == 0.0 and top.depth_md is not None:
+            wd = top.depth_md - (well.kb_elev or 0.0)
+            top.water_depth_m = wd
+            water_depth_set.append({'name': top.name, 'depth_md': top.depth_md, 'kb_elev': well.kb_elev, 'water_depth_m': wd})
+    if water_depth_set:
+        _log.info('water_depth_auto_set', extra={'event': {
+            'operation': 'import_tops', 'phase': 'water_depth_auto_set',
+            'picks': water_depth_set,
+        }})
+
     ages_present = sum(1 for t in imported if t.age_top_ma is not None)
     ages_null = len(imported) - ages_present
     _log.info('picks_imported', extra={'event': {
