@@ -2,7 +2,7 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 
 import { useFormationDrag } from '@/hooks'
 import { useViewStore, useWellDataStore, useWorkspaceStore } from '@/stores'
-import { formationDisplayColor, visibleMarkerColor } from '@/types'
+import { formationDisplayColor } from '@/types'
 import type { FormationTop } from '@/types'
 
 interface FormationTopLineProps {
@@ -153,7 +153,7 @@ export function FormationTopLine({
   })
 
   const isUnconformity = formation.kind === 'unconformity'
-  const color = isUnconformity ? '#ef4444' : visibleMarkerColor(formationDisplayColor(formation))
+  const color = isUnconformity ? '#ef4444' : formationDisplayColor(formation)
   const displayY = localY !== null ? localY : yPosition
   const cursor = !editable ? 'default' : formation.is_locked ? 'not-allowed' : isActivePick ? 'crosshair' : 'ns-resize'
   const strokeOpacity = isDragging || isActivePick ? 1.0 : 0.75
@@ -212,7 +212,7 @@ export function FormationTopLine({
                   y={displayY - LABEL_HEIGHT / 2}
                   dominantBaseline="middle"
                   textAnchor="middle"
-                  fill="#ffffff"
+                  fill="#000000"
                   fontSize={11}
                   fontWeight={600}
                   style={{ userSelect: 'none' }}
@@ -238,7 +238,7 @@ export function FormationTopLine({
                   dominantBaseline="middle"
                   textAnchor="end"
                   dx={-4}
-                  fill="#ffffff"
+                  fill="#000000"
                   fontSize={11}
                   fontWeight={600}
                   style={{ userSelect: 'none' }}
@@ -274,7 +274,7 @@ export function FormationTopLine({
                   x={LABEL_PADDING}
                   y={displayY - LABEL_HEIGHT / 2}
                   dominantBaseline="middle"
-                  fill="#ffffff"
+                  fill="#000000"
                   fontSize={11}
                   fontWeight={600}
                   style={{ userSelect: 'none' }}

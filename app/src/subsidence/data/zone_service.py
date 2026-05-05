@@ -1,7 +1,10 @@
 from __future__ import annotations
 
 import json
+import logging
 from pathlib import Path
+
+_log = logging.getLogger('subsidence.zone_service')
 
 import numpy as np
 
@@ -14,12 +17,35 @@ from .schema import (
     CurveMetadata,
     FormationTopModel,
     FormationZone,
+    StratChart,
+    StratUnit,
     TopSet,
     TopSetHorizon,
     WellActiveTopSet,
     WellModel,
     ZoneWellData,
 )
+
+_FALLBACK_COLORS: frozenset[str] = frozenset({'', '#4b5563', '#808080', '#9ca3af', '#90a4ae'})
+
+
+def _strat_color_for_age(session: Session, age_ma: float | None) -> str | None:
+    if age_ma is None:
+        return None
+    chart_id = session.scalar(select(StratChart.id).where(StratChart.is_active.is_(True)))
+    if chart_id is None:
+        return None
+    unit = session.scalar(
+        select(StratUnit)
+        .where(
+            StratUnit.chart_id == chart_id,
+            StratUnit.age_top_ma <= age_ma,
+            StratUnit.age_base_ma >= age_ma,
+        )
+        .order_by((StratUnit.age_base_ma - StratUnit.age_top_ma).asc())
+        .limit(1)
+    )
+    return unit.color_hex if unit and unit.color_hex else None
 
 
 def _top_name_key(name: str | None) -> str:
@@ -94,27 +120,72 @@ def _floor_match_horizon(horizons: list[TopSetHorizon], age_top_ma: float | None
 
 
 def link_picks_to_horizons(session: Session, well_id: str, top_set_id: int) -> int:
-    """Link a well's picks to TopSet horizons by age floor-match."""
+    """Link a well's picks to TopSet horizons.
+
+    Name match takes priority: if a horizon with the same normalised name exists,
+    use it. Fall back to age floor-match only when no name matches.
+    This handles duplicate-age horizons correctly.
+    """
     horizons = list(session.scalars(
         select(TopSetHorizon).where(TopSetHorizon.top_set_id == top_set_id)
     ).all())
     if not horizons:
         return 0
 
+    horizon_by_name = {_top_name_key(h.name): h for h in horizons}
     horizons_with_age = [h for h in horizons if h.age_ma is not None]
     youngest_color = min(horizons_with_age, key=lambda h: h.age_ma).color if horizons_with_age else '#9ca3af'
 
+    _log.info('link_picks.start', extra={'event': {
+        'operation': 'link_picks_to_horizons', 'phase': 'start',
+        'well_id': well_id, 'top_set_id': top_set_id,
+        'horizon_count': len(horizons),
+        'horizons': [{'name': h.name, 'age_ma': h.age_ma, 'id': h.id} for h in horizons],
+    }})
+
     linked = 0
+    unmatched = []
+    color_log = []
     for pick in session.scalars(
         select(FormationTopModel).where(FormationTopModel.well_id == well_id)
     ).all():
-        matched = _floor_match_horizon(horizons, pick.age_top_ma)
+        matched = horizon_by_name.get(_top_name_key(pick.name)) or _floor_match_horizon(horizons, pick.age_top_ma)
         new_horizon_id = matched.id if matched else None
         if pick.horizon_id != new_horizon_id:
             pick.horizon_id = new_horizon_id
             linked += 1
+        old_color = pick.color
+        color_updated = False
         if pick.color_source == 'auto':
-            pick.color = matched.color if matched else youngest_color
+            horizon_color = matched.color if matched else youngest_color
+            if horizon_color.lower() in _FALLBACK_COLORS:
+                strat_color = _strat_color_for_age(session, matched.age_ma if matched else pick.age_top_ma)
+                if strat_color:
+                    if matched:
+                        matched.color = strat_color
+                    horizon_color = strat_color
+            new_color = horizon_color
+            pick.color = new_color
+            color_updated = old_color != new_color
+        color_log.append({
+            'name': pick.name,
+            'color_source': pick.color_source,
+            'old_color': old_color,
+            'new_color': pick.color,
+            'color_updated': color_updated,
+            'horizon_matched': matched.name if matched else None,
+        })
+        if matched is None:
+            unmatched.append({'name': pick.name, 'age_top_ma': pick.age_top_ma, 'depth_md': pick.depth_md})
+
+    _log.info('link_picks.done', extra={'event': {
+        'operation': 'link_picks_to_horizons', 'phase': 'done',
+        'well_id': well_id, 'top_set_id': top_set_id,
+        'linked': linked,
+        'unmatched_count': len(unmatched),
+        'unmatched': unmatched,
+        'colors': color_log,
+    }})
 
     session.flush()
     return linked
@@ -132,8 +203,19 @@ def create_ghost_picks(session: Session, well_id: str, top_set_id: int) -> int:
         select(FormationTopModel).where(FormationTopModel.well_id == well_id)
     ).all()
 
+    real_picks_list = list(real_picks)
+    _log.info('ghost_picks.start', extra={'event': {
+        'operation': 'create_ghost_picks', 'phase': 'start',
+        'well_id': well_id, 'top_set_id': top_set_id,
+        'horizon_count': len(horizons),
+        'real_pick_count': len(real_picks_list),
+        'real_picks': [{'name': p.name, 'age_top_ma': p.age_top_ma, 'horizon_id': p.horizon_id} for p in real_picks_list],
+    }})
+
     covered_ids: set[int] = set()
-    for pick in real_picks:
+    for pick in real_picks_list:
+        if pick.horizon_id is not None:
+            covered_ids.add(pick.horizon_id)
         matched = _floor_match_horizon(horizons, pick.age_top_ma)
         if matched is not None:
             covered_ids.add(matched.id)
@@ -142,6 +224,11 @@ def create_ghost_picks(session: Session, well_id: str, top_set_id: int) -> int:
     for horizon in horizons:
         if horizon.id in covered_ids:
             continue
+        _log.info('ghost_picks.creating', extra={'event': {
+            'operation': 'create_ghost_picks', 'phase': 'creating',
+            'well_id': well_id, 'horizon_name': horizon.name,
+            'horizon_age_ma': horizon.age_ma, 'horizon_id': horizon.id,
+        }})
         session.add(FormationTopModel(
             well_id=well_id,
             horizon_id=horizon.id,
@@ -156,6 +243,13 @@ def create_ghost_picks(session: Session, well_id: str, top_set_id: int) -> int:
             is_locked=False,
         ))
         created += 1
+
+    _log.info('ghost_picks.done', extra={'event': {
+        'operation': 'create_ghost_picks', 'phase': 'done',
+        'well_id': well_id, 'top_set_id': top_set_id,
+        'created': created,
+        'covered_horizon_ids': list(covered_ids),
+    }})
 
     session.flush()
     return created

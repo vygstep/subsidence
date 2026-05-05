@@ -77,19 +77,6 @@ export function formationDisplayColor(f: Pick<FormationTop, 'color' | 'color_sou
   return f.active_strat_color ?? f.color
 }
 
-export function visibleMarkerColor(hex: string): string {
-  if (hex.length < 7 || hex[0] !== '#') return hex
-  const r = parseInt(hex.slice(1, 3), 16)
-  const g = parseInt(hex.slice(3, 5), 16)
-  const b = parseInt(hex.slice(5, 7), 16)
-  if ((r + g + b) / 3 > 210) {
-    const dr = Math.round(r * 0.35).toString(16).padStart(2, '0')
-    const dg = Math.round(g * 0.35).toString(16).padStart(2, '0')
-    const db = Math.round(b * 0.35).toString(16).padStart(2, '0')
-    return `#${dr}${dg}${db}`
-  }
-  return hex
-}
 
 export interface FormationInventoryItem {
   id: string

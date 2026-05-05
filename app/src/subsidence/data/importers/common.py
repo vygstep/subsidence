@@ -276,7 +276,7 @@ def _load_ics_units(units_path: Path | None = None, ranks_path: Path | None = No
                 'rank_order': rank_order.get(rank_id, 999),
                 'start_age_ma': start_age,
                 'end_age_ma': end_age,
-                'interval_width': start_age - end_age,
+                'interval_width': end_age - start_age,
                 'standard_sort': int(row['standard_sort']) if (row.get('standard_sort') or '').strip() else 0,
                 'color_hex': color_hex,
             }
@@ -289,7 +289,7 @@ def _resolve_ics_color(age_ma: float | None, units: list[dict[str, object]]) -> 
         return None
     matches = [
         unit for unit in units
-        if float(unit['end_age_ma']) <= age_ma <= float(unit['start_age_ma'])
+        if float(unit['start_age_ma']) <= age_ma <= float(unit['end_age_ma'])
     ]
     if not matches:
         return None

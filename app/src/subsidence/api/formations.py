@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import logging
+
 from fastapi import APIRouter, HTTPException, Request
 from pydantic import BaseModel
 from sqlalchemy import select
@@ -26,6 +28,8 @@ from subsidence.data.zone_service import (
 )
 
 router = APIRouter(tags=['formations'])
+
+_log = logging.getLogger('subsidence.api.formations')
 
 
 class FormationTopCreate(BaseModel):
@@ -212,7 +216,23 @@ def list_formations(well_id: str, request: Request) -> list[FormationTopResponse
             .order_by(FormationTopModel.depth_md.asc(), FormationTopModel.id.asc())
             .options(*_load_options())
         ).all()
-        return [_to_response(row) for row in rows]
+        responses = [_to_response(row) for row in rows]
+        _log.info('list_formations.response', extra={'event': {
+            'operation': 'list_formations',
+            'well_id': well_id,
+            'count': len(responses),
+            'picks': [
+                {
+                    'name': r.name,
+                    'color': r.color,
+                    'color_source': r.color_source,
+                    'active_strat_color': r.active_strat_color,
+                    'horizon_id': r.horizon_id,
+                }
+                for r in responses
+            ],
+        }})
+        return responses
 
 
 @router.post('/wells/{well_id}/formations', response_model=FormationTopResponse, status_code=201)
@@ -376,6 +396,7 @@ def update_formation(well_id: str, formation_id: int, body: FormationTopPatch, r
                     if top_set_id is not None:
                         if needs_relink:
                             link_picks_to_horizons(session, top.well_id, top_set_id)
+                            auto_link_to_active_chart(session, top)
                         if needs_thickness:
                             recalculate_zone_thickness(session, top_set_id, top.well_id)
                             aggregate_zone_lithology_from_curve(session, manager.project_path, top.well_id)
