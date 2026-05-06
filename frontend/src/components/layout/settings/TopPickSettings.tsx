@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react'
 
-import { useWellDataStore } from '@/stores'
+import { useNotificationStore, useWellDataStore } from '@/stores'
 import { formationDisplayColor } from '@/types'
 import type { FormationTop, SeaLevelPoint } from '@/types'
 
@@ -40,10 +40,12 @@ interface TopPickSettingsProps {
 
 export function TopPickSettings({ selectedFormation, onFormationUpdate, onFormationMove }: TopPickSettingsProps) {
   const wellId = useWellDataStore((state) => state.well?.well_id)
+  const wellTdMd = useWellDataStore((state) => state.well?.td_md ?? null)
   const wellInventories = useWellDataStore((state) => state.wellInventories)
   const loadSeaLevelPoints = useWellDataStore((state) => state.loadSeaLevelPoints)
   const seaLevelCurves = useWellDataStore((state) => state.seaLevelCurves)
   const formations = useWellDataStore((state) => state.formations)
+  const addQcWarnings = useNotificationStore((state) => state.addQcWarnings)
 
   const activeCurveId = wellInventories.find((w) => w.well_id === wellId)?.active_sea_level_curve_id ?? null
   const activeCurveName = seaLevelCurves.find((c) => c.id === activeCurveId)?.name ?? null
@@ -177,6 +179,13 @@ export function TopPickSettings({ selectedFormation, onFormationUpdate, onFormat
           onBlur={() => {
             const parsed = Number(draftDepthMd)
             if (draftDepthMd !== '' && !isNaN(parsed)) {
+              if (wellTdMd !== null && (parsed < 0 || parsed > wellTdMd)) {
+                addQcWarnings([
+                  `Top depth ${parsed.toFixed(1)} m is outside well interval 0.0-${wellTdMd.toFixed(1)} m; change was ignored.`,
+                ])
+                setDraftDepthMd(selectedFormation.depth_md != null ? String(selectedFormation.depth_md) : '')
+                return
+              }
               onFormationMove(selectedFormation.id, parsed)
             } else {
               setDraftDepthMd(selectedFormation.depth_md != null ? String(selectedFormation.depth_md) : '')

@@ -1,6 +1,6 @@
 import { useRef, useState } from 'react'
 
-import { useComputedStore, useViewStore, useWellDataStore } from '@/stores'
+import { useComputedStore, useNotificationStore, useViewStore, useWellDataStore } from '@/stores'
 import { formationDisplayColor } from '@/types'
 import type { FormationTop } from '@/types'
 
@@ -9,7 +9,9 @@ export function FormationTopsList() {
   const addFormation = useWellDataStore((s) => s.addFormation)
   const updateFormation = useWellDataStore((s) => s.updateFormation)
   const removeFormation = useWellDataStore((s) => s.removeFormation)
+  const wellTdMd = useWellDataStore((s) => s.well?.td_md ?? null)
   const triggerRecalculation = useComputedStore((s) => s.triggerRecalculation)
+  const addQcWarnings = useNotificationStore((s) => s.addQcWarnings)
 
   const cursorDepth = useViewStore((s) => s.cursorDepth)
   const visibleDepthRange = useViewStore((s) => s.visibleDepthRange)
@@ -26,9 +28,22 @@ export function FormationTopsList() {
 
   const midDepth = (visibleDepthRange.min + visibleDepthRange.max) / 2
   const halfViewport = (visibleDepthRange.max - visibleDepthRange.min) / 2
+  const warnInvalidDepth = (depth: number) => {
+    const td = wellTdMd ?? 0
+    addQcWarnings([
+      `Top depth ${depth.toFixed(1)} m is outside well interval 0.0-${td.toFixed(1)} m; change was ignored.`,
+    ])
+  }
+  const isInsideWellMd = (depth: number): boolean => (
+    wellTdMd !== null && depth >= 0 && depth <= wellTdMd
+  )
 
   function handleAdd() {
     const depth = cursorDepth ?? midDepth
+    if (!isInsideWellMd(depth)) {
+      warnInvalidDepth(depth)
+      return
+    }
     void addFormation({ name: 'New formation', depth_md: depth, color: '#808080' })
   }
 
@@ -62,6 +77,11 @@ export function FormationTopsList() {
     return f.depth_md
   }
 
+  function savedDisplayDepth(formation: FormationTop): string {
+    const depth = getDisplayDepth(formation)
+    return depth != null ? String(depth.toFixed(2)) : ''
+  }
+
   function startDepthEdit(e: React.MouseEvent, f: FormationTop) {
     e.stopPropagation()
     setEditingDepthId(f.id)
@@ -74,6 +94,12 @@ export function FormationTopsList() {
     if (!isNaN(val)) {
       const field =
         depthType === 'TVD' ? 'depth_tvd' : depthType === 'TVDSS' ? 'depth_tvdss' : 'depth_md'
+      if (field === 'depth_md' && !isInsideWellMd(val)) {
+        warnInvalidDepth(val)
+        setDraftDepth(savedDisplayDepth(f))
+        setEditingDepthId(null)
+        return
+      }
       void updateFormation(f.id, { [field]: val })
     }
     setEditingDepthId(null)
