@@ -40,7 +40,7 @@ export function drawFormationFills(
     for (const pt of upper) ctx.lineTo(timeToX(pt.age_ma), depthToY(pt.depth_m))
     for (const pt of lower) ctx.lineTo(timeToX(pt.age_ma), depthToY(pt.depth_m))
     ctx.closePath()
-    ctx.fillStyle = curves[i].color + '4d'
+    ctx.fillStyle = curves[i + 1].color + '4d'
     ctx.fill()
   }
 }
