@@ -113,6 +113,26 @@ def get_sea_level_points(curve_id: int, request: Request) -> list[SeaLevelPointR
 
 
 
+@router.delete('/sea-level-curves/{curve_id}', status_code=204)
+def delete_sea_level_curve(curve_id: int, request: Request) -> None:
+    manager = _require_open_project(request)
+    with manager.get_session() as session:
+        curve = session.get(SeaLevelCurve, curve_id)
+        if curve is None:
+            raise HTTPException(status_code=404, detail=f'Sea level curve not found: {curve_id}')
+        if curve.is_builtin:
+            raise HTTPException(status_code=409, detail='Built-in sea level curves cannot be deleted')
+        in_use = session.scalar(
+            select(WellActiveSeaLevelCurve).where(WellActiveSeaLevelCurve.curve_id == curve_id)
+        )
+        if in_use is not None:
+            raise HTTPException(status_code=409, detail='Sea level curve is currently assigned to a well')
+        for pt in session.scalars(select(SeaLevelPoint).where(SeaLevelPoint.curve_id == curve_id)).all():
+            session.delete(pt)
+        session.delete(curve)
+        session.commit()
+
+
 @router.put('/wells/{well_id}/active-sea-level-curve')
 def set_well_active_sea_level_curve(well_id: str, body: ActiveSeaLevelCurveRequest, request: Request) -> dict[str, object]:
     manager = _require_open_project(request)

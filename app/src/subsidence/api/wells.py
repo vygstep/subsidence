@@ -51,6 +51,8 @@ class FormationInventoryItem(BaseModel):
     depth_tvdss: float | None = None
     horizon_id: int | None = None
     active_strat_color: str | None = None
+    color: str = '#9ca3af'
+    color_source: str = 'auto'
     kind: str = 'strat'
 
 
@@ -400,6 +402,8 @@ def list_well_inventories(request: Request) -> list[WellInventoryResponse]:
                             active_strat_color=(
                                 _active_link(row).strat_unit.color_hex if _active_link(row) else None
                             ),
+                            color=row.color,
+                            color_source=row.color_source,
                             kind=row.kind,
                         )
                         for row in formation_rows

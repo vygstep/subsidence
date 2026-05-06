@@ -263,8 +263,8 @@ def _load_ics_units(units_path: Path | None = None, ranks_path: Path | None = No
     _, unit_rows = _read_csv_rows(resolved_units)
     units: list[dict[str, object]] = []
     for row in unit_rows:
-        start_age = _extract_float(row, 'start_age_ma')
         end_age = _extract_float(row, 'end_age_ma')
+        start_age = _extract_float(row, 'start_age_ma')
         rank_id = int(row['rank_id']) if (row.get('rank_id') or '').strip() else 0
         color_hex = _extract_text(row, 'html_rgb_hash')
         if start_age is None or end_age is None or color_hex is None:

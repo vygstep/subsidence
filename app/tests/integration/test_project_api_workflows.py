@@ -491,8 +491,8 @@ def test_tops_deviation_and_strat_chart_workflows(api_client: TestClient, tmp_pa
     chart_csv = tmp_path / 'custom_chart.csv'
     chart_csv.write_text(
         'unit_id,parent_unit_id,unit_name,rank_name,start_age_ma,end_age_ma,html_rgb_hash\n'
-        '1,,System A,system,0,50,#123456\n'
-        '2,1,Stage A,stage,0,25,#abcdef\n',
+        '1,,System A,system,50,0,#123456\n'
+        '2,1,Stage A,stage,25,0,#abcdef\n',
         encoding='utf-8',
     )
     response = api_client.post('/api/strat-charts/import', json={'csv_path': str(chart_csv)})
@@ -1419,16 +1419,16 @@ def test_tops_import_can_attach_to_existing_zone_set_by_top_names(api_client: Te
     response = api_client.post('/api/top-sets', json={'name': 'Regional ZoneSet'})
     assert response.status_code == 201, response.text
     top_set_id = response.json()['id']
-    for name in ['H1', 'H2', 'H3']:
-        response = api_client.post(f'/api/top-sets/{top_set_id}/horizons', json={'name': name})
+    for name, age in [('H1', 10.0), ('H2', 20.0), ('H3', 30.0)]:
+        response = api_client.post(f'/api/top-sets/{top_set_id}/horizons', json={'name': name, 'age_ma': age})
         assert response.status_code == 201, response.text
 
     csv_path = tmp_path / 'tops_existing_zone_set.csv'
     csv_path.write_text(
-        'well_name,top_name,depth_md\n'
-        'Existing ZoneSet Well,H1,100\n'
-        'Existing ZoneSet Well,H2,250\n'
-        'Existing ZoneSet Well,HX,300\n',
+        'well_name,top_name,depth_md,strat_age_ma\n'
+        'Existing ZoneSet Well,H1,100,10\n'
+        'Existing ZoneSet Well,H2,250,20\n'
+        'Existing ZoneSet Well,HX,300,25\n',
         encoding='utf-8',
     )
 
@@ -1659,21 +1659,21 @@ def _create_well_with_top_set(client, tmp_path: Path):
     assert resp.status_code == 200, resp.text
     well_id = resp.json()['well_id']
 
-    # Create 4 picks with known depths
-    pick_depths = {'H1': 100.0, 'H2': 300.0, 'H3': 600.0, 'H4': 900.0}
-    for name, depth in pick_depths.items():
+    # Create 4 picks with known depths and ages (deeper = older = larger Ma)
+    picks = [('H1', 100.0, 10.0), ('H2', 300.0, 20.0), ('H3', 600.0, 30.0), ('H4', 900.0, 40.0)]
+    for name, depth, age in picks:
         resp = client.post(f'/api/wells/{well_id}/formations', json={
-            'name': name, 'depth_md': depth, 'color': '#aaaaaa',
+            'name': name, 'depth_md': depth, 'color': '#aaaaaa', 'age_ma': age,
         })
         assert resp.status_code == 201, resp.text
 
-    # Create TopSet with 4 horizons
+    # Create TopSet with 4 horizons with matching ages
     resp = client.post('/api/top-sets', json={'name': 'Main Set'})
     assert resp.status_code == 201, resp.text
     top_set_id = resp.json()['id']
 
-    for name in ['H1', 'H2', 'H3', 'H4']:
-        resp = client.post(f'/api/top-sets/{top_set_id}/horizons', json={'name': name})
+    for name, age in [('H1', 10.0), ('H2', 20.0), ('H3', 30.0), ('H4', 40.0)]:
+        resp = client.post(f'/api/top-sets/{top_set_id}/horizons', json={'name': name, 'age_ma': age})
         assert resp.status_code == 201, resp.text
 
     # Link well to TopSet
@@ -2147,7 +2147,11 @@ def test_zone003_no_curve_returns_zero_updates(api_client: TestClient, tmp_path:
 # ---------------------------------------------------------------------------
 
 def test_bstrip001_water_depth_shifts_burial_deeper(api_client: TestClient, tmp_path: Path):
-    """Per-zone water_depth_m = 50 shifts all burial depths 50 m deeper than water_depth_m = 0."""
+    """Per-zone water_depth_m = 50 shifts all paleo burial depths 50 m deeper than water_depth_m = 0.
+
+    The present-day anchor (age_ma=0, from actual TVDSS) is excluded — it does not shift
+    with paleobathymetry since it is grounded to the measured well depth.
+    """
     well_id, _ = _create_well_with_zone_subsidence(api_client, tmp_path)
 
     # Base calculation with default water_depth_m = 0
@@ -2167,11 +2171,18 @@ def test_bstrip001_water_depth_shifts_burial_deeper(api_client: TestClient, tmp_
 
     for name in base_results:
         for bp_base, bp_shifted in zip(base_results[name], shifted[name]):
+            if bp_base['age_ma'] == 0:
+                continue  # present-day TVDSS anchor is not affected by paleobathymetry
             assert bp_shifted['depth_m'] == pytest.approx(bp_base['depth_m'] + 50.0, abs=0.1)
 
 
 def test_bstrip001_sea_level_curve_shifts_burial(api_client: TestClient, tmp_path: Path):
-    """Assigning a sea level curve with constant +30 m shifts burial depths by +30 m."""
+    """Sea level curve with constant +30 m shifts paleo burial depths by -30 m (shallower).
+
+    sign convention: sea_level_m > 0 means sea surface was above the modern datum.
+    offset = water_depth - sea_level, so a higher sea level reduces burial depth.
+    Present-day anchors (age_ma=0) are excluded from comparison.
+    """
     well_id, _ = _create_well_with_zone_subsidence(api_client, tmp_path)
 
     resp = api_client.post(f'/api/wells/{well_id}/subsidence')
@@ -2197,7 +2208,9 @@ def test_bstrip001_sea_level_curve_shifts_burial(api_client: TestClient, tmp_pat
 
     for name in base_results:
         for bp_base, bp_shifted in zip(base_results[name], shifted[name]):
-            assert bp_shifted['depth_m'] == pytest.approx(bp_base['depth_m'] + 30.0, abs=0.1)
+            if bp_base['age_ma'] == 0:
+                continue  # present-day TVDSS anchor is not affected by sea level correction
+            assert bp_shifted['depth_m'] == pytest.approx(bp_base['depth_m'] - 30.0, abs=0.1)
 
     # Removing the curve restores original depths
     api_client.put(f'/api/wells/{well_id}/active-sea-level-curve', json={'curve_id': None})
@@ -2206,6 +2219,8 @@ def test_bstrip001_sea_level_curve_shifts_burial(api_client: TestClient, tmp_pat
     restored = {r['formation_name']: r['burial_path'] for r in resp.json()}
     for name in base_results:
         for bp_base, bp_restored in zip(base_results[name], restored[name]):
+            if bp_base['age_ma'] == 0:
+                continue
             assert bp_restored['depth_m'] == pytest.approx(bp_base['depth_m'], abs=0.1)
 
 

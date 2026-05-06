@@ -1,5 +1,5 @@
 ﻿well_name,top_name,depth_md,strat_age_ma,boundary_type
-PLESHET 01,Q,12.24,0.01,unconformity
+PLESHET 01,Q,12.24,0,unconformity
 PLESHET 01,N1_B.GUVRIN,62,16,unconformity
 PLESHET 01,Pg2_MARESHA,133,37,conformable
 PLESHET 01,Pg2_ADULAM,193,49,conformable

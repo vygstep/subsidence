@@ -1,4 +1,5 @@
 import { create } from 'zustand'
+import { useNotificationStore } from './notificationStore'
 
 import type {
   CompactionModel,
@@ -52,10 +53,13 @@ interface FormationResponse {
   depth_tvd: number | null
   depth_tvdss: number | null
   horizon_id: number | null
+  horizon_name?: string | null
+  horizon_color?: string | null
   age_ma?: number
   age_base_ma?: number | null
   hiatus_duration_ma?: number
   color: string
+  color_source?: string
   kind: string
   is_locked: boolean
   water_depth_m: number
@@ -65,6 +69,7 @@ interface FormationResponse {
   strat_links: FormationTop['strat_links']
   active_strat_color: string | null
   active_strat_unit_name: string | null
+  warnings?: string[]
 }
 
 interface FormationCreatePayload {
@@ -83,6 +88,8 @@ interface FormationPatchPayload {
   depth_tvd?: number
   depth_tvdss?: number
   color?: string
+  color_source?: string
+  reset_color?: boolean
   kind?: string
   lithology?: FormationTop['lithology']
   age_ma?: number
@@ -246,10 +253,13 @@ function mapFormation(row: FormationResponse): FormationTop {
     depth_tvd: row.depth_tvd ?? null,
     depth_tvdss: row.depth_tvdss ?? null,
     horizon_id: row.horizon_id ?? null,
+    horizon_name: row.horizon_name ?? null,
+    horizon_color: row.horizon_color ?? null,
     age_ma: row.age_ma,
     age_base_ma: row.age_base_ma ?? null,
     hiatus_duration_ma: row.hiatus_duration_ma ?? 0,
     color: row.color,
+    color_source: row.color_source ?? 'auto',
     kind: row.kind,
     is_locked: row.is_locked,
     water_depth_m: row.water_depth_m ?? 0,
@@ -454,7 +464,11 @@ export const useWellDataStore = create<WellDataStore>((set, get) => ({
       throw new Error(await readError(response, `Failed to update formation '${formationId}' (${response.status})`))
     }
 
-    const updated = mapFormation((await response.json()) as FormationResponse)
+    const data = (await response.json()) as FormationResponse
+    if (data.warnings && data.warnings.length > 0) {
+      useNotificationStore.getState().addQcWarnings(data.warnings)
+    }
+    const updated = mapFormation(data)
     set((state) => ({
       formations: sortFormations(
         state.formations.map((formation) => (

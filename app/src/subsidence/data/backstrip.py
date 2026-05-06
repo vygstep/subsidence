@@ -188,11 +188,11 @@ def backstrip(
 
     # Time steps: all formation top ages + 0 (present), oldest first
     time_steps = sorted(
-        {f.age_top_ma for f in valid} | {0.0},
+        {f.age_top_ma for f in valid},
         reverse=True,
     )
 
-    # Track burial path for each formation
+    # Track burial path for each formation + one extra for the base of the deepest zone
     results = [
         SubsidenceResult(
             formation_name=f.name,
@@ -201,6 +201,10 @@ def backstrip(
         )
         for f in valid
     ]
+    deepest = valid[0]
+    arrow_idx = deepest.name.find('→')
+    base_name = deepest.name[arrow_idx + 1:].strip() if arrow_idx != -1 else deepest.name
+    base_result = SubsidenceResult(formation_name=base_name, color=deepest.color, lithology=deepest.lithology)
 
     for t_ma in time_steps:
         # Active formations at this time step (already deposited)
@@ -232,6 +236,10 @@ def backstrip(
         for i in active_indices:
             results[i].burial_path.append(BurialPoint(age_ma=t_ma, depth_m=paleo_tops[i] + offset))
 
+        # z_top is now the base of the deepest active formation
+        if 0 in active_indices:
+            base_result.burial_path.append(BurialPoint(age_ma=t_ma, depth_m=z_top + offset))
+
     # Append present-time (age_ma=0) anchor from actual TVDSS well data.
     # This grounds each burial curve at its real measured depth, independent of
     # the paleobathymetry-based offset that governs the rest of the history.
@@ -239,8 +247,13 @@ def backstrip(
         if f.current_top_tvdss is not None:
             results[i].burial_path.append(BurialPoint(age_ma=0, depth_m=f.current_top_tvdss))
 
+    if deepest.current_top_tvdss is not None:
+        base_tvdss = deepest.current_top_tvdss + (deepest.current_base_m - deepest.current_top_m)
+        base_result.burial_path.append(BurialPoint(age_ma=0, depth_m=base_tvdss))
+
     # Sort burial paths chronologically (oldest → present)
     for r in results:
         r.burial_path.sort(key=lambda p: p.age_ma, reverse=True)
+    base_result.burial_path.sort(key=lambda p: p.age_ma, reverse=True)
 
-    return results
+    return results + [base_result]

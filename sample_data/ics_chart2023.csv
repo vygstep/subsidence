@@ -1,4 +1,4 @@
-unit_id,parent_unit_id,unit_name,strat_index,rank_id,rank_name,start_age_ma,end_age_ma,start_age_err_ma,font_color,cmyk,cyan,magenta,yellow,black,rgb,red,green,blue,html_rgb_hash,standard_sort
+﻿unit_id,parent_unit_id,unit_name,strat_index,rank_id,rank_name,end_age_ma,start_age_ma,start_age_err_ma,font_color,cmyk,cyan,magenta,yellow,black,rgb,red,green,blue,html_rgb_hash,standard_sort
 194,92,Meghalayan,Q2m,8,Stage,0,0.0042,,Black,0/10/5/0,0,10,5,0,253/237/236,253,237,236,#FDEDEC,1
 92,81,Upper/Late Holocene,Q2-3,7,Subseries,0,0.0042,,Black,0/10/5/0,0,10,5,0,253/237/236,253,237,236,#FDEDEC,2
 193,91,Northgrippian,Q2n,8,Stage,0.0042,0.0082,,Black,0/10/10/0,0,10,10,0,253/236/228,253,236,228,#FDECE4,3

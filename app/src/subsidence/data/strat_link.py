@@ -41,20 +41,9 @@ def find_strat_unit_by_age(session: Session, age_ma: float | None, chart_id: int
     )
 
 
-def _link_exists(session: Session, formation_id: int, chart_id: int) -> bool:
-    return session.scalar(
-        select(FormationStratLink.id).where(
-            FormationStratLink.formation_id == formation_id,
-            FormationStratLink.chart_id == chart_id,
-        )
-    ) is not None
-
-
 def auto_link_formation_to_chart(session: Session, formation: FormationTopModel, chart: StratChart) -> bool:
     if formation.id is None:
         session.flush()
-    if _link_exists(session, formation.id, chart.id):
-        return False
 
     unit = find_strat_unit_by_name(session, formation.name, chart.id)
     if unit is None and formation.age_top_ma is not None:
@@ -62,11 +51,23 @@ def auto_link_formation_to_chart(session: Session, formation: FormationTopModel,
     if unit is None:
         return False
 
-    session.add(FormationStratLink(
-        formation_id=formation.id,
-        strat_unit_id=unit.id,
-        chart_id=chart.id,
-    ))
+    existing = session.scalar(
+        select(FormationStratLink).where(
+            FormationStratLink.formation_id == formation.id,
+            FormationStratLink.chart_id == chart.id,
+        )
+    )
+    if existing is not None:
+        if existing.strat_unit_id == unit.id:
+            return False
+        existing.strat_unit_id = unit.id
+    else:
+        session.add(FormationStratLink(
+            formation_id=formation.id,
+            strat_unit_id=unit.id,
+            chart_id=chart.id,
+        ))
+
     current_color = (formation.color or '').strip().lower()
     if current_color in _FALLBACK_COLORS and unit.color_hex:
         formation.color = unit.color_hex

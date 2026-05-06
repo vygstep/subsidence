@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import logging
+
 from fastapi import APIRouter, HTTPException, Request
 from pydantic import BaseModel
 from sqlalchemy import select
@@ -15,11 +17,20 @@ from subsidence.data import (
 )
 from subsidence.data.deviation_transform import compute_tvd_tvdss, tvd_to_md
 from subsidence.data.undo import _model_to_dict
-from subsidence.data.schema import FormationStratLink, FormationTopModel, StratChart, StratUnit, WellModel
+from subsidence.data.schema import FormationStratLink, FormationTopModel, StratChart, StratUnit, TopSetHorizon, WellModel
 from subsidence.data.strat_link import auto_link_to_active_chart, find_strat_unit_by_name
-from subsidence.data.zone_service import aggregate_zone_lithology_from_curve, get_well_active_top_set_id, recalculate_zone_thickness
+from subsidence.data.zone_service import (
+    _floor_match_horizon,
+    aggregate_zone_lithology_from_curve,
+    ensure_zone_well_data,
+    get_well_active_top_set_id,
+    link_picks_to_horizons,
+    recalculate_zone_thickness,
+)
 
 router = APIRouter(tags=['formations'])
+
+_log = logging.getLogger('subsidence.api.formations')
 
 
 class FormationTopCreate(BaseModel):
@@ -50,6 +61,7 @@ class FormationTopPatch(BaseModel):
     water_depth_m: float | None = None
     eroded_thickness_m: float | None = None
     sea_level_m_override: float | None = None
+    reset_color: bool = False
 
 
 class FormationStratLinkResponse(BaseModel):
@@ -67,7 +79,10 @@ class FormationTopResponse(BaseModel):
     depth_tvd: float | None
     depth_tvdss: float | None
     horizon_id: int | None
+    horizon_name: str | None
+    horizon_color: str | None
     color: str
+    color_source: str
     kind: str
     lithology: str | None
     age_ma: float | None
@@ -80,6 +95,7 @@ class FormationTopResponse(BaseModel):
     strat_links: list[FormationStratLinkResponse]
     active_strat_color: str | None
     active_strat_unit_name: str | None
+    warnings: list[str] = []
 
 
 class StratUnitLookupResponse(BaseModel):
@@ -117,7 +133,8 @@ def _load_options():
         selectinload(FormationTopModel.strat_links).options(
             selectinload(FormationStratLink.strat_unit),
             selectinload(FormationStratLink.chart),
-        )
+        ),
+        selectinload(FormationTopModel.horizon),
     ]
 
 
@@ -129,7 +146,7 @@ def _load_formation(session, formation_id: int) -> FormationTopModel | None:
     )
 
 
-def _to_response(row: FormationTopModel) -> FormationTopResponse:
+def _to_response(row: FormationTopModel, warnings: list[str] | None = None) -> FormationTopResponse:
     links = [
         FormationStratLinkResponse(
             chart_id=link.chart_id,
@@ -148,7 +165,10 @@ def _to_response(row: FormationTopModel) -> FormationTopResponse:
         depth_tvd=row.depth_tvd,
         depth_tvdss=row.depth_tvdss,
         horizon_id=row.horizon_id,
+        horizon_name=row.horizon.name if row.horizon else None,
+        horizon_color=row.horizon.color if row.horizon else None,
         color=row.color,
+        color_source=row.color_source,
         kind=row.kind,
         lithology=row.lithology,
         age_ma=row.age_top_ma,
@@ -161,6 +181,7 @@ def _to_response(row: FormationTopModel) -> FormationTopResponse:
         strat_links=links,
         active_strat_color=active_link.strat_unit.color_hex if active_link else None,
         active_strat_unit_name=active_link.strat_unit.name if active_link else None,
+        warnings=warnings or [],
     )
 
 
@@ -198,7 +219,23 @@ def list_formations(well_id: str, request: Request) -> list[FormationTopResponse
             .order_by(FormationTopModel.depth_md.asc(), FormationTopModel.id.asc())
             .options(*_load_options())
         ).all()
-        return [_to_response(row) for row in rows]
+        responses = [_to_response(row) for row in rows]
+        _log.info('list_formations.response', extra={'event': {
+            'operation': 'list_formations',
+            'well_id': well_id,
+            'count': len(responses),
+            'picks': [
+                {
+                    'name': r.name,
+                    'color': r.color,
+                    'color_source': r.color_source,
+                    'active_strat_color': r.active_strat_color,
+                    'horizon_id': r.horizon_id,
+                }
+                for r in responses
+            ],
+        }})
+        return responses
 
 
 @router.post('/wells/{well_id}/formations', response_model=FormationTopResponse, status_code=201)
@@ -261,6 +298,7 @@ def update_formation(well_id: str, formation_id: int, body: FormationTopPatch, r
 
         old_values: dict[str, object] = {}
         new_values: dict[str, object] = {}
+        validation_warnings: list[str] = []
 
         patch_map = {
             'name': ('name', body.name),
@@ -292,6 +330,71 @@ def update_formation(well_id: str, formation_id: int, body: FormationTopPatch, r
                 old_values['sea_level_m_override'] = current
                 new_values['sea_level_m_override'] = next_val
 
+        # color → mark as user-overridden
+        if 'color' in new_values:
+            old_values['color_source'] = row.color_source
+            new_values['color_source'] = 'user'
+
+        # reset_color: compute from linked horizon or use grey, mark auto
+        if body.reset_color:
+            horizons = list(session.scalars(
+                select(TopSetHorizon).where(
+                    TopSetHorizon.top_set_id == (
+                        select(TopSetHorizon.top_set_id)
+                        .where(TopSetHorizon.id == row.horizon_id)
+                        .scalar_subquery()
+                    )
+                )
+            ).all()) if row.horizon_id else []
+            matched = _floor_match_horizon(horizons, row.age_top_ma) if horizons else None
+            reset_color_val = matched.color if matched else (row.horizon.color if row.horizon else '#9ca3af')
+            old_values['color'] = row.color
+            new_values['color'] = reset_color_val
+            old_values['color_source'] = row.color_source
+            new_values['color_source'] = 'auto'
+
+        # age_top_ma: validate depth-order constraint
+        if 'age_top_ma' in new_values:
+            new_age = new_values['age_top_ma']
+            if new_age is not None:
+                ordered = session.scalars(
+                    select(FormationTopModel)
+                    .where(FormationTopModel.well_id == well_id)
+                    .order_by(FormationTopModel.depth_md.asc().nulls_last(), FormationTopModel.id.asc())
+                ).all()
+                idx = next((i for i, p in enumerate(ordered) if p.id == formation_id), None)
+                if idx is not None:
+                    above_age = next((p.age_top_ma for p in reversed(ordered[:idx]) if p.age_top_ma is not None), None)
+                    below_age = next((p.age_top_ma for p in ordered[idx + 1:] if p.age_top_ma is not None), None)
+                    invalid = (above_age is not None and new_age < above_age) or \
+                              (below_age is not None and new_age > below_age)
+                    if invalid:
+                        new_values['age_top_ma'] = None
+                        msg = f'Age {new_age} Ma violates depth order — cleared'
+                        validation_warnings.append(msg)
+                        _log.warning('age_validation_failed', extra={'event': {
+                            'operation': 'update_formation', 'phase': 'age_validation_failed',
+                            'formation_id': formation_id, 'name': row.name,
+                            'new_age': new_age, 'above_age': above_age, 'below_age': below_age,
+                        }})
+
+        # age=0: auto-set water_depth_m = TVDSS (depth_md - kb_elev) if not explicitly provided
+        if new_values.get('age_top_ma') == 0.0 and 'water_depth_m' not in new_values:
+            tvdss = row.depth_tvdss
+            effective_depth = new_values.get('depth_md', row.depth_md)
+            if tvdss is None and effective_depth is not None:
+                well_obj = session.get(WellModel, well_id)
+                tvdss = effective_depth - (well_obj.kb_elev or 0.0) if well_obj else None
+            if tvdss is not None:
+                old_values['water_depth_m'] = row.water_depth_m
+                new_values['water_depth_m'] = tvdss
+                _log.info('water_depth_auto_set', extra={'event': {
+                    'operation': 'update_formation', 'phase': 'water_depth_auto_set',
+                    'formation_id': formation_id, 'name': row.name,
+                    'depth_md': effective_depth, 'tvdss': tvdss,
+                    'old_water_depth_m': row.water_depth_m, 'new_water_depth_m': tvdss,
+                }})
+
     if not new_values:
         with manager.get_session() as session:
             existing = _load_formation(session, formation_id)
@@ -311,21 +414,52 @@ def update_formation(well_id: str, formation_id: int, body: FormationTopPatch, r
         ))
     else:
         manager.execute_command(UpdateFormation(formation_id, old_values, new_values))
-        if 'depth_md' in new_values:
+        needs_relink = 'age_top_ma' in new_values
+        needs_thickness = 'depth_md' in new_values or needs_relink
+        needs_horizon_name_sync = 'name' in new_values
+        if needs_thickness or needs_relink or needs_horizon_name_sync:
             with manager.get_session() as session:
                 top = session.get(FormationTopModel, formation_id)
                 if top is not None:
+                    # Sync horizon name when pick is renamed so the pick stays name-matched.
+                    if needs_horizon_name_sync and top.horizon_id is not None:
+                        horizon = session.get(TopSetHorizon, top.horizon_id)
+                        if horizon is not None and horizon.name != top.name:
+                            old_horizon_name = horizon.name
+                            horizon.name = top.name
+                            session.flush()
+                            _log.info('horizon_name_synced', extra={'event': {
+                                'operation': 'update_formation', 'phase': 'horizon_name_synced',
+                                'formation_id': formation_id, 'new_name': top.name,
+                                'horizon_id': top.horizon_id, 'old_horizon_name': old_horizon_name,
+                            }})
                     top_set_id = get_well_active_top_set_id(session, top.well_id)
                     if top_set_id is not None:
-                        recalculate_zone_thickness(session, top_set_id, top.well_id)
-                        aggregate_zone_lithology_from_curve(session, manager.project_path, top.well_id)
+                        if needs_relink or needs_horizon_name_sync:
+                            link_picks_to_horizons(session, top.well_id, top_set_id)
+                            auto_link_to_active_chart(session, top)
+                            if top.horizon_id is not None and top.age_top_ma is not None:
+                                horizon = session.get(TopSetHorizon, top.horizon_id)
+                                if horizon is not None and horizon.age_ma != top.age_top_ma:
+                                    old_horizon_age = horizon.age_ma
+                                    horizon.age_ma = top.age_top_ma
+                                    _log.info('horizon_age_synced', extra={'event': {
+                                        'operation': 'update_formation', 'phase': 'horizon_age_synced',
+                                        'formation_id': formation_id, 'name': top.name,
+                                        'horizon_id': top.horizon_id, 'horizon_name': horizon.name,
+                                        'old_age_ma': old_horizon_age, 'new_age_ma': top.age_top_ma,
+                                    }})
+                        if needs_thickness:
+                            ensure_zone_well_data(session, top_set_id, top.well_id)
+                            recalculate_zone_thickness(session, top_set_id, top.well_id)
+                            aggregate_zone_lithology_from_curve(session, manager.project_path, top.well_id)
                         session.commit()
 
     with manager.get_session() as session:
         updated = _load_formation(session, formation_id)
         if updated is None:
             raise HTTPException(status_code=404, detail=f'Formation not found: {formation_id}')
-        return _to_response(updated)
+        return _to_response(updated, warnings=validation_warnings)
 
 
 @router.put('/wells/{well_id}/formations/{formation_id}/strat-link', response_model=FormationTopResponse)

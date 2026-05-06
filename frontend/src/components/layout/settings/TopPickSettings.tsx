@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from 'react'
 
 import { useWellDataStore } from '@/stores'
+import { formationDisplayColor } from '@/types'
 import type { FormationTop, SeaLevelPoint } from '@/types'
 
 function interpolateSeaLevel(points: SeaLevelPoint[], ageMa: number): number | null {
@@ -27,6 +28,8 @@ interface TopPickSettingsProps {
       hiatus_duration_ma?: number
       kind?: string
       color?: string
+      color_source?: string
+      reset_color?: boolean
       water_depth_m?: number
       eroded_thickness_m?: number
       sea_level_m_override?: number | null
@@ -40,6 +43,7 @@ export function TopPickSettings({ selectedFormation, onFormationUpdate, onFormat
   const wellInventories = useWellDataStore((state) => state.wellInventories)
   const loadSeaLevelPoints = useWellDataStore((state) => state.loadSeaLevelPoints)
   const seaLevelCurves = useWellDataStore((state) => state.seaLevelCurves)
+  const formations = useWellDataStore((state) => state.formations)
 
   const activeCurveId = wellInventories.find((w) => w.well_id === wellId)?.active_sea_level_curve_id ?? null
   const activeCurveName = seaLevelCurves.find((c) => c.id === activeCurveId)?.name ?? null
@@ -80,14 +84,65 @@ export function TopPickSettings({ selectedFormation, onFormationUpdate, onFormat
     )
   }, [selectedFormation.id, selectedFormation.sea_level_m_override, seaLevelAtAge])
 
-  const depositionalElevation = effectiveSeaLevel != null
-    ? effectiveSeaLevel - selectedFormation.water_depth_m
-    : null
+  const [draftName, setDraftName] = useState<string>(() => selectedFormation.name)
+  useEffect(() => {
+    setDraftName(selectedFormation.name)
+  }, [selectedFormation.id, selectedFormation.name])
+
+  const [draftDepthMd, setDraftDepthMd] = useState<string>(
+    () => selectedFormation.depth_md != null ? String(selectedFormation.depth_md) : '',
+  )
+  useEffect(() => {
+    setDraftDepthMd(selectedFormation.depth_md != null ? String(selectedFormation.depth_md) : '')
+  }, [selectedFormation.id, selectedFormation.depth_md])
+
+  const [draftAgeMa, setDraftAgeMa] = useState<string>(
+    () => selectedFormation.age_ma != null ? String(selectedFormation.age_ma) : '',
+  )
+  useEffect(() => {
+    setDraftAgeMa(selectedFormation.age_ma != null ? String(selectedFormation.age_ma) : '')
+  }, [selectedFormation.id, selectedFormation.age_ma])
+
+  const [draftHiatus, setDraftHiatus] = useState<string>(
+    () => String(selectedFormation.hiatus_duration_ma),
+  )
+  useEffect(() => {
+    setDraftHiatus(String(selectedFormation.hiatus_duration_ma))
+  }, [selectedFormation.id, selectedFormation.hiatus_duration_ma])
+
+  const [draftErodedThickness, setDraftErodedThickness] = useState<string>(
+    () => String(selectedFormation.eroded_thickness_m),
+  )
+  useEffect(() => {
+    setDraftErodedThickness(String(selectedFormation.eroded_thickness_m))
+  }, [selectedFormation.id, selectedFormation.eroded_thickness_m])
+
+  const [draftWaterDepth, setDraftWaterDepth] = useState<string>(
+    () => String(selectedFormation.water_depth_m),
+  )
+  useEffect(() => {
+    setDraftWaterDepth(String(selectedFormation.water_depth_m))
+  }, [selectedFormation.id, selectedFormation.water_depth_m])
+
+  const depositionalElevation = (effectiveSeaLevel ?? 0) - selectedFormation.water_depth_m
 
   const isUnconformity = selectedFormation.kind === 'unconformity'
   const depositionResumedMa = selectedFormation.age_ma != null
     ? selectedFormation.age_ma - selectedFormation.hiatus_duration_ma
     : null
+
+  // Neighbor age bounds for clamping the age input
+  const { minAgeMa, maxAgeMa } = useMemo(() => {
+    const sorted = [...formations].sort((a, b) => (a.depth_md ?? Infinity) - (b.depth_md ?? Infinity))
+    const idx = sorted.findIndex((f) => f.id === selectedFormation.id)
+    const aboveAge = idx > 0
+      ? sorted.slice(0, idx).reverse().find((f) => f.age_ma != null)?.age_ma
+      : undefined
+    const belowAge = idx >= 0 && idx < sorted.length - 1
+      ? sorted.slice(idx + 1).find((f) => f.age_ma != null)?.age_ma
+      : undefined
+    return { minAgeMa: aboveAge, maxAgeMa: belowAge }
+  }, [formations, selectedFormation.id])
 
   return (
     <div className="template-panel">
@@ -98,8 +153,17 @@ export function TopPickSettings({ selectedFormation, onFormationUpdate, onFormat
       <div className="sf-row">
         <span>Name</span>
         <input
-          value={selectedFormation.name}
-          onChange={(event) => void onFormationUpdate(selectedFormation.id, { name: event.target.value })}
+          value={draftName}
+          onChange={(e) => setDraftName(e.target.value)}
+          onKeyDown={(e) => { if (e.key === 'Enter') e.currentTarget.blur() }}
+          onBlur={() => {
+            const trimmed = draftName.trim()
+            if (trimmed && trimmed !== selectedFormation.name) {
+              void onFormationUpdate(selectedFormation.id, { name: trimmed })
+            } else {
+              setDraftName(selectedFormation.name)
+            }
+          }}
         />
       </div>
       <div className="sf-row">
@@ -107,8 +171,17 @@ export function TopPickSettings({ selectedFormation, onFormationUpdate, onFormat
         <input
           type="number"
           step="0.1"
-          value={selectedFormation.depth_md ?? ''}
-          onChange={(event) => onFormationMove(selectedFormation.id, Number(event.target.value))}
+          value={draftDepthMd}
+          onChange={(e) => setDraftDepthMd(e.target.value)}
+          onKeyDown={(e) => { if (e.key === 'Enter') e.currentTarget.blur() }}
+          onBlur={() => {
+            const parsed = Number(draftDepthMd)
+            if (draftDepthMd !== '' && !isNaN(parsed)) {
+              onFormationMove(selectedFormation.id, parsed)
+            } else {
+              setDraftDepthMd(selectedFormation.depth_md != null ? String(selectedFormation.depth_md) : '')
+            }
+          }}
         />
       </div>
       <div className="sf-row">
@@ -126,19 +199,40 @@ export function TopPickSettings({ selectedFormation, onFormationUpdate, onFormat
         <input
           type="color"
           className="sf-swatch"
-          value={selectedFormation.color}
-          onChange={(event) => void onFormationUpdate(selectedFormation.id, { color: event.target.value })}
+          value={formationDisplayColor(selectedFormation)}
+          onChange={(event) => void onFormationUpdate(selectedFormation.id, {
+            color: event.target.value,
+            color_source: 'user',
+          })}
         />
+        {selectedFormation.color_source === 'user' && (
+          <button
+            className="sf-btn-inline"
+            title="Reset to horizon color"
+            onClick={() => void onFormationUpdate(selectedFormation.id, { reset_color: true })}
+          >
+            Reset
+          </button>
+        )}
       </div>
       <div className="sf-row">
         <span>{isUnconformity ? 'Top age (Ma)' : 'Age (Ma)'}</span>
         <input
           type="number"
           step="0.01"
-          value={selectedFormation.age_ma ?? ''}
-          onChange={(event) => void onFormationUpdate(selectedFormation.id, {
-            age_ma: event.target.value ? Number(event.target.value) : undefined,
-          })}
+          min={minAgeMa}
+          max={maxAgeMa}
+          value={draftAgeMa}
+          onChange={(e) => setDraftAgeMa(e.target.value)}
+          onKeyDown={(e) => { if (e.key === 'Enter') e.currentTarget.blur() }}
+          onBlur={() => {
+            const parsed = Number(draftAgeMa)
+            if (draftAgeMa !== '' && !isNaN(parsed)) {
+              void onFormationUpdate(selectedFormation.id, { age_ma: parsed })
+            } else {
+              setDraftAgeMa(selectedFormation.age_ma != null ? String(selectedFormation.age_ma) : '')
+            }
+          }}
         />
       </div>
       {isUnconformity && (
@@ -147,10 +241,17 @@ export function TopPickSettings({ selectedFormation, onFormationUpdate, onFormat
           <input
             type="number"
             step="0.01"
-            value={selectedFormation.hiatus_duration_ma}
-            onChange={(event) => void onFormationUpdate(selectedFormation.id, {
-              hiatus_duration_ma: event.target.value ? Number(event.target.value) : 0,
-            })}
+            value={draftHiatus}
+            onChange={(e) => setDraftHiatus(e.target.value)}
+            onKeyDown={(e) => { if (e.key === 'Enter') e.currentTarget.blur() }}
+            onBlur={() => {
+              const parsed = Number(draftHiatus)
+              if (draftHiatus !== '' && !isNaN(parsed)) {
+                void onFormationUpdate(selectedFormation.id, { hiatus_duration_ma: parsed })
+              } else {
+                setDraftHiatus(String(selectedFormation.hiatus_duration_ma))
+              }
+            }}
           />
         </div>
       )}
@@ -171,6 +272,7 @@ export function TopPickSettings({ selectedFormation, onFormationUpdate, onFormat
               step="0.1"
               value={draftSeaLevel}
               onChange={(e) => setDraftSeaLevel(e.target.value)}
+              onKeyDown={(e) => { if (e.key === 'Enter') e.currentTarget.blur() }}
               onBlur={() => {
                 if (draftSeaLevel !== '') {
                   void onFormationUpdate(selectedFormation.id, { sea_level_m_override: Number(draftSeaLevel) })
@@ -200,8 +302,17 @@ export function TopPickSettings({ selectedFormation, onFormationUpdate, onFormat
         <input
           type="number"
           step="1"
-          value={selectedFormation.water_depth_m}
-          onChange={(event) => void onFormationUpdate(selectedFormation.id, { water_depth_m: Number(event.target.value) })}
+          value={draftWaterDepth}
+          onChange={(e) => setDraftWaterDepth(e.target.value)}
+          onKeyDown={(e) => { if (e.key === 'Enter') e.currentTarget.blur() }}
+          onBlur={() => {
+            const parsed = Number(draftWaterDepth)
+            if (draftWaterDepth !== '' && !isNaN(parsed)) {
+              void onFormationUpdate(selectedFormation.id, { water_depth_m: parsed })
+            } else {
+              setDraftWaterDepth(String(selectedFormation.water_depth_m))
+            }
+          }}
         />
       </div>
       {isUnconformity && (
@@ -211,14 +322,23 @@ export function TopPickSettings({ selectedFormation, onFormationUpdate, onFormat
             type="number"
             min="0"
             step="1"
-            value={selectedFormation.eroded_thickness_m}
-            onChange={(event) => void onFormationUpdate(selectedFormation.id, { eroded_thickness_m: Number(event.target.value) })}
+            value={draftErodedThickness}
+            onChange={(e) => setDraftErodedThickness(e.target.value)}
+            onKeyDown={(e) => { if (e.key === 'Enter') e.currentTarget.blur() }}
+            onBlur={() => {
+              const parsed = Number(draftErodedThickness)
+              if (draftErodedThickness !== '' && !isNaN(parsed)) {
+                void onFormationUpdate(selectedFormation.id, { eroded_thickness_m: parsed })
+              } else {
+                setDraftErodedThickness(String(selectedFormation.eroded_thickness_m))
+              }
+            }}
           />
         </div>
       )}
       <div className="tree-leaf">
         <span>Linked unit</span>
-        <span>{selectedFormation.active_strat_unit_name ?? 'Unlinked'}</span>
+        <span>{selectedFormation.horizon_name ?? '—'}</span>
       </div>
     </div>
   )

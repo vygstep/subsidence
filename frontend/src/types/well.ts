@@ -54,10 +54,13 @@ export interface FormationTop {
   depth_tvd: number | null
   depth_tvdss: number | null
   horizon_id: number | null
+  horizon_name: string | null
+  horizon_color: string | null
   age_ma?: number
   age_base_ma?: number | null
   hiatus_duration_ma: number
   color: string
+  color_source: string
   kind: string
   is_locked: boolean
   water_depth_m: number
@@ -69,6 +72,12 @@ export interface FormationTop {
   active_strat_unit_name: string | null
 }
 
+export function formationDisplayColor(f: Pick<FormationTop, 'color' | 'color_source' | 'active_strat_color'>): string {
+  if (f.color_source === 'user') return f.color
+  return f.active_strat_color ?? f.color
+}
+
+
 export interface FormationInventoryItem {
   id: string
   name: string
@@ -77,6 +86,8 @@ export interface FormationInventoryItem {
   depth_tvdss: number | null
   horizon_id: number | null
   active_strat_color: string | null
+  color: string
+  color_source: string
   kind: string
 }
 

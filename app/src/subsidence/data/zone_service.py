@@ -1,7 +1,10 @@
 from __future__ import annotations
 
 import json
+import logging
 from pathlib import Path
+
+_log = logging.getLogger('subsidence.zone_service')
 
 import numpy as np
 
@@ -14,12 +17,35 @@ from .schema import (
     CurveMetadata,
     FormationTopModel,
     FormationZone,
+    StratChart,
+    StratUnit,
     TopSet,
     TopSetHorizon,
     WellActiveTopSet,
     WellModel,
     ZoneWellData,
 )
+
+_FALLBACK_COLORS: frozenset[str] = frozenset({'', '#4b5563', '#808080', '#9ca3af', '#90a4ae'})
+
+
+def _strat_color_for_age(session: Session, age_ma: float | None) -> str | None:
+    if age_ma is None:
+        return None
+    chart_id = session.scalar(select(StratChart.id).where(StratChart.is_active.is_(True)))
+    if chart_id is None:
+        return None
+    unit = session.scalar(
+        select(StratUnit)
+        .where(
+            StratUnit.chart_id == chart_id,
+            StratUnit.age_top_ma <= age_ma,
+            StratUnit.age_base_ma >= age_ma,
+        )
+        .order_by((StratUnit.age_base_ma - StratUnit.age_top_ma).asc())
+        .limit(1)
+    )
+    return unit.color_hex if unit and unit.color_hex else None
 
 
 def _top_name_key(name: str | None) -> str:
@@ -80,44 +106,182 @@ def extract_horizons_from_well_picks(
     return created
 
 
+def _floor_match_horizon(horizons: list[TopSetHorizon], age_top_ma: float | None) -> TopSetHorizon | None:
+    """Return horizon with max age_ma <= age_top_ma (floor-match), or None."""
+    if age_top_ma is None:
+        return None
+    matched: TopSetHorizon | None = None
+    for h in sorted(horizons, key=lambda h: h.age_ma if h.age_ma is not None else -1):
+        if h.age_ma is not None and h.age_ma <= age_top_ma:
+            matched = h
+        elif h.age_ma is not None and h.age_ma > age_top_ma:
+            break
+    return matched
+
+
 def link_picks_to_horizons(session: Session, well_id: str, top_set_id: int) -> int:
-    """Link a well's picks to TopSet horizons by normalized marker name."""
-    horizons = session.scalars(
+    """Link a well's picks to TopSet horizons.
+
+    Name match takes priority: if a horizon with the same normalised name exists,
+    use it. Fall back to age floor-match only when no name matches.
+    This handles duplicate-age horizons correctly.
+    """
+    horizons = list(session.scalars(
         select(TopSetHorizon).where(TopSetHorizon.top_set_id == top_set_id)
-    ).all()
-    horizon_by_name = {_top_name_key(h.name): h for h in horizons}
-    if not horizon_by_name:
+    ).all())
+    if not horizons:
         return 0
 
-    linked = 0
-    for pick in session.scalars(
+    horizon_by_name = {_top_name_key(h.name): h for h in horizons}
+    horizons_with_age = [h for h in horizons if h.age_ma is not None]
+    youngest_color = min(horizons_with_age, key=lambda h: h.age_ma).color if horizons_with_age else '#9ca3af'
+
+    all_picks = list(session.scalars(
         select(FormationTopModel).where(FormationTopModel.well_id == well_id)
-    ).all():
-        horizon = horizon_by_name.get(_top_name_key(pick.name))
-        if horizon is not None and pick.horizon_id != horizon.id:
-            pick.horizon_id = horizon.id
+    ).all())
+
+    # Phase 1: record horizons claimed by name-match so floor-match cannot steal them.
+    name_claimed_horizon_ids: set[int] = set()
+    for pick in all_picks:
+        h = horizon_by_name.get(_top_name_key(pick.name))
+        if h is not None:
+            name_claimed_horizon_ids.add(h.id)
+
+    _log.info('link_picks.start', extra={'event': {
+        'operation': 'link_picks_to_horizons', 'phase': 'start',
+        'well_id': well_id, 'top_set_id': top_set_id,
+        'horizon_count': len(horizons),
+        'name_claimed_count': len(name_claimed_horizon_ids),
+        'horizons': [{'name': h.name, 'age_ma': h.age_ma, 'id': h.id} for h in horizons],
+    }})
+
+    linked = 0
+    unmatched = []
+    color_log = []
+    for pick in all_picks:
+        name_matched = horizon_by_name.get(_top_name_key(pick.name))
+        if name_matched is not None:
+            matched = name_matched
+        else:
+            floor_matched = _floor_match_horizon(horizons, pick.age_top_ma)
+            # Don't steal a horizon that is already claimed by a name-matched pick.
+            matched = floor_matched if (floor_matched is None or floor_matched.id not in name_claimed_horizon_ids) else None
+        new_horizon_id = matched.id if matched else None
+        if pick.horizon_id != new_horizon_id:
+            pick.horizon_id = new_horizon_id
             linked += 1
+        old_color = pick.color
+        color_updated = False
+        if pick.color_source == 'auto':
+            if matched is not None:
+                strat_color = (
+                    _strat_color_for_age(session, pick.age_top_ma)
+                    or _strat_color_for_age(session, matched.age_ma)
+                )
+                if strat_color:
+                    matched.color = strat_color
+                    horizon_color = strat_color
+                else:
+                    horizon_color = matched.color
+            else:
+                strat_color = _strat_color_for_age(session, pick.age_top_ma)
+                horizon_color = strat_color if strat_color else youngest_color
+            pick.color = horizon_color
+            color_updated = old_color != horizon_color
+        color_log.append({
+            'name': pick.name,
+            'color_source': pick.color_source,
+            'old_color': old_color,
+            'new_color': pick.color,
+            'color_updated': color_updated,
+            'horizon_matched': matched.name if matched else None,
+            'floor_blocked_by_name_claim': name_matched is None and matched is None and pick.age_top_ma is not None,
+        })
+        if matched is None:
+            unmatched.append({'name': pick.name, 'age_top_ma': pick.age_top_ma, 'depth_md': pick.depth_md})
+
+    # Horizons that now have at least one pick with real depth data.
+    horizons_with_real_depth: set[int] = {
+        pick.horizon_id
+        for pick in all_picks
+        if pick.horizon_id is not None and (
+            pick.depth_md is not None or pick.depth_tvd is not None or pick.depth_tvdss is not None
+        )
+    }
+
+    # Delete ghost picks (all depths None) that are either orphaned (no horizon) or
+    # shadowed (horizon already covered by a real pick).
+    orphans_deleted = 0
+    for pick in all_picks:
+        is_ghost = pick.depth_md is None and pick.depth_tvd is None and pick.depth_tvdss is None
+        if not is_ghost:
+            continue
+        if pick.horizon_id is None:
+            phase = 'orphan_ghost_deleted'
+        elif pick.horizon_id in horizons_with_real_depth:
+            phase = 'shadowed_ghost_deleted'
+        else:
+            continue
+        _log.info(phase, extra={'event': {
+            'operation': 'link_picks_to_horizons', 'phase': phase,
+            'well_id': well_id, 'pick_id': pick.id, 'name': pick.name, 'age_top_ma': pick.age_top_ma,
+            'horizon_id': pick.horizon_id,
+        }})
+        session.delete(pick)
+        orphans_deleted += 1
+
+    _log.info('link_picks.done', extra={'event': {
+        'operation': 'link_picks_to_horizons', 'phase': 'done',
+        'well_id': well_id, 'top_set_id': top_set_id,
+        'linked': linked,
+        'orphans_deleted': orphans_deleted,
+        'unmatched_count': len(unmatched),
+        'unmatched': unmatched,
+        'colors': color_log,
+    }})
 
     session.flush()
     return linked
 
 
 def create_ghost_picks(session: Session, well_id: str, top_set_id: int) -> int:
-    """Create unset picks for TopSet horizons that are absent in a linked well."""
-    horizons = session.scalars(
+    """Create unset picks for TopSet horizons not covered by any age-matched pick."""
+    horizons = list(session.scalars(
         select(TopSetHorizon).where(TopSetHorizon.top_set_id == top_set_id)
+    ).all())
+    if not horizons:
+        return 0
+
+    real_picks = session.scalars(
+        select(FormationTopModel).where(FormationTopModel.well_id == well_id)
     ).all()
-    existing_names = {
-        _top_name_key(pick.name)
-        for pick in session.scalars(
-            select(FormationTopModel).where(FormationTopModel.well_id == well_id)
-        ).all()
-    }
+
+    real_picks_list = list(real_picks)
+    _log.info('ghost_picks.start', extra={'event': {
+        'operation': 'create_ghost_picks', 'phase': 'start',
+        'well_id': well_id, 'top_set_id': top_set_id,
+        'horizon_count': len(horizons),
+        'real_pick_count': len(real_picks_list),
+        'real_picks': [{'name': p.name, 'age_top_ma': p.age_top_ma, 'horizon_id': p.horizon_id} for p in real_picks_list],
+    }})
+
+    covered_ids: set[int] = set()
+    for pick in real_picks_list:
+        if pick.horizon_id is not None:
+            covered_ids.add(pick.horizon_id)
+        matched = _floor_match_horizon(horizons, pick.age_top_ma)
+        if matched is not None:
+            covered_ids.add(matched.id)
 
     created = 0
     for horizon in horizons:
-        if _top_name_key(horizon.name) in existing_names:
+        if horizon.id in covered_ids:
             continue
+        _log.info('ghost_picks.creating', extra={'event': {
+            'operation': 'create_ghost_picks', 'phase': 'creating',
+            'well_id': well_id, 'horizon_name': horizon.name,
+            'horizon_age_ma': horizon.age_ma, 'horizon_id': horizon.id,
+        }})
         session.add(FormationTopModel(
             well_id=well_id,
             horizon_id=horizon.id,
@@ -127,10 +291,18 @@ def create_ghost_picks(session: Session, well_id: str, top_set_id: int) -> int:
             depth_tvd=None,
             depth_tvdss=None,
             color=horizon.color,
+            color_source='auto',
             age_top_ma=horizon.age_ma,
             is_locked=False,
         ))
         created += 1
+
+    _log.info('ghost_picks.done', extra={'event': {
+        'operation': 'create_ghost_picks', 'phase': 'done',
+        'well_id': well_id, 'top_set_id': top_set_id,
+        'created': created,
+        'covered_horizon_ids': list(covered_ids),
+    }})
 
     session.flush()
     return created
@@ -392,16 +564,19 @@ def build_zone_layer_inputs(
         return []
 
     horizon_ids = {z.upper_horizon_id for z in zones} | {z.lower_horizon_id for z in zones}
-    picks_by_horizon: dict[int, FormationTopModel] = {
-        pick.horizon_id: pick
-        for pick in session.scalars(
-            select(FormationTopModel).where(
-                FormationTopModel.well_id == well_id,
-                FormationTopModel.horizon_id.in_(horizon_ids),
-            )
-        ).all()
-        if pick.horizon_id is not None
-    }
+    picks_by_horizon: dict[int, FormationTopModel] = {}
+    for pick in session.scalars(
+        select(FormationTopModel).where(
+            FormationTopModel.well_id == well_id,
+            FormationTopModel.horizon_id.in_(horizon_ids),
+        )
+    ).all():
+        if pick.horizon_id is None:
+            continue
+        existing = picks_by_horizon.get(pick.horizon_id)
+        # Prefer pick with real depth over ghost (depth=None).
+        if existing is None or (existing.depth_md is None and pick.depth_md is not None):
+            picks_by_horizon[pick.horizon_id] = pick
 
     zwd_by_zone: dict[int, ZoneWellData] = {
         row.zone_id: row
@@ -413,7 +588,19 @@ def build_zone_layer_inputs(
         ).all()
     }
 
+    _log.info('build_zone_layer_inputs.start', extra={'event': {
+        'operation': 'build_zone_layer_inputs',
+        'well_id': well_id,
+        'zone_count': len(zones),
+        'picks_by_horizon_count': len(picks_by_horizon),
+        'picks_by_horizon': {
+            hid: {'name': p.name, 'depth_md': p.depth_md, 'age_top_ma': p.age_top_ma}
+            for hid, p in picks_by_horizon.items()
+        },
+    }})
+
     result: list[ZoneLayerInput] = []
+    skipped: list[dict] = []
     for zone in zones:
         upper = zone.upper_horizon
         lower = zone.lower_horizon
@@ -424,6 +611,13 @@ def build_zone_layer_inputs(
             upper_pick is None or lower_pick is None
             or upper_pick.depth_md is None or lower_pick.depth_md is None
         ):
+            skipped.append({
+                'zone': f'{upper.name} → {lower.name}',
+                'upper_pick': upper_pick.name if upper_pick else None,
+                'upper_depth': upper_pick.depth_md if upper_pick else None,
+                'lower_pick': lower_pick.name if lower_pick else None,
+                'lower_depth': lower_pick.depth_md if lower_pick else None,
+            })
             continue
 
         zwd = zwd_by_zone.get(zone.id)
@@ -457,6 +651,15 @@ def build_zone_layer_inputs(
             eroded_thickness_m=upper_pick.eroded_thickness_m,
             current_top_tvdss=top_tvdss,
         ))
+
+    _log.info('build_zone_layer_inputs.done', extra={'event': {
+        'operation': 'build_zone_layer_inputs',
+        'well_id': well_id,
+        'included': len(result),
+        'skipped': len(skipped),
+        'skipped_zones': skipped,
+        'included_zones': [r.name for r in result],
+    }})
 
     return result
 

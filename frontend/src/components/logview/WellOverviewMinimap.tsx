@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef } from 'react'
 
 import { useViewStore, useWellDataStore } from '@/stores'
+import { formationDisplayColor } from '@/types'
 import type { CurveData } from '@/types'
 
 const WIDTH = 24
@@ -89,7 +90,7 @@ export function WellOverviewMinimap({ height, curves }: WellOverviewMinimapProps
       if (f.depth_md === null) continue
       const y = depthToY(f.depth_md)
       ctx.beginPath()
-      ctx.strokeStyle = f.active_strat_color ?? f.color
+      ctx.strokeStyle = formationDisplayColor(f)
       ctx.lineWidth = 0.75
       ctx.moveTo(0, y)
       ctx.lineTo(WIDTH, y)
