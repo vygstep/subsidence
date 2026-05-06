@@ -48,6 +48,30 @@ Interaction behavior:
 - In edit-tops mode, clicks with `depth < wellTopDepth` or `depth > wellBottomDepth` should not create or move a top.
 - The active-pick ghost line should not advertise a valid placement inside the padding zones.
 
+## Invalid Top Depth UX
+
+When a user enters a top depth outside the editable well interval `[0, well.td_md]`:
+
+- Do not send the invalid change to the backend.
+- Do not optimistically move the top.
+- Restore the input to the previous saved value.
+- Add a QC warning through `useNotificationStore.addQcWarnings`.
+- Suggested warning text:
+  `Top depth 8000.0 m is outside well interval 0.0-6000.0 m; change was ignored.`
+
+This applies to:
+
+- `TopPickSettings` depth input.
+- `FormationTopsList` inline depth edit.
+- `FormationTopsList` add action when the cursor or viewport midpoint is outside `[0, well.td_md]`.
+
+Backend validation is still required as the source of truth:
+
+- Reject `POST /wells/{well_id}/formations` when `depth_md` is outside `[0, well.td_md]`.
+- Reject `PATCH /wells/{well_id}/formations/{formation_id}` when the resolved MD is outside `[0, well.td_md]`.
+- The PATCH rule applies to direct `depth_md` and to `depth_tvd` / `depth_tvdss` after conversion to MD.
+- Existing invalid historical tops may still be loaded and shown, but new writes must not create more invalid tops.
+
 ## Additional Fit Behavior
 
 Current behavior:
@@ -110,6 +134,9 @@ Files:
 - `frontend/src/components/logview/DataTrack.tsx`
 - `frontend/src/components/logview/FormationColumn.tsx`
 - `frontend/src/components/interaction/InteractionOverlay.tsx`
+- `frontend/src/components/layout/settings/TopPickSettings.tsx`
+- `frontend/src/components/layout/FormationTopsList.tsx`
+- `app/src/subsidence/api/formations.py`
 
 Pass or use the same well extent for:
 
@@ -136,3 +163,6 @@ Checks:
 - The `-100..0` and `TD..TD+100` intervals are grey.
 - Track grid and data are not visible inside grey padding zones.
 - Edit-tops clicks in grey padding do not place or move tops.
+- Entering a settings top depth below `0` or above `TD` shows a QC warning and leaves the previous saved depth unchanged.
+- Inline top-list depth edits below `0` or above `TD` show a QC warning and leave the previous saved depth unchanged.
+- Backend formation create/update rejects out-of-well MD values.
