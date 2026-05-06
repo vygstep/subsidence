@@ -18,6 +18,8 @@ interface InteractionOverlayProps {
   mouseClient: { x: number; y: number } | null
   tooltipVisible: boolean
   topsEditable: boolean
+  wellTopDepth: number
+  wellBottomDepth: number
 }
 
 export function InteractionOverlay({
@@ -30,6 +32,8 @@ export function InteractionOverlay({
   mouseClient,
   tooltipVisible,
   topsEditable,
+  wellTopDepth,
+  wellBottomDepth,
 }: InteractionOverlayProps) {
   const activePickId = useViewStore((state) => state.activePickId)
   const selectedFormationId = useWorkspaceStore((state) => state.selectedFormationId)
@@ -41,6 +45,7 @@ export function InteractionOverlay({
   const notPickedFormations = formations.filter((f) => f.depth_md === null)
   const activePick = effectiveActivePickId === null ? null : formations.find((f) => f.id === effectiveActivePickId) ?? null
   const cursorY = cursorDepth === null ? null : depthToPixel(cursorDepth)
+  const cursorInsideWell = cursorDepth !== null && cursorDepth >= wellTopDepth && cursorDepth <= wellBottomDepth
   const activePickColor = activePick != null ? formationDisplayColor(activePick) : '#9ca3af'
 
   return (
@@ -81,7 +86,7 @@ export function InteractionOverlay({
           )
         })}
         {/* Ghost line at cursor when a pick (including not-picked) is active */}
-        {topsEditable && effectiveActivePickId !== null && cursorDepth !== null && (
+        {topsEditable && effectiveActivePickId !== null && cursorDepth !== null && cursorInsideWell && (
           <line
             x1={0}
             y1={cursorY ?? 0}
@@ -95,7 +100,7 @@ export function InteractionOverlay({
             style={{ pointerEvents: 'none' }}
           />
         )}
-        {topsEditable && activePick && cursorY !== null ? (
+        {topsEditable && activePick && cursorY !== null && cursorInsideWell ? (
           <g style={{ pointerEvents: 'none' }}>
             <rect x={4} y={Math.max(2, cursorY - 24)} width={120} height={18} fill={activePickColor} opacity={0.85} rx={2} />
             <text

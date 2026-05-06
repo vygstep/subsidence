@@ -360,6 +360,8 @@ export function LogViewPanel({
               mouseClient={mouseClient}
               tooltipVisible={curveTooltipVisible}
               topsEditable={interactionMode === 'edit-tops'}
+              wellTopDepth={wellTopDepth}
+              wellBottomDepth={wellBottomDepth}
             />
           </div>
           {overviewVisible ? <WellOverviewMinimap height={trackHeight} curves={minimapCurves} /> : null}
