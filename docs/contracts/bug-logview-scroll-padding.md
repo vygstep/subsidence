@@ -24,6 +24,30 @@ When a well has formation tops but no imported log curves:
 - If curves or tops extend beyond TD, the rendered and scroll range should still include the deepest content plus bottom padding.
 - When `well.td_md` changes, the scroll clamp and viewer extent should update.
 
+## Padding Zone Behavior
+
+The scroll range is intentionally larger than the editable well interval.
+
+Definitions:
+
+- `scrollMinDepth = -100`
+- `wellTopDepth = 0`
+- `wellBottomDepth = max(well.td_md, deepestCurveDepth, deepestFormationDepth, 0)`
+- `scrollMaxDepth = wellBottomDepth + 100`
+
+Visual behavior:
+
+- The interval above `wellTopDepth` and below `wellBottomDepth` should be rendered as grey padding.
+- Data tracks and formation track should not show grid, curves, lithology blocks, or zones inside the grey padding.
+- The depth track should keep the depth scale readable while making padding visually distinct.
+- The `wellTopDepth` and `wellBottomDepth` boundaries should remain visually clear.
+
+Interaction behavior:
+
+- Formation tops must not be placed in the padding zones.
+- In edit-tops mode, clicks with `depth < wellTopDepth` or `depth > wellBottomDepth` should not create or move a top.
+- The active-pick ghost line should not advertise a valid placement inside the padding zones.
+
 ## Additional Fit Behavior
 
 Current behavior:
@@ -70,7 +94,9 @@ Compute log-view bounds from:
 Use:
 
 - `minDepth = -100`
-- `maxDepth = max(well.td_md, deepestCurveDepth, deepestFormationDepth, 0) + 100`
+- `wellTopDepth = 0`
+- `wellBottomDepth = max(well.td_md, deepestCurveDepth, deepestFormationDepth, 0)`
+- `maxDepth = wellBottomDepth + 100`
 
 ### Step 3: Apply extent consistently
 
@@ -79,12 +105,19 @@ Files:
 - `frontend/src/components/layout/ViewerWorkspace.tsx`
 - `frontend/src/components/logview/WellOverviewMinimap.tsx`
 - `frontend/src/components/logview/WellViewerToolbar.tsx`
+- `frontend/src/components/logview/LogViewPanel.tsx`
+- `frontend/src/components/logview/DepthTrack.tsx`
+- `frontend/src/components/logview/DataTrack.tsx`
+- `frontend/src/components/logview/FormationColumn.tsx`
+- `frontend/src/components/interaction/InteractionOverlay.tsx`
 
 Pass or use the same well extent for:
 
 - scroll clamp
 - minimap
 - Fit well
+- grey padding rendering
+- edit-tops placement guard
 
 Update `Fit data` to include picked formation tops as fit content, not only curve data.
 
@@ -100,3 +133,6 @@ Checks:
 - `Fit well` works with a well that has tops but no curves.
 - `Fit data` fits to tops when no curves exist.
 - `Fit data` fits to the combined curve and top range when both exist.
+- The `-100..0` and `TD..TD+100` intervals are grey.
+- Track grid and data are not visible inside grey padding zones.
+- Edit-tops clicks in grey padding do not place or move tops.

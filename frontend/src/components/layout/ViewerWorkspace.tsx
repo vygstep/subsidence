@@ -6,6 +6,8 @@ import { SplitView } from './SplitView'
 import { buildTrackOrder, createDefaultWellView, useViewStore, useWellDataStore, useWorkspaceStore } from '@/stores'
 import { convertScrollDepth } from '@/utils/depthTransform'
 
+const LOG_VIEW_DEPTH_PADDING_M = 100
+
 export function ViewerWorkspace() {
   const well = useWellDataStore((state) => state.well)
   const lodCurves = useWellDataStore((state) => state.curves)
@@ -65,14 +67,24 @@ export function ViewerWorkspace() {
     return wellViewStates[wellId] ?? createDefaultWellView()
   }, [wellId, wellViewStates])
 
-  const maxDepth = useMemo(() => {
-    if (curves.length === 0) return 1000
+  const depthExtent = useMemo(() => {
     let max = -Infinity
+    if (well?.td_md !== undefined && Number.isFinite(well.td_md)) {
+      max = Math.max(max, well.td_md)
+    }
     for (const curve of curves) {
       if (curve.depths.length > 0) max = Math.max(max, curve.depths[curve.depths.length - 1])
     }
-    return Number.isFinite(max) ? max : 1000
-  }, [curves])
+    for (const formation of formations) {
+      if (formation.depth_md !== null && Number.isFinite(formation.depth_md)) {
+        max = Math.max(max, formation.depth_md)
+      }
+    }
+    return {
+      minDepth: -LOG_VIEW_DEPTH_PADDING_M,
+      maxDepth: Math.max(Number.isFinite(max) ? max : 0, 0) + LOG_VIEW_DEPTH_PADDING_M,
+    }
+  }, [curves, formations, well?.td_md])
 
   const tracks = useMemo(() => (
     activeWellView.tracks
@@ -123,8 +135,8 @@ export function ViewerWorkspace() {
                 formations={visibleFormations}
                 zoneFormations={formations}
                 zones={visibleZones}
-                minDepth={0}
-                maxDepth={maxDepth}
+                minDepth={depthExtent.minDepth}
+                maxDepth={depthExtent.maxDepth}
               />
             }
             right={<SubsidencePanel />}
