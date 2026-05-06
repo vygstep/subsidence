@@ -174,18 +174,20 @@ def link_picks_to_horizons(session: Session, well_id: str, top_set_id: int) -> i
         color_updated = False
         if pick.color_source == 'auto':
             if matched is not None:
-                horizon_color = matched.color
-                if horizon_color.lower() in _FALLBACK_COLORS:
-                    strat_color = _strat_color_for_age(session, matched.age_ma)
-                    if strat_color:
-                        matched.color = strat_color
-                        horizon_color = strat_color
+                strat_color = (
+                    _strat_color_for_age(session, pick.age_top_ma)
+                    or _strat_color_for_age(session, matched.age_ma)
+                )
+                if strat_color:
+                    matched.color = strat_color
+                    horizon_color = strat_color
+                else:
+                    horizon_color = matched.color
             else:
                 strat_color = _strat_color_for_age(session, pick.age_top_ma)
                 horizon_color = strat_color if strat_color else youngest_color
-            new_color = horizon_color
-            pick.color = new_color
-            color_updated = old_color != new_color
+            pick.color = horizon_color
+            color_updated = old_color != horizon_color
         color_log.append({
             'name': pick.name,
             'color_source': pick.color_source,
@@ -198,20 +200,35 @@ def link_picks_to_horizons(session: Session, well_id: str, top_set_id: int) -> i
         if matched is None:
             unmatched.append({'name': pick.name, 'age_top_ma': pick.age_top_ma, 'depth_md': pick.depth_md})
 
-    # Delete orphan ghost picks: depth_md=None in all coordinates AND no horizon link.
-    # These were ghost picks for a horizon that no longer needs them (e.g. after rename).
+    # Horizons that now have at least one pick with real depth data.
+    horizons_with_real_depth: set[int] = {
+        pick.horizon_id
+        for pick in all_picks
+        if pick.horizon_id is not None and (
+            pick.depth_md is not None or pick.depth_tvd is not None or pick.depth_tvdss is not None
+        )
+    }
+
+    # Delete ghost picks (all depths None) that are either orphaned (no horizon) or
+    # shadowed (horizon already covered by a real pick).
     orphans_deleted = 0
     for pick in all_picks:
-        if (
-            pick.depth_md is None and pick.depth_tvd is None and pick.depth_tvdss is None
-            and pick.horizon_id is None
-        ):
-            _log.info('orphan_ghost_deleted', extra={'event': {
-                'operation': 'link_picks_to_horizons', 'phase': 'orphan_ghost_deleted',
-                'well_id': well_id, 'pick_id': pick.id, 'name': pick.name, 'age_top_ma': pick.age_top_ma,
-            }})
-            session.delete(pick)
-            orphans_deleted += 1
+        is_ghost = pick.depth_md is None and pick.depth_tvd is None and pick.depth_tvdss is None
+        if not is_ghost:
+            continue
+        if pick.horizon_id is None:
+            phase = 'orphan_ghost_deleted'
+        elif pick.horizon_id in horizons_with_real_depth:
+            phase = 'shadowed_ghost_deleted'
+        else:
+            continue
+        _log.info(phase, extra={'event': {
+            'operation': 'link_picks_to_horizons', 'phase': phase,
+            'well_id': well_id, 'pick_id': pick.id, 'name': pick.name, 'age_top_ma': pick.age_top_ma,
+            'horizon_id': pick.horizon_id,
+        }})
+        session.delete(pick)
+        orphans_deleted += 1
 
     _log.info('link_picks.done', extra={'event': {
         'operation': 'link_picks_to_horizons', 'phase': 'done',
@@ -547,16 +564,19 @@ def build_zone_layer_inputs(
         return []
 
     horizon_ids = {z.upper_horizon_id for z in zones} | {z.lower_horizon_id for z in zones}
-    picks_by_horizon: dict[int, FormationTopModel] = {
-        pick.horizon_id: pick
-        for pick in session.scalars(
-            select(FormationTopModel).where(
-                FormationTopModel.well_id == well_id,
-                FormationTopModel.horizon_id.in_(horizon_ids),
-            )
-        ).all()
-        if pick.horizon_id is not None
-    }
+    picks_by_horizon: dict[int, FormationTopModel] = {}
+    for pick in session.scalars(
+        select(FormationTopModel).where(
+            FormationTopModel.well_id == well_id,
+            FormationTopModel.horizon_id.in_(horizon_ids),
+        )
+    ).all():
+        if pick.horizon_id is None:
+            continue
+        existing = picks_by_horizon.get(pick.horizon_id)
+        # Prefer pick with real depth over ghost (depth=None).
+        if existing is None or (existing.depth_md is None and pick.depth_md is not None):
+            picks_by_horizon[pick.horizon_id] = pick
 
     zwd_by_zone: dict[int, ZoneWellData] = {
         row.zone_id: row
@@ -568,7 +588,19 @@ def build_zone_layer_inputs(
         ).all()
     }
 
+    _log.info('build_zone_layer_inputs.start', extra={'event': {
+        'operation': 'build_zone_layer_inputs',
+        'well_id': well_id,
+        'zone_count': len(zones),
+        'picks_by_horizon_count': len(picks_by_horizon),
+        'picks_by_horizon': {
+            hid: {'name': p.name, 'depth_md': p.depth_md, 'age_top_ma': p.age_top_ma}
+            for hid, p in picks_by_horizon.items()
+        },
+    }})
+
     result: list[ZoneLayerInput] = []
+    skipped: list[dict] = []
     for zone in zones:
         upper = zone.upper_horizon
         lower = zone.lower_horizon
@@ -579,6 +611,13 @@ def build_zone_layer_inputs(
             upper_pick is None or lower_pick is None
             or upper_pick.depth_md is None or lower_pick.depth_md is None
         ):
+            skipped.append({
+                'zone': f'{upper.name} → {lower.name}',
+                'upper_pick': upper_pick.name if upper_pick else None,
+                'upper_depth': upper_pick.depth_md if upper_pick else None,
+                'lower_pick': lower_pick.name if lower_pick else None,
+                'lower_depth': lower_pick.depth_md if lower_pick else None,
+            })
             continue
 
         zwd = zwd_by_zone.get(zone.id)
@@ -612,6 +651,15 @@ def build_zone_layer_inputs(
             eroded_thickness_m=upper_pick.eroded_thickness_m,
             current_top_tvdss=top_tvdss,
         ))
+
+    _log.info('build_zone_layer_inputs.done', extra={'event': {
+        'operation': 'build_zone_layer_inputs',
+        'well_id': well_id,
+        'included': len(result),
+        'skipped': len(skipped),
+        'skipped_zones': skipped,
+        'included_zones': [r.name for r in result],
+    }})
 
     return result
 

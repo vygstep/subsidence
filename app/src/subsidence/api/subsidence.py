@@ -3,8 +3,11 @@ from __future__ import annotations
 import asyncio
 import hashlib
 import json
+import logging
 from pathlib import Path
 from uuid import uuid4
+
+_log = logging.getLogger('subsidence.api.subsidence')
 
 from fastapi import APIRouter, HTTPException, Request, WebSocket, WebSocketDisconnect
 from pydantic import BaseModel
@@ -159,6 +162,20 @@ def _compute_subsidence(manager, well_id: str) -> list[SubsidenceResultResponse]
         if top_set_id is not None:
             zone_inputs = build_zone_layer_inputs(session, well_id, litho_params, kb_elev=kb_elev)
             results = backstrip(zone_inputs, litho_params, sea_level_curve=sea_level_curve)
+            _log.info('backstrip.results', extra={'event': {
+                'operation': 'backstrip',
+                'well_id': well_id,
+                'result_count': len(results),
+                'curves': [
+                    {
+                        'name': r.formation_name,
+                        'burial_path_len': len(r.burial_path),
+                        'path_oldest': {'age_ma': r.burial_path[0].age_ma, 'depth_m': r.burial_path[0].depth_m} if r.burial_path else None,
+                        'path_present': {'age_ma': r.burial_path[-1].age_ma, 'depth_m': r.burial_path[-1].depth_m} if r.burial_path else None,
+                    }
+                    for r in results
+                ],
+            }})
         else:
             td_m = well.td_md if well.td_md is not None else 0.0
             formations = session.scalars(
@@ -198,6 +215,20 @@ def _compute_subsidence(manager, well_id: str) -> list[SubsidenceResultResponse]
                 ))
 
             results = backstrip(inputs, litho_params, sea_level_curve=sea_level_curve)
+            _log.info('backstrip.results', extra={'event': {
+                'operation': 'backstrip',
+                'well_id': well_id,
+                'result_count': len(results),
+                'curves': [
+                    {
+                        'name': r.formation_name,
+                        'burial_path_len': len(r.burial_path),
+                        'path_oldest': {'age_ma': r.burial_path[0].age_ma, 'depth_m': r.burial_path[0].depth_m} if r.burial_path else None,
+                        'path_present': {'age_ma': r.burial_path[-1].age_ma, 'depth_m': r.burial_path[-1].depth_m} if r.burial_path else None,
+                    }
+                    for r in results
+                ],
+            }})
 
     return [
         SubsidenceResultResponse(

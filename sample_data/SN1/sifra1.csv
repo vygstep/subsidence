@@ -1,0 +1,33 @@
+﻿tvdss,depth,bottom ,formation,thickness ,Lithology
+170,500,600,Bina,100,limestone
+270,600,690,Tamar,90,dolomite
+360,690,805,Avnon,115,limestone
+475,805,852,Zafit,47,dolomite
+522,852,889,Ein Yorqeam,37,dolo+shale
+559,889,1140,Hevion,251,dolomite
+810,1140,1267,Uza,127,limestone
+937,1267,1355,Malhta,88,limestone
+1025,1355,1437,Dragot,82,limestone
+1107,1437,1541,Zuweira U,104,sandstone
+1211,1541,1630,Telamim,89,limestone
+1300,1630,1808,Zuweira L,178,sandstone
+1478,1808,1907,Haluza,99,shaly limstone
+1577,1907,2034,Beer Sheva,127,limestone
+1704,2034,2166,Kidod,132,shale
+1836,2166,2318,Zohar,152,limestone
+1988,2318,2703,Sherif,385,sandstone
+2373,2703,3053,Daya,350,limestone
+2723,3053,3298,Inmar u,245,sandstone
+2968,3298,3491,Qeren,193,limestone
+3161,3491,3586,Inmar l,95,sandstone
+3256,3586,3886,Ardon,300,limestone
+3556,3886,3896,Mishor,10,shale
+3566,3896,3964,Mohila,68,Dol+anhyd
+3634,3964,4186,Saharonim,222,limestone
+3856,4186,4234,Gevanim,48,shale
+3904,4234,4352,Raaf,118,dolomite
+4022,4352,4386,Zafir,34,shale
+4056,4386,4473,Yamin,87,limestone
+4143,4473,4488,Shezaf,15,shale+Carbonate 
+4158,4488,4722,Arqov,234,Shale
+4392,4722,4722,Saad,,sandstone

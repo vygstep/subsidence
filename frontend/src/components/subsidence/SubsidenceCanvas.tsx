@@ -277,7 +277,6 @@ export function SubsidenceCanvas() {
     return max > 0 ? max : 100
   }, [formations])
 
-  // Y axis auto range: fit to burial data (no tdMd padding)
   const autoMaxDepthM = useMemo(() => {
     let max = 0
     for (const c of coloredCurves) {

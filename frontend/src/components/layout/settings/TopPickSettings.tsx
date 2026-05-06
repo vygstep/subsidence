@@ -84,6 +84,11 @@ export function TopPickSettings({ selectedFormation, onFormationUpdate, onFormat
     )
   }, [selectedFormation.id, selectedFormation.sea_level_m_override, seaLevelAtAge])
 
+  const [draftName, setDraftName] = useState<string>(() => selectedFormation.name)
+  useEffect(() => {
+    setDraftName(selectedFormation.name)
+  }, [selectedFormation.id, selectedFormation.name])
+
   const [draftDepthMd, setDraftDepthMd] = useState<string>(
     () => selectedFormation.depth_md != null ? String(selectedFormation.depth_md) : '',
   )
@@ -148,8 +153,17 @@ export function TopPickSettings({ selectedFormation, onFormationUpdate, onFormat
       <div className="sf-row">
         <span>Name</span>
         <input
-          value={selectedFormation.name}
-          onChange={(event) => void onFormationUpdate(selectedFormation.id, { name: event.target.value })}
+          value={draftName}
+          onChange={(e) => setDraftName(e.target.value)}
+          onKeyDown={(e) => { if (e.key === 'Enter') e.currentTarget.blur() }}
+          onBlur={() => {
+            const trimmed = draftName.trim()
+            if (trimmed && trimmed !== selectedFormation.name) {
+              void onFormationUpdate(selectedFormation.id, { name: trimmed })
+            } else {
+              setDraftName(selectedFormation.name)
+            }
+          }}
         />
       </div>
       <div className="sf-row">

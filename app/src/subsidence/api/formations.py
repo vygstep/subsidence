@@ -22,6 +22,7 @@ from subsidence.data.strat_link import auto_link_to_active_chart, find_strat_uni
 from subsidence.data.zone_service import (
     _floor_match_horizon,
     aggregate_zone_lithology_from_curve,
+    ensure_zone_well_data,
     get_well_active_top_set_id,
     link_picks_to_horizons,
     recalculate_zone_thickness,
@@ -449,6 +450,7 @@ def update_formation(well_id: str, formation_id: int, body: FormationTopPatch, r
                                         'old_age_ma': old_horizon_age, 'new_age_ma': top.age_top_ma,
                                     }})
                         if needs_thickness:
+                            ensure_zone_well_data(session, top_set_id, top.well_id)
                             recalculate_zone_thickness(session, top_set_id, top.well_id)
                             aggregate_zone_lithology_from_curve(session, manager.project_path, top.well_id)
                         session.commit()

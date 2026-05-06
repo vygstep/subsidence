@@ -65,6 +65,7 @@ def configure_logging() -> None:
     _add_module_handler('subsidence.zone_service', 'zone_service.log', level)
     _add_module_handler('subsidence.api', 'api.log', level)
     _add_module_handler('subsidence.api.formations', 'formations.log', level)
+    _add_module_handler('subsidence.api.subsidence', 'subsidence.log', level)
 
 
 def _add_module_handler(logger_name: str, filename: str, level: int) -> None:
