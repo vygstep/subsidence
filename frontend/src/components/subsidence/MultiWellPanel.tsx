@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef } from 'react'
 
+import { logDiagnosticEvent } from '@/utils/diagnostics'
 import { useCanvasRenderer } from '@/hooks/useCanvasRenderer'
 import { useMultiWellStore } from '@/stores/multiWellStore'
 import { useViewStore } from '@/stores/viewStore'
@@ -54,6 +55,27 @@ export function MultiWellPanel() {
   useEffect(() => {
     void fetchResults()
   }, [fetchResults])
+
+  useEffect(() => {
+    if (wellResults.length === 0) return
+    logDiagnosticEvent({
+      level: 'info',
+      operation: 'subsidence.visualize.multi',
+      phase: 'event',
+      details: {
+        wellCount: wellResults.length,
+        wells: wellResults.map(wr => {
+          const allDepths = wr.curves.flatMap(c => c.burial_path.map(p => p.depth_m))
+          return {
+            wellId: wr.wellId,
+            wellName: wr.wellName,
+            curveCount: wr.curves.length,
+            maxDepthM: allDepths.length > 0 ? Math.max(...allDepths) : 0,
+          }
+        }),
+      },
+    })
+  }, [wellResults])
 
   const maxAge = useMemo(() => {
     let max = 0

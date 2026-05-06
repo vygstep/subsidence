@@ -8,6 +8,7 @@ import { useWellDataStore } from '@/stores/wellDataStore'
 import { formationDisplayColor } from '@/types'
 import type { SeaLevelPoint } from '@/types'
 import type { SubsidenceResult } from '@/types/subsidence'
+import { logDiagnosticEvent } from '@/utils/diagnostics'
 import { GeologicalTimescale } from './GeologicalTimescale'
 
 const TIMESCALE_HEIGHT = 52
@@ -283,6 +284,25 @@ export function SubsidenceCanvas() {
       for (const pt of c.burial_path) {
         if (pt.depth_m > max) max = pt.depth_m
       }
+    }
+    if (coloredCurves.length > 0) {
+      const ageMin = Math.min(...coloredCurves.flatMap(c => c.burial_path.map(p => p.age_ma)))
+      const ageMax = Math.max(...coloredCurves.flatMap(c => c.burial_path.map(p => p.age_ma)))
+      logDiagnosticEvent({
+        level: 'info',
+        operation: 'subsidence.visualize.single',
+        phase: 'event',
+        details: {
+          curveCount: coloredCurves.length,
+          ageRangeMa: [ageMin, ageMax],
+          maxDepthM: max,
+          curves: coloredCurves.map(c => ({
+            name: c.formation_name,
+            ageMa: [Math.min(...c.burial_path.map(p => p.age_ma)), Math.max(...c.burial_path.map(p => p.age_ma))],
+            depthM: [Math.min(...c.burial_path.map(p => p.depth_m)), Math.max(...c.burial_path.map(p => p.depth_m))],
+          })),
+        },
+      })
     }
     return max > 0 ? max : 3000
   }, [coloredCurves])
