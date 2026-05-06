@@ -1,5 +1,13 @@
 # TODO
 
+Active bugfix contract: `docs/contracts/bug-logview-scroll-padding.md`
+
+## Current bugfix
+
+| Item | Title | Contract | Status |
+|---|---|---|---|
+| BUG-LOGVIEW-SCROLL-PADDING | Log view scroll extent and empty-curve banner | `docs/contracts/bug-logview-scroll-padding.md` | todo |
+
 Active contract: `docs/contracts/bugs_and_features_4.md`
 
 ## BF4 — current sprint
