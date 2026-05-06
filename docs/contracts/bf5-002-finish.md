@@ -15,7 +15,7 @@
 
 ---
 
-## F1: Ghost multiplication fix `todo`
+## F1: Ghost multiplication fix `done`
 
 ### Проблема
 
@@ -53,7 +53,7 @@ for pick in real_picks:
 
 ---
 
-## F2: water_depth_m auto-set для age=0 `todo`
+## F2: water_depth_m auto-set для age=0 `done`
 
 ### Правило
 
@@ -104,7 +104,7 @@ if new_values.get('age_top_ma') == 0.0 and 'water_depth_m' not in new_values:
 
 ---
 
-## F3: BF5-002-C — предупреждение при невалидном возрасте `todo`
+## F3: BF5-002-C — предупреждение при невалидном возрасте `done`
 
 ### Текущее поведение
 
@@ -137,8 +137,8 @@ warnings.append(f"Age {new_age} violates depth order — cleared")
 
 ## Manual checks перед мержем
 
-- [ ] Повторный вызов activate_top_set_for_well → количество ghost-пиков не растёт
-- [ ] Импорт tops с age=0 пиком → `water_depth_m` заполнен как `depth_md - kb_elev`
-- [ ] Установить age=0 в Settings → `water_depth_m` обновился в Paleobathymetry
-- [ ] Установить невалидный возраст → поле очистилось, в логе появилось предупреждение
-- [ ] `pytest app/tests` — все тесты зелёные
+- [x] Повторный вызов activate_top_set_for_well → количество ghost-пиков не растёт
+- [x] Импорт tops с age=0 пиком → `water_depth_m` заполнен как `depth_md - kb_elev`
+- [x] Установить age=0 в Settings → `water_depth_m` обновился в Paleobathymetry
+- [x] Установить невалидный возраст → поле очистилось, в логе появилось предупреждение
+- [x] `pytest app/tests` — все тесты зелёные
