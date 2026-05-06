@@ -1,7 +1,7 @@
 import { useMemo } from 'react'
 
 import { useCanvasRenderer, useDepthScale } from '@/hooks'
-import { drawDepthGridlines, drawDepthLabels } from '@/renderers'
+import { drawDepthGridlines, drawDepthLabels, drawWellPaddingZones } from '@/renderers'
 import { useViewStore, useWellDataStore } from '@/stores'
 import { mdToTvd } from '@/utils/depthTransform'
 
@@ -9,9 +9,11 @@ interface DepthTrackProps {
   height: number
   width?: number
   isSelected?: boolean
+  wellTopDepth: number
+  wellBottomDepth: number
 }
 
-export function DepthTrack({ height, width = 60, isSelected = false }: DepthTrackProps) {
+export function DepthTrack({ height, width = 60, isSelected = false, wellTopDepth, wellBottomDepth }: DepthTrackProps) {
   const visibleDepthRange = useViewStore((state) => state.visibleDepthRange)
   const depthTrackConfig = useViewStore((state) => state.depthTrackConfig)
   const depthType = useViewStore((state) => state.depthType)
@@ -43,12 +45,13 @@ export function DepthTrack({ height, width = 60, isSelected = false }: DepthTrac
     (ctx, canvasWidth, _canvasHeight) => {
       ctx.fillStyle = depthTrackConfig.backgroundColor
       ctx.fillRect(0, 0, canvasWidth, _canvasHeight)
+      drawWellPaddingZones(ctx, depthScale, canvasWidth, _canvasHeight, wellTopDepth, wellBottomDepth)
       if (depthTrackConfig.showHorizontalGrid) {
         drawDepthGridlines(ctx, depthScale, canvasWidth, majorInterval, minorInterval, depthTrackConfig.gridColor)
       }
       drawDepthLabels(ctx, depthScale, canvasWidth, majorInterval, depthTrackConfig.unit, labelTransform, depthTrackConfig.labelColor)
     },
-    [depthScale, depthTrackConfig, majorInterval, minorInterval, labelTransform],
+    [depthScale, depthTrackConfig, majorInterval, minorInterval, labelTransform, wellTopDepth, wellBottomDepth],
   )
 
   return <canvas ref={canvasRef} className={`depth-track ${isSelected ? 'depth-track--selected' : ''}`} style={{ width, height }} />

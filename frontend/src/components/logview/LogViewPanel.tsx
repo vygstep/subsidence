@@ -304,6 +304,8 @@ export function LogViewPanel({
                       height={trackHeight}
                       width={depthWidth}
                       isSelected={selectedTrackId === DEPTH_TRACK_ID}
+                      wellTopDepth={wellTopDepth}
+                      wellBottomDepth={wellBottomDepth}
                     />
                     <TrackResizeHandle trackId={DEPTH_TRACK_ID} initialWidth={depthWidth} />
                   </Fragment>
@@ -319,6 +321,8 @@ export function LogViewPanel({
                       zones={zones}
                       height={trackHeight}
                       maxDepth={maxDepth}
+                      wellTopDepth={wellTopDepth}
+                      wellBottomDepth={wellBottomDepth}
                       width={formationWidth}
                       isSelected={selectedTrackId === FORMATION_TRACK_ID}
                     />
@@ -334,7 +338,14 @@ export function LogViewPanel({
               const width = trackWidths[track.id] ?? track.width
               return (
                 <Fragment key={track.id}>
-                  <DataTrack config={track} curves={curves} width={width} height={trackHeight} />
+                  <DataTrack
+                    config={track}
+                    curves={curves}
+                    width={width}
+                    height={trackHeight}
+                    wellTopDepth={wellTopDepth}
+                    wellBottomDepth={wellBottomDepth}
+                  />
                   <TrackResizeHandle trackId={track.id} initialWidth={width} />
                 </Fragment>
               )

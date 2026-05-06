@@ -10,6 +10,7 @@ import {
   drawFillToBaseline,
   drawLinearGrid,
   drawLogarithmicGrid,
+  drawWellPaddingZones,
 } from '@/renderers'
 import { drawDiscreteBlocks } from '@/renderers/discreteBlockRenderer'
 import { drawLithologyComposition, drawLithologyDiscrete, type CompositionBand } from '@/renderers/lithologyCompositionRenderer'
@@ -22,6 +23,8 @@ interface DataTrackProps {
   curves: CurveData[]
   width: number
   height: number
+  wellTopDepth: number
+  wellBottomDepth: number
 }
 
 interface VisibleCurve {
@@ -99,7 +102,7 @@ function interpolateAtDepth(depths: Float32Array, values: Float32Array, target: 
   return Number.isFinite(v) ? v : null
 }
 
-export function DataTrack({ config, curves, width, height }: DataTrackProps) {
+export function DataTrack({ config, curves, width, height, wellTopDepth, wellBottomDepth }: DataTrackProps) {
   const visibleDepthRange = useViewStore((state) => state.visibleDepthRange)
   const selectedElementId = useViewStore((state) => state.selectedElementId)
   const selectedElementType = useViewStore((state) => state.selectedElementType)
@@ -214,6 +217,7 @@ export function DataTrack({ config, curves, width, height }: DataTrackProps) {
             () => setPatternRenderTick((t) => t + 1),
           )
         }
+        drawWellPaddingZones(ctx, depthScale, canvasWidth, canvasHeight, wellTopDepth, wellBottomDepth)
         return
       }
 
@@ -333,6 +337,8 @@ export function DataTrack({ config, curves, width, height }: DataTrackProps) {
         const isSelected = selectedElementType === 'curve' && selectedElementId === style.mnemonic
         drawCurve(ctx, curve.depths, curve.values, depthScale, valueScale, style, curve.null_value, isSelected, 5, curveGapThresholds.get(style.mnemonic))
       })
+
+      drawWellPaddingZones(ctx, depthScale, canvasWidth, canvasHeight, wellTopDepth, wellBottomDepth)
     },
     [
       clippedCurveMap,
@@ -352,6 +358,8 @@ export function DataTrack({ config, curves, width, height }: DataTrackProps) {
       patternRenderTick,
       selectedElementId,
       selectedElementType,
+      wellTopDepth,
+      wellBottomDepth,
     ],
   )
 

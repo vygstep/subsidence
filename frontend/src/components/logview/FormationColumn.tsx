@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState } from 'react'
 
 import { useCanvasRenderer, useDepthScale } from '@/hooks'
 import { useViewStore, useWellDataStore } from '@/stores'
-import { drawLithologyBlock } from '@/renderers'
+import { drawLithologyBlock, drawWellPaddingZones } from '@/renderers'
 import { formationDisplayColor } from '@/types'
 import type { FormationTop, FormationZone, LithologyPatternEntry, LithologyType } from '@/types'
 import { mdToTvd } from '@/utils/depthTransform'
@@ -13,6 +13,8 @@ interface FormationColumnProps {
   zones?: FormationZone[] | undefined
   height: number
   maxDepth: number
+  wellTopDepth: number
+  wellBottomDepth: number
   width?: number
   isSelected?: boolean
 }
@@ -34,7 +36,17 @@ function toRenderableLithology(lithology: LithologyType | undefined) {
   return lithology
 }
 
-export function FormationColumn({ formations, visibleMarkerFormations = formations, zones, height, maxDepth, width = 80, isSelected = false }: FormationColumnProps) {
+export function FormationColumn({
+  formations,
+  visibleMarkerFormations = formations,
+  zones,
+  height,
+  maxDepth,
+  wellTopDepth,
+  wellBottomDepth,
+  width = 80,
+  isSelected = false,
+}: FormationColumnProps) {
   const visibleDepthRange = useViewStore((state) => state.visibleDepthRange)
   const formationsTrackConfig = useViewStore((state) => state.formationsTrackConfig)
   const tvdTable = useWellDataStore((state) => state.tvdTable)
@@ -97,6 +109,7 @@ export function FormationColumn({ formations, visibleMarkerFormations = formatio
       ctx.fillRect(0, 0, canvasWidth, canvasHeight)
 
       if (orderedFormations.length === 0) {
+        drawWellPaddingZones(ctx, depthScale, canvasWidth, canvasHeight, wellTopDepth, wellBottomDepth)
         return
       }
 
@@ -167,10 +180,12 @@ export function FormationColumn({ formations, visibleMarkerFormations = formatio
           ctx.fillText(formation.name, anchor.x, yTop + blockHeight / 2, anchor.maxWidth)
           ctx.restore()
         })
+        drawWellPaddingZones(ctx, depthScale, canvasWidth, canvasHeight, wellTopDepth, wellBottomDepth)
         return
       }
 
       if (zones !== undefined) {
+        drawWellPaddingZones(ctx, depthScale, canvasWidth, canvasHeight, wellTopDepth, wellBottomDepth)
         return
       }
 
@@ -223,6 +238,7 @@ export function FormationColumn({ formations, visibleMarkerFormations = formatio
         ctx.fillText(label, anchor.x, yTop + blockHeight / 2, anchor.maxWidth)
         ctx.restore()
       })
+      drawWellPaddingZones(ctx, depthScale, canvasWidth, canvasHeight, wellTopDepth, wellBottomDepth)
     },
     [
       depthScale,
@@ -240,6 +256,8 @@ export function FormationColumn({ formations, visibleMarkerFormations = formatio
       visibleMarkerFormations,
       visibleDepthRange.max,
       visibleDepthRange.min,
+      wellTopDepth,
+      wellBottomDepth,
     ],
   )
 
