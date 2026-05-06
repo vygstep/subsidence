@@ -240,6 +240,14 @@ def backstrip(
         if 0 in active_indices:
             base_result.burial_path.append(BurialPoint(age_ma=t_ma, depth_m=z_top + offset))
 
+    # Starting point for base curve: at age_base_ma the lower horizon was at the seafloor
+    if deepest.age_base_ma is not None:
+        sl_base = _sea_level_at(deepest.age_base_ma, sea_level_curve) if sea_level_curve else 0.0
+        base_result.burial_path.append(BurialPoint(
+            age_ma=deepest.age_base_ma,
+            depth_m=(deepest.water_depth_m or 0.0) - sl_base,
+        ))
+
     # Append present-time (age_ma=0) anchor from actual TVDSS well data.
     # This grounds each burial curve at its real measured depth, independent of
     # the paleobathymetry-based offset that governs the rest of the history.
@@ -256,4 +264,4 @@ def backstrip(
         r.burial_path.sort(key=lambda p: p.age_ma, reverse=True)
     base_result.burial_path.sort(key=lambda p: p.age_ma, reverse=True)
 
-    return results + [base_result]
+    return [base_result] + results
