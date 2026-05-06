@@ -80,9 +80,12 @@ export function ViewerWorkspace() {
         max = Math.max(max, formation.depth_md)
       }
     }
+    const wellBottomDepth = Math.max(Number.isFinite(max) ? max : 0, 0)
     return {
       minDepth: -LOG_VIEW_DEPTH_PADDING_M,
-      maxDepth: Math.max(Number.isFinite(max) ? max : 0, 0) + LOG_VIEW_DEPTH_PADDING_M,
+      wellTopDepth: 0,
+      wellBottomDepth,
+      maxDepth: wellBottomDepth + LOG_VIEW_DEPTH_PADDING_M,
     }
   }, [curves, formations, well?.td_md])
 
@@ -137,6 +140,8 @@ export function ViewerWorkspace() {
                 zones={visibleZones}
                 minDepth={depthExtent.minDepth}
                 maxDepth={depthExtent.maxDepth}
+                wellTopDepth={depthExtent.wellTopDepth}
+                wellBottomDepth={depthExtent.wellBottomDepth}
               />
             }
             right={<SubsidencePanel />}

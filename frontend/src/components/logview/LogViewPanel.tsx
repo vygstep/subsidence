@@ -23,12 +23,25 @@ interface LogViewPanelProps {
   zones: FormationZone[]
   minDepth: number
   maxDepth: number
+  wellTopDepth: number
+  wellBottomDepth: number
 }
 
 const DEFAULT_DEPTH_WIDTH = 60
 const DEFAULT_FORMATION_WIDTH = 80
 
-export function LogViewPanel({ tracks, trackOrder, curves, formations, zoneFormations, zones, minDepth, maxDepth }: LogViewPanelProps) {
+export function LogViewPanel({
+  tracks,
+  trackOrder,
+  curves,
+  formations,
+  zoneFormations,
+  zones,
+  minDepth,
+  maxDepth,
+  wellTopDepth,
+  wellBottomDepth,
+}: LogViewPanelProps) {
   const containerRef = useRef<HTMLDivElement | null>(null)
   const [trackHeight, setTrackHeight] = useState(600)
 
@@ -125,6 +138,9 @@ export function LogViewPanel({ tracks, trackOrder, curves, formations, zoneForma
       const rect = e.currentTarget.getBoundingClientRect()
       const y = e.clientY - rect.top
       const depth = scrollDepth + y * depthPerPixel
+      if (depth < wellTopDepth || depth > wellBottomDepth) {
+        return
+      }
       const selectedPick = selectedFormationId === null
         ? null
         : zoneFormations.find((formation) => formation.id === selectedFormationId) ?? null
@@ -209,6 +225,8 @@ export function LogViewPanel({ tracks, trackOrder, curves, formations, zoneForma
       selectedFormationId,
       scrollDepth,
       depthPerPixel,
+      wellTopDepth,
+      wellBottomDepth,
       zoneFormations,
       zones,
       well,
