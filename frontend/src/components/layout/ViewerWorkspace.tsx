@@ -112,9 +112,6 @@ export function ViewerWorkspace() {
         <p className="app-error-banner">No wells are available in the open project.</p>
       ) : (
         <>
-          {curves.length === 0 && (
-            <p className="app-error-banner">Well loaded. No curves imported yet.</p>
-          )}
           <SplitView
             subsidenceWidth={subsidenceWidth}
             onWidthChange={setSubsidenceWidth}
