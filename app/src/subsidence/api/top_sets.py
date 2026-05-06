@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import math
+
 from fastapi import APIRouter, HTTPException, Request
 from pydantic import BaseModel
 from sqlalchemy import select
@@ -205,6 +207,20 @@ def _require_well(session, well_id: str) -> WellModel:
     return well
 
 
+def _validate_pick_depth_inside_well(well: WellModel, depth_md: float | None) -> None:
+    if depth_md is None:
+        return
+    if not math.isfinite(depth_md):
+        raise HTTPException(status_code=400, detail='Top depth must be a finite number')
+    td_md = well.td_md
+    if depth_md < 0 or (td_md is not None and depth_md > td_md):
+        upper = td_md if td_md is not None else 0.0
+        raise HTTPException(
+            status_code=400,
+            detail=f'Top depth {depth_md:.1f} m is outside well interval 0.0-{upper:.1f} m',
+        )
+
+
 # ---------------------------------------------------------------------------
 # TopSet CRUD
 # ---------------------------------------------------------------------------
@@ -383,6 +399,7 @@ def create_top_set_pick(top_set_id: int, body: TopSetPickCreate, request: Reques
     with manager.get_session() as session:
         _require_top_set(session, top_set_id)
         well = _require_well(session, body.well_id)
+        _validate_pick_depth_inside_well(well, body.depth_md)
         active_link = session.scalar(
             select(WellActiveTopSet).where(
                 WellActiveTopSet.well_id == body.well_id,

@@ -64,13 +64,23 @@ This applies to:
 - `TopPickSettings` depth input.
 - `FormationTopsList` inline depth edit.
 - `FormationTopsList` add action when the cursor or viewport midpoint is outside `[0, well.td_md]`.
+- Dragging an existing top line outside `[0, well.td_md]`.
 
 Backend validation is still required as the source of truth:
 
 - Reject `POST /wells/{well_id}/formations` when `depth_md` is outside `[0, well.td_md]`.
 - Reject `PATCH /wells/{well_id}/formations/{formation_id}` when the resolved MD is outside `[0, well.td_md]`.
+- Reject `POST /top-sets/{top_set_id}/picks` when `depth_md` is outside `[0, well.td_md]`.
 - The PATCH rule applies to direct `depth_md` and to `depth_tvd` / `depth_tvdss` after conversion to MD.
 - Existing invalid historical tops may still be loaded and shown, but new writes must not create more invalid tops.
+
+Drag behavior:
+
+- While dragging an existing top line, clamp the visual line to `[0, well.td_md]`.
+- On release, save the clamped boundary depth if the pointer went outside the interval.
+- Add a QC warning when clamping occurs:
+  - `Top depth was limited to 0.0 m.`
+  - `Top depth was limited to well TD 6000.0 m.`
 
 ## Additional Fit Behavior
 
@@ -136,7 +146,9 @@ Files:
 - `frontend/src/components/interaction/InteractionOverlay.tsx`
 - `frontend/src/components/layout/settings/TopPickSettings.tsx`
 - `frontend/src/components/layout/FormationTopsList.tsx`
+- `frontend/src/components/interaction/FormationTopLine.tsx`
 - `app/src/subsidence/api/formations.py`
+- `app/src/subsidence/api/top_sets.py`
 
 Pass or use the same well extent for:
 
@@ -165,4 +177,6 @@ Checks:
 - Edit-tops clicks in grey padding do not place or move tops.
 - Entering a settings top depth below `0` or above `TD` shows a QC warning and leaves the previous saved depth unchanged.
 - Inline top-list depth edits below `0` or above `TD` show a QC warning and leave the previous saved depth unchanged.
+- Dragging a top above `0` or below `TD` clamps to the boundary, saves the boundary depth, and shows a QC warning.
 - Backend formation create/update rejects out-of-well MD values.
+- Backend TopSet pick creation rejects out-of-well MD values.

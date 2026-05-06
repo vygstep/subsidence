@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 
 import { useFormationDrag } from '@/hooks'
-import { useViewStore, useWellDataStore, useWorkspaceStore } from '@/stores'
+import { useNotificationStore, useViewStore, useWellDataStore, useWorkspaceStore } from '@/stores'
 import { formationDisplayColor } from '@/types'
 import type { FormationTop } from '@/types'
 
@@ -35,6 +35,8 @@ export function FormationTopLine({
   const updateFormationDepth = useWellDataStore((state) => state.updateFormationDepth)
   const updateFormation = useWellDataStore((state) => state.updateFormation)
   const wellId = useWellDataStore((state) => state.well?.well_id)
+  const wellTdMd = useWellDataStore((state) => state.well?.td_md ?? null)
+  const addQcWarnings = useNotificationStore((state) => state.addQcWarnings)
   const setSelectedFormationId = useWorkspaceStore((state) => state.setSelectedFormationId)
   const setSelectedObject = useWorkspaceStore((state) => state.setSelectedObject)
   const depthType = useViewStore((state) => state.depthType)
@@ -42,6 +44,20 @@ export function FormationTopLine({
   const [popover, setPopover] = useState<DepthPopover | null>(null)
   const popoverRef = useRef<HTMLDivElement | null>(null)
   const didDragRef = useRef(false)
+
+  const clampDepthToWell = useCallback((depth: number): number => {
+    if (wellTdMd === null) return depth
+    return Math.max(0, Math.min(wellTdMd, depth))
+  }, [wellTdMd])
+
+  const warnClampedDepth = useCallback((rawDepth: number, clampedDepth: number) => {
+    if (rawDepth === clampedDepth) return
+    addQcWarnings([
+      clampedDepth <= 0
+        ? 'Top depth was limited to 0.0 m.'
+        : `Top depth was limited to well TD ${clampedDepth.toFixed(1)} m.`,
+    ])
+  }, [addQcWarnings])
 
   const handleDragStart = useCallback(() => {
     if (!wellId) return
@@ -52,16 +68,19 @@ export function FormationTopLine({
 
   const handleDepthChange = useCallback((depth: number) => {
     didDragRef.current = true
+    const clampedDepth = clampDepthToWell(depth)
     const { scrollDepth, depthPerPixel } = useViewStore.getState()
-    setLocalY((depth - scrollDepth) / depthPerPixel)
-  }, [])
+    setLocalY((clampedDepth - scrollDepth) / depthPerPixel)
+  }, [clampDepthToWell])
 
   const handleDragEnd = useCallback(
     (finalDepth: number) => {
       setLocalY(null)
-      void updateFormationDepth(formation.id, finalDepth)
+      const clampedDepth = clampDepthToWell(finalDepth)
+      warnClampedDepth(finalDepth, clampedDepth)
+      void updateFormationDepth(formation.id, clampedDepth)
     },
-    [formation.id, updateFormationDepth],
+    [clampDepthToWell, formation.id, updateFormationDepth, warnClampedDepth],
   )
 
   const { isDragging, dragHandlers } = useFormationDrag({

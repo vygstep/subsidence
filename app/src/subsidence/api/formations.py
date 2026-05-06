@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import logging
+import math
 
 from fastapi import APIRouter, HTTPException, Request
 from pydantic import BaseModel
@@ -128,6 +129,20 @@ def _require_well(session, well_id: str) -> WellModel:
     return well
 
 
+def _validate_depth_inside_well(well: WellModel, depth_md: float | None) -> None:
+    if depth_md is None:
+        return
+    if not math.isfinite(depth_md):
+        raise HTTPException(status_code=400, detail='Top depth must be a finite number')
+    td_md = well.td_md
+    if depth_md < 0 or (td_md is not None and depth_md > td_md):
+        upper = td_md if td_md is not None else 0.0
+        raise HTTPException(
+            status_code=400,
+            detail=f'Top depth {depth_md:.1f} m is outside well interval 0.0-{upper:.1f} m',
+        )
+
+
 def _load_options():
     return [
         selectinload(FormationTopModel.strat_links).options(
@@ -242,9 +257,9 @@ def list_formations(well_id: str, request: Request) -> list[FormationTopResponse
 def create_formation(well_id: str, body: FormationTopCreate, request: Request) -> FormationTopResponse:
     manager = _require_open_project(request)
     with manager.get_session() as session:
-        _require_well(session, well_id)
-        well = session.get(WellModel, well_id)
-        tvd, tvdss = compute_tvd_tvdss(manager.project_path, well, body.depth_md) if well is not None else (None, None)
+        well = _require_well(session, well_id)
+        _validate_depth_inside_well(well, body.depth_md)
+        tvd, tvdss = compute_tvd_tvdss(manager.project_path, well, body.depth_md)
         row = FormationTopModel(
             well_id=well_id,
             name=body.name,
@@ -295,6 +310,11 @@ def update_formation(well_id: str, formation_id: int, body: FormationTopPatch, r
             if md_result is None:
                 raise HTTPException(status_code=400, detail='No deviation survey available for TVD/TVDSS-to-MD back-calculation')
             resolved_depth_md = md_result
+        if resolved_depth_md is not None:
+            well = session.get(WellModel, well_id)
+            if well is None:
+                raise HTTPException(status_code=404, detail=f'Well not found: {well_id}')
+            _validate_depth_inside_well(well, resolved_depth_md)
 
         old_values: dict[str, object] = {}
         new_values: dict[str, object] = {}
