@@ -6,6 +6,8 @@ const ZOOM_PRESETS = [
   { label: '1:1000', dpp: 1.0 },
 ] as const
 
+const LOG_VIEW_DEPTH_PADDING_M = 100
+
 export function WellViewerToolbar() {
   const overviewVisible = useViewStore((state) => state.overviewVisible)
   const curveTooltipVisible = useViewStore((state) => state.curveTooltipVisible)
@@ -16,6 +18,8 @@ export function WellViewerToolbar() {
   const setInteractionMode = useViewStore((state) => state.setInteractionMode)
   const setScale = useViewStore((state) => state.setScale)
   const well = useWellDataStore((state) => state.well)
+  const formations = useWellDataStore((state) => state.formations)
+  const fullCurves = useWellDataStore((state) => state.fullCurves)
 
   function isZoomActive(dpp: number): boolean {
     return Math.abs(depthPerPixel - dpp) < 0.001
@@ -23,21 +27,27 @@ export function WellViewerToolbar() {
 
   function handleFitToWell() {
     const { viewportHeight, setScroll, setScale: setScaleInner } = useViewStore.getState()
-    const { fullCurves } = useWellDataStore.getState()
-    if (fullCurves.length === 0) return
     let maxD = -Infinity
+    if (well?.td_md !== undefined && Number.isFinite(well.td_md)) {
+      maxD = Math.max(maxD, well.td_md)
+    }
     for (const c of fullCurves) {
       if (c.depths.length > 0) maxD = Math.max(maxD, c.depths[c.depths.length - 1])
     }
-    if (!Number.isFinite(maxD) || maxD <= 0) return
-    setScroll(0)
-    setScaleInner(maxD / viewportHeight)
+    for (const formation of formations) {
+      if (formation.depth_md !== null && Number.isFinite(formation.depth_md)) {
+        maxD = Math.max(maxD, formation.depth_md)
+      }
+    }
+    const wellBottomDepth = Math.max(Number.isFinite(maxD) ? maxD : 0, 0)
+    const minDepth = -LOG_VIEW_DEPTH_PADDING_M
+    const maxDepth = wellBottomDepth + LOG_VIEW_DEPTH_PADDING_M
+    setScroll(minDepth)
+    setScaleInner(Math.max((maxDepth - minDepth) / viewportHeight, 0.05))
   }
 
   function handleFitToContents() {
     const { viewportHeight, setScroll, setScale: setScaleInner } = useViewStore.getState()
-    const { fullCurves } = useWellDataStore.getState()
-    if (fullCurves.length === 0) return
     let minD = Infinity
     let maxD = -Infinity
     for (const c of fullCurves) {
@@ -46,10 +56,20 @@ export function WellViewerToolbar() {
         maxD = Math.max(maxD, c.depths[c.depths.length - 1])
       }
     }
-    if (!Number.isFinite(minD) || !Number.isFinite(maxD) || maxD <= minD) return
-    setScroll(minD)
-    setScaleInner((maxD - minD) / viewportHeight)
+    for (const formation of formations) {
+      if (formation.depth_md !== null && Number.isFinite(formation.depth_md)) {
+        minD = Math.min(minD, formation.depth_md)
+        maxD = Math.max(maxD, formation.depth_md)
+      }
+    }
+    if (!Number.isFinite(minD) || !Number.isFinite(maxD)) return
+    const span = Math.max(maxD - minD, LOG_VIEW_DEPTH_PADDING_M)
+    setScroll(minD - (span - (maxD - minD)) / 2)
+    setScaleInner(Math.max(span / viewportHeight, 0.05))
   }
+
+  const hasFitData = fullCurves.some((curve) => curve.depths.length > 0)
+    || formations.some((formation) => formation.depth_md !== null)
 
   return (
     <div className="well-viewer-toolbar" aria-label="Well viewer tools">
@@ -89,9 +109,9 @@ export function WellViewerToolbar() {
       <button
         type="button"
         className="well-viewer-toolbar__button"
-        disabled={well === null}
+        disabled={well === null || !hasFitData}
         onClick={handleFitToContents}
-        title="Fit view to curve data"
+        title="Fit view to curve and top data"
       >
         <span className="well-viewer-toolbar__button-label">Fit data</span>
       </button>
