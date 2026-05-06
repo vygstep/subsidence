@@ -5,6 +5,7 @@ import { formationDisplayColor } from '@/types'
 import type { CurveData } from '@/types'
 
 const WIDTH = 24
+const LOG_VIEW_DEPTH_PADDING_M = 100
 
 interface WellOverviewMinimapProps {
   height: number
@@ -16,23 +17,28 @@ export function WellOverviewMinimap({ height, curves }: WellOverviewMinimapProps
   const isDraggingRef = useRef(false)
 
   const formations = useWellDataStore((s) => s.formations)
+  const well = useWellDataStore((s) => s.well)
   const scrollDepth = useViewStore((s) => s.scrollDepth)
   const depthPerPixel = useViewStore((s) => s.depthPerPixel)
   const viewportHeight = useViewStore((s) => s.viewportHeight)
   const setScroll = useViewStore((s) => s.setScroll)
 
-  const minDepth = useRef(0)
+  const minDepth = useRef(-LOG_VIEW_DEPTH_PADDING_M)
   const maxDepth = useRef(1)
 
   useEffect(() => {
-    if (curves.length === 0) return
-    let hi = Number.NEGATIVE_INFINITY
+    let hi = well && Number.isFinite(well.td_md) ? well.td_md : 0
     for (const c of curves) {
       if (c.depths.length > 0) hi = Math.max(hi, c.depths[c.depths.length - 1])
     }
-    minDepth.current = 0
-    if (Number.isFinite(hi)) maxDepth.current = hi
-  }, [curves])
+    for (const formation of formations) {
+      if (formation.depth_md !== null && Number.isFinite(formation.depth_md)) {
+        hi = Math.max(hi, formation.depth_md)
+      }
+    }
+    minDepth.current = -LOG_VIEW_DEPTH_PADDING_M
+    maxDepth.current = Math.max(hi, 0) + LOG_VIEW_DEPTH_PADDING_M
+  }, [curves, formations, well])
 
   useEffect(() => {
     const canvas = canvasRef.current
