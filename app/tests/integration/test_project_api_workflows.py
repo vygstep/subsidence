@@ -1754,6 +1754,73 @@ def test_top_set_pick_insert_endpoint_adds_marker_from_data_manager(api_client: 
     assert len(resp.json()) == 3
 
 
+def test_formation_api_rejects_depth_outside_well_td(api_client: TestClient, tmp_path: Path):
+    _create_project(api_client, tmp_path, 'formation-depth-guard')
+
+    resp = api_client.post('/api/projects/wells', json={
+        'name': 'Depth Guard Well', 'x': 0.0, 'y': 0.0, 'kb': 0.0, 'td': 600.0, 'crs': 'local',
+    })
+    assert resp.status_code == 200, resp.text
+    well_id = resp.json()['well_id']
+
+    resp = api_client.post(f'/api/wells/{well_id}/formations', json={
+        'name': 'Too Deep',
+        'depth_md': 800.0,
+        'color': '#aaaaaa',
+    })
+    assert resp.status_code == 400, resp.text
+    assert 'outside well interval' in resp.json()['detail']
+
+    resp = api_client.get(f'/api/wells/{well_id}/formations')
+    assert resp.status_code == 200, resp.text
+    assert resp.json() == []
+
+
+def test_formation_api_rejects_invalid_depth_update_without_mutation(api_client: TestClient, tmp_path: Path):
+    _create_project(api_client, tmp_path, 'formation-depth-update-guard')
+
+    resp = api_client.post('/api/projects/wells', json={
+        'name': 'Depth Update Guard Well', 'x': 0.0, 'y': 0.0, 'kb': 0.0, 'td': 600.0, 'crs': 'local',
+    })
+    assert resp.status_code == 200, resp.text
+    well_id = resp.json()['well_id']
+
+    resp = api_client.post(f'/api/wells/{well_id}/formations', json={
+        'name': 'Valid Top',
+        'depth_md': 500.0,
+        'color': '#aaaaaa',
+    })
+    assert resp.status_code == 201, resp.text
+    formation_id = resp.json()['id']
+
+    resp = api_client.patch(
+        f'/api/wells/{well_id}/formations/{formation_id}',
+        json={'depth_md': 800.0},
+    )
+    assert resp.status_code == 400, resp.text
+    assert 'outside well interval' in resp.json()['detail']
+
+    resp = api_client.get(f'/api/wells/{well_id}/formations')
+    assert resp.status_code == 200, resp.text
+    [formation] = resp.json()
+    assert formation['depth_md'] == pytest.approx(500.0)
+
+
+def test_top_set_pick_api_rejects_depth_outside_well_td(api_client: TestClient, tmp_path: Path):
+    well_id, top_set_id = _create_well_with_top_set(api_client, tmp_path)
+
+    resp = api_client.post(
+        f'/api/top-sets/{top_set_id}/picks',
+        json={'well_id': well_id, 'depth_md': 1200.0},
+    )
+    assert resp.status_code == 400, resp.text
+    assert 'outside well interval' in resp.json()['detail']
+
+    resp = api_client.get(f'/api/wells/{well_id}/formations')
+    assert resp.status_code == 200, resp.text
+    assert len(resp.json()) == 4
+
+
 def test_zone_lifecycle_delete_middle_horizon_merges_zones(api_client: TestClient, tmp_path: Path):
     """Deleting a middle horizon merges adjacent zones; lithology cleared."""
     well_id, top_set_id = _create_well_with_top_set(api_client, tmp_path)

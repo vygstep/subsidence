@@ -668,6 +668,8 @@ Responsibilities:
 - Render depth track, log tracks, curves, fills, formation column, tops, and interaction overlays.
 - Keep canvas rendering separated from SVG/HTML interaction.
 - Apply curve mnemonic visual defaults.
+- Use the shared log-view extent for scroll, minimap, fit actions, and grey padding zones:
+  `-100..0` is top padding, `wellBottomDepth..wellBottomDepth+100` is bottom padding.
 
 Rule:
 

@@ -2,7 +2,9 @@
 
 ## Status
 
-`todo`
+`implemented`
+
+Completed on branch `bug/logview-scroll-padding`.
 
 ## Problem
 
@@ -180,3 +182,27 @@ Checks:
 - Dragging a top above `0` or below `TD` clamps to the boundary, saves the boundary depth, and shows a QC warning.
 - Backend formation create/update rejects out-of-well MD values.
 - Backend TopSet pick creation rejects out-of-well MD values.
+
+## Implementation Summary
+
+- Removed the empty-curve banner from the log-view workspace.
+- Centralized the log-view depth extent around the editable well interval and render padding:
+  - scroll minimum: `-100 m`
+  - well top: `0 m`
+  - well bottom: `max(well.td_md, deepest curve depth, deepest picked top depth, 0)`
+  - scroll maximum: `wellBottomDepth + 100 m`
+- Added grey padding-zone rendering for depth, curve, and formation tracks.
+- Kept curve grids, curve data, lithology zones, and top-placement affordances out of padding zones.
+- Updated minimap, scroll clamp, `Fit well`, and `Fit data` to use well/tops/curves consistently.
+- Added frontend guards and QC warnings for invalid top depth input, add actions, and drag clamping.
+- Added backend validation for formation create/update and TopSet pick creation.
+- Added API regression tests for invalid out-of-well top writes.
+
+## Verification
+
+- Frontend: `npm run test -- --run` in `frontend` passed: 49 tests.
+- Backend full suite: `pytest tests` in `app` had 82 passed and 11 existing failures unrelated to this contract.
+- Targeted backend API tests passed:
+  - `test_formation_api_rejects_depth_outside_well_td`
+  - `test_formation_api_rejects_invalid_depth_update_without_mutation`
+  - `test_top_set_pick_api_rejects_depth_outside_well_td`

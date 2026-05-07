@@ -23,7 +23,7 @@ The current implementation is built around:
 - Stratigraphic zone system with lithology aggregation from curves
 - Measurement unit registry and normalization engine
 
-The active development contract is Bugs and Features 3. Current future work is tracked in `todo.md`.
+Current active work is tracked in `todo.md`; completed and superseded contracts are archived under `docs/contracts/implemented/`.
 
 ---
 
@@ -64,7 +64,7 @@ Reference:
 
 ## Active Contracts
 
-- [Bugs and Features 3](contracts/bugs_and_features_3.md) - Wells-tab restructuring, ZoneSets, model settings, well colors, and built-in sea-level curves.
+See [Execution Backlog](../todo.md) for active contracts and checkpoint status.
 
 ---
 

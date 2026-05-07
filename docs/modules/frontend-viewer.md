@@ -43,6 +43,28 @@ This avoids DOM overload from curve samples while keeping interaction code simpl
 
 ---
 
+## Depth Extent and Padding
+
+The log viewer uses a shared well extent for scroll, minimap, fit actions, padding rendering, and top placement rules.
+
+Definitions:
+
+- `scrollMinDepth = -100`
+- `wellTopDepth = 0`
+- `wellBottomDepth = max(well.td_md, deepestCurveDepth, deepestPickedTopDepth, 0)`
+- `scrollMaxDepth = wellBottomDepth + 100`
+
+Rules:
+
+- The `-100..0` and `wellBottomDepth..wellBottomDepth+100` intervals are padding zones.
+- Padding zones are rendered grey.
+- Curve grids, curve data, lithology zones, and top placement affordances must not render inside padding zones.
+- Depth-track labels may remain visible in padding zones so the scroll context stays readable.
+- New or moved tops are only valid inside `[0, well.td_md]`; frontend guards show QC warnings and backend API validation remains the source of truth.
+- `Fit well` uses the full scroll extent; `Fit data` fits curves and picked tops together, and also works when a well has tops but no curves.
+
+---
+
 ## Renderers and Hooks
 
 Files:
