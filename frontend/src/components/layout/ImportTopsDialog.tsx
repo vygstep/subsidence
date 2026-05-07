@@ -165,11 +165,11 @@ export function ImportTopsDialog({ wells, activeWellId, onClose, onSuccess }: Im
         const payload = (await response.json()) as ImportTopsResponse & { qc_warnings?: string[] }
         rememberImportPath(nextPath)
         const warnings = payload.qc_warnings ?? []
-        await onSuccess(payload.well_id)
-        onClose()
         if (warnings.length > 0) {
           addQcWarnings(warnings)
         }
+        await onSuccess(payload.well_id)
+        onClose()
       }, {
         projectPath,
         activeWellId: useFileWell ? null : (wellId || activeWellId || null),

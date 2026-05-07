@@ -24,6 +24,7 @@ from .common import (
     apply_imported_well_metadata,
     compute_sampling_kind,
     create_empty_well,
+    extend_well_td_for_import,
     run_curve_qc,
 )
 
@@ -93,7 +94,7 @@ def import_logs_csv(
     depth_column: str | None = None,
     create_new_well: bool = False,
     trusted_depth_reference: str = 'MD',
-) -> tuple[object, list[str]]:
+) -> tuple[object, list[str], float | None]:
     bundle_path = Path(project_path)
     source_path = Path(csv_path)
     source_hash = _sha256(source_path)
@@ -107,7 +108,9 @@ def import_logs_csv(
     depths = convert_depth_values_to_meters(session, raw_depths, depth_unit or 'm')
     final_depth = depths[-1] if depths else None
     well = _resolve_or_create_well_for_logs(session, rows, well_id=well_id, td=final_depth, create_new_well=create_new_well)
+    td_before_import = well.td_md
     apply_imported_well_metadata(well, td=final_depth)
+    td_warning = extend_well_td_for_import(well, final_depth, previous_td=td_before_import)
 
     rules = load_curve_alias_rules(session)
     curve_columns = [
@@ -182,9 +185,11 @@ def import_logs_csv(
 
     import json as _json
     qc_warnings: list[str] = []
+    if td_warning is not None:
+        qc_warnings.append(td_warning)
     for p in curve_payloads:
         if p.get('qc_summary'):
             summary = _json.loads(str(p['qc_summary']))
             qc_warnings.extend(summary.get('messages', []))
 
-    return well, qc_warnings
+    return well, qc_warnings, final_depth

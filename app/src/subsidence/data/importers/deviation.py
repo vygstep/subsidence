@@ -22,6 +22,7 @@ from .common import (
     _validate_strictly_increasing_depth,
     apply_imported_well_metadata,
     create_empty_well,
+    extend_well_td_for_import,
 )
 
 _DEVIATION_MODE_COLUMNS = {
@@ -81,7 +82,7 @@ def import_deviation_csv(
     *,
     column_map: dict[str, str] | None = None,
     create_new_well: bool = False,
-) -> DeviationSurveyModel:
+) -> tuple[DeviationSurveyModel, list[str]]:
     bundle_path = Path(project_path)
     path = Path(csv_path)
     deviation_dir = bundle_path / 'deviation'
@@ -97,8 +98,14 @@ def import_deviation_csv(
     mode, value_columns = _detect_deviation_mode(fieldnames)
     depths = _validate_strictly_increasing_depth(rows, depth_column, path)
     well = _resolve_or_create_well_for_deviation(session, rows, depth_column, well_id, create_new_well=create_new_well)
+    td_before_import = well.td_md
     if depths:
         apply_imported_well_metadata(well, td=depths[-1])
+    td_warning = extend_well_td_for_import(
+        well,
+        depths[-1] if depths else None,
+        previous_td=td_before_import,
+    )
 
     frame_data: dict[str, list[float]] = {depth_column: depths}
     for column in value_columns:
@@ -138,4 +145,5 @@ def import_deviation_csv(
         survey.source_hash = source_hash
 
     session.flush()
-    return survey
+    qc_warnings = [td_warning] if td_warning is not None else []
+    return survey, qc_warnings

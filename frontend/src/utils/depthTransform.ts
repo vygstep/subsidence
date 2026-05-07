@@ -7,6 +7,7 @@ export interface SurveyPoint {
 export interface TVDTable {
   md: Float32Array
   tvd: Float32Array
+  lastInclinationCos?: number
 }
 
 export function minCurvatureToTVD(survey: SurveyPoint[]): TVDTable {
@@ -44,7 +45,8 @@ export function minCurvatureToTVD(survey: SurveyPoint[]): TVDTable {
     tvd[i] = tvd[i - 1] + dtvd
   }
 
-  return { md, tvd }
+  const lastInclination = survey[survey.length - 1]?.inclination_deg ?? 0
+  return { md, tvd, lastInclinationCos: Math.cos((lastInclination * Math.PI) / 180) }
 }
 
 export function tvdToMd(tvdValue: number, table: TVDTable): number {
@@ -92,7 +94,14 @@ export function mdToTvd(mdValue: number, table: TVDTable): number {
   const { md, tvd } = table
   if (md.length === 0) return mdValue
   if (mdValue <= md[0]) return tvd[0]
-  if (mdValue >= md[md.length - 1]) return tvd[tvd.length - 1]
+  if (mdValue > md[md.length - 1]) {
+    const slope = table.lastInclinationCos ?? (
+      md.length > 1
+        ? (tvd[tvd.length - 1] - tvd[tvd.length - 2]) / (md[md.length - 1] - md[md.length - 2])
+        : 1
+    )
+    return tvd[tvd.length - 1] + (mdValue - md[md.length - 1]) * slope
+  }
 
   // Binary search
   let lo = 0

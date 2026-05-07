@@ -13,6 +13,7 @@ from subsidence.data import (
     import_tops_csv,
 )
 from subsidence.data.deviation_transform import recalculate_picks_tvd
+from subsidence.data.deviation_transform import deviation_extrapolation_warning_for_import
 from subsidence.data.schema import CurveMetadata, FormationTopModel, FormationZone, TopSet, TopSetHorizon, WellModel
 from subsidence.data.zone_service import (
     activate_top_set_for_well,
@@ -112,7 +113,7 @@ def import_las(payload: ImportLasRequest, request: Request) -> ImportLasResponse
     with operation_log('import.las', project_path=_manager_project_path(manager), input_path=payload.las_path, well_id=payload.well_id, create_new_well=payload.create_new_well):
         try:
             with manager.get_session() as session:
-                well, qc_warnings = import_las_file(
+                well, qc_warnings, imported_max_md = import_las_file(
                     session,
                     manager.project_path,
                     Path(payload.las_path),
@@ -128,6 +129,9 @@ def import_las(payload: ImportLasRequest, request: Request) -> ImportLasResponse
                         ct = payload.curve_types.get(curve_row.mnemonic)
                         if ct in ('continuous', 'discrete'):
                             curve_row.curve_type = ct
+                deviation_warning = deviation_extrapolation_warning_for_import(manager.project_path, well, imported_max_md)
+                if deviation_warning is not None:
+                    qc_warnings.append(deviation_warning)
                 command = ImportWell.capture(session, manager.project_path, well.id)
                 well_name = well.name
                 curve_count = len(list(session.scalars(select(CurveMetadata).where(CurveMetadata.well_id == well_id))))
@@ -149,7 +153,7 @@ def import_logs_csv_route(payload: ImportLogsCsvRequest, request: Request) -> Im
     with operation_log('import.logs_csv', project_path=_manager_project_path(manager), input_path=payload.csv_path, well_id=payload.well_id, depth_column=payload.depth_column, create_new_well=payload.create_new_well):
         try:
             with manager.get_session() as session:
-                well, qc_warnings = import_logs_csv(
+                well, qc_warnings, imported_max_md = import_logs_csv(
                     session,
                     manager.project_path,
                     Path(payload.csv_path),
@@ -166,6 +170,9 @@ def import_logs_csv_route(payload: ImportLogsCsvRequest, request: Request) -> Im
                         ct = payload.curve_types.get(curve_row.mnemonic)
                         if ct in ('continuous', 'discrete'):
                             curve_row.curve_type = ct
+                deviation_warning = deviation_extrapolation_warning_for_import(manager.project_path, well, imported_max_md)
+                if deviation_warning is not None:
+                    qc_warnings.append(deviation_warning)
                 command = ImportWell.capture(session, manager.project_path, well.id)
                 well_name = well.name
                 curve_count = len(list(session.scalars(select(CurveMetadata).where(CurveMetadata.well_id == well_id))))
@@ -198,6 +205,7 @@ def import_tops(payload: ImportTopsRequest, request: Request) -> ImportTopsRespo
                     create_new_well=payload.create_new_well,
                     top_set_id=zone_set_id,
                 )
+                first_pass_qc_warnings = list(qc_warnings)
                 target_well_id = imported[0].well_id if imported else target_well_id
                 if target_well_id is None:
                     raise HTTPException(status_code=500, detail='Import created no well')
@@ -217,9 +225,14 @@ def import_tops(payload: ImportTopsRequest, request: Request) -> ImportTopsRespo
                             create_new_well=False,
                             top_set_id=zone_set_id,
                         )
+                        qc_warnings = first_pass_qc_warnings + qc_warnings
                 well = session.get(WellModel, target_well_id)
                 if well:
                     well.depth_unit = payload.depth_unit
+                    imported_max_md = max((pick.depth_md or 0.0) for pick in imported) if imported else None
+                    deviation_warning = deviation_extrapolation_warning_for_import(manager.project_path, well, imported_max_md)
+                    if deviation_warning is not None:
+                        qc_warnings.append(deviation_warning)
                     recalculate_picks_tvd(session, manager.project_path, well)
                 horizon_count = 0
                 zone_count = 0
@@ -251,7 +264,7 @@ def import_deviation(payload: ImportDeviationRequest, request: Request) -> Impor
     with operation_log('import.deviation', project_path=_manager_project_path(manager), input_path=payload.csv_path, well_id=payload.well_id, create_new_well=payload.create_new_well):
         try:
             with manager.get_session() as session:
-                survey = import_deviation_csv(
+                survey, qc_warnings = import_deviation_csv(
                     session,
                     manager.project_path,
                     payload.well_id,
@@ -270,4 +283,4 @@ def import_deviation(payload: ImportDeviationRequest, request: Request) -> Impor
             manager.save_project()
         except (ValueError, FileNotFoundError) as error:
             raise HTTPException(status_code=400, detail=str(error)) from error
-        return ImportDeviationResponse(well_id=target_well_id, reference=reference, mode=mode, data_uri=data_uri)
+        return ImportDeviationResponse(well_id=target_well_id, reference=reference, mode=mode, data_uri=data_uri, qc_warnings=qc_warnings)

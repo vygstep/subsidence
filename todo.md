@@ -1,5 +1,20 @@
 # TODO
 
+## Active import warning bug
+
+Active contract: `docs/contracts/bug-import-warning-panel-delivery.md`
+
+| Item | Title | Status |
+|---|---|---|
+| BUG-IMPORT-TD-WARN-001 | Import TD-extension QC warnings are missing in some flows | todo |
+
+Details:
+
+- Tops import works and extends well TD when imported tops are deeper than the current well TD, but the QC warning message is not shown in the bottom-right warning panel.
+- Deviation import also misses the QC warning when deviation is the first imported data for the well/project.
+- Deviation import warning does appear after tops have already been imported first, then deviation is imported.
+- Expected warning behavior: any import that extends `well.td_md` should surface a QC warning in the existing warning panel, regardless of import order or imported data type.
+
 Active contract: `docs/contracts/bugs_and_features_4.md`
 
 ## BF4 — current sprint

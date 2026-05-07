@@ -25,6 +25,7 @@ from .common import (
     _resolve_well,
     apply_imported_well_metadata,
     create_empty_well,
+    extend_well_td_for_import,
     run_top_qc,
 )
 
@@ -141,8 +142,10 @@ def import_tops_csv(
 
     well = _resolve_or_create_well_for_tops(session, rows, well_id, create_new_well=create_new_well)
     max_depth = max((_extract_float(row, 'depth_md', 'depth') or 0.0) for row in rows) if rows else None
+    td_before_import = well.td_md
     if max_depth is not None:
         apply_imported_well_metadata(well, td=max_depth)
+    td_warning = extend_well_td_for_import(well, max_depth, previous_td=td_before_import)
 
     _log.info('well_resolved', extra={'event': {
         'operation': 'import_tops', 'phase': 'well_resolved',
@@ -299,6 +302,8 @@ def import_tops_csv(
     # Collect QC warning messages
     import json as _json
     qc_warnings: list[str] = []
+    if td_warning is not None:
+        qc_warnings.append(td_warning)
     for top in imported:
         if top.qc_summary:
             summary = _json.loads(top.qc_summary)

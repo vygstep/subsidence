@@ -2,7 +2,7 @@
 
 ## Status
 
-`todo`
+`implemented`
 
 ## Problem
 
@@ -74,6 +74,12 @@ File:
 Mirror backend extrapolation for `mdToTvd`.
 
 ### Step 4: Verification
+
+Automated checks:
+
+- `pytest tests/integration/test_project_api_workflows.py -k "tops_import_create_top_set_preserves_td_extension_warning or tops_import_warns_and_extrapolates_below_deviation_survey or logs_import_extends_well_td_with_warning or deviation_import_extends_well_td_with_warning"`: 4 passed.
+- `npm run test -- --run ImportDialogTargetWell.integration.test.tsx`: 7 passed.
+- `npm run test -- --run depthTransform.test.ts`: 1 passed.
 
 Manual checks:
 

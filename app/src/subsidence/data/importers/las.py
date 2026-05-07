@@ -23,6 +23,7 @@ from .common import (
     apply_imported_well_metadata,
     compute_sampling_kind,
     create_empty_well,
+    extend_well_td_for_import,
     run_curve_qc,
 )
 
@@ -71,7 +72,7 @@ def import_las_file(
     well_id: str | None = None,
     create_new_well: bool = False,
     trusted_depth_reference: str = 'MD',
-) -> tuple[object, list[str]]:
+) -> tuple[object, list[str], float | None]:
     bundle_path = Path(project_path)
     source_path = Path(las_path)
     originals_dir = bundle_path / 'originals'
@@ -91,8 +92,10 @@ def import_las_file(
     null_value = _coerce_float(getattr(las.well.get('NULL'), 'value', None))
     rules = load_curve_alias_rules(session)
     metadata = _well_metadata_from_las(las, original_relative_path, final_depth=final_depth)
+    td_before_import: float | None = None
     if well_id:
         well = _resolve_well(session, well_id)
+        td_before_import = well.td_md
     elif not create_new_well:
         well = _find_existing_well_by_identity(
             session,
@@ -113,6 +116,7 @@ def import_las_file(
                 extra=metadata['extra'] if isinstance(metadata['extra'], dict) else None,
             )
         else:
+            td_before_import = well.td_md
             apply_imported_well_metadata(
                 well,
                 name=metadata['name'],
@@ -151,6 +155,7 @@ def import_las_file(
             source_las_path=metadata['source_las_path'],
             extra=metadata['extra'],
         )
+    td_warning = extend_well_td_for_import(well, final_depth, previous_td=td_before_import)
     curve_payloads: list[dict[str, object]] = []
 
     for curve in las.curves:
@@ -216,10 +221,12 @@ def import_las_file(
 
     # Collect all unique warning messages from QC summaries
     qc_warnings: list[str] = []
+    if td_warning is not None:
+        qc_warnings.append(td_warning)
     for p in curve_payloads:
         if p.get('qc_summary'):
             import json as _json
             summary = _json.loads(str(p['qc_summary']))
             qc_warnings.extend(summary.get('messages', []))
 
-    return well, qc_warnings
+    return well, qc_warnings, final_depth

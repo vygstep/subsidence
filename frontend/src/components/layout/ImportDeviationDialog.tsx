@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
 import type { FormEvent } from 'react'
 
-import { useProjectStore } from '@/stores'
+import { useNotificationStore, useProjectStore } from '@/stores'
 import { recordOperation } from '@/utils/diagnostics'
 
 import {
@@ -38,10 +38,12 @@ interface ImportDeviationDialogProps {
 
 interface ImportDeviationResponse {
   well_id: string
+  qc_warnings?: string[]
 }
 
 export function ImportDeviationDialog({ wells, activeWellId, onClose, onSuccess }: ImportDeviationDialogProps) {
   const projectPath = useProjectStore((state) => state.projectPath)
+  const addQcWarnings = useNotificationStore((state) => state.addQcWarnings)
   const [wellId, setWellId] = useState(activeWellId ?? '')
   const [createNewWell, setCreateNewWell] = useState(false)
   const [csvPath, setCsvPath] = useState(() => getLastImportRoot())
@@ -107,8 +109,12 @@ export function ImportDeviationDialog({ wells, activeWellId, onClose, onSuccess 
 
         const payload = (await response.json()) as ImportDeviationResponse
         rememberImportPath(nextPath)
+        const warnings = payload.qc_warnings ?? []
         await onSuccess(payload.well_id)
         onClose()
+        if (warnings.length > 0) {
+          addQcWarnings(warnings)
+        }
       }, {
         projectPath,
         activeWellId: wellId || activeWellId || null,

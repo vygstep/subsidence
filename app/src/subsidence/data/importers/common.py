@@ -167,6 +167,32 @@ def apply_imported_well_metadata(
     return well
 
 
+def extend_well_td_for_import(
+    well: WellModel,
+    imported_max_md: float | None,
+    *,
+    previous_td: float | None = None,
+) -> str | None:
+    if imported_max_md is None:
+        return None
+
+    old_td = previous_td if previous_td is not None else well.td_md
+    if old_td is None:
+        if well.td_md is None or imported_max_md > well.td_md:
+            well.td_md = imported_max_md
+        return None
+
+    if imported_max_md > old_td:
+        if well.td_md is None or imported_max_md > well.td_md:
+            well.td_md = imported_max_md
+        return (
+            f'Imported data extends below current TD {old_td:.1f} m; '
+            f'TD was updated to {imported_max_md:.1f} m.'
+        )
+
+    return None
+
+
 def _is_valid_sample(depth: float, value: float, null_value: float | None) -> bool:
     if not math.isfinite(depth) or not math.isfinite(value):
         return False

@@ -5,6 +5,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { ImportDeviationDialog } from '@/components/layout/ImportDeviationDialog'
 import { ImportLasDialog } from '@/components/layout/ImportLasDialog'
 import { ImportTopsDialog } from '@/components/layout/ImportTopsDialog'
+import { useNotificationStore } from '@/stores/notificationStore'
 import { useProjectStore } from '@/stores/projectStore'
 
 const wells = [
@@ -62,6 +63,7 @@ async function advanceToPreview(user: ReturnType<typeof userEvent.setup>) {
 describe('Import dialogs target active well by default', () => {
   beforeEach(() => {
     useProjectStore.setState({ projectPath: 'D:\\projects\\test.subsidence' })
+    useNotificationStore.setState({ qcWarnings: [], isQcPanelOpen: false })
     window.localStorage.setItem('subsidence:last-import-root', 'D:\\data\\imports')
     mockFetch()
   })
@@ -175,5 +177,47 @@ describe('Import dialogs target active well by default', () => {
     const body = JSON.parse(String(executeCall?.[1]?.body))
     expect(body.create_zone_set).toBe(true)
     expect(body.zone_set_id).toBeNull()
+  })
+
+  it('adds tops import QC warnings to the notification store', async () => {
+    const user = userEvent.setup()
+    vi.stubGlobal('fetch', vi.fn().mockImplementation((url: string) => {
+      if (url === '/api/top-sets') {
+        return Promise.resolve({
+          ok: true,
+          json: async () => [{ id: 7, name: 'Regional TopSet', description: null, horizon_count: 3 }],
+        })
+      }
+      if (url === '/api/projects/import-tops') {
+        return Promise.resolve({
+          ok: true,
+          json: async () => ({
+            well_id: 'well-b',
+            zone_set_id: 8,
+            qc_warnings: ['Imported data extends below current TD 100.0 m; TD was updated to 200.0 m.'],
+          }),
+        })
+      }
+      return Promise.resolve({ ok: true, json: async () => TABULAR_PREVIEW_RESPONSE })
+    }))
+
+    render(
+      <ImportTopsDialog
+        wells={wells}
+        activeWellId="well-b"
+        onClose={vi.fn()}
+        onSuccess={vi.fn()}
+      />,
+    )
+
+    await advanceToPreview(user)
+    await user.click(screen.getByRole('button', { name: 'Load tops' }))
+
+    await waitFor(() => {
+      expect(useNotificationStore.getState().qcWarnings).toEqual([
+        'Imported data extends below current TD 100.0 m; TD was updated to 200.0 m.',
+      ])
+    })
+    expect(useNotificationStore.getState().isQcPanelOpen).toBe(true)
   })
 })

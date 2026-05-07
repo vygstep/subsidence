@@ -574,7 +574,7 @@ def get_curves_full(
     and the well has an INCL_AZIM deviation survey, depth arrays are converted on-the-fly.
     Curves with a non-MD trusted_depth_reference are always returned in their native basis.
     """
-    from subsidence.data.deviation_transform import _interpolate, _load_survey_arrays
+    from subsidence.data.deviation_transform import _load_survey_arrays_with_incl, md_to_tvd_with_extrapolation
 
     db_depth_basis = depth_basis.upper()
     manager = _require_open_project(request)
@@ -594,9 +594,9 @@ def get_curves_full(
             return []
 
         # Pre-load survey arrays once for TVD/TVDSS conversion
-        survey_arrays: tuple[object, object] | None = None
+        survey_arrays: tuple[object, object, object] | None = None
         if db_depth_basis in ('TVD', 'TVDSS') and well.deviation_survey is not None:
-            survey_arrays = _load_survey_arrays(manager.project_path, well.deviation_survey)
+            survey_arrays = _load_survey_arrays_with_incl(manager.project_path, well.deviation_survey)
         kb_elev = well.kb_elev or 0.0
 
         curve_maps = _load_curve_maps(manager.project_path, curve_rows)
@@ -609,9 +609,9 @@ def get_curves_full(
 
             # Depth conversion: only for MD-native curves when conversion is requested
             if db_depth_basis != 'MD' and row.trusted_depth_reference == 'MD' and survey_arrays is not None:
-                md_arr, tvd_arr = survey_arrays
+                md_arr, tvd_arr, incl_arr = survey_arrays
                 converted_depths = [
-                    float(_interpolate(float(d), md_arr, tvd_arr)) - (kb_elev if db_depth_basis == 'TVDSS' else 0.0)
+                    float(md_to_tvd_with_extrapolation(float(d), md_arr, tvd_arr, incl_arr)) - (kb_elev if db_depth_basis == 'TVDSS' else 0.0)
                     for d in depths_arr
                 ]
                 results.append(

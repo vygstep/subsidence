@@ -10,8 +10,11 @@ from sqlalchemy.orm import Session
 from .schema import DeviationSurveyModel, FormationTopModel, WellModel
 
 
-def _load_survey_arrays(project_path: Path, survey: DeviationSurveyModel) -> tuple[np.ndarray, np.ndarray] | None:
-    """Load deviation parquet and return (md_array, tvd_array) via min-curvature.
+def _load_survey_arrays_with_incl(
+    project_path: Path,
+    survey: DeviationSurveyModel,
+) -> tuple[np.ndarray, np.ndarray, np.ndarray] | None:
+    """Load deviation parquet and return (md_array, tvd_array, incl_array) via min-curvature.
 
     Only INCL_AZIM mode is supported; other modes return None.
     """
@@ -37,7 +40,16 @@ def _load_survey_arrays(project_path: Path, survey: DeviationSurveyModel) -> tup
     incl_arr = df['incl_deg'].to_numpy(dtype=float)
     azim_arr = df['azim_deg'].to_numpy(dtype=float)
 
-    return _min_curvature(md_arr, incl_arr, azim_arr)
+    md_arr, tvd_arr = _min_curvature(md_arr, incl_arr, azim_arr)
+    return md_arr, tvd_arr, incl_arr
+
+
+def _load_survey_arrays(project_path: Path, survey: DeviationSurveyModel) -> tuple[np.ndarray, np.ndarray] | None:
+    arrays = _load_survey_arrays_with_incl(project_path, survey)
+    if arrays is None:
+        return None
+    md_arr, tvd_arr, _incl_arr = arrays
+    return md_arr, tvd_arr
 
 
 def _min_curvature(
@@ -84,6 +96,48 @@ def _interpolate(value: float, x_arr: np.ndarray, y_arr: np.ndarray) -> float:
     return float(y_arr[idx]) + t * float(y_arr[idx + 1] - y_arr[idx])
 
 
+def md_to_tvd_with_extrapolation(
+    depth_md: float,
+    md_arr: np.ndarray,
+    tvd_arr: np.ndarray,
+    incl_arr: np.ndarray,
+) -> float:
+    """Interpolate MD to TVD and extend below the last station using last inclination."""
+    if len(md_arr) == 0:
+        return depth_md
+    if depth_md <= md_arr[0]:
+        return float(tvd_arr[0])
+    if depth_md > md_arr[-1]:
+        last_incl_rad = math.radians(float(incl_arr[-1])) if len(incl_arr) else 0.0
+        return float(tvd_arr[-1]) + (depth_md - float(md_arr[-1])) * math.cos(last_incl_rad)
+    return _interpolate(depth_md, md_arr, tvd_arr)
+
+
+def deviation_extrapolation_warning_for_import(
+    project_path: Path | str,
+    well: WellModel,
+    imported_max_md: float | None,
+) -> str | None:
+    if imported_max_md is None or well.deviation_survey is None:
+        return None
+
+    arrays = _load_survey_arrays_with_incl(Path(project_path), well.deviation_survey)
+    if arrays is None:
+        return None
+
+    md_arr, _tvd_arr, _incl_arr = arrays
+    if len(md_arr) == 0:
+        return None
+    survey_max_md = float(md_arr[-1])
+    if imported_max_md <= survey_max_md:
+        return None
+
+    return (
+        f'Deviation survey ends at {survey_max_md:.1f} m; '
+        'TVD/TVDSS below this depth uses the last inclination/azimuth.'
+    )
+
+
 def compute_tvd_tvdss(
     project_path: Path | str,
     well: WellModel,
@@ -100,12 +154,12 @@ def compute_tvd_tvdss(
     if survey is None:
         return None, None
 
-    arrays = _load_survey_arrays(project_path, survey)
+    arrays = _load_survey_arrays_with_incl(project_path, survey)
     if arrays is None:
         return None, None
 
-    md_arr, tvd_arr = arrays
-    tvd = _interpolate(depth_md, md_arr, tvd_arr)
+    md_arr, tvd_arr, incl_arr = arrays
+    tvd = md_to_tvd_with_extrapolation(depth_md, md_arr, tvd_arr, incl_arr)
     tvdss = tvd - well.kb_elev
     return tvd, tvdss
 
@@ -150,17 +204,17 @@ def recalculate_picks_tvd(
     if survey is None:
         return 0
 
-    arrays = _load_survey_arrays(project_path, survey)
+    arrays = _load_survey_arrays_with_incl(project_path, survey)
     if arrays is None:
         return 0
 
-    md_arr, tvd_arr = arrays
+    md_arr, tvd_arr, incl_arr = arrays
     count = 0
     for pick in session.query(FormationTopModel).filter(
         FormationTopModel.well_id == well.id,
         FormationTopModel.depth_md.is_not(None),
     ).all():
-        tvd = _interpolate(float(pick.depth_md), md_arr, tvd_arr)
+        tvd = md_to_tvd_with_extrapolation(float(pick.depth_md), md_arr, tvd_arr, incl_arr)
         pick.depth_tvd = tvd
         pick.depth_tvdss = tvd - well.kb_elev
         count += 1

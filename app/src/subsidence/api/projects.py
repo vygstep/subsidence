@@ -197,6 +197,7 @@ class ImportDeviationResponse(BaseModel):
     reference: str
     mode: str
     data_uri: str
+    qc_warnings: list[str] = []
 
 
 class CreateProjectResponse(BaseModel):

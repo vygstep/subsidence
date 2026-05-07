@@ -1378,6 +1378,162 @@ def test_tops_import_with_column_map(api_client: TestClient, tmp_path: Path) -> 
     assert 'Cretaceous Base' in top_names
 
 
+def test_logs_import_extends_well_td_with_warning(api_client: TestClient, tmp_path: Path) -> None:
+    _create_project(api_client, tmp_path, 'logs-extends-td')
+    response = api_client.post('/api/projects/wells', json={
+        'name': 'Logs TD Well',
+        'x': 0.0,
+        'y': 0.0,
+        'kb': 10.0,
+        'td': 100.0,
+        'crs': 'local',
+    })
+    assert response.status_code == 200, response.text
+    well_id = response.json()['well_id']
+
+    csv_path = tmp_path / 'logs_extend_td.csv'
+    csv_path.write_text(
+        'well_name,DEPT,GR\n'
+        'Logs TD Well,0,80\n'
+        'Logs TD Well,200,90\n',
+        encoding='utf-8',
+    )
+
+    response = api_client.post('/api/projects/import-logs-csv', json={
+        'csv_path': str(csv_path),
+        'well_id': well_id,
+    })
+    assert response.status_code == 200, response.text
+    assert response.json()['qc_warnings'] == [
+        'Imported data extends below current TD 100.0 m; TD was updated to 200.0 m.'
+    ]
+
+    response = api_client.get('/api/wells/inventory')
+    assert response.status_code == 200, response.text
+    well = next(w for w in response.json() if w['well_id'] == well_id)
+    assert well['td_md'] == pytest.approx(200.0)
+
+
+def test_deviation_import_extends_well_td_with_warning(api_client: TestClient, tmp_path: Path) -> None:
+    _create_project(api_client, tmp_path, 'deviation-extends-td')
+    response = api_client.post('/api/projects/wells', json={
+        'name': 'Deviation TD Well',
+        'x': 0.0,
+        'y': 0.0,
+        'kb': 10.0,
+        'td': 100.0,
+        'crs': 'local',
+    })
+    assert response.status_code == 200, response.text
+    well_id = response.json()['well_id']
+
+    csv_path = tmp_path / 'deviation_extend_td.csv'
+    csv_path.write_text(
+        'md,incl_deg,azim_deg\n'
+        '0,0,0\n'
+        '200,0,0\n',
+        encoding='utf-8',
+    )
+
+    response = api_client.post('/api/projects/import-deviation', json={
+        'csv_path': str(csv_path),
+        'well_id': well_id,
+    })
+    assert response.status_code == 200, response.text
+    assert response.json()['qc_warnings'] == [
+        'Imported data extends below current TD 100.0 m; TD was updated to 200.0 m.'
+    ]
+
+    response = api_client.get('/api/wells/inventory')
+    assert response.status_code == 200, response.text
+    well = next(w for w in response.json() if w['well_id'] == well_id)
+    assert well['td_md'] == pytest.approx(200.0)
+
+
+def test_tops_import_warns_and_extrapolates_below_deviation_survey(api_client: TestClient, tmp_path: Path) -> None:
+    _create_project(api_client, tmp_path, 'tops-deviation-extrapolation')
+    response = api_client.post('/api/projects/wells', json={
+        'name': 'Deviation Short Well',
+        'x': 0.0,
+        'y': 0.0,
+        'kb': 10.0,
+        'td': 300.0,
+        'crs': 'local',
+    })
+    assert response.status_code == 200, response.text
+    well_id = response.json()['well_id']
+
+    deviation_csv = tmp_path / 'short_deviation.csv'
+    deviation_csv.write_text(
+        'md,incl_deg,azim_deg\n'
+        '0,60,0\n'
+        '100,60,0\n',
+        encoding='utf-8',
+    )
+    response = api_client.post('/api/projects/import-deviation', json={
+        'csv_path': str(deviation_csv),
+        'well_id': well_id,
+    })
+    assert response.status_code == 200, response.text
+
+    tops_csv = tmp_path / 'tops_below_deviation.csv'
+    tops_csv.write_text(
+        'well_name,top_name,depth_md,age_ma\n'
+        'Deviation Short Well,Deep Top,200,20\n',
+        encoding='utf-8',
+    )
+    response = api_client.post('/api/projects/import-tops', json={
+        'csv_path': str(tops_csv),
+        'well_id': well_id,
+    })
+    assert response.status_code == 200, response.text
+    assert response.json()['qc_warnings'] == [
+        'Deviation survey ends at 100.0 m; TVD/TVDSS below this depth uses the last inclination/azimuth.'
+    ]
+
+    response = api_client.get(f'/api/wells/{well_id}/formations')
+    assert response.status_code == 200, response.text
+    [top] = response.json()
+    assert top['depth_tvd'] == pytest.approx(100.0)
+    assert top['depth_tvdss'] == pytest.approx(90.0)
+
+
+def test_tops_import_create_top_set_preserves_td_extension_warning(api_client: TestClient, tmp_path: Path) -> None:
+    _create_project(api_client, tmp_path, 'tops-td-warning-two-pass')
+    response = api_client.post('/api/projects/wells', json={
+        'name': 'Tops TD Well',
+        'x': 0.0,
+        'y': 0.0,
+        'kb': 10.0,
+        'td': 100.0,
+        'crs': 'local',
+    })
+    assert response.status_code == 200, response.text
+    well_id = response.json()['well_id']
+
+    tops_csv = tmp_path / 'tops_extend_td_with_topset.csv'
+    tops_csv.write_text(
+        'well_name,top_name,depth_md,age_ma\n'
+        'Tops TD Well,Deep Top,200,20\n',
+        encoding='utf-8',
+    )
+    response = api_client.post('/api/projects/import-tops', json={
+        'csv_path': str(tops_csv),
+        'well_id': well_id,
+        'create_zone_set': True,
+        'zone_set_name': 'TD Warning TopSet',
+    })
+    assert response.status_code == 200, response.text
+    assert response.json()['qc_warnings'] == [
+        'Imported data extends below current TD 100.0 m; TD was updated to 200.0 m.'
+    ]
+
+    response = api_client.get('/api/wells/inventory')
+    assert response.status_code == 200, response.text
+    well = next(w for w in response.json() if w['well_id'] == well_id)
+    assert well['td_md'] == pytest.approx(200.0)
+
+
 def test_tops_import_accepts_unconformity_rows(api_client: TestClient, tmp_path: Path) -> None:
     _create_project(api_client, tmp_path, 'tops-unconformity')
     response = api_client.post('/api/projects/wells', json={
