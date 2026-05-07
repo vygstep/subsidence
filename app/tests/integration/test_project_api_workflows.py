@@ -2162,9 +2162,10 @@ def test_zone004_legacy_path_requires_no_top_set(api_client: TestClient, tmp_pat
     resp = api_client.post(f'/api/wells/{well_id}/subsidence')
     assert resp.status_code == 200, resp.text
     results = resp.json()
-    assert len(results) == 2
+    assert len(results) == 3
     names = [r['formation_name'] for r in results]
-    assert 'A' in names and 'B' in names
+    assert names.count('A') == 1
+    assert names.count('B') == 2
 
 
 def test_zone004_zone_path_used_when_top_set_active(api_client: TestClient, tmp_path: Path):
@@ -2182,8 +2183,9 @@ def test_zone004_zone_path_used_when_top_set_active(api_client: TestClient, tmp_
     resp = api_client.post(f'/api/wells/{well_id}/subsidence')
     assert resp.status_code == 200, resp.text
     results = resp.json()
-    assert len(results) == 2
+    assert len(results) == 3
     names = {r['formation_name'] for r in results}
+    assert 'C' in names
     assert 'A → B' in names
     assert 'B → C' in names
 
@@ -2203,7 +2205,10 @@ def test_zone004_zone_path_matches_legacy_for_single_lithology(api_client: TestC
 
     resp = api_client.post(f'/api/wells/{well_id}/subsidence')
     assert resp.status_code == 200, resp.text
-    legacy = {r['formation_name']: r['burial_path'] for r in resp.json()}
+    legacy_results = resp.json()
+    assert len(legacy_results) == 3
+    legacy = {r['formation_name']: r['burial_path'] for r in legacy_results[1:]}
+    assert legacy_results[0]['formation_name'] == 'Y'
 
     resp = api_client.post('/api/top-sets', json={'name': 'Match Set'})
     top_set_id = resp.json()['id']
@@ -2220,7 +2225,10 @@ def test_zone004_zone_path_matches_legacy_for_single_lithology(api_client: TestC
 
     resp = api_client.post(f'/api/wells/{well_id}/subsidence')
     assert resp.status_code == 200, resp.text
-    zone_results = {r['formation_name']: r['burial_path'] for r in resp.json()}
+    zone_payload = resp.json()
+    assert len(zone_payload) == 3
+    assert zone_payload[0]['formation_name'] == 'Z'
+    zone_results = {r['formation_name']: r['burial_path'] for r in zone_payload[1:]}
 
     assert len(legacy) == len(zone_results) == 2
 
@@ -2246,7 +2254,7 @@ def test_zone004_zones_without_lithology_use_default(api_client: TestClient, tmp
     resp = api_client.post(f'/api/wells/{well_id}/subsidence')
     assert resp.status_code == 200, resp.text
     results = resp.json()
-    assert len(results) == 2
+    assert len(results) == 3
     for r in results:
         assert len(r['burial_path']) > 0
 

@@ -52,9 +52,10 @@ def _two_formation_column() -> list[FormationInput]:
     ]
 
 
-def test_two_formation_returns_two_results():
+def test_two_formation_returns_base_plus_two_results():
     results = backstrip(_two_formation_column(), LITHO)
-    assert len(results) == 2
+    assert len(results) == 3
+    assert results[0].formation_name == 'Shale A'
 
 
 def test_burial_paths_nonempty():
@@ -112,7 +113,7 @@ def test_unknown_lithology_uses_default():
     for f in col:
         f.lithology = 'unknown_xyz'
     results = backstrip(col, LITHO)
-    assert len(results) == 2
+    assert len(results) == 3
 
 
 def test_result_color_matches_input():
@@ -151,16 +152,17 @@ def _two_zone_column() -> list[ZoneLayerInput]:
     ]
 
 
-def test_zone_layer_input_returns_two_results():
+def test_zone_layer_input_returns_base_plus_two_results():
     results = backstrip(_two_zone_column(), {})
-    assert len(results) == 2
+    assert len(results) == 3
+    assert results[0].formation_name == 'B'
 
 
 def test_zone_layer_input_matches_formation_input():
     """ZoneLayerInput with pre-resolved param gives identical burial depths as FormationInput."""
     f_results = backstrip(_two_formation_column(), LITHO)
     z_results = backstrip(_two_zone_column(), {})
-    assert len(f_results) == len(z_results) == 2
+    assert len(f_results) == len(z_results) == 3
     for fr, zr in zip(f_results, z_results):
         for fp, zp in zip(fr.burial_path, zr.burial_path):
             assert fp.age_ma == zp.age_ma
