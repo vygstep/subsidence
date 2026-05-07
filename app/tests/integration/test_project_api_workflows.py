@@ -2221,6 +2221,55 @@ def test_top_set_pick_api_rejects_depth_outside_well_td(api_client: TestClient, 
     assert len(resp.json()) == 4
 
 
+def test_delete_linked_top_pick_clears_to_ghost(api_client: TestClient, tmp_path: Path):
+    well_id, _top_set_id = _create_well_with_top_set(api_client, tmp_path)
+
+    resp = api_client.get(f'/api/wells/{well_id}/formations')
+    assert resp.status_code == 200, resp.text
+    h2 = next(top for top in resp.json() if top['name'] == 'H2')
+    assert h2['horizon_id'] is not None
+    assert h2['depth_md'] == pytest.approx(300.0)
+
+    resp = api_client.delete(f'/api/wells/{well_id}/formations/{h2["id"]}')
+    assert resp.status_code == 204, resp.text
+
+    resp = api_client.get(f'/api/wells/{well_id}/formations')
+    assert resp.status_code == 200, resp.text
+    h2_after = next(top for top in resp.json() if top['id'] == h2['id'])
+    assert h2_after['horizon_id'] == h2['horizon_id']
+    assert h2_after['depth_md'] is None
+    assert h2_after['depth_tvd'] is None
+    assert h2_after['depth_tvdss'] is None
+
+    resp = api_client.get(f'/api/wells/{well_id}/zones')
+    assert resp.status_code == 200, resp.text
+    zones = resp.json()
+    assert any(zone['thickness_md'] is None for zone in zones)
+
+
+def test_delete_unlinked_top_pick_removes_row(api_client: TestClient, tmp_path: Path):
+    _create_project(api_client, tmp_path, 'delete-unlinked-top-pick')
+    resp = api_client.post('/api/projects/wells', json={
+        'name': 'Unlinked Pick Well', 'x': 0.0, 'y': 0.0, 'kb': 0.0, 'td': 1000.0, 'crs': 'local',
+    })
+    assert resp.status_code == 200, resp.text
+    well_id = resp.json()['well_id']
+
+    resp = api_client.post(f'/api/wells/{well_id}/formations', json={
+        'name': 'Standalone Top', 'depth_md': 300.0, 'color': '#aaaaaa',
+    })
+    assert resp.status_code == 201, resp.text
+    formation_id = resp.json()['id']
+    assert resp.json()['horizon_id'] is None
+
+    resp = api_client.delete(f'/api/wells/{well_id}/formations/{formation_id}')
+    assert resp.status_code == 204, resp.text
+
+    resp = api_client.get(f'/api/wells/{well_id}/formations')
+    assert resp.status_code == 200, resp.text
+    assert all(top['id'] != formation_id for top in resp.json())
+
+
 def test_zone_lifecycle_delete_middle_horizon_merges_zones(api_client: TestClient, tmp_path: Path):
     """Deleting a middle horizon merges adjacent zones; lithology cleared."""
     well_id, top_set_id = _create_well_with_top_set(api_client, tmp_path)

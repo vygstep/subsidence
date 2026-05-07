@@ -346,16 +346,26 @@ class RemoveFormation(Command):
 
     @property
     def description(self) -> str:
+        if self._snapshot.get('horizon_id') is not None:
+            return f"Clear formation pick {self._snapshot['name']!r}"
         return f"Delete formation {self._snapshot['name']!r}"
 
     def apply(self, session: Session) -> None:
         formation = session.get(FormationTopModel, self._snapshot['id'])
         if formation is None:
             return
+        if formation.horizon_id is not None:
+            formation.depth_md = None
+            formation.depth_tvd = None
+            formation.depth_tvdss = None
+            return
         session.delete(formation)
 
     def revert(self, session: Session) -> None:
-        if session.get(FormationTopModel, self._snapshot['id']) is not None:
+        formation = session.get(FormationTopModel, self._snapshot['id'])
+        if formation is not None:
+            for key, value in self._snapshot.items():
+                setattr(formation, key, value)
             return
         session.add(FormationTopModel(**self._snapshot))
 

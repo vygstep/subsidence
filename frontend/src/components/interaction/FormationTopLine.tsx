@@ -34,6 +34,7 @@ export function FormationTopLine({
 }: FormationTopLineProps) {
   const updateFormationDepth = useWellDataStore((state) => state.updateFormationDepth)
   const updateFormation = useWellDataStore((state) => state.updateFormation)
+  const removeFormation = useWellDataStore((state) => state.removeFormation)
   const wellId = useWellDataStore((state) => state.well?.well_id)
   const wellTdMd = useWellDataStore((state) => state.well?.td_md ?? null)
   const addQcWarnings = useNotificationStore((state) => state.addQcWarnings)
@@ -62,9 +63,10 @@ export function FormationTopLine({
   const handleDragStart = useCallback(() => {
     if (!wellId) return
     didDragRef.current = false
+    onSetActivePick?.(formation.id)
     setSelectedFormationId(formation.id)
     setSelectedObject({ type: 'top-pick', wellId, formationId: formation.id })
-  }, [formation.id, setSelectedFormationId, setSelectedObject, wellId])
+  }, [formation.id, onSetActivePick, setSelectedFormationId, setSelectedObject, wellId])
 
   const handleDepthChange = useCallback((depth: number) => {
     didDragRef.current = true
@@ -100,6 +102,42 @@ export function FormationTopLine({
     setSelectedFormationId(formation.id)
     setSelectedObject({ type: 'top-pick', wellId, formationId: formation.id })
   }, [editable, formation.id, onSetActivePick, setSelectedFormationId, setSelectedObject, wellId])
+
+  useEffect(() => {
+    if (!isActivePick || !editable) return
+
+    function isEditableTarget(target: EventTarget | null): boolean {
+      if (!(target instanceof HTMLElement)) return false
+      const tag = target.tagName.toLowerCase()
+      return tag === 'input' || tag === 'textarea' || tag === 'select' || target.isContentEditable
+    }
+
+    function onKeyDown(event: KeyboardEvent) {
+      if (event.key !== 'Delete' && event.key !== 'Backspace') return
+      if (isEditableTarget(event.target)) return
+      event.preventDefault()
+      event.stopPropagation()
+      void removeFormation(formation.id).then(() => {
+        onSetActivePick?.(null)
+        setSelectedFormationId(null)
+        if (wellId) {
+          setSelectedObject({ type: 'well', wellId })
+        }
+      })
+    }
+
+    window.addEventListener('keydown', onKeyDown, true)
+    return () => window.removeEventListener('keydown', onKeyDown, true)
+  }, [
+    editable,
+    formation.id,
+    isActivePick,
+    onSetActivePick,
+    removeFormation,
+    setSelectedFormationId,
+    setSelectedObject,
+    wellId,
+  ])
 
   const handleContextMenu = useCallback(
     (e: React.MouseEvent) => {

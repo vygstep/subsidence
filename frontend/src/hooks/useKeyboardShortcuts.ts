@@ -1,6 +1,6 @@
 import { useEffect } from 'react'
 
-import { useProjectStore, useViewStore, useWellDataStore } from '@/stores'
+import { useProjectStore, useViewStore, useWellDataStore, useWorkspaceStore } from '@/stores'
 
 const MIN_DPP = 0.05
 const MAX_DPP = 5.0
@@ -68,22 +68,30 @@ export function useKeyboardShortcuts(): void {
         return
       }
 
-      // Formation-specific shortcuts require a selected formation
-      const { selectedElementId, selectedElementType } = view
-      if (selectedElementType !== 'formation' || !selectedElementId) return
+      const selectedFormationId = useWorkspaceStore.getState().selectedFormationId
+      const selectedElementFormationId = view.selectedElementType === 'formation' ? view.selectedElementId : null
+      const targetFormationId = view.activePickId ?? selectedFormationId ?? selectedElementFormationId
+      if (!targetFormationId) return
 
       // Delete / Backspace — remove formation
       if (e.key === 'Delete' || e.key === 'Backspace') {
         e.preventDefault()
-        void useWellDataStore.getState().removeFormation(selectedElementId)
+        void useWellDataStore.getState().removeFormation(targetFormationId).then(() => {
+          useViewStore.getState().setActivePickId(null)
+          useWorkspaceStore.getState().setSelectedFormationId(null)
+          const wellId = useWellDataStore.getState().well?.well_id
+          if (wellId) {
+            useWorkspaceStore.getState().setSelectedObject({ type: 'well', wellId })
+          }
+        })
         return
       }
 
       // L — toggle lock
       if (e.key === 'l' || e.key === 'L') {
         e.preventDefault()
-        const f = useWellDataStore.getState().formations.find((x) => x.id === selectedElementId)
-        if (f) void useWellDataStore.getState().updateFormation(selectedElementId, { is_locked: !f.is_locked })
+        const f = useWellDataStore.getState().formations.find((x) => x.id === targetFormationId)
+        if (f) void useWellDataStore.getState().updateFormation(targetFormationId, { is_locked: !f.is_locked })
       }
     }
 
