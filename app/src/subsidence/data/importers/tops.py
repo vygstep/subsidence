@@ -184,7 +184,9 @@ def import_tops_csv(
         hiatus_ma = _extract_float(row, 'hiatus_duration_ma', 'hiatus_ma', 'hiatus') or 0.0
         eroded_m = _extract_float(row, 'eroded_thickness_m', 'eroded_m', 'eroded') or 0.0
         explicit_color = _extract_text(row, 'color')
+        has_explicit_color = explicit_color is not None
         color = explicit_color or _resolve_ics_color(age_ma, ics_units) or _DEFAULT_TOP_COLOR
+        color_source = 'user' if has_explicit_color else 'auto'
         note = _extract_text(row, 'note')
 
         qc = run_top_qc(top_name, depth_md, well.td_md)
@@ -216,7 +218,7 @@ def import_tops_csv(
                 age_base_ma=None,
                 confidence=None,
                 color=color,
-                color_source='auto',
+                color_source=color_source,
                 is_locked=False,
             )
             session.add(top)
@@ -229,7 +231,9 @@ def import_tops_csv(
         top.age_top_ma = age_ma
         top.age_base_ma = None
         top.confidence = None
-        top.color = color
+        if has_explicit_color or top.color_source != 'user':
+            top.color = color
+            top.color_source = color_source
         top.hiatus_duration_ma = hiatus_ma if is_unconformity else 0.0
         top.eroded_thickness_m = eroded_m if is_unconformity else 0.0
         top.note = note
