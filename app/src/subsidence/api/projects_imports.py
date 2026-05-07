@@ -3,7 +3,7 @@ from __future__ import annotations
 from pathlib import Path
 
 from fastapi import APIRouter, HTTPException, Request
-from sqlalchemy import select
+from sqlalchemy import func, select
 
 from subsidence.data import (
     ImportWell,
@@ -39,6 +39,17 @@ def _top_name_key(name: str | None) -> str:
     return (name or '').strip().lower()
 
 
+def _ensure_top_set_name_available(session, name: str) -> None:
+    existing = session.scalar(
+        select(TopSet).where(func.lower(TopSet.name) == name.lower())
+    )
+    if existing is not None:
+        raise HTTPException(
+            status_code=409,
+            detail=f'TopSet "{name}" already exists; choose the existing TopSet or use a different name.',
+        )
+
+
 def _resolve_import_top_set(
     session,
     payload: ImportTopsRequest,
@@ -59,6 +70,7 @@ def _resolve_import_top_set(
         well = session.get(WellModel, target_well_id)
         name = f'{well.name if well else target_well_id} tops'
 
+    _ensure_top_set_name_available(session, name)
     top_set = TopSet(name=name, description='Created during tops import')
     session.add(top_set)
     session.flush()

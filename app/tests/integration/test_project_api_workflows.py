@@ -1403,6 +1403,52 @@ def test_tops_import_can_create_zone_set_from_imported_tops(api_client: TestClie
     assert [z['thickness_md'] for z in well['zones']] == [150.0, 150.0]
 
 
+def test_tops_import_rejects_create_zone_set_with_existing_name(api_client: TestClient, tmp_path: Path) -> None:
+    _create_project(api_client, tmp_path, 'tops-zone-set-duplicate-name')
+    response = api_client.post('/api/projects/wells', json={
+        'name': 'Duplicate TopSet Well',
+        'x': 0.0,
+        'y': 0.0,
+        'kb': 10.0,
+        'td': 500.0,
+        'crs': 'local',
+    })
+    assert response.status_code == 200, response.text
+    well_id = response.json()['well_id']
+
+    csv_path = tmp_path / 'tops_duplicate_zone_set.csv'
+    csv_path.write_text(
+        'well_name,top_name,depth_md,strat_age_ma,color\n'
+        'Duplicate TopSet Well,H1,100,10,#111111\n'
+        'Duplicate TopSet Well,H2,250,20,#222222\n',
+        encoding='utf-8',
+    )
+
+    first = api_client.post('/api/projects/import-tops', json={
+        'csv_path': str(csv_path),
+        'well_id': well_id,
+        'create_zone_set': True,
+        'zone_set_name': 'Duplicate TopSet',
+    })
+    assert first.status_code == 200, first.text
+    top_set_id = first.json()['zone_set_id']
+
+    second = api_client.post('/api/projects/import-tops', json={
+        'csv_path': str(csv_path),
+        'well_id': well_id,
+        'create_zone_set': True,
+        'zone_set_name': 'Duplicate TopSet',
+    })
+    assert second.status_code == 409, second.text
+    assert 'already exists' in second.json()['detail']
+
+    response = api_client.get('/api/top-sets')
+    assert response.status_code == 200, response.text
+    top_sets = response.json()
+    assert [ts['name'] for ts in top_sets].count('Duplicate TopSet') == 1
+    assert next(ts for ts in top_sets if ts['name'] == 'Duplicate TopSet')['id'] == top_set_id
+
+
 def test_tops_import_can_attach_to_existing_zone_set_by_top_names(api_client: TestClient, tmp_path: Path) -> None:
     _create_project(api_client, tmp_path, 'tops-zone-set-existing')
     response = api_client.post('/api/projects/wells', json={

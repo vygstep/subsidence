@@ -4,7 +4,7 @@ import math
 
 from fastapi import APIRouter, HTTPException, Request
 from pydantic import BaseModel
-from sqlalchemy import select
+from sqlalchemy import func, select
 from sqlalchemy.orm import selectinload
 
 from subsidence.data.deviation_transform import compute_tvd_tvdss, recalculate_picks_tvd
@@ -162,6 +162,18 @@ def _require_top_set(session, top_set_id: int) -> TopSet:
     return ts
 
 
+def _ensure_top_set_name_available(session, name: str, *, exclude_id: int | None = None) -> None:
+    query = select(TopSet).where(func.lower(TopSet.name) == name.lower())
+    if exclude_id is not None:
+        query = query.where(TopSet.id != exclude_id)
+    existing = session.scalar(query)
+    if existing is not None:
+        raise HTTPException(
+            status_code=409,
+            detail=f'TopSet "{name}" already exists; choose the existing TopSet or use a different name.',
+        )
+
+
 def _next_auto_top_name(session, top_set_id: int) -> str:
     existing = {
         name.lower()
@@ -252,6 +264,7 @@ def create_top_set(body: TopSetCreate, request: Request) -> TopSetDetail:
         name = body.name.strip()
         if not name:
             raise HTTPException(status_code=400, detail='Name cannot be empty')
+        _ensure_top_set_name_available(session, name)
         ts = TopSet(name=name, description=body.description)
         session.add(ts)
         session.commit()
@@ -278,6 +291,7 @@ def patch_top_set(top_set_id: int, body: TopSetPatch, request: Request) -> TopSe
             next_name = body.name.strip()
             if not next_name:
                 raise HTTPException(status_code=400, detail='Name cannot be empty')
+            _ensure_top_set_name_available(session, next_name, exclude_id=top_set_id)
             ts.name = next_name
         if body.description is not None:
             ts.description = body.description

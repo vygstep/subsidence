@@ -86,6 +86,22 @@ Desired behavior:
 - Preserve existing equivalence assertions between legacy formation path and TopSet zone path for the actual layer/zone curves.
 - Do not hide, remove, or make the base curve optional in this contract.
 
+### 4. Create-new TopSet allows duplicate names during tops import
+
+The tops import dialog has two distinct workflows:
+
+- create a new TopSet;
+- import into an existing TopSet by `zone_set_id`.
+
+The backend currently accepts `create_zone_set=true` with a `zone_set_name` that already exists. Since `TopSet.name` is not unique, this creates another TopSet with the same display name. In the UI this looks like the existing TopSet was overwritten or corrupted because the active TopSet switches to a different id with the same name.
+
+Desired behavior:
+
+- `create_zone_set=true` with an existing TopSet name must be rejected.
+- The response should clearly instruct the user to choose the existing TopSet or use a different name.
+- Importing into an existing TopSet via `zone_set_id` remains allowed for the current well and for other wells.
+- Do not auto-rename duplicate TopSets; require an explicit user choice.
+
 ## Implementation Plan
 
 ### Step 1: Preserve explicit imported colors
@@ -128,6 +144,20 @@ Expected change:
 - Update expected result counts from `2` to `3` where the base curve is required.
 - Assert the base curve exists and is distinct from layer/zone curves.
 - Keep comparisons focused on matching layer/zone curves when checking legacy-vs-zone equivalence.
+
+### Step 4: Reject duplicate TopSet names on create
+
+Files:
+
+- `app/src/subsidence/api/projects_imports.py`
+- `app/src/subsidence/api/top_sets.py`
+- `app/tests/integration/test_project_api_workflows.py`
+
+Expected change:
+
+- Add a case-insensitive TopSet name uniqueness check for explicit create operations.
+- Return `409 Conflict` when a duplicate name is submitted.
+- Keep `zone_set_id=<existing id>` imports working as the supported way to append/load picks into an existing TopSet.
 
 ## Verification
 
