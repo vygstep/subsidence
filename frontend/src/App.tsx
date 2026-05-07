@@ -60,6 +60,8 @@ function App() {
   const formations = useWellDataStore((state) => state.formations)
   const selectedFormationId = useWorkspaceStore((state) => state.selectedFormationId)
   const setSelectedFormationId = useWorkspaceStore((state) => state.setSelectedFormationId)
+  const activePickId = useViewStore((state) => state.activePickId)
+  const setActivePickId = useViewStore((state) => state.setActivePickId)
   const setSelectedObject = useWorkspaceStore((state) => state.setSelectedObject)
   const resetWorkspace = useWorkspaceStore((state) => state.resetWorkspace)
   const ensureWellViewState = useWorkspaceStore((state) => state.ensureWellViewState)
@@ -220,21 +222,26 @@ function App() {
     if (selectedFormationId && !formations.some((f) => f.id === selectedFormationId)) {
       setSelectedFormationId(null)
     }
-  }, [formations, selectedFormationId, setSelectedFormationId])
+    if (activePickId && !formations.some((f) => f.id === activePickId)) {
+      setActivePickId(null)
+    }
+  }, [activePickId, formations, selectedFormationId, setActivePickId, setSelectedFormationId])
 
   useEffect(() => {
     if (!well?.well_id) {
       applyActiveWellTrackWidths({})
       selectTrack(null)
       setSelectedFormationId(null)
+      setActivePickId(null)
       setSelectedObject(null)
       return
     }
     ensureWellViewState(well.well_id)
     selectTrack(null)
     setSelectedFormationId(null)
+    setActivePickId(null)
     setSelectedObject({ type: 'well', wellId: well.well_id })
-  }, [applyActiveWellTrackWidths, ensureWellViewState, selectTrack, well?.well_id, setSelectedFormationId, setSelectedObject])
+  }, [applyActiveWellTrackWidths, ensureWellViewState, selectTrack, well?.well_id, setActivePickId, setSelectedFormationId, setSelectedObject])
 
   useEffect(() => {
     if (wellInventories.length === 0) return

@@ -354,6 +354,8 @@ export function useDataManagerController() {
   }
 
   async function handleActivateTopSet(topSetId: number, wellId: string): Promise<void> {
+    setSelectedFormationId(null)
+    setActivePickId(null)
     await setWellActiveTopSet(wellId, topSetId)
     await loadTopSets()
     await loadWellInventories()
