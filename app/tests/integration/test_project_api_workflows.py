@@ -1534,6 +1534,60 @@ def test_tops_import_create_top_set_preserves_td_extension_warning(api_client: T
     assert well['td_md'] == pytest.approx(200.0)
 
 
+def test_tops_first_import_creates_well_with_default_td_warning(api_client: TestClient, tmp_path: Path) -> None:
+    _create_project(api_client, tmp_path, 'tops-first-import-default-td-warning')
+
+    tops_csv = tmp_path / 'tops_first_import.csv'
+    tops_csv.write_text(
+        'well_name,top_name,depth_md,age_ma\n'
+        'First Tops Well,Deep Top,250,20\n',
+        encoding='utf-8',
+    )
+    response = api_client.post('/api/projects/import-tops', json={
+        'csv_path': str(tops_csv),
+        'create_zone_set': True,
+        'zone_set_name': 'First Import TopSet',
+    })
+    assert response.status_code == 200, response.text
+    payload = response.json()
+    assert payload['qc_warnings'] == [
+        'Imported data extends below current TD 100.0 m; TD was updated to 250.0 m.'
+    ]
+
+    response = api_client.get('/api/wells/inventory')
+    assert response.status_code == 200, response.text
+    [well] = response.json()
+    assert well['well_name'] == 'First Tops Well'
+    assert well['td_md'] == pytest.approx(250.0)
+
+
+def test_deviation_first_import_creates_well_with_default_td_warning(api_client: TestClient, tmp_path: Path) -> None:
+    _create_project(api_client, tmp_path, 'deviation-first-import-default-td-warning')
+
+    deviation_csv = tmp_path / 'deviation_first_import.csv'
+    deviation_csv.write_text(
+        'well_name,md,incl_deg,azim_deg\n'
+        'First Deviation Well,0,0,0\n'
+        'First Deviation Well,250,0,0\n',
+        encoding='utf-8',
+    )
+    response = api_client.post('/api/projects/import-deviation', json={
+        'csv_path': str(deviation_csv),
+        'create_new_well': True,
+    })
+    assert response.status_code == 200, response.text
+    payload = response.json()
+    assert payload['qc_warnings'] == [
+        'Imported data extends below current TD 100.0 m; TD was updated to 250.0 m.'
+    ]
+
+    response = api_client.get('/api/wells/inventory')
+    assert response.status_code == 200, response.text
+    [well] = response.json()
+    assert well['well_name'] == 'First Deviation Well'
+    assert well['td_md'] == pytest.approx(250.0)
+
+
 def test_tops_import_accepts_unconformity_rows(api_client: TestClient, tmp_path: Path) -> None:
     _create_project(api_client, tmp_path, 'tops-unconformity')
     response = api_client.post('/api/projects/wells', json={

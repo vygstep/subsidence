@@ -71,7 +71,6 @@ def _resolve_or_create_well_for_logs(
     rows: list[dict[str, str]],
     *,
     well_id: str | None,
-    td: float | None,
     create_new_well: bool = False,
 ) -> object:
     if well_id:
@@ -82,7 +81,7 @@ def _resolve_or_create_well_for_logs(
         existing = _find_existing_well_by_identity(session, name=first_name)
         if existing is not None:
             return existing
-    return create_empty_well(session, name=first_name or DEFAULT_WELL_NAME, td=td, kb=DEFAULT_WELL_KB)
+    return create_empty_well(session, name=first_name or DEFAULT_WELL_NAME, kb=DEFAULT_WELL_KB)
 
 
 def import_logs_csv(
@@ -107,7 +106,7 @@ def import_logs_csv(
     _depth_mnemonic, depth_unit = _header_curve_parts(resolved_depth_column)
     depths = convert_depth_values_to_meters(session, raw_depths, depth_unit or 'm')
     final_depth = depths[-1] if depths else None
-    well = _resolve_or_create_well_for_logs(session, rows, well_id=well_id, td=final_depth, create_new_well=create_new_well)
+    well = _resolve_or_create_well_for_logs(session, rows, well_id=well_id, create_new_well=create_new_well)
     td_before_import = well.td_md
     apply_imported_well_metadata(well, td=final_depth)
     td_warning = extend_well_td_for_import(well, final_depth, previous_td=td_before_import)

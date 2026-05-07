@@ -70,8 +70,7 @@ def _resolve_or_create_well_for_deviation(
         existing = _find_existing_well_by_identity(session, name=first_name)
         if existing is not None:
             return existing
-    td = _coerce_float(rows[-1].get(depth_column)) if rows else None
-    return create_empty_well(session, name=first_name or DEFAULT_WELL_NAME, td=td, kb=DEFAULT_WELL_KB)
+    return create_empty_well(session, name=first_name or DEFAULT_WELL_NAME, kb=DEFAULT_WELL_KB)
 
 
 def import_deviation_csv(

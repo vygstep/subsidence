@@ -32,7 +32,7 @@ export function CreateWellDialog({ onClose, onSuccess }: CreateWellDialogProps) 
   const [x, setX] = useState('0')
   const [y, setY] = useState('0')
   const [kb, setKb] = useState('10')
-  const [td, setTd] = useState('')
+  const [td, setTd] = useState('100')
   const [crs, setCrs] = useState('unset')
   const [error, setError] = useState<string | null>(null)
   const [isSubmitting, setIsSubmitting] = useState(false)
@@ -124,7 +124,7 @@ export function CreateWellDialog({ onClose, onSuccess }: CreateWellDialogProps) 
           </label>
           <label className="project-dialog__field">
             <span>TD</span>
-            <input type="number" value={td} onChange={(event) => setTd(event.target.value)} placeholder="Optional" />
+            <input type="number" value={td} onChange={(event) => setTd(event.target.value)} />
           </label>
         </div>
 

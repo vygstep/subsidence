@@ -22,6 +22,7 @@ DEFAULT_WELL_NAME = 'well-1'
 DEFAULT_WELL_X = 0.0
 DEFAULT_WELL_Y = 0.0
 DEFAULT_WELL_KB = 10.0
+DEFAULT_WELL_TD_MD = 100.0
 DEFAULT_WELL_CRS = 'unset'
 _CSV_EXCLUDED_COLUMNS = {'well_name'}
 
@@ -113,7 +114,7 @@ def create_empty_well(
         name=_normalize_well_name(name),
         kb_elev=kb if kb is not None else DEFAULT_WELL_KB,
         gl_elev=0.0,
-        td_md=td,
+        td_md=td if td is not None else DEFAULT_WELL_TD_MD,
         lat=y if y is not None else DEFAULT_WELL_Y,
         lon=x if x is not None else DEFAULT_WELL_X,
         crs=_normalized_crs(crs),

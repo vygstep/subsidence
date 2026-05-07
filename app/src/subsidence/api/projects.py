@@ -15,6 +15,7 @@ from subsidence.data import (
     DEFAULT_WELL_CRS,
     DEFAULT_WELL_KB,
     DEFAULT_WELL_NAME,
+    DEFAULT_WELL_TD_MD,
     DEFAULT_WELL_X,
     DEFAULT_WELL_Y,
     ImportWell,
@@ -209,7 +210,7 @@ class CreateWellRequest(BaseModel):
     x: float = DEFAULT_WELL_X
     y: float = DEFAULT_WELL_Y
     kb: float = DEFAULT_WELL_KB
-    td: float | None = None
+    td: float | None = DEFAULT_WELL_TD_MD
     crs: str = DEFAULT_WELL_CRS
 
 
