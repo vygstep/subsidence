@@ -309,7 +309,14 @@ export function WellDataPanel({
         entry.wellIds.add(item.well_id)
         entry.wells.push({ well_id: item.well_id, well_name: item.well_name })
       }
+      const activeHorizonIds = new Set<number>()
+      for (const zone of item.zones) {
+        activeHorizonIds.add(zone.upper_horizon.id)
+        activeHorizonIds.add(zone.lower_horizon.id)
+      }
       for (const formation of item.formations) {
+        if (formation.horizon_id === null) continue
+        if (activeHorizonIds.size > 0 && !activeHorizonIds.has(formation.horizon_id)) continue
         const key = formation.horizon_id !== null ? `id:${formation.horizon_id}` : `name:${formation.name.toLowerCase()}`
         const marker = entry.markerCounts.get(key) ?? {
           horizon_id: formation.horizon_id,

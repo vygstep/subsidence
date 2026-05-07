@@ -132,6 +132,7 @@ def link_picks_to_horizons(session: Session, well_id: str, top_set_id: int) -> i
     if not horizons:
         return 0
 
+    horizon_ids = {h.id for h in horizons}
     horizon_by_name = {_top_name_key(h.name): h for h in horizons}
     horizons_with_age = [h for h in horizons if h.age_ma is not None]
     youngest_color = min(horizons_with_age, key=lambda h: h.age_ma).color if horizons_with_age else '#9ca3af'
@@ -139,10 +140,14 @@ def link_picks_to_horizons(session: Session, well_id: str, top_set_id: int) -> i
     all_picks = list(session.scalars(
         select(FormationTopModel).where(FormationTopModel.well_id == well_id)
     ).all())
+    eligible_picks = [
+        pick for pick in all_picks
+        if pick.horizon_id is None or pick.horizon_id in horizon_ids
+    ]
 
     # Phase 1: record horizons claimed by name-match so floor-match cannot steal them.
     name_claimed_horizon_ids: set[int] = set()
-    for pick in all_picks:
+    for pick in eligible_picks:
         h = horizon_by_name.get(_top_name_key(pick.name))
         if h is not None:
             name_claimed_horizon_ids.add(h.id)
@@ -158,7 +163,7 @@ def link_picks_to_horizons(session: Session, well_id: str, top_set_id: int) -> i
     linked = 0
     unmatched = []
     color_log = []
-    for pick in all_picks:
+    for pick in eligible_picks:
         name_matched = horizon_by_name.get(_top_name_key(pick.name))
         if name_matched is not None:
             matched = name_matched
@@ -203,7 +208,7 @@ def link_picks_to_horizons(session: Session, well_id: str, top_set_id: int) -> i
     # Horizons that now have at least one pick with real depth data.
     horizons_with_real_depth: set[int] = {
         pick.horizon_id
-        for pick in all_picks
+        for pick in eligible_picks
         if pick.horizon_id is not None and (
             pick.depth_md is not None or pick.depth_tvd is not None or pick.depth_tvdss is not None
         )
@@ -212,7 +217,7 @@ def link_picks_to_horizons(session: Session, well_id: str, top_set_id: int) -> i
     # Delete ghost picks (all depths None) that are either orphaned (no horizon) or
     # shadowed (horizon already covered by a real pick).
     orphans_deleted = 0
-    for pick in all_picks:
+    for pick in eligible_picks:
         is_ghost = pick.depth_md is None and pick.depth_tvd is None and pick.depth_tvdss is None
         if not is_ghost:
             continue

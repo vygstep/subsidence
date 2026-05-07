@@ -86,6 +86,24 @@ def _load_or_create_horizon(
     return horizon
 
 
+def _normalize_duplicate_imported_ages(imported: list[FormationTopModel]) -> None:
+    by_age: dict[float, list[FormationTopModel]] = {}
+    for top in imported:
+        if top.age_top_ma is None:
+            continue
+        by_age.setdefault(top.age_top_ma, []).append(top)
+
+    for tops in by_age.values():
+        if len(tops) < 2:
+            continue
+        ordered = sorted(
+            tops,
+            key=lambda top: (top.depth_md is None, top.depth_md if top.depth_md is not None else 0.0, top.id or 0),
+        )
+        for duplicate in ordered[1:]:
+            duplicate.age_top_ma = None
+
+
 def import_tops_csv(
     session: Session,
     well_id: str | None,
@@ -141,6 +159,7 @@ def import_tops_csv(
             select(TopSetHorizon).where(TopSetHorizon.top_set_id == top_set_id)
         ).all()
         horizon_by_name = {_top_name_key(horizon.name): horizon for horizon in existing_horizons}
+        horizon_ids = {horizon.id for horizon in existing_horizons}
         next_horizon_sort = max((horizon.sort_order for horizon in existing_horizons), default=-1) + 1
         existing_picks = session.scalars(
             select(FormationTopModel).where(FormationTopModel.well_id == well.id)
@@ -148,7 +167,7 @@ def import_tops_csv(
         picks_by_horizon_id = {
             pick.horizon_id: pick
             for pick in existing_picks
-            if pick.horizon_id is not None
+            if pick.horizon_id in horizon_ids
         }
         unlinked_picks_by_name = {
             _top_name_key(pick.name): pick
@@ -249,6 +268,7 @@ def import_tops_csv(
         imported.append(top)
 
     session.flush()
+    _normalize_duplicate_imported_ages(imported)
 
     water_depth_set: list[dict] = []
     for top in imported:

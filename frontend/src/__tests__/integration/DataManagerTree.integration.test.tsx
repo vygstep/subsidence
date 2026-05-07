@@ -381,6 +381,47 @@ describe('Data Manager well tree', () => {
     expect(props.onSelectFormation).toHaveBeenCalledWith('well-a', 'top-a')
   })
 
+  it('does not render inactive TopSet picks as active STRATIGRAPHY markers', () => {
+    renderPanel({
+      wells: [
+        createWellInventory({
+          well_id: 'well-a',
+          well_name: 'Well A',
+          active_top_set_id: 20,
+          active_top_set_name: 'Second TopSet',
+          formations: [
+            { id: 'old-q', name: 'Quaternary', depth_md: 0, depth_tvd: null, depth_tvdss: null, horizon_id: 101, active_strat_color: '#111111', color: '#111111', color_source: 'user', kind: 'strat' },
+            { id: 'old-n', name: 'Neogene', depth_md: 100, depth_tvd: null, depth_tvdss: null, horizon_id: 102, active_strat_color: '#222222', color: '#222222', color_source: 'user', kind: 'strat' },
+            { id: 'new-q', name: 'Quaternary', depth_md: 0, depth_tvd: null, depth_tvdss: null, horizon_id: 201, active_strat_color: '#aaaaaa', color: '#aaaaaa', color_source: 'user', kind: 'strat' },
+            { id: 'new-n', name: 'Neogene', depth_md: 120, depth_tvd: null, depth_tvdss: null, horizon_id: 202, active_strat_color: '#bbbbbb', color: '#bbbbbb', color_source: 'user', kind: 'strat' },
+          ],
+          zones: [{
+            zone_id: 300,
+            top_set_id: 20,
+            upper_horizon: { id: 201, name: 'Quaternary', age_ma: 0 },
+            lower_horizon: { id: 202, name: 'Neogene', age_ma: 23 },
+            sort_order: 0,
+            thickness_md: 120,
+            thickness_tvd: 120,
+            age_span_ma: 23,
+            hiatus_ma: null,
+            lithology_fractions: null,
+            lithology_source: 'auto',
+            water_depth_m: 0,
+          }],
+        }),
+      ],
+      visibleFormationIdsByWellId: { 'well-a': ['new-q', 'new-n'], 'well-b': [] },
+    })
+
+    const topSetRow = screen.getByText('Second TopSet').closest('.tree-node__row')
+    const topSetExpand = topSetRow?.querySelector('button[aria-label="Expand"]') as HTMLButtonElement
+    fireEvent.click(topSetExpand)
+
+    expect(screen.getAllByText('Quaternary')).toHaveLength(1)
+    expect(screen.getAllByText('Neogene')).toHaveLength(1)
+  })
+
   it('exposes delete actions for wells and TopSet markers', () => {
     const { props } = renderPanel({
       wells: [

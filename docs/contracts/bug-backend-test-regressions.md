@@ -115,6 +115,28 @@ Desired behavior:
 - Result files owned only by the deleted well are removed from the project bundle.
 - Undo/redo for `RemoveWell` remains coherent by snapshotting and restoring deleted result rows and files.
 
+### 6. Creating a new TopSet can steal picks from an existing TopSet
+
+The tops importer and TopSet activation link picks by name/horizon across all picks for the well. When a user imports tops into a newly created TopSet whose marker names match an existing TopSet, existing picks can be relinked to the new TopSet horizons instead of creating independent picks for the new TopSet.
+
+Desired behavior:
+
+- Importing into a new TopSet creates independent picks for that TopSet.
+- Existing picks linked to another TopSet must keep their original `horizon_id`.
+- Importing into an existing TopSet by `zone_set_id` still updates picks linked to that same TopSet.
+- Unlinked picks may still be linked/imported into the selected TopSet.
+
+### 7. Data Manager shows non-active TopSet picks inside the active TopSet
+
+After independent picks are preserved for multiple TopSets, `/api/wells/inventory` still returns all tops for the well. The frontend STRATIGRAPHY tree builds the active TopSet from all `item.formations`, so picks linked to inactive TopSets can appear as duplicate markers in the active TopSet and break marker ordering.
+
+Desired behavior:
+
+- The active TopSet tree should include only markers belonging to that TopSet.
+- Picks linked to another TopSet must not appear as extra markers under the active TopSet.
+- Marker ordering should continue to follow active TopSet zone/horizon order.
+- Showing all inactive TopSets is deferred to `docs/contracts/stratigraphy-multiple-topsets.md`.
+
 ## Implementation Plan
 
 ### Step 1: Preserve explicit imported colors
@@ -186,6 +208,34 @@ Expected change:
 - Delete those rows before deleting the `WellModel`.
 - Restore the rows and files on undo.
 - Add an integration test that deletes a well with a stored calculation result and verifies the API returns success.
+
+### Step 6: Scope TopSet pick linking to the selected TopSet
+
+Files:
+
+- `app/src/subsidence/data/importers/tops.py`
+- `app/src/subsidence/data/zone_service.py`
+- `app/tests/integration/test_project_api_workflows.py`
+
+Expected change:
+
+- When importing into a TopSet, only upsert picks already linked to horizons in that TopSet or unlinked picks.
+- When activating/linking a TopSet, only relink picks that are unlinked or already linked to horizons in that TopSet.
+- Add an integration test that imports the same marker names into two different TopSets and verifies both TopSets retain separate picks.
+
+### Step 7: Scope active TopSet rendering in Data Manager
+
+Files:
+
+- `frontend/src/components/layout/WellDataPanel.tsx`
+- `frontend/src/__tests__/integration/DataManagerTree.integration.test.tsx`
+
+Expected change:
+
+- Derive active TopSet horizon ids from active zones.
+- Add markers from `item.formations` only when their `horizon_id` belongs to the active TopSet.
+- Do not add unlinked or other-TopSet picks to the active TopSet STRATIGRAPHY tree.
+- Add a frontend integration test that verifies inactive TopSet picks are not rendered as duplicate active markers.
 
 ## Verification
 

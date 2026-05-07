@@ -1512,6 +1512,87 @@ def test_tops_import_rejects_create_zone_set_with_existing_name(api_client: Test
     assert next(ts for ts in top_sets if ts['name'] == 'Duplicate TopSet')['id'] == top_set_id
 
 
+def test_tops_import_new_zone_set_does_not_steal_existing_top_set_picks(api_client: TestClient, tmp_path: Path) -> None:
+    _create_project(api_client, tmp_path, 'tops-zone-set-independent-picks')
+    response = api_client.post('/api/projects/wells', json={
+        'name': 'Independent TopSet Well',
+        'x': 0.0,
+        'y': 0.0,
+        'kb': 10.0,
+        'td': 500.0,
+        'crs': 'local',
+    })
+    assert response.status_code == 200, response.text
+    well_id = response.json()['well_id']
+
+    csv_path = tmp_path / 'tops_independent_zone_sets.csv'
+    csv_path.write_text(
+        'well_name,top_name,depth_md,strat_age_ma,color\n'
+        'Independent TopSet Well,H1,100,10,#111111\n'
+        'Independent TopSet Well,H2,250,20,#222222\n',
+        encoding='utf-8',
+    )
+    first = api_client.post('/api/projects/import-tops', json={
+        'csv_path': str(csv_path),
+        'well_id': well_id,
+        'create_zone_set': True,
+        'zone_set_name': 'First TopSet',
+    })
+    assert first.status_code == 200, first.text
+    first_top_set_id = first.json()['zone_set_id']
+
+    csv_path.write_text(
+        'well_name,top_name,depth_md,strat_age_ma,color\n'
+        'Independent TopSet Well,H1,120,10,#aaaaaa\n'
+        'Independent TopSet Well,H2,280,20,#bbbbbb\n',
+        encoding='utf-8',
+    )
+    second = api_client.post('/api/projects/import-tops', json={
+        'csv_path': str(csv_path),
+        'well_id': well_id,
+        'create_zone_set': True,
+        'zone_set_name': 'Second TopSet',
+    })
+    assert second.status_code == 200, second.text
+    second_top_set_id = second.json()['zone_set_id']
+    assert second_top_set_id != first_top_set_id
+
+    manager = app.state.project_manager
+    with manager.get_session() as session:
+        first_horizons = session.scalars(
+            sa_select(TopSetHorizon).where(TopSetHorizon.top_set_id == first_top_set_id)
+        ).all()
+        second_horizons = session.scalars(
+            sa_select(TopSetHorizon).where(TopSetHorizon.top_set_id == second_top_set_id)
+        ).all()
+        first_horizon_ids = {h.id for h in first_horizons}
+        second_horizon_ids = {h.id for h in second_horizons}
+        first_picks = session.scalars(
+            sa_select(FormationTopModel)
+            .where(FormationTopModel.well_id == well_id, FormationTopModel.horizon_id.in_(first_horizon_ids))
+            .order_by(FormationTopModel.name.asc())
+        ).all()
+        second_picks = session.scalars(
+            sa_select(FormationTopModel)
+            .where(FormationTopModel.well_id == well_id, FormationTopModel.horizon_id.in_(second_horizon_ids))
+            .order_by(FormationTopModel.name.asc())
+        ).all()
+
+    assert len(first_picks) == 2
+    assert len(second_picks) == 2
+    assert [pick.name for pick in first_picks] == ['H1', 'H2']
+    assert [pick.depth_md for pick in first_picks] == [100.0, 250.0]
+    assert [pick.color for pick in first_picks] == ['#111111', '#222222']
+    assert [pick.name for pick in second_picks] == ['H1', 'H2']
+    assert [pick.depth_md for pick in second_picks] == [120.0, 280.0]
+    assert [pick.color for pick in second_picks] == ['#aaaaaa', '#bbbbbb']
+
+    response = api_client.get('/api/wells/inventory')
+    assert response.status_code == 200, response.text
+    well = next(w for w in response.json() if w['well_id'] == well_id)
+    assert well['active_top_set_id'] == second_top_set_id
+
+
 def test_tops_import_can_attach_to_existing_zone_set_by_top_names(api_client: TestClient, tmp_path: Path) -> None:
     _create_project(api_client, tmp_path, 'tops-zone-set-existing')
     response = api_client.post('/api/projects/wells', json={
