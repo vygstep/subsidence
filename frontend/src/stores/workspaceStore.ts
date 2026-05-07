@@ -18,6 +18,7 @@ export type SelectedObject =
   | { type: 'top-pick'; wellId: string; formationId: string }
   | { type: 'zones-group'; wellId: string }
   | { type: 'zone-sets-root' }
+  | { type: 'top-set'; topSetId: number }
   | { type: 'zone-set'; zoneSetId: number; wellId: string }
   | { type: 'zone'; wellId: string; zoneId: number; zoneSetId?: number }
   | { type: 'strat-charts-root' }

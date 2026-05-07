@@ -10,9 +10,11 @@ import type {
   LithologyPatternPaletteSummary,
   LithologySetSummary,
   StratChartInfo,
+  TopSetSummary,
   TrackConfig,
   UnitDimensionSummary,
   Well,
+  WellInventory,
 } from '@/types'
 
 interface WellInspectorDraft {
@@ -59,6 +61,10 @@ interface SettingsPaneShellProps {
   ) => void | Promise<void>
   onFormationMove: (formationId: string, depth: number) => void
   selectedChart: StratChartInfo | null
+  topSets: TopSetSummary[]
+  wellInventories: WellInventory[]
+  activeWellId: string | null
+  onActivateTopSet: (topSetId: number, wellId: string) => void
   selectedCompactionModel: CompactionModel | null
   selectedCompactionPreset: CompactionPresetSummary | null
   compactionPresets: CompactionPresetSummary[]

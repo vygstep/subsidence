@@ -5,11 +5,12 @@ import { useWorkspaceStore } from '@/stores/workspaceStore'
 import { useViewStore, type SubsidenceModelType } from '@/stores/viewStore'
 import { useWellDataStore } from '@/stores/wellDataStore'
 import { formationDisplayColor } from '@/types'
-import type { FormationInventoryItem, WellInventory } from '@/types'
+import type { FormationInventoryItem, TopSetSummary, WellInventory } from '@/types'
 import type { FormationZone } from '@/types'
 
 interface WellDataPanelProps {
   wells: WellInventory[]
+  topSets?: TopSetSummary[]
   activeWellId: string | null
   visibleCurveMnemonicsByWellId: Record<string, string[]>
   visibleFormationIdsByWellId: Record<string, string[]>
@@ -52,7 +53,6 @@ interface WellDataPanelProps {
   onDeleteAllCurves?: (wellId: string, wellName: string, curveCount: number) => void
   onDeleteDeviation?: (wellId: string, wellName: string) => void
   onSelectZoneSetsRoot?: () => void
-  onSelectZoneSet?: (zoneSetId: number, wellId: string) => void
   onSelectZoneInSet?: (zoneSetId: number, wellId: string, zoneId: number) => void
   selectedZoneId?: number | null
   selectedZoneSetId?: number | null
@@ -63,6 +63,7 @@ type ToggleState = 'none' | 'partial' | 'all'
 interface ZoneSetTreeItem {
   id: number
   name: string
+  horizon_count: number
   wells: Array<{ well_id: string; well_name: string }>
   markers: ZoneSetMarkerTreeItem[]
   zones: FormationZone[]
@@ -118,9 +119,10 @@ function TreeToggleButton({ isOpen, onToggle }: TreeToggleButtonProps) {
 interface TriStateCheckboxProps {
   state: ToggleState
   onToggle: (nextValue: boolean) => void
+  disabled?: boolean
 }
 
-function TriStateCheckbox({ state, onToggle }: TriStateCheckboxProps) {
+function TriStateCheckbox({ state, onToggle, disabled = false }: TriStateCheckboxProps) {
   const inputRef = useRef<HTMLInputElement | null>(null)
 
   useLayoutEffect(() => {
@@ -135,6 +137,7 @@ function TriStateCheckbox({ state, onToggle }: TriStateCheckboxProps) {
       type="checkbox"
       className={`tree-tristate-checkbox tree-tristate-checkbox--${state}`}
       checked={state === 'all'}
+      disabled={disabled}
       onChange={() => onToggle(state === 'none')}
       onClick={(event) => {
         event.stopPropagation()
@@ -235,6 +238,7 @@ function ModelsRoot() {
 
 export function WellDataPanel({
   wells,
+  topSets = [],
   activeWellId,
   visibleCurveMnemonicsByWellId,
   visibleFormationIdsByWellId,
@@ -264,7 +268,6 @@ export function WellDataPanel({
   onContextMenuWell,
   onDeleteWell,
   onSelectZoneSetsRoot = () => {},
-  onSelectZoneSet = () => {},
   onSelectZoneInSet = () => {},
   selectedZoneId = null,
   selectedZoneSetId = null,
@@ -273,6 +276,7 @@ export function WellDataPanel({
   onDeleteDeviation,
 }: WellDataPanelProps) {
   const { isExpanded, toggleExpanded, setExpanded } = useDataManager()
+  const setSelectedObject = useWorkspaceStore((s) => s.setSelectedObject)
   const didInitializeExpanded = useRef(false)
 
   useEffect(() => {
@@ -292,12 +296,26 @@ export function WellDataPanel({
 
   const zoneSets = useMemo<ZoneSetTreeItem[]>(() => {
     const byId = new Map<number, ZoneSetTreeItem & { zoneIds: Set<number>; wellIds: Set<string>; markerCounts: Map<string, { horizon_id: number | null; name: string; color: string; is_unconformity: boolean; formationIdsByWellId: Map<string, string[]> }> }>()
+    for (const topSet of topSets) {
+      byId.set(topSet.id, {
+        id: topSet.id,
+        name: topSet.name,
+        horizon_count: topSet.horizon_count,
+        wells: [],
+        markers: [],
+        zones: [],
+        zoneIds: new Set<number>(),
+        wellIds: new Set<string>(),
+        markerCounts: new Map<string, { horizon_id: number | null; name: string; color: string; is_unconformity: boolean; formationIdsByWellId: Map<string, string[]> }>(),
+      })
+    }
     for (const item of wells) {
       if (item.active_top_set_id === null) continue
       const existing = byId.get(item.active_top_set_id)
       const entry = existing ?? {
         id: item.active_top_set_id,
         name: item.active_top_set_name ?? `TopSet ${item.active_top_set_id}`,
+        horizon_count: 0,
         wells: [],
         markers: [],
         zones: [],
@@ -393,13 +411,14 @@ export function WellDataPanel({
         return {
           id: entry.id,
           name: entry.name,
+          horizon_count: entry.horizon_count,
           wells: entry.wells,
           markers,
           zones: entry.zones,
         }
       })
       .sort((a, b) => a.name.localeCompare(b.name))
-  }, [wells])
+  }, [topSets, wells])
 
   return (
     <div className="sidebar-panel__body">
@@ -610,10 +629,13 @@ export function WellDataPanel({
           {isOpen('zones-root') ? (
             <div className="tree-node__children">
               {zoneSets.length === 0 ? (
-                <p className="sidebar-panel__empty">No TopSets assigned.</p>
+                <p className="sidebar-panel__empty">No TopSets loaded.</p>
               ) : zoneSets.map((zoneSet) => {
-                const selectedWellId = zoneSet.wells.find((w) => w.well_id === activeWellId)?.well_id ?? zoneSet.wells[0]?.well_id
-                const isZoneSetSelected = selectedObject?.type === 'zone-set' && selectedZoneSetId === zoneSet.id
+                const isActiveForCurrentWell = activeWellId !== null
+                  && wells.some((item) => item.well_id === activeWellId && item.active_top_set_id === zoneSet.id)
+                const selectedWellId = isActiveForCurrentWell ? activeWellId : undefined
+                const isZoneSetSelected = (selectedObject?.type === 'top-set' && selectedObject.topSetId === zoneSet.id)
+                  || (selectedObject?.type === 'zone-set' && selectedZoneSetId === zoneSet.id)
                 const selectedVisibleFormationIds = selectedWellId ? visibleFormationIdsByWellId[selectedWellId] ?? [] : []
                 const selectedHiddenZoneIds = selectedWellId ? hiddenTopSetZoneIdsByWellId[selectedWellId] ?? [] : []
                 const markerVisibleStates = zoneSet.markers.map((marker) => {
@@ -631,16 +653,21 @@ export function WellDataPanel({
                   <div key={zoneSet.id} className="tree-node">
                     <div
                       className={`tree-node__row ${isZoneSetSelected ? 'tree-node__row--selected' : ''}`}
-                      onClick={() => selectedWellId && onSelectZoneSet(zoneSet.id, selectedWellId)}
+                      onClick={() => setSelectedObject({ type: 'top-set', topSetId: zoneSet.id })}
                     >
                       <TreeToggleButton
                         isOpen={isOpen(`zones:${zoneSet.id}`)}
                         onToggle={() => toggleNode(`zones:${zoneSet.id}`)}
                       />
-                      <TriStateCheckbox state={topSetCheckboxState} onToggle={(nextValue) => onToggleTopSetVisibility(zoneSet.id, nextValue)} />
+                      <TriStateCheckbox
+                        state={topSetCheckboxState}
+                        disabled={!selectedWellId}
+                        onToggle={(nextValue) => onToggleTopSetVisibility(zoneSet.id, nextValue)}
+                      />
                       <button type="button" className="tree-node__section-label">
                         {zoneSet.name}
                       </button>
+                      <span className="tree-node__badge">{isActiveForCurrentWell ? 'active' : 'inactive'}</span>
                       <button
                         type="button"
                         className="dm-action dm-action--ghost dm-action--danger dm-action--row-end"

@@ -1,14 +1,17 @@
 import { fireEvent, render, screen } from '@testing-library/react'
-import { describe, expect, it, vi } from 'vitest'
+import { beforeEach, describe, expect, it, vi } from 'vitest'
 
 import { DataManagerProvider } from '@/components/layout/dataManager/DataManagerContext'
+import { TopSetSettings } from '@/components/layout/settings/TopSetSettings'
 import { TemplatesTab } from '@/components/layout/TemplatesTab'
 import { WellDataPanel } from '@/components/layout/WellDataPanel'
+import { useWorkspaceStore } from '@/stores/workspaceStore'
 import type {
   CompactionPresetSummary,
   CurveMnemonicSetSummary,
   LithologyPatternPaletteSummary,
   LithologySetSummary,
+  TopSetSummary,
   UnitDimensionSummary,
   WellInventory,
 } from '@/types'
@@ -99,6 +102,10 @@ function renderPanel(overrides: Partial<React.ComponentProps<typeof WellDataPane
     ),
   }
 }
+
+beforeEach(() => {
+  useWorkspaceStore.getState().resetWorkspace()
+})
 
 const builtinPreset: CompactionPresetSummary = {
   id: 1, name: 'Shale', origin: 'builtin', is_builtin: true, source_lithology_code: 'sh',
@@ -360,6 +367,35 @@ describe('Data Manager well tree', () => {
     expect(props.onToggleTopSetVisibility).toHaveBeenCalledWith(10, true)
   })
 
+  it('renders inactive project TopSets and selects the TopSet object', () => {
+    renderPanel({
+      topSets: [
+        { id: 10, name: 'Regional', description: null, horizon_count: 2 },
+        { id: 20, name: 'Legacy', description: null, horizon_count: 2 },
+      ],
+      wells: [
+        createWellInventory({
+          well_id: 'well-a',
+          well_name: 'Well A',
+          active_top_set_id: 10,
+          active_top_set_name: 'Regional',
+          formations: [{ id: 'top-a', name: 'Top A', depth_md: 100, depth_tvd: null, depth_tvdss: null, horizon_id: 100, active_strat_color: '#aaaaaa', kind: 'strat' }],
+        }),
+      ],
+    })
+
+    expect(screen.getByText('Regional')).toBeTruthy()
+    expect(screen.getByText('Legacy')).toBeTruthy()
+
+    const legacyRow = screen.getByText('Legacy').closest('.tree-node__row')!
+    expect(legacyRow.textContent).toContain('inactive')
+    const checkbox = legacyRow.querySelector('input[type="checkbox"]') as HTMLInputElement
+    expect(checkbox.disabled).toBe(true)
+
+    fireEvent.click(screen.getByText('Legacy'))
+    expect(useWorkspaceStore.getState().selectedObject).toEqual({ type: 'top-set', topSetId: 20 })
+  })
+
   it('selects a TopSet marker as the active well top pick', () => {
     const { props } = renderPanel({
       wells: [
@@ -447,5 +483,32 @@ describe('Data Manager well tree', () => {
 
     fireEvent.click(screen.getByLabelText('Delete marker "Top A"'))
     expect(props.onDeleteTopSetMarker).toHaveBeenCalledWith(10, 100, 'Top A')
+  })
+})
+
+describe('TopSet settings', () => {
+  const topSet: TopSetSummary = { id: 20, name: 'Legacy', description: null, horizon_count: 2 }
+
+  it('activates an inactive TopSet for the current well', () => {
+    const onActivateTopSet = vi.fn()
+    render(
+      <TopSetSettings
+        topSet={topSet}
+        activeWellId="well-a"
+        wellInventories={[
+          createWellInventory({
+            well_id: 'well-a',
+            well_name: 'Well A',
+            active_top_set_id: 10,
+            active_top_set_name: 'Regional',
+          }),
+        ]}
+        onActivateTopSet={onActivateTopSet}
+      />,
+    )
+
+    expect(screen.getByText('inactive')).toBeTruthy()
+    fireEvent.click(screen.getByText('Activate for current well'))
+    expect(onActivateTopSet).toHaveBeenCalledWith(20, 'well-a')
   })
 })

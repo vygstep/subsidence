@@ -17,6 +17,7 @@ function App() {
   const loadWellInventories = useWellDataStore((state) => state.loadWellInventories)
   const resetWell = useWellDataStore((state) => state.reset)
   const loadStratCharts = useWellDataStore((state) => state.loadStratCharts)
+  const loadTopSets = useWellDataStore((state) => state.loadTopSets)
   const loadCompactionModels = useWellDataStore((state) => state.loadCompactionModels)
   const loadCompactionPresets = useWellDataStore((state) => state.loadCompactionPresets)
   const loadMnemonicSets = useWellDataStore((state) => state.loadMnemonicSets)
@@ -136,7 +137,8 @@ function App() {
   useEffect(() => {
     if (!isProjectOpen) return
     void loadStratCharts()
-  }, [isProjectOpen, loadStratCharts])
+    void loadTopSets()
+  }, [isProjectOpen, loadStratCharts, loadTopSets])
 
   useEffect(() => {
     if (!isProjectOpen) return

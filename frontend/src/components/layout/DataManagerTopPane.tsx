@@ -8,6 +8,7 @@ import type {
   LithologyPatternPaletteSummary,
   LithologySetSummary,
   StratChartInfo,
+  TopSetSummary,
   UnitDimensionSummary,
   WellInventory,
 } from '@/types'
@@ -71,12 +72,12 @@ interface DataManagerTopPaneProps {
   selectedLithologyPatternPaletteId: number | null
   selectedObject: SelectedObject | null
   stratCharts: StratChartInfo[]
+  topSets: TopSetSummary[]
   visibleCurveMnemonicsByWellId: Record<string, string[]>
   visibleFormationIdsByWellId: Record<string, string[]>
   hiddenTopSetZoneIdsByWellId: Record<string, number[]>
   wellInventories: WellInventory[]
   onSelectZoneSetsRoot: () => void
-  onSelectZoneSet: (zoneSetId: number, wellId: string) => void
   onSelectZoneInSet: (zoneSetId: number, wellId: string, zoneId: number) => void
   onToggleTopSetVisibility: (zoneSetId: number, nextValue: boolean) => void
   onToggleTopSetMarker: (zoneSetId: number, horizonId: number | null, name: string, nextValue: boolean) => void
@@ -149,12 +150,12 @@ export function DataManagerTopPane({
   selectedLithologyPatternPaletteId,
   selectedObject,
   stratCharts,
+  topSets,
   visibleCurveMnemonicsByWellId,
   visibleFormationIdsByWellId,
   hiddenTopSetZoneIdsByWellId,
   wellInventories,
   onSelectZoneSetsRoot,
-  onSelectZoneSet,
   onSelectZoneInSet,
   onToggleTopSetVisibility,
   onToggleTopSetMarker,
@@ -205,6 +206,7 @@ export function DataManagerTopPane({
       ) : activeSidebarTab === 'wells' ? (
         <WellDataPanel
           wells={wellInventories}
+          topSets={topSets}
           activeWellId={activeWellId}
           visibleCurveMnemonicsByWellId={visibleCurveMnemonicsByWellId}
           visibleFormationIdsByWellId={visibleFormationIdsByWellId}
@@ -238,7 +240,6 @@ export function DataManagerTopPane({
           onDeleteAllCurves={onDeleteAllCurves}
           onDeleteDeviation={onDeleteDeviation}
           onSelectZoneSetsRoot={onSelectZoneSetsRoot}
-          onSelectZoneSet={onSelectZoneSet}
           onSelectZoneInSet={onSelectZoneInSet}
           selectedZoneId={selectedZoneId}
           selectedZoneSetId={selectedZoneSetId}

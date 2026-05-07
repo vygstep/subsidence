@@ -3,17 +3,16 @@ import { useWellDataStore } from '@/stores'
 
 export function ZoneSetsRootSettings() {
   const wellInventories = useWellDataStore((s) => s.wellInventories)
+  const topSets = useWellDataStore((s) => s.topSets)
 
-  const { topSetCount, linkedWellCount } = useMemo(() => {
-    const topSetIds = new Set<number>()
+  const { linkedWellCount } = useMemo(() => {
     const linkedWellIds = new Set<string>()
     for (const item of wellInventories) {
       if (item.active_top_set_id !== null) {
-        topSetIds.add(item.active_top_set_id)
         linkedWellIds.add(item.well_id)
       }
     }
-    return { topSetCount: topSetIds.size, linkedWellCount: linkedWellIds.size }
+    return { linkedWellCount: linkedWellIds.size }
   }, [wellInventories])
 
   return (
@@ -24,14 +23,14 @@ export function ZoneSetsRootSettings() {
       </div>
       <div className="tree-leaf">
         <span>TopSets</span>
-        <span>{topSetCount}</span>
+        <span>{topSets.length}</span>
       </div>
       <div className="tree-leaf">
         <span>Linked wells</span>
         <span>{linkedWellCount}</span>
       </div>
-      {topSetCount === 0 && (
-        <p className="sidebar-panel__empty">No TopSets assigned. Import tops and assign a TopSet to a well.</p>
+      {topSets.length === 0 && (
+        <p className="sidebar-panel__empty">No TopSets loaded. Import tops to create a TopSet.</p>
       )}
     </div>
   )

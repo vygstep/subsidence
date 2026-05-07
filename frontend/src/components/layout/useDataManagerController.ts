@@ -22,6 +22,7 @@ export function useDataManagerController() {
   const curves = useWellDataStore((state) => state.curves)
   const formations = useWellDataStore((state) => state.formations)
   const zones = useWellDataStore((state) => state.zones)
+  const topSets = useWellDataStore((state) => state.topSets)
   const stratCharts = useWellDataStore((state) => state.stratCharts)
   const compactionModels = useWellDataStore((state) => state.compactionModels)
   const compactionPresets = useWellDataStore((state) => state.compactionPresets)
@@ -38,6 +39,8 @@ export function useDataManagerController() {
   const deleteChart = useWellDataStore((state) => state.deleteChart)
   const refreshWell = useWellDataStore((state) => state.refreshWell)
   const loadWellInventories = useWellDataStore((state) => state.loadWellInventories)
+  const loadTopSets = useWellDataStore((state) => state.loadTopSets)
+  const setWellActiveTopSet = useWellDataStore((state) => state.setWellActiveTopSet)
   const activateCompactionModel = useWellDataStore((state) => state.activateCompactionModel)
   const createCompactionModel = useWellDataStore((state) => state.createCompactionModel)
   const deleteCompactionModel = useWellDataStore((state) => state.deleteCompactionModel)
@@ -342,11 +345,20 @@ export function useDataManagerController() {
       window.alert(`Failed to delete TopSet (${response.status})`)
       return
     }
+    await loadTopSets()
     await loadWellInventories()
     const currentWellId = useWellDataStore.getState().well?.well_id
     if (currentWellId) {
       await refreshWell(currentWellId)
     }
+  }
+
+  async function handleActivateTopSet(topSetId: number, wellId: string): Promise<void> {
+    await setWellActiveTopSet(wellId, topSetId)
+    await loadTopSets()
+    await loadWellInventories()
+    await refreshWell(wellId)
+    setSelectedObject({ type: 'zone-set', zoneSetId: topSetId, wellId })
   }
 
   async function handleCreateTopSetPick(
@@ -436,6 +448,7 @@ export function useDataManagerController() {
     handleToggleTopSetZone,
     handleDeleteTopSet,
     handleDeleteTopSetMarker,
+    handleActivateTopSet,
     handleCreateTopSetPick,
     handleWellInspectorDraftChange: actions.handleWellInspectorDraftChange,
     maxDepth,
@@ -521,6 +534,7 @@ export function useDataManagerController() {
     sidebarTopRatio,
     sidebarWidth,
     stratCharts,
+    topSets,
     visibleCurveCount: visibleCurveMnemonics.length,
     visibleCurveMnemonicsByWellId,
     visibleFormationIds: activeWellView.visibleFormationIds,

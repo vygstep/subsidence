@@ -9,9 +9,11 @@ import type {
   LithologyPatternPaletteSummary,
   LithologySetSummary,
   StratChartInfo,
+  TopSetSummary,
   TrackConfig,
   UnitDimensionSummary,
   Well,
+  WellInventory,
 } from '@/types'
 import { CompactionPresetDraftSettings } from './settings/CompactionPresetDraftSettings'
 import { CompactionPresetSettings } from './settings/CompactionPresetSettings'
@@ -37,6 +39,7 @@ import { ModelSettings } from './settings/ModelSettings'
 import { ModelsRootSettings } from './settings/ModelsRootSettings'
 import { StratChartSettings } from './settings/StratChartSettings'
 import { TopPickSettings } from './settings/TopPickSettings'
+import { TopSetSettings } from './settings/TopSetSettings'
 import { TopsSettings } from './settings/TopsSettings'
 import { WellSettings } from './settings/WellSettings'
 import { ZoneDetailSettings } from './settings/ZoneDetailSettings'
@@ -81,6 +84,10 @@ interface SettingsInspectorProps {
   ) => void | Promise<void>
   onFormationMove: (formationId: string, depth: number) => void
   selectedChart: StratChartInfo | null
+  topSets: TopSetSummary[]
+  wellInventories: WellInventory[]
+  activeWellId: string | null
+  onActivateTopSet: (topSetId: number, wellId: string) => void
   selectedCompactionModel: CompactionModel | null
   selectedCompactionPreset: CompactionPresetSummary | null
   compactionPresets: CompactionPresetSummary[]
@@ -122,6 +129,10 @@ export function SettingsInspector({
   onFormationUpdate,
   onFormationMove,
   selectedChart,
+  topSets,
+  wellInventories,
+  activeWellId,
+  onActivateTopSet,
   selectedCompactionModel,
   selectedCompactionPreset,
   compactionPresets,
@@ -221,6 +232,21 @@ export function SettingsInspector({
         zoneSetId={selectedObject.zoneSetId}
         onSelectZone={onSelectZone}
         selectedZoneId={selectedZoneId}
+      />
+    )
+  }
+
+  if (selectedObject.type === 'top-set') {
+    const topSet = topSets.find((item) => item.id === selectedObject.topSetId) ?? null
+    if (!topSet) {
+      return <EmptyInspector message="Selected TopSet is not loaded yet." />
+    }
+    return (
+      <TopSetSettings
+        topSet={topSet}
+        activeWellId={activeWellId}
+        wellInventories={wellInventories}
+        onActivateTopSet={onActivateTopSet}
       />
     )
   }

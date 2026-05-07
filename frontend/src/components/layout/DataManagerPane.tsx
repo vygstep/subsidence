@@ -351,12 +351,12 @@ export function DataManagerPane({ sidebarRef, onInternalSplitterMouseDown }: Dat
           lithologyPatternPalettes={controller.lithologyPatternPalettes}
           selectedObject={controller.selectedObject}
           stratCharts={controller.stratCharts}
+          topSets={controller.topSets}
           visibleCurveMnemonicsByWellId={controller.visibleCurveMnemonicsByWellId}
           visibleFormationIdsByWellId={controller.visibleFormationIdsByWellId}
           hiddenTopSetZoneIdsByWellId={controller.hiddenTopSetZoneIdsByWellId}
           wellInventories={controller.wellInventories}
           onSelectZoneSetsRoot={controller.handleSelectZoneSetsRoot}
-          onSelectZoneSet={controller.handleSelectZoneSet}
           onSelectZoneInSet={controller.handleSelectZoneInSet}
           selectedZoneId={controller.selectedZoneId}
           selectedZoneSetId={controller.selectedZoneSetId}
@@ -388,6 +388,10 @@ export function DataManagerPane({ sidebarRef, onInternalSplitterMouseDown }: Dat
           onFormationUpdate={controller.setFormationUpdate}
           onFormationMove={controller.setFormationMove}
           selectedChart={controller.selectedChart}
+          topSets={controller.topSets}
+          wellInventories={controller.wellInventories}
+          activeWellId={controller.activeWellId}
+          onActivateTopSet={controller.handleActivateTopSet}
           selectedCompactionModel={controller.selectedCompactionModel}
           selectedCompactionPreset={controller.selectedCompactionPreset}
           compactionPresets={controller.compactionPresets}
