@@ -2,7 +2,7 @@
 
 ## Status
 
-`todo`
+`implemented`
 
 ## Problem
 
@@ -62,8 +62,17 @@ Expected change:
 
 ## Verification
 
-- `npm run test -- --run DataManagerTree.integration.test.tsx`
+- `npm run test -- --run DataManagerTree.integration.test.tsx`: 18 passed.
 - Manual check: create two TopSets for one well, switch active TopSet, confirm both remain visible in STRATIGRAPHY.
+- Manual check: TopSet rows show only `active` / `inactive` metadata.
+- Manual check: selecting an inactive TopSet opens TopSet settings; activation happens through `Activate for current well`.
+- Manual check: activating another TopSet clears the previously active pick/line selection.
+
+## Implementation Notes
+
+- Activation is intentionally not triggered by clicking a TopSet row. Row click selects the TopSet and opens settings.
+- Inactive TopSets are shown from project-level `/api/top-sets` summaries.
+- `/api/wells/inventory` remains the source for active per-well TopSet links, active picks, and zones.
 
 ## Non-Goals
 
