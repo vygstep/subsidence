@@ -1,0 +1,142 @@
+# BUG: Backend Test Regressions
+
+## Status
+
+`todo`
+
+Branch: `bug/backend-test-regressions`
+
+## Current Test Baseline
+
+Backend:
+
+- Command: `pytest tests` in `app`
+- Result: `85 passed, 11 failed`
+
+Frontend:
+
+- Command: `npm run test -- --run` in `frontend`
+- Result: `49 passed`
+
+## Problems
+
+### 1. Explicit tops CSV colors are overwritten
+
+`import_tops_csv()` reads explicit CSV colors and writes them to `FormationTopModel.color`, but new picks are created with `color_source='auto'`.
+
+After import, `link_picks_to_horizons()` updates any `auto` color from the matched horizon or active strat chart. This overwrites user-supplied CSV colors during initial import and repeated import into an existing TopSet.
+
+Failing test:
+
+- `tests/integration/test_project_api_workflows.py::test_tops_import_into_top_set_is_idempotent`
+
+Desired behavior:
+
+- If a tops CSV row contains an explicit `color`, preserve that color and mark the pick as `color_source='user'`.
+- If a tops CSV row does not contain an explicit `color`, keep automatic color behavior with `color_source='auto'`.
+- Repeated import into the same TopSet updates depth, age, attributes, and explicit color without creating duplicate picks.
+
+### 2. Duplicate imported ages are not normalized
+
+The tops importer currently writes every parsed `age_ma` / `strat_age_ma` value directly to `FormationTopModel.age_top_ma`.
+
+Existing tests require duplicate-age cleanup:
+
+- for the same imported age, the shallowest pick keeps the age;
+- deeper picks with the same age are set to `age_top_ma = None`;
+- unique ages are unchanged.
+
+Failing tests:
+
+- `tests/integration/test_tops_import.py::test_duplicate_ages_shallower_keeps_age`
+- `tests/integration/test_tops_import.py::test_three_same_ages_only_shallowest_keeps`
+
+Desired behavior:
+
+- Normalize duplicate ages during tops import after rows are parsed and before final flush/logging.
+- Use measured depth ordering; the shallowest `depth_md` wins for each duplicate age.
+- Preserve existing water-depth auto-set behavior for age `0.0`.
+- Keep `qc_warnings` collection compatible with existing importer QC output.
+
+### 3. Base curve is now required, but tests still expect old result count
+
+`backstrip()` now returns an extra base curve for the deepest lower boundary. This is required product behavior and should remain.
+
+Current implementation:
+
+- creates `base_result` in `app/src/subsidence/data/backstrip.py`;
+- returns `[base_result] + results`;
+- API `/api/wells/{well_id}/subsidence` returns the base curve together with layer/zone curves.
+
+Failing tests still expect the old two-result model:
+
+- `tests/unit/test_backstrip.py::test_two_formation_returns_two_results`
+- `tests/unit/test_backstrip.py::test_unknown_lithology_uses_default`
+- `tests/unit/test_backstrip.py::test_zone_layer_input_returns_two_results`
+- `tests/unit/test_backstrip.py::test_zone_layer_input_matches_formation_input`
+- `tests/integration/test_project_api_workflows.py::test_zone004_legacy_path_requires_no_top_set`
+- `tests/integration/test_project_api_workflows.py::test_zone004_zone_path_used_when_top_set_active`
+- `tests/integration/test_project_api_workflows.py::test_zone004_zone_path_matches_legacy_for_single_lithology`
+- `tests/integration/test_project_api_workflows.py::test_zone004_zones_without_lithology_use_default`
+
+Desired behavior:
+
+- Keep the base curve in `backstrip()` and API results.
+- Update unit and integration tests to assert the new result count and the expected base curve name/path.
+- Preserve existing equivalence assertions between legacy formation path and TopSet zone path for the actual layer/zone curves.
+- Do not hide, remove, or make the base curve optional in this contract.
+
+## Implementation Plan
+
+### Step 1: Preserve explicit imported colors
+
+Files:
+
+- `app/src/subsidence/data/importers/tops.py`
+- existing tests in `app/tests/integration/test_project_api_workflows.py`
+
+Expected change:
+
+- Track whether `color` was explicitly present in the CSV row.
+- Set `color_source='user'` for explicit colors.
+- Set `color_source='auto'` when color is inferred from strat chart or fallback.
+- On upsert/re-import, update `color_source` consistently with the incoming row.
+
+### Step 2: Restore duplicate-age normalization
+
+Files:
+
+- `app/src/subsidence/data/importers/tops.py`
+- existing tests in `app/tests/integration/test_tops_import.py`
+
+Expected change:
+
+- Before final flush/logging, group imported picks by non-null `age_top_ma`.
+- For each age group with more than one pick, keep the age only on the shallowest `depth_md`.
+- Set deeper duplicates to `None`.
+
+### Step 3: Update base-curve tests
+
+Files:
+
+- `app/tests/unit/test_backstrip.py`
+- `app/tests/integration/test_project_api_workflows.py`
+- optionally `docs/modules/subsidence-panel.md` or `docs/modules/backend-data-layer.md` if behavior is not documented clearly.
+
+Expected change:
+
+- Update expected result counts from `2` to `3` where the base curve is required.
+- Assert the base curve exists and is distinct from layer/zone curves.
+- Keep comparisons focused on matching layer/zone curves when checking legacy-vs-zone equivalence.
+
+## Verification
+
+- `pytest tests` in `app`
+- `npm run test -- --run` in `frontend`
+
+## Non-Goals
+
+- Do not remove the deepest base curve.
+- Do not make the base curve optional.
+- Do not change frontend rendering unless backend/API test updates reveal a concrete frontend contract mismatch.
+- Do not commit `docs/contracts/bug-import-extends-well-td.md` in this branch unless explicitly requested.
