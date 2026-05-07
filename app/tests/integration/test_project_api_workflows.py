@@ -9,6 +9,7 @@ from sqlalchemy import select as sa_select
 
 from subsidence.api.main import app
 from subsidence.data.schema import (
+    CalculationResult,
     CompactionModel,
     CompactionModelParam,
     CompactionPreset,
@@ -963,6 +964,68 @@ def test_undo_redo_create_well_and_delete_well(api_client: TestClient, tmp_path:
     response = api_client.get('/api/wells/inventory')
     assert response.status_code == 200, response.text
     assert response.json() == []
+
+
+def test_delete_well_removes_stored_calculation_results(api_client: TestClient, tmp_path: Path):
+    project_path = _create_project(api_client, tmp_path, 'delete-well-results')
+    response = api_client.post('/api/projects/wells', json={
+        'name': 'Result Well',
+        'x': 0.0,
+        'y': 0.0,
+        'kb': 10.0,
+        'td': 500.0,
+        'crs': 'local',
+    })
+    assert response.status_code == 200, response.text
+    well_id = response.json()['well_id']
+
+    result_uri = f'results/{well_id}-subsidence.json'
+    result_path = project_path / result_uri
+    result_path.write_text('{"series":[]}', encoding='utf-8')
+
+    manager = api_client.app.state.project_manager
+    with manager.get_session() as session:
+        session.add(CalculationResult(
+            well_id=well_id,
+            kind='subsidence',
+            algorithm='airy_backstrip',
+            params_json='{}',
+            inputs_hash='test-hash',
+            data_uri=result_uri,
+            is_stale=False,
+        ))
+        session.commit()
+
+    response = api_client.delete(f'/api/projects/wells/{well_id}')
+    assert response.status_code == 200, response.text
+
+    with manager.get_session() as session:
+        assert session.get(WellModel, well_id) is None
+        stored_results = session.scalars(
+            sa_select(CalculationResult).where(CalculationResult.well_id == well_id)
+        ).all()
+        assert stored_results == []
+    assert not result_path.exists()
+
+    response = api_client.post('/api/projects/undo')
+    assert response.status_code == 200, response.text
+    with manager.get_session() as session:
+        assert session.get(WellModel, well_id) is not None
+        restored_results = session.scalars(
+            sa_select(CalculationResult).where(CalculationResult.well_id == well_id)
+        ).all()
+        assert len(restored_results) == 1
+        assert restored_results[0].data_uri == result_uri
+    assert result_path.exists()
+
+    response = api_client.post('/api/projects/redo')
+    assert response.status_code == 200, response.text
+    with manager.get_session() as session:
+        assert session.get(WellModel, well_id) is None
+        assert session.scalars(
+            sa_select(CalculationResult).where(CalculationResult.well_id == well_id)
+        ).all() == []
+    assert not result_path.exists()
 
 
 def test_checkpoint_create_restore_delete(api_client: TestClient, tmp_path: Path):

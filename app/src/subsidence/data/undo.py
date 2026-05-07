@@ -8,7 +8,15 @@ from typing import Any
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-from .schema import CurveMetadata, DeviationSurveyModel, FormationStratLink, FormationTopModel, VisualConfig, WellModel
+from .schema import (
+    CalculationResult,
+    CurveMetadata,
+    DeviationSurveyModel,
+    FormationStratLink,
+    FormationTopModel,
+    VisualConfig,
+    WellModel,
+)
 from .strat_link import auto_link_all_formations_to_chart
 
 
@@ -121,9 +129,13 @@ def _capture_well_snapshot(session: Session, project_path: Path | str, well_id: 
     links = list(session.scalars(
         select(FormationStratLink).where(FormationStratLink.formation_id.in_(top_ids))
     )) if top_ids else []
+    calculation_results = list(session.scalars(
+        select(CalculationResult).where(CalculationResult.well_id == well_id)
+    ))
 
     files: dict[str, bytes] = {}
     relative_paths: set[str] = {row.data_uri for row in curve_rows}
+    relative_paths.update(row.data_uri for row in calculation_results)
     if deviation is not None:
         relative_paths.add(deviation.data_uri)
     if well.source_las_path:
@@ -139,6 +151,7 @@ def _capture_well_snapshot(session: Session, project_path: Path | str, well_id: 
         'deviation': _model_to_dict(deviation) if deviation is not None else None,
         'formation_tops': [_model_to_dict(row) for row in tops],
         'formation_strat_links': [_model_to_dict(link) for link in links],
+        'calculation_results': [_model_to_dict(row) for row in calculation_results],
         'files': files,
     }
 
@@ -164,16 +177,34 @@ def _restore_well_snapshot(session: Session, project_path: Path | str, snapshot:
     session.flush()
     for row in snapshot.get('formation_strat_links', []):
         session.add(FormationStratLink(**row))
+    for row in snapshot.get('calculation_results', []):
+        session.add(CalculationResult(**row))
 
 
 def _delete_well_snapshot(session: Session, project_path: Path | str, snapshot: dict[str, Any]) -> None:
     project_path = Path(project_path)
+    calculation_result_paths = {
+        row['data_uri']
+        for row in snapshot.get('calculation_results', [])
+    }
+    for row in snapshot.get('calculation_results', []):
+        result = session.get(CalculationResult, row['id'])
+        if result is not None:
+            session.delete(result)
+    session.flush()
+
     well = session.get(WellModel, snapshot['well']['id'])
     if well is not None:
         session.delete(well)
         session.flush()
 
     for relative_path in snapshot['files']:
+        if relative_path in calculation_result_paths:
+            still_used = session.scalar(
+                select(CalculationResult).where(CalculationResult.data_uri == relative_path)
+            )
+            if still_used is not None:
+                continue
         file_path = project_path / relative_path
         if file_path.exists():
             file_path.unlink()

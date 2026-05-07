@@ -102,6 +102,19 @@ Desired behavior:
 - Importing into an existing TopSet via `zone_set_id` remains allowed for the current well and for other wells.
 - Do not auto-rename duplicate TopSets; require an explicit user choice.
 
+### 5. Deleting a well can fail with related calculation results
+
+The well delete route uses `RemoveWell`, which snapshots the well and then deletes the `WellModel`.
+
+Most well-owned data is removed through ORM relationships or database cascades, but `calculation_results.well_id` is a direct foreign key without a `WellModel` relationship or `ON DELETE CASCADE`. If a well has stored calculation results, deleting the well can fail with a database integrity error and the frontend shows `Failed to delete well '<name>' (500)`.
+
+Desired behavior:
+
+- Deleting a well succeeds when the well has stored calculation results.
+- Well-scoped calculation result rows are removed with the well.
+- Result files owned only by the deleted well are removed from the project bundle.
+- Undo/redo for `RemoveWell` remains coherent by snapshotting and restoring deleted result rows and files.
+
 ## Implementation Plan
 
 ### Step 1: Preserve explicit imported colors
@@ -158,6 +171,21 @@ Expected change:
 - Add a case-insensitive TopSet name uniqueness check for explicit create operations.
 - Return `409 Conflict` when a duplicate name is submitted.
 - Keep `zone_set_id=<existing id>` imports working as the supported way to append/load picks into an existing TopSet.
+
+### Step 5: Delete wells with stored calculation results
+
+Files:
+
+- `app/src/subsidence/data/undo.py`
+- `app/tests/integration/test_project_api_workflows.py`
+
+Expected change:
+
+- Include `CalculationResult` rows for the well in the `RemoveWell` snapshot.
+- Include their `data_uri` files in the snapshot file payloads.
+- Delete those rows before deleting the `WellModel`.
+- Restore the rows and files on undo.
+- Add an integration test that deletes a well with a stored calculation result and verifies the API returns success.
 
 ## Verification
 
