@@ -557,11 +557,13 @@ export const useWellDataStore = create<WellDataStore>((set, get) => ({
       throw new Error(await readError(response, `Failed to delete formation '${formationId}' (${response.status})`))
     }
 
-    set((state) => ({
-      formations: state.formations.filter((formation) => formation.id !== formationId),
-      error: null,
-    }))
     await get().loadWellInventories()
+    const activeWellId = get().well?.well_id
+    if (activeWellId) {
+      await get().loadWell(activeWellId)
+    } else {
+      set({ error: null })
+    }
     const { useComputedStore } = await import('./computedStore')
     useComputedStore.getState().triggerRecalculation()
   },
