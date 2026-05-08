@@ -1,6 +1,6 @@
 # Bug: Inactive TopSets Must Be Visible But Read-only
 
-Status: active
+Status: implemented
 
 ## Problem
 
