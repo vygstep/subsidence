@@ -241,6 +241,19 @@ export function SettingsInspector({
     if (!topSet) {
       return <EmptyInspector message="Selected TopSet is not loaded yet." />
     }
+    const activeInventory = activeWellId
+      ? wellInventories.find((item) => item.well_id === activeWellId) ?? null
+      : null
+    if (activeInventory?.active_top_set_id === topSet.id) {
+      return (
+        <ZoneSettings
+          wellId={activeInventory.well_id}
+          zoneSetId={topSet.id}
+          onSelectZone={onSelectZone}
+          selectedZoneId={selectedZoneId}
+        />
+      )
+    }
     return (
       <TopSetSettings
         topSet={topSet}

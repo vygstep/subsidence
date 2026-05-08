@@ -653,7 +653,13 @@ export function WellDataPanel({
                   <div key={zoneSet.id} className="tree-node">
                     <div
                       className={`tree-node__row ${isZoneSetSelected ? 'tree-node__row--selected' : ''}`}
-                      onClick={() => setSelectedObject({ type: 'top-set', topSetId: zoneSet.id })}
+                      onClick={() => {
+                        if (selectedWellId) {
+                          setSelectedObject({ type: 'zone-set', zoneSetId: zoneSet.id, wellId: selectedWellId })
+                          return
+                        }
+                        setSelectedObject({ type: 'top-set', topSetId: zoneSet.id })
+                      }}
                     >
                       <TreeToggleButton
                         isOpen={isOpen(`zones:${zoneSet.id}`)}

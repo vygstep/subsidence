@@ -367,7 +367,7 @@ describe('Data Manager well tree', () => {
     expect(props.onToggleTopSetVisibility).toHaveBeenCalledWith(10, true)
   })
 
-  it('renders inactive project TopSets and selects the TopSet object', () => {
+  it('routes active TopSets to per-well settings and inactive TopSets to generic settings', () => {
     renderPanel({
       topSets: [
         { id: 10, name: 'Regional', description: null, horizon_count: 2 },
@@ -386,6 +386,9 @@ describe('Data Manager well tree', () => {
 
     expect(screen.getByText('Regional')).toBeTruthy()
     expect(screen.getByText('Legacy')).toBeTruthy()
+
+    fireEvent.click(screen.getByText('Regional'))
+    expect(useWorkspaceStore.getState().selectedObject).toEqual({ type: 'zone-set', zoneSetId: 10, wellId: 'well-a' })
 
     const legacyRow = screen.getByText('Legacy').closest('.tree-node__row')!
     expect(legacyRow.textContent).toContain('inactive')
