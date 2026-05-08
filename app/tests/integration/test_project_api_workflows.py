@@ -2154,6 +2154,85 @@ def test_top_set_pick_insert_endpoint_adds_marker_from_data_manager(api_client: 
     assert len(resp.json()) == 3
 
 
+def test_linked_top_set_marker_rename_syncs_all_well_picks(api_client: TestClient, tmp_path: Path):
+    well_a_id, top_set_id = _create_well_with_top_set(api_client, tmp_path)
+
+    resp = api_client.post('/api/projects/wells', json={
+        'name': 'Second Zone Well', 'x': 1.0, 'y': 1.0, 'kb': 0.0, 'td': 1000.0, 'crs': 'local',
+    })
+    assert resp.status_code == 200, resp.text
+    well_b_id = resp.json()['well_id']
+
+    for name, depth, age in [('H1', 110.0, 10.0), ('H2', 330.0, 20.0), ('H3', 650.0, 30.0), ('H4', 920.0, 40.0)]:
+        resp = api_client.post(f'/api/wells/{well_b_id}/formations', json={
+            'name': name, 'depth_md': depth, 'color': '#bbbbbb', 'age_ma': age,
+        })
+        assert resp.status_code == 201, resp.text
+
+    resp = api_client.put(f'/api/wells/{well_b_id}/active-top-set', json={'top_set_id': top_set_id})
+    assert resp.status_code == 200, resp.text
+
+    resp = api_client.get(f'/api/wells/{well_a_id}/formations')
+    assert resp.status_code == 200, resp.text
+    h2_pick_a = next(top for top in resp.json() if top['name'] == 'H2')
+
+    resp = api_client.patch(
+        f'/api/wells/{well_a_id}/formations/{h2_pick_a["id"]}',
+        json={'name': 'Renamed H2'},
+    )
+    assert resp.status_code == 200, resp.text
+    assert resp.json()['name'] == 'Renamed H2'
+
+    resp = api_client.get(f'/api/top-sets/{top_set_id}')
+    assert resp.status_code == 200, resp.text
+    horizons = resp.json()['horizons']
+    assert any(h['id'] == h2_pick_a['horizon_id'] and h['name'] == 'Renamed H2' for h in horizons)
+
+    resp = api_client.get(f'/api/wells/{well_a_id}/formations')
+    assert resp.status_code == 200, resp.text
+    assert any(top['horizon_id'] == h2_pick_a['horizon_id'] and top['name'] == 'Renamed H2' for top in resp.json())
+
+    resp = api_client.get(f'/api/wells/{well_b_id}/formations')
+    assert resp.status_code == 200, resp.text
+    well_b_tops = resp.json()
+    assert any(top['horizon_id'] == h2_pick_a['horizon_id'] and top['name'] == 'Renamed H2' for top in well_b_tops)
+    assert any(top['name'] == 'H1' and top['depth_md'] == pytest.approx(110.0) for top in well_b_tops)
+
+    resp = api_client.get('/api/wells/inventory')
+    assert resp.status_code == 200, resp.text
+    well_b_inventory = next(well for well in resp.json() if well['well_id'] == well_b_id)
+    assert any(top['horizon_id'] == h2_pick_a['horizon_id'] and top['name'] == 'Renamed H2' for top in well_b_inventory['formations'])
+    zone_names = [
+        (zone['upper_horizon']['name'], zone['lower_horizon']['name'])
+        for zone in well_b_inventory['zones']
+    ]
+    assert ('H1', 'Renamed H2') in zone_names
+    assert ('Renamed H2', 'H3') in zone_names
+
+
+def test_unlinked_top_rename_stays_local(api_client: TestClient, tmp_path: Path):
+    well_a_id, _top_set_id = _create_well_with_top_set(api_client, tmp_path)
+
+    resp = api_client.post(f'/api/wells/{well_a_id}/formations', json={
+        'name': 'Local Pick', 'depth_md': 950.0, 'color': '#cccccc', 'age_ma': 45.0,
+    })
+    assert resp.status_code == 201, resp.text
+    local_pick_id = resp.json()['id']
+    assert resp.json()['horizon_id'] is None
+
+    resp = api_client.patch(
+        f'/api/wells/{well_a_id}/formations/{local_pick_id}',
+        json={'name': 'Local Pick Renamed'},
+    )
+    assert resp.status_code == 200, resp.text
+    assert resp.json()['name'] == 'Local Pick Renamed'
+    assert resp.json()['horizon_id'] is None
+
+    resp = api_client.get(f'/api/wells/{well_a_id}/formations')
+    assert resp.status_code == 200, resp.text
+    assert any(top['id'] == local_pick_id and top['name'] == 'Local Pick Renamed' for top in resp.json())
+
+
 def test_formation_api_rejects_depth_outside_well_td(api_client: TestClient, tmp_path: Path):
     _create_project(api_client, tmp_path, 'formation-depth-guard')
 

@@ -447,11 +447,20 @@ def update_formation(well_id: str, formation_id: int, body: FormationTopPatch, r
                         if horizon is not None and horizon.name != top.name:
                             old_horizon_name = horizon.name
                             horizon.name = top.name
+                            linked_picks = session.scalars(
+                                select(FormationTopModel).where(
+                                    FormationTopModel.horizon_id == top.horizon_id,
+                                    FormationTopModel.id != top.id,
+                                )
+                            ).all()
+                            for linked_pick in linked_picks:
+                                linked_pick.name = top.name
                             session.flush()
                             _log.info('horizon_name_synced', extra={'event': {
                                 'operation': 'update_formation', 'phase': 'horizon_name_synced',
                                 'formation_id': formation_id, 'new_name': top.name,
                                 'horizon_id': top.horizon_id, 'old_horizon_name': old_horizon_name,
+                                'linked_pick_count': len(linked_picks),
                             }})
                     top_set_id = get_well_active_top_set_id(session, top.well_id)
                     if top_set_id is not None:
