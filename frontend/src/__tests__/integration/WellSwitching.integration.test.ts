@@ -10,6 +10,12 @@ describe('WellSwitching - Selection Cleanup + Data Reload', () => {
       json: async () => [],
     })
   }
+  const mockEmptyTopSets = () => {
+    ;(global.fetch as any).mockResolvedValueOnce({
+      ok: true,
+      json: async () => [],
+    })
+  }
 
   beforeEach(() => {
     vi.clearAllMocks()
@@ -66,6 +72,7 @@ describe('WellSwitching - Selection Cleanup + Data Reload', () => {
       json: async () => [],
     })
     mockEmptySeaLevelCurves()
+    mockEmptyTopSets()
 
     // Act: switch to Well B
     act(() => {
@@ -116,6 +123,7 @@ describe('WellSwitching - Selection Cleanup + Data Reload', () => {
       json: async () => [],
     })
     mockEmptySeaLevelCurves()
+    mockEmptyTopSets()
 
     act(() => {
       result.current.loadWell(well.well_id)
@@ -162,6 +170,7 @@ describe('WellSwitching - Selection Cleanup + Data Reload', () => {
       json: async () => [],
     })
     mockEmptySeaLevelCurves()
+    mockEmptyTopSets()
 
     act(() => {
       result.current.loadWell(well.well_id)
@@ -202,6 +211,7 @@ describe('WellSwitching - Selection Cleanup + Data Reload', () => {
       json: async () => [],
     })
     mockEmptySeaLevelCurves()
+    mockEmptyTopSets()
 
     act(() => {
       result.current.loadWell(well.well_id)
@@ -231,6 +241,7 @@ describe('WellSwitching - Selection Cleanup + Data Reload', () => {
       }),
     )
     mockEmptySeaLevelCurves()
+    mockEmptyTopSets()
 
     act(() => {
       result.current.loadWellInventories()
@@ -260,6 +271,7 @@ describe('WellSwitching - Selection Cleanup + Data Reload', () => {
       json: async () => inventories,
     })
     mockEmptySeaLevelCurves()
+    mockEmptyTopSets()
 
     act(() => {
       result.current.loadWell('well-1')
