@@ -250,9 +250,15 @@ export function useDataManagerController() {
       : formation.name.toLowerCase() === name.toLowerCase()
   }
 
+  function topSetHorizonIds(zoneSetId: number): Set<number> {
+    return new Set((topSets.find((topSet) => topSet.id === zoneSetId)?.horizons ?? []).map((horizon) => horizon.id))
+  }
+
   function handleToggleTopSetMarker(zoneSetId: number, horizonId: number | null, name: string, nextValue: boolean): void {
+    const horizonIds = topSetHorizonIds(zoneSetId)
     for (const inventory of wellInventories) {
-      if (inventory.active_top_set_id !== zoneSetId) continue
+      if (horizonIds.size === 0 && inventory.active_top_set_id !== zoneSetId) continue
+      if (horizonId !== null && horizonIds.size > 0 && !horizonIds.has(horizonId)) continue
       const formationIds = inventory.formations
         .filter((formation) => markerMatches(formation, horizonId, name))
         .map((formation) => formation.id)
@@ -279,14 +285,21 @@ export function useDataManagerController() {
   }
 
   function handleToggleTopSetVisibility(zoneSetId: number, nextValue: boolean): void {
+    const horizonIds = topSetHorizonIds(zoneSetId)
     const zoneIds = Array.from(new Set(
       wellInventories
         .filter((inventory) => inventory.active_top_set_id === zoneSetId)
         .flatMap((inventory) => inventory.zones.map((zone) => zone.zone_id)),
     ))
     for (const inventory of wellInventories) {
-      if (inventory.active_top_set_id !== zoneSetId) continue
-      const formationIds = inventory.formations.map((formation) => formation.id)
+      const formationIds = horizonIds.size > 0
+        ? inventory.formations
+          .filter((formation) => formation.horizon_id !== null && horizonIds.has(formation.horizon_id))
+          .map((formation) => formation.id)
+        : inventory.active_top_set_id === zoneSetId
+          ? inventory.formations.map((formation) => formation.id)
+          : []
+      if (formationIds.length === 0 && inventory.active_top_set_id !== zoneSetId) continue
       updateWellViewState(inventory.well_id, (state) => ({
         ...state,
         visibleFormationIds: nextValue

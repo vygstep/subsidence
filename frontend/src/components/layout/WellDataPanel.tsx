@@ -78,6 +78,22 @@ interface ZoneSetMarkerTreeItem {
   zone_below: FormationZone | null
 }
 
+interface ZoneSetMarkerAccumulator {
+  horizon_id: number | null
+  name: string
+  color: string
+  is_unconformity: boolean
+  sort_order: number
+  formationIdsByWellId: Map<string, string[]>
+}
+
+type ZoneSetTreeAccumulator = ZoneSetTreeItem & {
+  horizonIds: Set<number>
+  zoneIds: Set<number>
+  wellIds: Set<string>
+  markerCounts: Map<string, ZoneSetMarkerAccumulator>
+}
+
 const MODEL_NODES: Array<{ type: SubsidenceModelType; label: string; available: boolean }> = [
   { type: 'total', label: 'Total burial / total subsidence', available: true },
   { type: 'decompaction', label: 'Decompaction', available: false },
@@ -295,7 +311,7 @@ export function WellDataPanel({
   }
 
   const zoneSets = useMemo<ZoneSetTreeItem[]>(() => {
-    const byId = new Map<number, ZoneSetTreeItem & { zoneIds: Set<number>; wellIds: Set<string>; markerCounts: Map<string, { horizon_id: number | null; name: string; color: string; is_unconformity: boolean; formationIdsByWellId: Map<string, string[]> }> }>()
+    const byId = new Map<number, ZoneSetTreeAccumulator>()
     for (const topSet of topSets) {
       byId.set(topSet.id, {
         id: topSet.id,
@@ -304,62 +320,100 @@ export function WellDataPanel({
         wells: [],
         markers: [],
         zones: [],
+        horizonIds: new Set((topSet.horizons ?? []).map((horizon) => horizon.id)),
         zoneIds: new Set<number>(),
         wellIds: new Set<string>(),
-        markerCounts: new Map<string, { horizon_id: number | null; name: string; color: string; is_unconformity: boolean; formationIdsByWellId: Map<string, string[]> }>(),
+        markerCounts: new Map<string, ZoneSetMarkerAccumulator>(
+          (topSet.horizons ?? []).map((horizon) => [
+            markerTreeKey(horizon.id, horizon.name),
+            {
+              horizon_id: horizon.id,
+              name: horizon.name,
+              color: horizon.color,
+              is_unconformity: horizon.kind === 'unconformity',
+              sort_order: horizon.sort_order,
+              formationIdsByWellId: new Map<string, string[]>(),
+            },
+          ]),
+        ),
       })
     }
     for (const item of wells) {
-      if (item.active_top_set_id === null) continue
-      const existing = byId.get(item.active_top_set_id)
-      const entry = existing ?? {
-        id: item.active_top_set_id,
-        name: item.active_top_set_name ?? `TopSet ${item.active_top_set_id}`,
-        horizon_count: 0,
-        wells: [],
-        markers: [],
-        zones: [],
-        zoneIds: new Set<number>(),
-        wellIds: new Set<string>(),
-        markerCounts: new Map<string, { horizon_id: number | null; name: string; color: string; is_unconformity: boolean; formationIdsByWellId: Map<string, string[]> }>(),
+      const inventoryHorizonIds = new Set(
+        item.formations
+          .map((formation) => formation.horizon_id)
+          .filter((horizonId): horizonId is number => horizonId !== null),
+      )
+      const linkedTopSetIds = new Set<number>()
+      if (item.active_top_set_id !== null) linkedTopSetIds.add(item.active_top_set_id)
+      for (const entry of byId.values()) {
+        if ([...entry.horizonIds].some((horizonId) => inventoryHorizonIds.has(horizonId))) {
+          linkedTopSetIds.add(entry.id)
+        }
       }
-      if (!entry.wellIds.has(item.well_id)) {
-        entry.wellIds.add(item.well_id)
-        entry.wells.push({ well_id: item.well_id, well_name: item.well_name })
-      }
+
       const activeHorizonIds = new Set<number>()
       for (const zone of item.zones) {
         activeHorizonIds.add(zone.upper_horizon.id)
         activeHorizonIds.add(zone.lower_horizon.id)
       }
-      for (const formation of item.formations) {
-        if (formation.horizon_id === null) continue
-        if (activeHorizonIds.size > 0 && !activeHorizonIds.has(formation.horizon_id)) continue
-        const key = formation.horizon_id !== null ? `id:${formation.horizon_id}` : `name:${formation.name.toLowerCase()}`
-        const marker = entry.markerCounts.get(key) ?? {
-          horizon_id: formation.horizon_id,
-          name: formation.name,
-          color: topBackgroundColor(formation),
-          is_unconformity: false,
-          formationIdsByWellId: new Map<string, string[]>(),
+
+      for (const topSetId of linkedTopSetIds) {
+        const existing = byId.get(topSetId)
+        const entry = existing ?? {
+          id: topSetId,
+          name: item.active_top_set_id === topSetId ? item.active_top_set_name ?? `TopSet ${topSetId}` : `TopSet ${topSetId}`,
+          horizon_count: 0,
+          wells: [],
+          markers: [],
+          zones: [],
+          horizonIds: new Set<number>(),
+          zoneIds: new Set<number>(),
+          wellIds: new Set<string>(),
+          markerCounts: new Map<string, ZoneSetMarkerAccumulator>(),
         }
-        marker.color = formation.kind !== 'unconformity' && marker.color === '#9ca3af'
+
+        if (!entry.wellIds.has(item.well_id)) {
+          entry.wellIds.add(item.well_id)
+          entry.wells.push({ well_id: item.well_id, well_name: item.well_name })
+        }
+
+        for (const formation of item.formations) {
+          if (formation.horizon_id === null) continue
+          const belongsToTopSet = entry.horizonIds.size > 0
+            ? entry.horizonIds.has(formation.horizon_id)
+            : topSetId === item.active_top_set_id && (activeHorizonIds.size === 0 || activeHorizonIds.has(formation.horizon_id))
+          if (!belongsToTopSet) continue
+          const key = formation.horizon_id !== null ? `id:${formation.horizon_id}` : `name:${formation.name.toLowerCase()}`
+          const marker = entry.markerCounts.get(key) ?? {
+            horizon_id: formation.horizon_id,
+            name: formation.name,
+            color: topBackgroundColor(formation),
+            is_unconformity: false,
+            sort_order: Number.MAX_SAFE_INTEGER,
+            formationIdsByWellId: new Map<string, string[]>(),
+          }
+          marker.color = formation.kind !== 'unconformity' && marker.color === '#9ca3af'
             ? topBackgroundColor(formation)
             : marker.color
-        marker.is_unconformity = marker.is_unconformity || formation.kind === 'unconformity'
-        marker.formationIdsByWellId.set(item.well_id, [
-          ...(marker.formationIdsByWellId.get(item.well_id) ?? []),
-          formation.id,
-        ])
-        entry.markerCounts.set(key, marker)
-      }
-      for (const zone of item.zones) {
-        if (!entry.zoneIds.has(zone.zone_id)) {
-          entry.zoneIds.add(zone.zone_id)
-          entry.zones.push(zone)
+          marker.is_unconformity = marker.is_unconformity || formation.kind === 'unconformity'
+          marker.formationIdsByWellId.set(item.well_id, [
+            ...(marker.formationIdsByWellId.get(item.well_id) ?? []),
+            formation.id,
+          ])
+          entry.markerCounts.set(key, marker)
         }
+
+        if (topSetId === item.active_top_set_id) {
+          for (const zone of item.zones) {
+            if (!entry.zoneIds.has(zone.zone_id)) {
+              entry.zoneIds.add(zone.zone_id)
+              entry.zones.push(zone)
+            }
+          }
+        }
+        byId.set(entry.id, entry)
       }
-      byId.set(entry.id, entry)
     }
     return Array.from(byId.values())
       .map((entry) => {
@@ -404,7 +458,7 @@ export function WellDataPanel({
         if (lastZone) {
           addMarker(lastZone.lower_horizon.id, lastZone.lower_horizon.name, null)
         }
-        for (const marker of Array.from(entry.markerCounts.values()).sort((a, b) => a.name.localeCompare(b.name))) {
+        for (const marker of Array.from(entry.markerCounts.values()).sort((a, b) => a.sort_order - b.sort_order || a.name.localeCompare(b.name))) {
           addMarker(marker.horizon_id, marker.name, null)
         }
 
@@ -633,7 +687,9 @@ export function WellDataPanel({
               ) : zoneSets.map((zoneSet) => {
                 const isActiveForCurrentWell = activeWellId !== null
                   && wells.some((item) => item.well_id === activeWellId && item.active_top_set_id === zoneSet.id)
-                const selectedWellId = isActiveForCurrentWell ? activeWellId : undefined
+                const hasCurrentWellData = activeWellId !== null
+                  && zoneSet.wells.some((item) => item.well_id === activeWellId)
+                const selectedWellId = hasCurrentWellData ? activeWellId : undefined
                 const isZoneSetSelected = (selectedObject?.type === 'top-set' && selectedObject.topSetId === zoneSet.id)
                   || (selectedObject?.type === 'zone-set' && selectedZoneSetId === zoneSet.id)
                 const selectedVisibleFormationIds = selectedWellId ? visibleFormationIdsByWellId[selectedWellId] ?? [] : []
@@ -654,7 +710,7 @@ export function WellDataPanel({
                     <div
                       className={`tree-node__row ${isZoneSetSelected ? 'tree-node__row--selected' : ''}`}
                       onClick={() => {
-                        if (selectedWellId) {
+                        if (isActiveForCurrentWell && selectedWellId) {
                           setSelectedObject({ type: 'zone-set', zoneSetId: zoneSet.id, wellId: selectedWellId })
                           return
                         }

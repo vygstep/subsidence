@@ -3,7 +3,7 @@ from __future__ import annotations
 import math
 
 from fastapi import APIRouter, HTTPException, Request
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 from sqlalchemy import func, select
 from sqlalchemy.orm import selectinload
 
@@ -88,6 +88,7 @@ class TopSetSummary(BaseModel):
     name: str
     description: str | None
     horizon_count: int
+    horizons: list[HorizonResponse] = Field(default_factory=list)
 
 
 class TopSetDetail(BaseModel):
@@ -252,6 +253,7 @@ def list_top_sets(request: Request) -> list[TopSetSummary]:
                 name=ts.name,
                 description=ts.description,
                 horizon_count=len(ts.horizons),
+                horizons=[_horizon_to_response(h) for h in ts.horizons],
             )
             for ts in rows
         ]

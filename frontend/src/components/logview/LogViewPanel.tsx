@@ -21,6 +21,7 @@ interface LogViewPanelProps {
   formations: FormationTop[]
   zoneFormations: FormationTop[]
   zones: FormationZone[]
+  editableFormationIds: Set<string>
   minDepth: number
   maxDepth: number
   wellTopDepth: number
@@ -37,6 +38,7 @@ export function LogViewPanel({
   formations,
   zoneFormations,
   zones,
+  editableFormationIds,
   minDepth,
   maxDepth,
   wellTopDepth,
@@ -145,6 +147,9 @@ export function LogViewPanel({
         ? null
         : zoneFormations.find((formation) => formation.id === selectedFormationId) ?? null
       const targetPickId = activePickId ?? selectedPick?.id ?? null
+      if (targetPickId !== null && !editableFormationIds.has(targetPickId)) {
+        return
+      }
       const formationByHorizonId = new Map(zoneFormations.filter((f) => f.horizon_id !== null).map((f) => [f.horizon_id!, f]))
       const validateDepth = (formation: FormationTop, candidateDepth: number): boolean => {
         if (formation.horizon_id === null) return true
@@ -223,6 +228,7 @@ export function LogViewPanel({
       interactionMode,
       activePickId,
       selectedFormationId,
+      editableFormationIds,
       scrollDepth,
       depthPerPixel,
       wellTopDepth,
@@ -355,6 +361,7 @@ export function LogViewPanel({
               height={trackHeight}
               formations={formations}
               curves={tooltipCurves}
+              editableFormationIds={editableFormationIds}
               depthToPixel={depthToPixel}
               cursorDepth={cursorDepth}
               mouseClient={mouseClient}

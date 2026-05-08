@@ -190,6 +190,7 @@ export interface TopSetSummary {
   name: string
   description: string | null
   horizon_count: number
+  horizons?: TopSetHorizon[]
 }
 
 export interface TopSetDetail {

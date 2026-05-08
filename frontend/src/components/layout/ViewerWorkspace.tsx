@@ -14,6 +14,7 @@ export function ViewerWorkspace() {
   const fullCurves = useWellDataStore((state) => state.fullCurves)
   const formations = useWellDataStore((state) => state.formations)
   const zones = useWellDataStore((state) => state.zones)
+  const wellInventories = useWellDataStore((state) => state.wellInventories)
   const colorOverrides = useWellDataStore((state) => state.colorOverrides)
   const error = useWellDataStore((state) => state.error)
   const wellViewStates = useWorkspaceStore((state) => state.wellViewStates)
@@ -114,6 +115,28 @@ export function ViewerWorkspace() {
     zones.filter((zone) => !activeWellView.hiddenTopSetZoneIds.includes(zone.zone_id))
   ), [zones, activeWellView.hiddenTopSetZoneIds])
 
+  const editableFormationIds = useMemo(() => {
+    const activeInventory = wellId
+      ? wellInventories.find((inventory) => inventory.well_id === wellId) ?? null
+      : null
+    if (!activeInventory?.active_top_set_id) {
+      return new Set(formations.filter((formation) => formation.horizon_id === null).map((formation) => formation.id))
+    }
+    const activeHorizonIds = new Set<number>()
+    for (const zone of activeInventory.zones) {
+      activeHorizonIds.add(zone.upper_horizon.id)
+      activeHorizonIds.add(zone.lower_horizon.id)
+    }
+    return new Set(
+      formations
+        .filter((formation) => (
+          formation.horizon_id === null
+          || activeHorizonIds.has(formation.horizon_id)
+        ))
+        .map((formation) => formation.id),
+    )
+  }, [formations, wellId, wellInventories])
+
   const trackOrder = useMemo(
     () => buildTrackOrder(tracks.map((track) => track.id), activeWellView.trackOrder),
     [tracks, activeWellView.trackOrder],
@@ -138,6 +161,7 @@ export function ViewerWorkspace() {
                 formations={visibleFormations}
                 zoneFormations={formations}
                 zones={visibleZones}
+                editableFormationIds={editableFormationIds}
                 minDepth={depthExtent.minDepth}
                 maxDepth={depthExtent.maxDepth}
                 wellTopDepth={depthExtent.wellTopDepth}

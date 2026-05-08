@@ -368,10 +368,19 @@ describe('Data Manager well tree', () => {
   })
 
   it('routes active TopSets to per-well settings and inactive TopSets to generic settings', () => {
-    renderPanel({
+    const { props } = renderPanel({
       topSets: [
         { id: 10, name: 'Regional', description: null, horizon_count: 2 },
-        { id: 20, name: 'Legacy', description: null, horizon_count: 2 },
+        {
+          id: 20,
+          name: 'Legacy',
+          description: null,
+          horizon_count: 2,
+          horizons: [
+            { id: 201, name: 'Legacy Top', kind: 'strat', age_ma: 5, color: '#123456', sort_order: 1, note: null },
+            { id: 202, name: 'Legacy Base', kind: 'strat', age_ma: 15, color: '#654321', sort_order: 0, note: null },
+          ],
+        },
       ],
       wells: [
         createWellInventory({
@@ -379,7 +388,10 @@ describe('Data Manager well tree', () => {
           well_name: 'Well A',
           active_top_set_id: 10,
           active_top_set_name: 'Regional',
-          formations: [{ id: 'top-a', name: 'Top A', depth_md: 100, depth_tvd: null, depth_tvdss: null, horizon_id: 100, active_strat_color: '#aaaaaa', kind: 'strat' }],
+          formations: [
+            { id: 'top-a', name: 'Top A', depth_md: 100, depth_tvd: null, depth_tvdss: null, horizon_id: 100, active_strat_color: '#aaaaaa', kind: 'strat' },
+            { id: 'legacy-base-a', name: 'Legacy Base', depth_md: 220, depth_tvd: null, depth_tvdss: null, horizon_id: 202, active_strat_color: '#654321', color: '#654321', color_source: 'user', kind: 'strat' },
+          ],
         }),
       ],
     })
@@ -393,7 +405,21 @@ describe('Data Manager well tree', () => {
     const legacyRow = screen.getByText('Legacy').closest('.tree-node__row')!
     expect(legacyRow.textContent).toContain('inactive')
     const checkbox = legacyRow.querySelector('input[type="checkbox"]') as HTMLInputElement
-    expect(checkbox.disabled).toBe(true)
+    expect(checkbox.disabled).toBe(false)
+
+    const legacyExpand = legacyRow.querySelector('button[aria-label="Expand"]') as HTMLButtonElement
+    fireEvent.click(legacyExpand)
+    expect(screen.getByText('Legacy Top')).toBeTruthy()
+    expect(screen.getByText('Legacy Base')).toBeTruthy()
+    const legacyMarkerLabels = Array.from(legacyRow.parentElement!.querySelectorAll('.tree-node__section-label'))
+      .map((node) => node.textContent)
+    expect(legacyMarkerLabels).toEqual(['Legacy', 'Legacy Base', 'Legacy Top'])
+    expect(screen.queryByText('No markers loaded.')).toBeNull()
+    const legacyBaseRow = screen.getByText('Legacy Base').closest('.tree-node__row')!
+    const legacyBaseCheckbox = legacyBaseRow.querySelector('input[type="checkbox"]') as HTMLInputElement
+    expect(legacyBaseCheckbox.disabled).toBe(false)
+    fireEvent.click(legacyBaseCheckbox)
+    expect(props.onToggleTopSetMarker).toHaveBeenCalledWith(20, 202, 'Legacy Base', true)
 
     fireEvent.click(screen.getByText('Legacy'))
     expect(useWorkspaceStore.getState().selectedObject).toEqual({ type: 'top-set', topSetId: 20 })

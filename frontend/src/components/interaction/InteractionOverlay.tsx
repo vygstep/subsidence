@@ -13,6 +13,7 @@ interface InteractionOverlayProps {
   height: number
   formations: FormationTop[]
   curves: CurveData[]
+  editableFormationIds: Set<string>
   depthToPixel: (depth: number) => number
   cursorDepth: number | null
   mouseClient: { x: number; y: number } | null
@@ -27,6 +28,7 @@ export function InteractionOverlay({
   height,
   formations,
   curves,
+  editableFormationIds,
   depthToPixel,
   cursorDepth,
   mouseClient,
@@ -40,10 +42,11 @@ export function InteractionOverlay({
   const setActivePickId = useViewStore((state) => state.setActivePickId)
   const effectiveActivePickId = activePickId ?? selectedFormationId
   const clipPathId = `${useId().replace(/:/g, '')}-track-bounds`
+  const editableFormations = formations.filter((formation) => editableFormationIds.has(formation.id))
 
   // Collect not-picked formations for indicator strip at top
-  const notPickedFormations = formations.filter((f) => f.depth_md === null)
-  const activePick = effectiveActivePickId === null ? null : formations.find((f) => f.id === effectiveActivePickId) ?? null
+  const notPickedFormations = editableFormations.filter((f) => f.depth_md === null)
+  const activePick = effectiveActivePickId === null ? null : editableFormations.find((f) => f.id === effectiveActivePickId) ?? null
   const cursorY = cursorDepth === null ? null : depthToPixel(cursorDepth)
   const cursorInsideWell = cursorDepth !== null && cursorDepth >= wellTopDepth && cursorDepth <= wellBottomDepth
   const activePickColor = activePick != null ? formationDisplayColor(activePick) : '#9ca3af'
@@ -78,8 +81,8 @@ export function InteractionOverlay({
               key={formation.id}
               formation={formation}
               yPosition={y}
-              editable={topsEditable}
-              isActivePick={effectiveActivePickId === formation.id}
+              editable={topsEditable && editableFormationIds.has(formation.id)}
+              isActivePick={editableFormationIds.has(formation.id) && effectiveActivePickId === formation.id}
               onSetActivePick={setActivePickId}
               lineClipPathId={clipPathId}
             />
