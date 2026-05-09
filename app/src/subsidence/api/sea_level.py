@@ -5,6 +5,7 @@ from pydantic import BaseModel
 from sqlalchemy import func, select
 
 from subsidence.data.schema import SeaLevelCurve, SeaLevelPoint, WellActiveSeaLevelCurve, WellModel
+from subsidence.api._deps import require_open_project as _require_open_project
 
 router = APIRouter(tags=['sea-level'])
 
@@ -34,13 +35,6 @@ class SeaLevelPointResponse(BaseModel):
 
 class ActiveSeaLevelCurveRequest(BaseModel):
     curve_id: int | None
-
-
-def _require_open_project(request: Request):
-    manager = request.app.state.project_manager
-    if not manager.is_open:
-        raise HTTPException(status_code=400, detail='No project is currently open')
-    return manager
 
 
 @router.get('/sea-level-curves', response_model=list[SeaLevelCurveResponse])

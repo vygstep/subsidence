@@ -23,6 +23,7 @@ from subsidence.data.zone_service import (
     rebuild_zones_for_top_set,
     recalculate_zone_thickness,
 )
+from subsidence.api._deps import require_open_project as _require_open_project
 
 router = APIRouter(tags=['top-sets'])
 
@@ -105,17 +106,6 @@ class ActiveTopSetResponse(BaseModel):
 
 class RecalculateTvdResponse(BaseModel):
     updated_count: int
-
-
-def _manager(request: Request):
-    return request.app.state.project_manager
-
-
-def _require_open_project(request: Request):
-    manager = _manager(request)
-    if not manager.is_open:
-        raise HTTPException(status_code=400, detail='No project is currently open')
-    return manager
 
 
 def _load_top_set(session, top_set_id: int) -> TopSet | None:

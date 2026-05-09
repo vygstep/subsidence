@@ -75,7 +75,7 @@ maps and module docs that both claim to be canonical.
 - Update `todo.md` so it points to this contract, not removed historical contracts.
 - Keep `todo.md` compact: active items only.
 
-Status: done.
+Status: implementation done; backend test run pending.
 
 ### D0.2 Normalize `docs/maps/`
 
@@ -156,6 +156,8 @@ Verification:
 
 - Backend tests pass.
 - API smoke tests for open-project-required endpoints still return the same status/detail.
+
+Status: done.
 
 ### R2: Make horizon floor matching public
 

@@ -22,6 +22,7 @@ from subsidence.data.schema import (
     MeasurementUnitAlias,
     UnitDimension,
 )
+from subsidence.api._deps import require_open_project as _require_open_project
 
 router = APIRouter(tags=['compaction'])
 
@@ -270,13 +271,6 @@ class UnitDimensionDetail(UnitDimensionSummary):
 # ---------------------------------------------------------------------------
 # Helpers
 # ---------------------------------------------------------------------------
-
-def _require_open_project(request: Request):
-    manager = request.app.state.project_manager
-    if not manager.is_open:
-        raise HTTPException(status_code=400, detail='No project is currently open')
-    return manager
-
 
 def _ensure_lithology_sets(manager) -> None:
     project_path = manager.project_path

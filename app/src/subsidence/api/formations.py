@@ -10,7 +10,6 @@ from sqlalchemy.orm import selectinload
 
 from subsidence.data import (
     CreateFormation,
-    ProjectManager,
     RemoveFormation,
     UpdateFormation,
     UpdateFormationDepth,
@@ -28,6 +27,7 @@ from subsidence.data.zone_service import (
     link_picks_to_horizons,
     recalculate_zone_thickness,
 )
+from subsidence.api._deps import require_open_project as _require_open_project
 
 router = APIRouter(tags=['formations'])
 
@@ -109,17 +109,6 @@ class StratUnitLookupResponse(BaseModel):
 class StratLinkRequest(BaseModel):
     chart_id: int
     strat_unit_id: int | None
-
-
-def _manager(request: Request) -> ProjectManager:
-    return request.app.state.project_manager
-
-
-def _require_open_project(request: Request) -> ProjectManager:
-    manager = _manager(request)
-    if not manager.is_open:
-        raise HTTPException(status_code=400, detail='No project is currently open')
-    return manager
 
 
 def _require_well(session, well_id: str) -> WellModel:

@@ -11,23 +11,13 @@ from subsidence.data import ActivateStratChart, ProjectManager
 from subsidence.data.schema import FormationStratLink, StratChart, StratUnit
 from subsidence.data.strat_link import auto_link_all_formations_to_chart
 from subsidence.observability import operation_log
+from subsidence.api._deps import manager_project_path as _manager_project_path, require_open_project
 
 router = APIRouter(tags=['strat-chart'])
 
 
-def _manager(request: Request) -> ProjectManager:
-    return request.app.state.project_manager
-
-
 def _require_open_project(request: Request) -> ProjectManager:
-    manager = _manager(request)
-    if not manager.is_open:
-        raise HTTPException(status_code=400, detail='No project is open')
-    return manager
-
-
-def _manager_project_path(manager: ProjectManager) -> str | None:
-    return str(manager.project_path) if manager.project_path else None
+    return require_open_project(request, detail='No project is open')
 
 
 class ImportStratChartRequest(BaseModel):
