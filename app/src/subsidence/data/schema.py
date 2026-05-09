@@ -79,6 +79,7 @@ class WellModel(Base, AuditMixin):
     kb_elev: Mapped[float] = mapped_column(Float, default=0.0)
     gl_elev: Mapped[float] = mapped_column(Float, default=0.0)
     td_md: Mapped[float | None] = mapped_column(Float, nullable=True)
+    # Historical coordinate storage: lon stores X and lat stores Y.
     lat: Mapped[float | None] = mapped_column(Float, nullable=True)
     lon: Mapped[float | None] = mapped_column(Float, nullable=True)
     crs: Mapped[str] = mapped_column(String(64), default="unset")

@@ -22,16 +22,15 @@ This contract is not a rewrite and not a broad structural refactor.
 
 ### Documentation Drift
 
-- `todo.md` points to `docs/contracts/bugs_and_features_4.md`, but active `docs/contracts/` currently contains only this contract.
-- `docs/maps/` contains useful current audit maps, but overlaps with `docs/modules/*`
-  and `docs/codebase-map.md`.
-- `docs/codebase-map.md` and `docs/modules/backend-api.md` reference non-existent `app/src/subsidence/api/projects_export.py`.
-- `docs/modules/backend-api.md` does not document `GET /api/wells/{well_id}/curves/full`.
-- `docs/modules/backend-api.md` should document the strat chart CSV convention:
+- `todo.md` has been normalized to point to this contract.
+- Former `docs/maps/` audit files were moved to `docs/audits/2026-05-refactor-map/`
+  so they no longer compete with canonical module docs.
+- Active docs no longer reference non-existent `app/src/subsidence/api/projects_export.py`.
+- `docs/modules/backend-api.md` documents `GET /api/wells/{well_id}/curves/full`.
+- `docs/modules/backend-api.md` documents the strat chart CSV convention:
   `start_age_ma` = older/larger Ma, `end_age_ma` = younger/smaller Ma.
 - `WellModel.lat`/`lon` have historical inverted semantics:
-  `lon` stores X, `lat` stores Y. This is documented in `docs/maps/03-schema-map.md`,
-  but should also be noted near the schema fields.
+  `lon` stores X, `lat` stores Y. This is now noted near the schema fields.
 
 ### Code Organization
 
@@ -76,6 +75,8 @@ maps and module docs that both claim to be canonical.
 - Update `todo.md` so it points to this contract, not removed historical contracts.
 - Keep `todo.md` compact: active items only.
 
+Status: done.
+
 ### D0.2 Normalize `docs/maps/`
 
 - Review each file in `docs/maps/`.
@@ -92,12 +93,16 @@ Decision:
 - `docs/maps/` should not remain a second permanent documentation layer unless the team
   explicitly decides it is canonical and updates `documentation-index.md` accordingly.
 
+Status: done. The audit files were moved to `docs/audits/2026-05-refactor-map/`.
+
 ### D0.3 Fix stale backend docs
 
 - Remove `projects_export.py` references from active docs.
 - Add `GET /api/wells/{well_id}/curves/full` to `docs/modules/backend-api.md`.
 - Add `start_age_ma`/`end_age_ma` CSV convention to `docs/modules/backend-api.md`.
 - Add the `lat`/`lon` historical inversion note near `WellModel.lat`/`WellModel.lon` in `schema.py`.
+
+Status: done.
 
 Verification:
 

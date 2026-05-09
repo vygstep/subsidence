@@ -59,6 +59,15 @@ Quality:
 Reference:
 
 - [Lithology Pattern Palettes](lithology-pattern-palettes.md): built-in Equinor SVG pattern source, seed snapshot location, and runtime vs checkout separation.
+- [Reference Sources](reference-sources.md): external scientific and implementation references.
+
+---
+
+## Audit Snapshots
+
+Audit snapshots are point-in-time analysis notes. They are useful context, but they are not canonical architecture documentation.
+
+- [2026-05 Refactor Map](audits/2026-05-refactor-map/07-reorganization-plan.md): trigger/data/schema/API/settings/risk maps used to prepare `REFACTOR-001`.
 
 ---
 
@@ -104,7 +113,7 @@ cd app
 pytest tests
 ```
 
-Baseline from 2026-04-23:
+Recent baseline from 2026-05-09:
 
-- Frontend: 34 passed.
-- Backend: 30 passed.
+- Frontend: 57 passed.
+- Backend: run before backend refactors.
