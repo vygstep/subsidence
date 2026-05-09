@@ -106,7 +106,7 @@ def extract_horizons_from_well_picks(
     return created
 
 
-def _floor_match_horizon(horizons: list[TopSetHorizon], age_top_ma: float | None) -> TopSetHorizon | None:
+def floor_match_horizon(horizons: list[TopSetHorizon], age_top_ma: float | None) -> TopSetHorizon | None:
     """Return horizon with max age_ma <= age_top_ma (floor-match), or None."""
     if age_top_ma is None:
         return None
@@ -168,7 +168,7 @@ def link_picks_to_horizons(session: Session, well_id: str, top_set_id: int) -> i
         if name_matched is not None:
             matched = name_matched
         else:
-            floor_matched = _floor_match_horizon(horizons, pick.age_top_ma)
+            floor_matched = floor_match_horizon(horizons, pick.age_top_ma)
             # Don't steal a horizon that is already claimed by a name-matched pick.
             matched = floor_matched if (floor_matched is None or floor_matched.id not in name_claimed_horizon_ids) else None
         new_horizon_id = matched.id if matched else None
@@ -274,7 +274,7 @@ def create_ghost_picks(session: Session, well_id: str, top_set_id: int) -> int:
     for pick in real_picks_list:
         if pick.horizon_id is not None:
             covered_ids.add(pick.horizon_id)
-        matched = _floor_match_horizon(horizons, pick.age_top_ma)
+        matched = floor_match_horizon(horizons, pick.age_top_ma)
         if matched is not None:
             covered_ids.add(matched.id)
 

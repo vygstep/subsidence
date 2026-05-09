@@ -20,9 +20,9 @@ from subsidence.data.undo import _model_to_dict
 from subsidence.data.schema import FormationStratLink, FormationTopModel, StratChart, StratUnit, TopSetHorizon, WellModel
 from subsidence.data.strat_link import auto_link_to_active_chart, find_strat_unit_by_name
 from subsidence.data.zone_service import (
-    _floor_match_horizon,
     aggregate_zone_lithology_from_curve,
     ensure_zone_well_data,
+    floor_match_horizon,
     get_well_active_top_set_id,
     link_picks_to_horizons,
     recalculate_zone_thickness,
@@ -355,7 +355,7 @@ def update_formation(well_id: str, formation_id: int, body: FormationTopPatch, r
                     )
                 )
             ).all()) if row.horizon_id else []
-            matched = _floor_match_horizon(horizons, row.age_top_ma) if horizons else None
+            matched = floor_match_horizon(horizons, row.age_top_ma) if horizons else None
             reset_color_val = matched.color if matched else (row.horizon.color if row.horizon else '#9ca3af')
             old_values['color'] = row.color
             new_values['color'] = reset_color_val

@@ -38,7 +38,7 @@ This contract is not a rewrite and not a broad structural refactor.
   `wells.py`, `formations.py`, `top_sets.py`, `strat_chart.py`,
   `subsidence.py`, `sea_level.py`, `compaction.py`, `lithology_patterns.py`,
   and partially `projects.py`.
-- `zone_service._floor_match_horizon` is imported by `api/formations.py`, so it is
+- `zone_service.floor_match_horizon` is imported by `api/formations.py`, so it is
   effectively public despite the private name.
 - `api/wells.py` is still large: around 853 lines with Pydantic models and mixed endpoint groups.
 - `api/compaction.py` is larger: around 1251 lines and should be treated as a future split target too.
@@ -75,7 +75,7 @@ maps and module docs that both claim to be canonical.
 - Update `todo.md` so it points to this contract, not removed historical contracts.
 - Keep `todo.md` compact: active items only.
 
-Status: implementation done; backend test run pending.
+Status: done. Backend tests: `109 passed`.
 
 ### D0.2 Normalize `docs/maps/`
 
@@ -174,6 +174,8 @@ Verification:
 
 - Backend tests pass.
 - No `_floor_match_horizon` references remain outside historical docs.
+
+Status: implementation done; backend test run pending.
 
 ## Stage 2: Behavior Decisions Before Bug Fixes
 
