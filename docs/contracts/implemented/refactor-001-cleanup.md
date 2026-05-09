@@ -4,7 +4,7 @@ Separate branch from `main`.
 
 ## Status
 
-`todo`
+`implemented`
 
 ## Goal
 
@@ -22,16 +22,15 @@ This contract is not a rewrite and not a broad structural refactor.
 
 ### Documentation Drift
 
-- `todo.md` points to `docs/contracts/bugs_and_features_4.md`, but active `docs/contracts/` currently contains only this contract.
-- `docs/maps/` contains useful current audit maps, but overlaps with `docs/modules/*`
-  and `docs/codebase-map.md`.
-- `docs/codebase-map.md` and `docs/modules/backend-api.md` reference non-existent `app/src/subsidence/api/projects_export.py`.
-- `docs/modules/backend-api.md` does not document `GET /api/wells/{well_id}/curves/full`.
-- `docs/modules/backend-api.md` should document the strat chart CSV convention:
+- `todo.md` has been normalized to point to this contract.
+- Former `docs/maps/` audit files were moved to `docs/audits/2026-05-refactor-map/`
+  so they no longer compete with canonical module docs.
+- Active docs no longer reference non-existent `app/src/subsidence/api/projects_export.py`.
+- `docs/modules/backend-api.md` documents `GET /api/wells/{well_id}/curves/full`.
+- `docs/modules/backend-api.md` documents the strat chart CSV convention:
   `start_age_ma` = older/larger Ma, `end_age_ma` = younger/smaller Ma.
 - `WellModel.lat`/`lon` have historical inverted semantics:
-  `lon` stores X, `lat` stores Y. This is documented in `docs/maps/03-schema-map.md`,
-  but should also be noted near the schema fields.
+  `lon` stores X, `lat` stores Y. This is now noted near the schema fields.
 
 ### Code Organization
 
@@ -39,7 +38,7 @@ This contract is not a rewrite and not a broad structural refactor.
   `wells.py`, `formations.py`, `top_sets.py`, `strat_chart.py`,
   `subsidence.py`, `sea_level.py`, `compaction.py`, `lithology_patterns.py`,
   and partially `projects.py`.
-- `zone_service._floor_match_horizon` is imported by `api/formations.py`, so it is
+- `zone_service.floor_match_horizon` is imported by `api/formations.py`, so it is
   effectively public despite the private name.
 - `api/wells.py` is still large: around 853 lines with Pydantic models and mixed endpoint groups.
 - `api/compaction.py` is larger: around 1251 lines and should be treated as a future split target too.
@@ -76,6 +75,8 @@ maps and module docs that both claim to be canonical.
 - Update `todo.md` so it points to this contract, not removed historical contracts.
 - Keep `todo.md` compact: active items only.
 
+Status: done. Backend tests: `109 passed`.
+
 ### D0.2 Normalize `docs/maps/`
 
 - Review each file in `docs/maps/`.
@@ -92,12 +93,16 @@ Decision:
 - `docs/maps/` should not remain a second permanent documentation layer unless the team
   explicitly decides it is canonical and updates `documentation-index.md` accordingly.
 
+Status: done. The audit files were moved to `docs/audits/2026-05-refactor-map/`.
+
 ### D0.3 Fix stale backend docs
 
 - Remove `projects_export.py` references from active docs.
 - Add `GET /api/wells/{well_id}/curves/full` to `docs/modules/backend-api.md`.
 - Add `start_age_ma`/`end_age_ma` CSV convention to `docs/modules/backend-api.md`.
 - Add the `lat`/`lon` historical inversion note near `WellModel.lat`/`WellModel.lon` in `schema.py`.
+
+Status: done.
 
 Verification:
 
@@ -152,6 +157,8 @@ Verification:
 - Backend tests pass.
 - API smoke tests for open-project-required endpoints still return the same status/detail.
 
+Status: done.
+
 ### R2: Make horizon floor matching public
 
 Rename:
@@ -168,6 +175,8 @@ Verification:
 - Backend tests pass.
 - No `_floor_match_horizon` references remain outside historical docs.
 
+Status: done. Backend tests: `109 passed`, then `112 passed` after DEC-2.
+
 ## Stage 2: Behavior Decisions Before Bug Fixes
 
 Do not change behavior here until the decision is written down and confirmed.
@@ -182,24 +191,25 @@ Problem:
 - The app also has per-pick/per-zone paleobathymetry data. A global slider may be an
   override, a temporary scenario control, or stale UI.
 
-Decision needed:
+Decision:
 
-- Is the UI water-depth slider still a product feature?
-- If yes, is it:
-  - a temporary calculation override only;
-  - persisted project/well setting;
-  - or deprecated in favor of per-zone paleobathymetry?
+- There are no current compatibility projects that require the global water-depth override.
+- Per-pick/per-zone paleobathymetry is the source of truth:
+  `FormationTopModel.water_depth_m`, Top Pick settings, and Zone settings.
+- The global subsidence toolbar/WebSocket `water_depth_m` path is deprecated and removed.
+- Do not add a backend override path unless a future scenario-control feature is explicitly designed.
 
-Implementation only after decision:
+Implementation: done.
 
-- Add optional `water_depth_m` parameter to `_compute_subsidence`.
-- In `ws_recalculate`, parse `water_depth_m` from payload and pass it to `_compute_subsidence`.
-- Apply override only for the recalculation request. Do not persist it to DB from the slider.
-- Preserve existing DB-driven per-zone/pick water depth when no override is supplied.
+- Remove `waterDepthM` and `setWaterDepthM` from `computedStore`.
+- Remove the `Wd` input from `SubsidenceToolbar`.
+- Remove the legacy water-depth input from `SubsidenceControls`.
+- Send only `well_id` through `sendRecalculation`.
 
-Test:
+Verification: done.
 
-- WebSocket or direct compute-path test proving `water_depth_m=1000` produces different results from `water_depth_m=0`.
+- No `waterDepthM` references remain.
+- Frontend tests: `57 passed`.
 
 ### DEC-2: Merged-zone lithology ownership
 
@@ -209,31 +219,37 @@ Problem:
 - Auto lithology aggregation skips non-auto zones, so merged zones can stop updating.
 - This may be intentional protection if either source zone was manually edited.
 
-Decision needed:
+Decision:
 
-- If both source zones are `auto`, should the merged zone stay `auto`?
-- If one source zone is `manual` and one is `auto`, should the merged zone be `manual`,
-  `auto`, or ask/warn the user?
-- If both source zones are `manual` with different fractions, what is the merge rule?
+- Merging zones:
+  - `auto + auto` -> merged `auto`;
+  - `manual + auto` or `auto + manual` -> merged `manual`, preserving the manual fractions;
+  - `manual + manual` -> merged `manual`, with fractions computed as a thickness-weighted average;
+  - if only one side has valid thickness, use that side's fractions;
+  - if neither side has valid thickness, use a simple average across lithology keys.
+- Splitting zones:
+  - source `auto` -> both new zones `auto`;
+  - source `manual` -> both new zones `manual`, each with a copy of the source manual fractions;
+  - newly ensured or missing zone rows without split context start as `auto`.
+- Future UI may expose merge/split lithology decisions more explicitly, but current behavior must be deterministic and silent.
 
-Likely rule to confirm:
-
-- both `auto` -> merged `auto`;
-- any `manual` -> merged `manual`, preserving the primary/manual fractions;
-- future UI should make this visible to the user.
-
-Implementation only after decision:
+Implementation: done.
 
 - Inspect adjacent `ZoneWellData` rows before delete.
-- Choose the primary source by larger valid thickness where possible.
 - If both source zones are `auto`, keep merged source as `auto`.
-- If either source zone is manual and selected as primary, preserve manual.
-- Keep `lithology_fractions` behavior explicit in the test.
+- If one source zone is `manual`, preserve its manual fractions.
+- If both source zones are `manual`, merge fractions using thickness-weighted averaging.
+- Ensure zone split paths preserve the source-zone lithology behavior described above.
+- Keep `lithology_fractions` behavior explicit in tests.
 
-Test:
+Test: done.
 
 - Horizon delete merges two auto zones and the merged `ZoneWellData.lithology_source` remains `auto`.
-- Mixed manual/auto behavior is covered or explicitly documented.
+- Mixed manual/auto merge preserves the manual fractions.
+- Manual/manual merge uses thickness-weighted fractions.
+- Manual-zone split copies manual fractions to both new zones.
+- Targeted DEC-2 tests: `4 passed`.
+- Backend tests: `112 passed`.
 
 ## Future Structural Refactors
 

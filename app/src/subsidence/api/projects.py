@@ -25,6 +25,11 @@ from subsidence.data import (
 )
 from subsidence.data.schema import ProjectMeta, WellModel
 from subsidence.observability import operation_log
+from subsidence.api._deps import (
+    get_manager as _manager,
+    manager_project_path as _manager_project_path,
+    require_open_project as _require_open_project,
+)
 
 router = APIRouter(tags=['projects'])
 
@@ -255,21 +260,6 @@ class VisualConfigResponse(BaseModel):
 
 class PickPathResponse(BaseModel):
     path: str | None = None
-
-
-def _manager(request: Request) -> ProjectManager:
-    return request.app.state.project_manager
-
-
-def _manager_project_path(manager: ProjectManager) -> str | None:
-    return str(manager.project_path) if manager.project_path else None
-
-
-def _require_open_project(request: Request) -> ProjectManager:
-    manager = _manager(request)
-    if not manager.is_open:
-        raise HTTPException(status_code=400, detail='No project is currently open')
-    return manager
 
 
 def _project_meta(session):

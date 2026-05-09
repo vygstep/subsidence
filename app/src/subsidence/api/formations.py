@@ -10,7 +10,6 @@ from sqlalchemy.orm import selectinload
 
 from subsidence.data import (
     CreateFormation,
-    ProjectManager,
     RemoveFormation,
     UpdateFormation,
     UpdateFormationDepth,
@@ -21,13 +20,14 @@ from subsidence.data.undo import _model_to_dict
 from subsidence.data.schema import FormationStratLink, FormationTopModel, StratChart, StratUnit, TopSetHorizon, WellModel
 from subsidence.data.strat_link import auto_link_to_active_chart, find_strat_unit_by_name
 from subsidence.data.zone_service import (
-    _floor_match_horizon,
     aggregate_zone_lithology_from_curve,
     ensure_zone_well_data,
+    floor_match_horizon,
     get_well_active_top_set_id,
     link_picks_to_horizons,
     recalculate_zone_thickness,
 )
+from subsidence.api._deps import require_open_project as _require_open_project
 
 router = APIRouter(tags=['formations'])
 
@@ -109,17 +109,6 @@ class StratUnitLookupResponse(BaseModel):
 class StratLinkRequest(BaseModel):
     chart_id: int
     strat_unit_id: int | None
-
-
-def _manager(request: Request) -> ProjectManager:
-    return request.app.state.project_manager
-
-
-def _require_open_project(request: Request) -> ProjectManager:
-    manager = _manager(request)
-    if not manager.is_open:
-        raise HTTPException(status_code=400, detail='No project is currently open')
-    return manager
 
 
 def _require_well(session, well_id: str) -> WellModel:
@@ -366,7 +355,7 @@ def update_formation(well_id: str, formation_id: int, body: FormationTopPatch, r
                     )
                 )
             ).all()) if row.horizon_id else []
-            matched = _floor_match_horizon(horizons, row.age_top_ma) if horizons else None
+            matched = floor_match_horizon(horizons, row.age_top_ma) if horizons else None
             reset_color_val = matched.color if matched else (row.horizon.color if row.horizon else '#9ca3af')
             old_values['color'] = row.color
             new_values['color'] = reset_color_val

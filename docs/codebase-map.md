@@ -2,7 +2,7 @@
 
 **Status:** Current navigation map  
 **Created:** 2026-04-23  
-**Updated:** 2026-04-27  
+**Updated:** 2026-05-09
 **Purpose:** Help contributors locate code by workflow before reading the whole repository.
 
 For the full documentation entry point, see [Documentation](documentation-index.md).
@@ -72,16 +72,16 @@ Files:
 - `app/src/subsidence/api/projects.py` — lifecycle, path helpers, shared models
 - `app/src/subsidence/api/projects_imports.py` — import endpoints (LAS, logs CSV, tops, unconformities, deviation)
 - `app/src/subsidence/api/projects_config.py` — undo/redo, checkpoints, dictionaries, visual config
-- `app/src/subsidence/api/projects_export.py` — LAS/CSV export
+- No export router is currently registered.
 
-All four routers share the `/api/projects` prefix and are registered in `main.py`. Public API paths are unchanged.
+The project routers share the `/api/projects` prefix and are registered in `main.py`. Public API paths are unchanged.
 
 `projects.py` also owns all Pydantic models and helpers used across the split files.
 
 Risk:
 
 - Native path picking endpoints in `projects.py` use platform-blocking dialogs. Do not make them async.
-- Shared models are imported by the other three files; renaming models in `projects.py` requires updating those imports.
+- Shared models are imported by the split files; renaming models in `projects.py` requires updating those imports.
 
 ### Well API
 
@@ -103,6 +103,7 @@ Main endpoint groups:
 - `GET /api/wells/inventory`
 - `GET /api/wells/{well_id}`
 - `GET /api/wells/{well_id}/curves`
+- `GET /api/wells/{well_id}/curves/full`
 - `PATCH /api/wells/{well_id}`
 - `GET /api/wells/{well_id}/deviation`
 

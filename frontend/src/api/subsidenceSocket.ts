@@ -72,9 +72,9 @@ export function ensureConnected(): void {
   connect()
 }
 
-export function sendRecalculation(wellId: string, waterDepthM = 0): void {
+export function sendRecalculation(wellId: string): void {
   ensureConnected()
-  const msg = JSON.stringify({ well_id: wellId, water_depth_m: waterDepthM })
+  const msg = JSON.stringify({ well_id: wellId })
   if (socket?.readyState === WebSocket.OPEN) {
     socket.send(msg)
   } else {

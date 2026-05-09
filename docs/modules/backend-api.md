@@ -32,9 +32,8 @@ Files:
 - `app/src/subsidence/api/projects.py` — project lifecycle
 - `app/src/subsidence/api/projects_imports.py` — import endpoints
 - `app/src/subsidence/api/projects_config.py` — undo/redo, checkpoints, dictionaries, visual config
-- `app/src/subsidence/api/projects_export.py` — LAS/CSV export endpoints
 
-All four routers are registered in `main.py` under the same `/api/projects` prefix. Public API paths are unchanged.
+All project routers are registered in `main.py` under the same `/api/projects` prefix. Public API paths are unchanged.
 
 `projects.py` responsibilities:
 
@@ -54,14 +53,11 @@ All four routers are registered in `main.py` under the same `/api/projects` pref
 - Dictionary endpoints (curve rules, lithology defaults).
 - Visual config save/load.
 
-`projects_export.py` responsibilities:
-
-- LAS and CSV export.
-
 Note:
 
 - Native path picking endpoints remain in `projects.py`; they are platform-blocking and must not be made async.
 - Shared Pydantic models and helpers live in `projects.py` and are imported by the split files.
+- LAS/CSV export endpoints are not currently registered.
 
 ---
 
@@ -76,6 +72,7 @@ Responsibilities:
 - List wells and inventories.
 - Load a well with curves, formations, and deviation summary.
 - Load curve LOD data.
+- Load full curves for depth-basis switches through `GET /api/wells/{well_id}/curves/full`.
 - Patch well metadata.
 - Load full deviation survey.
 
@@ -109,6 +106,12 @@ Common bug areas:
 - Built-in chart deletion.
 - Tops linked to one chart but rendered against another.
 - Formation strat links not refreshed after active chart changes.
+
+Strat chart CSV convention:
+
+- `start_age_ma` means the older/base age and should be larger Ma.
+- `end_age_ma` means the younger/top age and should be smaller Ma.
+- Do not swap these fields back; this convention is used by the ICS import path.
 
 ---
 

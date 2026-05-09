@@ -14,6 +14,7 @@ from subsidence.data.lttb import lttb
 from subsidence.data.schema import CurveMetadata, DeviationSurveyModel, FormationStratLink, FormationTopModel, FormationZone, WellActiveSeaLevelCurve, WellActiveTopSet, WellModel, ZoneWellData
 from subsidence.data.well_colors import DEFAULT_WELL_COLOR, normalize_hex_color
 from subsidence.data.zone_service import recalculate_zone_thickness
+from subsidence.api._deps import require_open_project as _require_open_project
 
 router = APIRouter(tags=['wells'])
 
@@ -177,18 +178,6 @@ def _require_non_negative_number(value: float, field_name: str) -> float:
         raise HTTPException(status_code=400, detail=f'{field_name} must be >= 0')
     return value
 
-
-
-def _manager(request: Request):
-    return request.app.state.project_manager
-
-
-
-def _require_open_project(request: Request):
-    manager = _manager(request)
-    if not manager.is_open:
-        raise HTTPException(status_code=400, detail='No project is currently open')
-    return manager
 
 
 def _deviation_fields(mode: str) -> list[str]:

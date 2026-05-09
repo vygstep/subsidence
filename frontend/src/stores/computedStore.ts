@@ -41,14 +41,12 @@ export interface ComputedStore {
   lastComputeTime: number
   showFormationFills: boolean
   showBurialCurves: boolean
-  waterDepthM: number
   triggerRecalculation: () => void
   setResults: (results: SubsidenceResult[]) => void
   setComputeError: (message: string) => void
   clearResults: () => void
   setShowFormationFills: (v: boolean) => void
   setShowBurialCurves: (v: boolean) => void
-  setWaterDepthM: (v: number) => void
 }
 
 export const useComputedStore = create<ComputedStore>((set, get) => ({
@@ -58,14 +56,9 @@ export const useComputedStore = create<ComputedStore>((set, get) => ({
   lastComputeTime: 0,
   showFormationFills: true,
   showBurialCurves: true,
-  waterDepthM: 0,
 
   setShowFormationFills(v) { set({ showFormationFills: v }) },
   setShowBurialCurves(v) { set({ showBurialCurves: v }) },
-  setWaterDepthM(v) {
-    set({ waterDepthM: v })
-    get().triggerRecalculation()
-  },
 
   triggerRecalculation() {
     const wellId = useWellDataStore.getState().well?.well_id
@@ -75,11 +68,10 @@ export const useComputedStore = create<ComputedStore>((set, get) => ({
       operation: 'subsidence.recalculate',
       phase: 'start',
       activeWellId: wellId,
-      details: { waterDepthM: get().waterDepthM },
     })
     set({ isComputing: true, computeError: null })
     scheduleComputeTimeout()
-    sendRecalculation(wellId, get().waterDepthM)
+    sendRecalculation(wellId)
   },
 
   setResults(results) {

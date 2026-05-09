@@ -19,10 +19,13 @@ from subsidence.data.schema import (
 from subsidence.data.zone_service import (
     activate_top_set_for_well,
     aggregate_zone_lithology_from_curve,
+    apply_split_zone_lithology,
     merge_zones_on_horizon_delete,
     rebuild_zones_for_top_set,
     recalculate_zone_thickness,
+    snapshot_zone_well_data,
 )
+from subsidence.api._deps import require_open_project as _require_open_project
 
 router = APIRouter(tags=['top-sets'])
 
@@ -105,17 +108,6 @@ class ActiveTopSetResponse(BaseModel):
 
 class RecalculateTvdResponse(BaseModel):
     updated_count: int
-
-
-def _manager(request: Request):
-    return request.app.state.project_manager
-
-
-def _require_open_project(request: Request):
-    manager = _manager(request)
-    if not manager.is_open:
-        raise HTTPException(status_code=400, detail='No project is currently open')
-    return manager
 
 
 def _load_top_set(session, top_set_id: int) -> TopSet | None:
@@ -425,10 +417,16 @@ def create_top_set_pick(top_set_id: int, body: TopSetPickCreate, request: Reques
         if active_link is None:
             raise HTTPException(status_code=400, detail='Choose an active TopSet for this well first')
 
+        split_source_snapshot: dict[str, tuple[str | None, str]] = {}
+        split_upper_horizon_id: int | None = None
+        split_lower_horizon_id: int | None = None
         if body.split_zone_id is not None:
             zone = session.get(FormationZone, body.split_zone_id)
             if zone is None or zone.top_set_id != top_set_id:
                 raise HTTPException(status_code=404, detail=f'Zone not found: {body.split_zone_id}')
+            split_source_snapshot = snapshot_zone_well_data(session, zone.id)
+            split_upper_horizon_id = zone.upper_horizon_id
+            split_lower_horizon_id = zone.lower_horizon_id
             upper = session.get(TopSetHorizon, zone.upper_horizon_id)
             sort_order = (upper.sort_order if upper is not None else zone.sort_order) + 1
         elif body.insert_before_horizon_id is not None:
@@ -454,6 +452,32 @@ def create_top_set_pick(top_set_id: int, body: TopSetPickCreate, request: Reques
         well_ids = _linked_well_ids(session, top_set_id)
         for wid in well_ids:
             activate_top_set_for_well(session, manager.project_path, wid, top_set_id)
+        if (
+            body.split_zone_id is not None
+            and split_upper_horizon_id is not None
+            and split_lower_horizon_id is not None
+        ):
+            upper_split_zone = session.scalar(
+                select(FormationZone).where(
+                    FormationZone.top_set_id == top_set_id,
+                    FormationZone.upper_horizon_id == split_upper_horizon_id,
+                    FormationZone.lower_horizon_id == horizon.id,
+                )
+            )
+            lower_split_zone = session.scalar(
+                select(FormationZone).where(
+                    FormationZone.top_set_id == top_set_id,
+                    FormationZone.upper_horizon_id == horizon.id,
+                    FormationZone.lower_horizon_id == split_lower_horizon_id,
+                )
+            )
+            if upper_split_zone is not None and lower_split_zone is not None:
+                apply_split_zone_lithology(
+                    session,
+                    split_source_snapshot,
+                    upper_split_zone.id,
+                    lower_split_zone.id,
+                )
 
         pick = session.scalar(
             select(FormationTopModel).where(

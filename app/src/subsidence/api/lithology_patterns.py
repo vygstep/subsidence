@@ -9,6 +9,7 @@ from sqlalchemy import func, select
 from subsidence.data.engine import create_all_tables
 from subsidence.data.lithology_patterns import SvgValidationError, normalize_pattern_code, sanitize_svg_content, sanitize_svg_file
 from subsidence.data.schema import LithologyPattern, LithologyPatternPalette, LithologySetEntry
+from subsidence.api._deps import require_open_project as _require_open_project
 
 router = APIRouter(tags=['lithology-patterns'])
 
@@ -67,13 +68,6 @@ class LithologyPatternCreateRequest(BaseModel):
     display_name: str
     svg_content: str
     description: str | None = None
-
-
-def _require_open_project(request: Request):
-    manager = request.app.state.project_manager
-    if not manager.is_open:
-        raise HTTPException(status_code=400, detail='No project is currently open')
-    return manager
 
 
 def _ensure_pattern_palettes(manager) -> None:

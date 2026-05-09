@@ -33,6 +33,7 @@ from subsidence.data.schema import (
     WellModel,
 )
 from subsidence.observability import operation_log, reset_request_id, set_request_id
+from subsidence.api._deps import manager_project_path as _manager_project_path, require_open_project as _require_open_project
 
 router = APIRouter(tags=['subsidence'])
 
@@ -55,17 +56,6 @@ class WellSubsidenceResultsResponse(BaseModel):
     algorithm: str
     td_md: float
     curves: list[SubsidenceResultResponse]
-
-
-def _require_open_project(request: Request):
-    manager = request.app.state.project_manager
-    if not manager.is_open:
-        raise HTTPException(status_code=400, detail='No project is currently open')
-    return manager
-
-
-def _manager_project_path(manager) -> str | None:
-    return str(manager.project_path) if manager.project_path else None
 
 
 def _engine_lithology_param(session, density: float, porosity_surface: float, compaction_coeff: float) -> LithologyParam:
