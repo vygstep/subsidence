@@ -4,7 +4,7 @@ Separate branch from `main`.
 
 ## Status
 
-`todo`
+`implemented`
 
 ## Goal
 
@@ -175,7 +175,7 @@ Verification:
 - Backend tests pass.
 - No `_floor_match_horizon` references remain outside historical docs.
 
-Status: implementation done; backend test run pending.
+Status: done. Backend tests: `109 passed`, then `112 passed` after DEC-2.
 
 ## Stage 2: Behavior Decisions Before Bug Fixes
 
@@ -199,17 +199,17 @@ Decision:
 - The global subsidence toolbar/WebSocket `water_depth_m` path is deprecated and removed.
 - Do not add a backend override path unless a future scenario-control feature is explicitly designed.
 
-Implementation:
+Implementation: done.
 
 - Remove `waterDepthM` and `setWaterDepthM` from `computedStore`.
 - Remove the `Wd` input from `SubsidenceToolbar`.
 - Remove the legacy water-depth input from `SubsidenceControls`.
 - Send only `well_id` through `sendRecalculation`.
 
-Verification:
+Verification: done.
 
 - No `waterDepthM` references remain.
-- Frontend tests pass.
+- Frontend tests: `57 passed`.
 
 ### DEC-2: Merged-zone lithology ownership
 
@@ -233,7 +233,7 @@ Decision:
   - newly ensured or missing zone rows without split context start as `auto`.
 - Future UI may expose merge/split lithology decisions more explicitly, but current behavior must be deterministic and silent.
 
-Implementation only after decision:
+Implementation: done.
 
 - Inspect adjacent `ZoneWellData` rows before delete.
 - If both source zones are `auto`, keep merged source as `auto`.
@@ -242,12 +242,14 @@ Implementation only after decision:
 - Ensure zone split paths preserve the source-zone lithology behavior described above.
 - Keep `lithology_fractions` behavior explicit in tests.
 
-Test:
+Test: done.
 
 - Horizon delete merges two auto zones and the merged `ZoneWellData.lithology_source` remains `auto`.
 - Mixed manual/auto merge preserves the manual fractions.
 - Manual/manual merge uses thickness-weighted fractions.
 - Manual-zone split copies manual fractions to both new zones.
+- Targeted DEC-2 tests: `4 passed`.
+- Backend tests: `112 passed`.
 
 ## Future Structural Refactors
 
