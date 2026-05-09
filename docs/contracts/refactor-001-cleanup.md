@@ -219,31 +219,35 @@ Problem:
 - Auto lithology aggregation skips non-auto zones, so merged zones can stop updating.
 - This may be intentional protection if either source zone was manually edited.
 
-Decision needed:
+Decision:
 
-- If both source zones are `auto`, should the merged zone stay `auto`?
-- If one source zone is `manual` and one is `auto`, should the merged zone be `manual`,
-  `auto`, or ask/warn the user?
-- If both source zones are `manual` with different fractions, what is the merge rule?
-
-Likely rule to confirm:
-
-- both `auto` -> merged `auto`;
-- any `manual` -> merged `manual`, preserving the primary/manual fractions;
-- future UI should make this visible to the user.
+- Merging zones:
+  - `auto + auto` -> merged `auto`;
+  - `manual + auto` or `auto + manual` -> merged `manual`, preserving the manual fractions;
+  - `manual + manual` -> merged `manual`, with fractions computed as a thickness-weighted average;
+  - if only one side has valid thickness, use that side's fractions;
+  - if neither side has valid thickness, use a simple average across lithology keys.
+- Splitting zones:
+  - source `auto` -> both new zones `auto`;
+  - source `manual` -> both new zones `manual`, each with a copy of the source manual fractions;
+  - newly ensured or missing zone rows without split context start as `auto`.
+- Future UI may expose merge/split lithology decisions more explicitly, but current behavior must be deterministic and silent.
 
 Implementation only after decision:
 
 - Inspect adjacent `ZoneWellData` rows before delete.
-- Choose the primary source by larger valid thickness where possible.
 - If both source zones are `auto`, keep merged source as `auto`.
-- If either source zone is manual and selected as primary, preserve manual.
-- Keep `lithology_fractions` behavior explicit in the test.
+- If one source zone is `manual`, preserve its manual fractions.
+- If both source zones are `manual`, merge fractions using thickness-weighted averaging.
+- Ensure zone split paths preserve the source-zone lithology behavior described above.
+- Keep `lithology_fractions` behavior explicit in tests.
 
 Test:
 
 - Horizon delete merges two auto zones and the merged `ZoneWellData.lithology_source` remains `auto`.
-- Mixed manual/auto behavior is covered or explicitly documented.
+- Mixed manual/auto merge preserves the manual fractions.
+- Manual/manual merge uses thickness-weighted fractions.
+- Manual-zone split copies manual fractions to both new zones.
 
 ## Future Structural Refactors
 

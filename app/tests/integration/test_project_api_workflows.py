@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import json
 from pathlib import Path
 
 import pytest
@@ -2350,7 +2351,7 @@ def test_delete_unlinked_top_pick_removes_row(api_client: TestClient, tmp_path: 
 
 
 def test_zone_lifecycle_delete_middle_horizon_merges_zones(api_client: TestClient, tmp_path: Path):
-    """Deleting a middle horizon merges adjacent zones; lithology cleared."""
+    """Deleting a middle horizon preserves manual lithology from one adjacent zone."""
     well_id, top_set_id = _create_well_with_top_set(api_client, tmp_path)
 
     # Patch zone H2→H3 with lithology fractions
@@ -2380,13 +2381,95 @@ def test_zone_lifecycle_delete_middle_horizon_merges_zones(api_client: TestClien
     names = {(z['upper_horizon']['name'], z['lower_horizon']['name']) for z in zones}
     assert ('H1', 'H3') in names
 
-    # Merged zone lithology is cleared
     merged = next(z for z in zones if z['upper_horizon']['name'] == 'H1' and z['lower_horizon']['name'] == 'H3')
-    assert merged['lithology_fractions'] is None
+    assert json.loads(merged['lithology_fractions']) == pytest.approx({'sandstone': 0.6, 'shale': 0.4})
     assert merged['lithology_source'] == 'manual'
 
     # Thickness should be recalculated for merged zone
     assert merged['thickness_md'] == pytest.approx(500.0)
+
+
+def test_zone_lifecycle_delete_middle_horizon_keeps_auto_when_both_zones_auto(api_client: TestClient, tmp_path: Path):
+    """Merging two auto zones should not freeze the merged zone as manual."""
+    well_id, top_set_id = _create_well_with_top_set(api_client, tmp_path)
+
+    resp = api_client.get(f'/api/top-sets/{top_set_id}')
+    assert resp.status_code == 200, resp.text
+    h2_id = next(h['id'] for h in resp.json()['horizons'] if h['name'] == 'H2')
+    resp = api_client.delete(f'/api/top-sets/{top_set_id}/horizons/{h2_id}')
+    assert resp.status_code == 204, resp.text
+
+    resp = api_client.get(f'/api/wells/{well_id}/zones')
+    assert resp.status_code == 200, resp.text
+    merged = next(z for z in resp.json() if z['upper_horizon']['name'] == 'H1' and z['lower_horizon']['name'] == 'H3')
+    assert merged['lithology_fractions'] is None
+    assert merged['lithology_source'] == 'auto'
+
+
+def test_zone_lifecycle_delete_middle_horizon_weight_averages_manual_lithology(api_client: TestClient, tmp_path: Path):
+    """Merging two manual zones should thickness-weight their fractions."""
+    well_id, top_set_id = _create_well_with_top_set(api_client, tmp_path)
+
+    resp = api_client.get(f'/api/wells/{well_id}/zones')
+    assert resp.status_code == 200, resp.text
+    zones = resp.json()
+    zone_h1_h2 = next(z for z in zones if z['upper_horizon']['name'] == 'H1')
+    zone_h2_h3 = next(z for z in zones if z['upper_horizon']['name'] == 'H2')
+
+    resp = api_client.patch(f'/api/wells/{well_id}/zones/{zone_h1_h2["zone_id"]}', json={
+        'lithology_fractions': '{"sandstone": 1.0}',
+        'lithology_source': 'manual',
+    })
+    assert resp.status_code == 200, resp.text
+    resp = api_client.patch(f'/api/wells/{well_id}/zones/{zone_h2_h3["zone_id"]}', json={
+        'lithology_fractions': '{"shale": 1.0}',
+        'lithology_source': 'manual',
+    })
+    assert resp.status_code == 200, resp.text
+
+    resp = api_client.get(f'/api/top-sets/{top_set_id}')
+    assert resp.status_code == 200, resp.text
+    h2_id = next(h['id'] for h in resp.json()['horizons'] if h['name'] == 'H2')
+    resp = api_client.delete(f'/api/top-sets/{top_set_id}/horizons/{h2_id}')
+    assert resp.status_code == 204, resp.text
+
+    resp = api_client.get(f'/api/wells/{well_id}/zones')
+    assert resp.status_code == 200, resp.text
+    merged = next(z for z in resp.json() if z['upper_horizon']['name'] == 'H1' and z['lower_horizon']['name'] == 'H3')
+    assert json.loads(merged['lithology_fractions']) == pytest.approx({'sandstone': 0.4, 'shale': 0.6})
+    assert merged['lithology_source'] == 'manual'
+
+
+def test_top_set_pick_split_copies_manual_lithology_to_new_zones(api_client: TestClient, tmp_path: Path):
+    """Splitting a manual zone should copy its fractions to both replacement zones."""
+    well_id, top_set_id = _create_well_with_top_set(api_client, tmp_path)
+
+    resp = api_client.get(f'/api/wells/{well_id}/zones')
+    assert resp.status_code == 200, resp.text
+    zone_h1_h2 = next(z for z in resp.json() if z['upper_horizon']['name'] == 'H1')
+    resp = api_client.patch(f'/api/wells/{well_id}/zones/{zone_h1_h2["zone_id"]}', json={
+        'lithology_fractions': '{"sandstone": 0.25, "shale": 0.75}',
+        'lithology_source': 'manual',
+    })
+    assert resp.status_code == 200, resp.text
+
+    resp = api_client.post(
+        f'/api/top-sets/{top_set_id}/picks',
+        json={'well_id': well_id, 'split_zone_id': zone_h1_h2['zone_id'], 'depth_md': 200.0},
+    )
+    assert resp.status_code == 201, resp.text
+    created_name = resp.json()['name']
+
+    resp = api_client.get(f'/api/wells/{well_id}/zones')
+    assert resp.status_code == 200, resp.text
+    split_zones = [
+        z for z in resp.json()
+        if (z['upper_horizon']['name'], z['lower_horizon']['name']) in {('H1', created_name), (created_name, 'H2')}
+    ]
+    assert len(split_zones) == 2
+    for zone in split_zones:
+        assert json.loads(zone['lithology_fractions']) == pytest.approx({'sandstone': 0.25, 'shale': 0.75})
+        assert zone['lithology_source'] == 'manual'
 
 
 def test_zone_lifecycle_pick_move_updates_thickness(api_client: TestClient, tmp_path: Path):

@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import json
 import logging
+import math
 from pathlib import Path
 
 _log = logging.getLogger('subsidence.zone_service')
@@ -27,6 +28,98 @@ from .schema import (
 )
 
 _FALLBACK_COLORS: frozenset[str] = frozenset({'', '#4b5563', '#808080', '#9ca3af', '#90a4ae'})
+
+
+def _parse_lithology_fractions(raw: str | None) -> dict[str, float] | None:
+    if not raw:
+        return None
+    try:
+        parsed = json.loads(raw)
+    except (TypeError, ValueError):
+        return None
+    if not isinstance(parsed, dict):
+        return None
+    result: dict[str, float] = {}
+    for key, value in parsed.items():
+        try:
+            result[str(key)] = float(value)
+        except (TypeError, ValueError):
+            continue
+    return result or None
+
+
+def _dump_lithology_fractions(fractions: dict[str, float] | None) -> str | None:
+    if not fractions:
+        return None
+    cleaned = {
+        key: value
+        for key, value in sorted(fractions.items())
+        if math.isfinite(value) and abs(value) > 1e-12
+    }
+    return json.dumps(cleaned) if cleaned else None
+
+
+def _valid_thickness(value: float | None) -> bool:
+    return value is not None and math.isfinite(value) and value > 0.0
+
+
+def _average_fractions(
+    first: dict[str, float] | None,
+    second: dict[str, float] | None,
+    first_weight: float | None,
+    second_weight: float | None,
+) -> dict[str, float] | None:
+    if not first:
+        return second
+    if not second:
+        return first
+
+    first_valid = _valid_thickness(first_weight)
+    second_valid = _valid_thickness(second_weight)
+    if first_valid and not second_valid:
+        return first
+    if second_valid and not first_valid:
+        return second
+    if first_valid and second_valid:
+        weight_a = float(first_weight)
+        weight_b = float(second_weight)
+    else:
+        weight_a = 1.0
+        weight_b = 1.0
+
+    total = weight_a + weight_b
+    keys = set(first) | set(second)
+    return {
+        key: ((first.get(key, 0.0) * weight_a) + (second.get(key, 0.0) * weight_b)) / total
+        for key in keys
+    }
+
+
+def _merged_lithology(
+    above: ZoneWellData | None,
+    below: ZoneWellData | None,
+) -> tuple[str | None, str]:
+    above_manual = above is not None and above.lithology_source == 'manual'
+    below_manual = below is not None and below.lithology_source == 'manual'
+
+    if not above_manual and not below_manual:
+        return None, 'auto'
+
+    above_fractions = _parse_lithology_fractions(above.lithology_fractions if above else None)
+    below_fractions = _parse_lithology_fractions(below.lithology_fractions if below else None)
+
+    if above_manual and not below_manual:
+        return _dump_lithology_fractions(above_fractions), 'manual'
+    if below_manual and not above_manual:
+        return _dump_lithology_fractions(below_fractions), 'manual'
+
+    merged = _average_fractions(
+        above_fractions,
+        below_fractions,
+        above.thickness_md if above else None,
+        below.thickness_md if below else None,
+    )
+    return _dump_lithology_fractions(merged), 'manual'
 
 
 def _strat_color_for_age(session: Session, age_ma: float | None) -> str | None:
@@ -490,13 +583,20 @@ def merge_zones_on_horizon_delete(
     new_lower_id = zone_below.lower_horizon_id if zone_below is not None else None
     new_sort_order = zone_above.sort_order if zone_above is not None else (zone_below.sort_order if zone_below is not None else 0)
 
-    # Collect well_ids with zone data before deleting
+    # Collect well data before deleting zones so merged-zone lithology can
+    # preserve manual user input according to the merge policy.
     affected_well_ids: set[str] = set()
+    above_data: dict[str, ZoneWellData] = {}
+    below_data: dict[str, ZoneWellData] = {}
     for zone in filter(None, [zone_above, zone_below]):
         for zwd in session.scalars(
             select(ZoneWellData).where(ZoneWellData.zone_id == zone.id)
         ).all():
             affected_well_ids.add(zwd.well_id)
+            if zone_above is not None and zone.id == zone_above.id:
+                above_data[zwd.well_id] = zwd
+            elif zone_below is not None and zone.id == zone_below.id:
+                below_data[zwd.well_id] = zwd
         session.delete(zone)
 
     session.flush()
@@ -513,13 +613,58 @@ def merge_zones_on_horizon_delete(
         session.flush()
 
         for well_id in affected_well_ids:
+            fractions, source = _merged_lithology(
+                above_data.get(well_id),
+                below_data.get(well_id),
+            )
             session.add(ZoneWellData(
                 zone_id=merged.id,
                 well_id=well_id,
-                lithology_fractions=None,
-                lithology_source='manual',
+                lithology_fractions=fractions,
+                lithology_source=source,
             ))
         session.flush()
+
+
+def snapshot_zone_well_data(
+    session: Session,
+    zone_id: int,
+) -> dict[str, tuple[str | None, str]]:
+    """Capture zone lithology before a split deletes the source zone."""
+    snapshot: dict[str, tuple[str | None, str]] = {}
+    for row in session.scalars(
+        select(ZoneWellData).where(ZoneWellData.zone_id == zone_id)
+    ).all():
+        snapshot[row.well_id] = (row.lithology_fractions, row.lithology_source)
+    return snapshot
+
+
+def apply_split_zone_lithology(
+    session: Session,
+    source_snapshot: dict[str, tuple[str | None, str]],
+    upper_zone_id: int,
+    lower_zone_id: int,
+) -> None:
+    """Copy manual split-zone lithology to both replacement zones."""
+    if not source_snapshot:
+        return
+
+    for well_id, (fractions, source) in source_snapshot.items():
+        if source != 'manual':
+            continue
+        for zone_id in (upper_zone_id, lower_zone_id):
+            row = session.scalar(
+                select(ZoneWellData).where(
+                    ZoneWellData.zone_id == zone_id,
+                    ZoneWellData.well_id == well_id,
+                )
+            )
+            if row is None:
+                row = ZoneWellData(zone_id=zone_id, well_id=well_id)
+                session.add(row)
+            row.lithology_fractions = fractions
+            row.lithology_source = 'manual'
+    session.flush()
 
 
 def get_well_active_top_set_id(session: Session, well_id: str) -> int | None:
