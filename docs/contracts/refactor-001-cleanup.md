@@ -191,24 +191,25 @@ Problem:
 - The app also has per-pick/per-zone paleobathymetry data. A global slider may be an
   override, a temporary scenario control, or stale UI.
 
-Decision needed:
+Decision:
 
-- Is the UI water-depth slider still a product feature?
-- If yes, is it:
-  - a temporary calculation override only;
-  - persisted project/well setting;
-  - or deprecated in favor of per-zone paleobathymetry?
+- There are no current compatibility projects that require the global water-depth override.
+- Per-pick/per-zone paleobathymetry is the source of truth:
+  `FormationTopModel.water_depth_m`, Top Pick settings, and Zone settings.
+- The global subsidence toolbar/WebSocket `water_depth_m` path is deprecated and removed.
+- Do not add a backend override path unless a future scenario-control feature is explicitly designed.
 
-Implementation only after decision:
+Implementation:
 
-- Add optional `water_depth_m` parameter to `_compute_subsidence`.
-- In `ws_recalculate`, parse `water_depth_m` from payload and pass it to `_compute_subsidence`.
-- Apply override only for the recalculation request. Do not persist it to DB from the slider.
-- Preserve existing DB-driven per-zone/pick water depth when no override is supplied.
+- Remove `waterDepthM` and `setWaterDepthM` from `computedStore`.
+- Remove the `Wd` input from `SubsidenceToolbar`.
+- Remove the legacy water-depth input from `SubsidenceControls`.
+- Send only `well_id` through `sendRecalculation`.
 
-Test:
+Verification:
 
-- WebSocket or direct compute-path test proving `water_depth_m=1000` produces different results from `water_depth_m=0`.
+- No `waterDepthM` references remain.
+- Frontend tests pass.
 
 ### DEC-2: Merged-zone lithology ownership
 
