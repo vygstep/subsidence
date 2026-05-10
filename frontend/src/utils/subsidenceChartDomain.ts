@@ -5,6 +5,30 @@ export interface NumericExtent {
   max: number
 }
 
+export interface ChartCutoff {
+  maxAgeMa?: number
+  maxDepthM?: number
+}
+
+export function applyChartCutoff(curves: SubsidenceResult[], cutoff: ChartCutoff | null): SubsidenceResult[] {
+  if (cutoff === null || (cutoff.maxAgeMa === undefined && cutoff.maxDepthM === undefined)) {
+    return curves
+  }
+
+  return curves.filter((curve) => {
+    if (curve.burial_path.length === 0) return false
+
+    const oldestAge = Math.max(...curve.burial_path.map((point) => point.age_ma))
+    const presentDepthPoint = curve.burial_path.reduce((present, point) => (
+      point.age_ma < present.age_ma ? point : present
+    ))
+
+    if (cutoff.maxAgeMa !== undefined && oldestAge > cutoff.maxAgeMa) return false
+    if (cutoff.maxDepthM !== undefined && presentDepthPoint.depth_m > cutoff.maxDepthM) return false
+    return true
+  })
+}
+
 export function curveAgeExtent(curves: SubsidenceResult[]): NumericExtent | null {
   let min = Infinity
   let max = -Infinity

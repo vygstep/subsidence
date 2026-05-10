@@ -6,7 +6,7 @@ import { useMultiWellStore } from '@/stores/multiWellStore'
 import { useViewStore } from '@/stores/viewStore'
 import { useWellDataStore } from '@/stores/wellDataStore'
 import { useWorkspaceStore } from '@/stores/workspaceStore'
-import { clampRangeToBounds, curveDepthExtent, paddedDepthExtent, panRange, resolveRange, zoomRangeAround } from '@/utils/subsidenceChartDomain'
+import { applyChartCutoff, clampRangeToBounds, curveDepthExtent, paddedDepthExtent, panRange, resolveRange, zoomRangeAround } from '@/utils/subsidenceChartDomain'
 import { GeologicalTimescale } from './GeologicalTimescale'
 
 const PADDING = { top: 12, right: 120, bottom: 40, left: 64 }
@@ -33,10 +33,13 @@ export function MultiWellPanel() {
   const fetchResults = useMultiWellStore((s) => s.fetchResults)
   const activeWellId = useWellDataStore((s) => s.well?.well_id ?? null)
   const wellInventories = useWellDataStore((s) => s.wellInventories)
+  const topSets = useWellDataStore((s) => s.topSets)
   const subsidenceDepthMinM = useViewStore((s) => s.subsidenceMultiDepthMin)
   const subsidenceDepthMaxM = useViewStore((s) => s.subsidenceMultiDepthMax)
   const subsidenceAgeMinMa = useViewStore((s) => s.subsidenceMultiAgeMin)
   const subsidenceAgeMaxMa = useViewStore((s) => s.subsidenceMultiAgeMax)
+  const compareByMarkerByWellId = useViewStore((s) => s.subsidenceCompareByMarkerByWellId)
+  const compareMarkerHorizonIdByWellId = useViewStore((s) => s.subsidenceCompareMarkerHorizonIdByWellId)
   const setSubsidenceDepthMinM = useViewStore((s) => s.setSubsidenceMultiDepthMin)
   const setSubsidenceDepthMaxM = useViewStore((s) => s.setSubsidenceMultiDepthMax)
   const setSubsidenceAgeMinMa = useViewStore((s) => s.setSubsidenceMultiAgeMin)
@@ -49,6 +52,31 @@ export function MultiWellPanel() {
   const wellColorById = useMemo(() => (
     new Map(wellInventories.map((well) => [well.well_id, well.color_hex]))
   ), [wellInventories])
+  const inventoryByWellId = useMemo(() => (
+    new Map(wellInventories.map((well) => [well.well_id, well]))
+  ), [wellInventories])
+  const horizonById = useMemo(() => (
+    new Map(topSets.flatMap((topSet) => topSet.horizons ?? []).map((horizon) => [horizon.id, horizon]))
+  ), [topSets])
+
+  const visibleWellResults = useMemo(() => (
+    wellResults.map((result) => {
+      if (!compareByMarkerByWellId[result.wellId]) return result
+      const horizonId = compareMarkerHorizonIdByWellId[result.wellId]
+      if (horizonId === null || horizonId === undefined) return result
+
+      const horizon = horizonById.get(horizonId)
+      const pick = inventoryByWellId.get(result.wellId)?.formations.find((formation) => formation.horizon_id === horizonId)
+      const maxAgeMa = horizon?.age_ma ?? undefined
+      const maxDepthM = pick?.depth_md ?? undefined
+      if (maxAgeMa === undefined && maxDepthM === undefined) return result
+
+      return {
+        ...result,
+        curves: applyChartCutoff(result.curves, { maxAgeMa, maxDepthM }),
+      }
+    })
+  ), [compareByMarkerByWellId, compareMarkerHorizonIdByWellId, horizonById, inventoryByWellId, wellResults])
 
   const handleTitleClick = useCallback(() => {
     setSelectedObject(isSelected ? null : { type: 'subsidence-chart', chartType: 'multi' })
@@ -70,14 +98,14 @@ export function MultiWellPanel() {
   }, [fetchResults])
 
   useEffect(() => {
-    if (wellResults.length === 0) return
+    if (visibleWellResults.length === 0) return
     logDiagnosticEvent({
       level: 'info',
       operation: 'subsidence.visualize.multi',
       phase: 'event',
       details: {
-        wellCount: wellResults.length,
-        wells: wellResults.map(wr => {
+        wellCount: visibleWellResults.length,
+        wells: visibleWellResults.map(wr => {
           const allDepths = wr.curves.flatMap(c => c.burial_path.map(p => p.depth_m))
           return {
             wellId: wr.wellId,
@@ -88,11 +116,11 @@ export function MultiWellPanel() {
         }),
       },
     })
-  }, [wellResults])
+  }, [visibleWellResults])
 
   const maxAge = useMemo(() => {
     let max = 0
-    for (const wr of wellResults) {
+    for (const wr of visibleWellResults) {
       for (const curve of wr.curves) {
         for (const pt of curve.burial_path) {
           if (pt.age_ma > max) max = pt.age_ma
@@ -100,10 +128,10 @@ export function MultiWellPanel() {
       }
     }
     return max > 0 ? max : 100
-  }, [wellResults])
+  }, [visibleWellResults])
   const minAge = useMemo(() => {
     let min = Infinity
-    for (const wr of wellResults) {
+    for (const wr of visibleWellResults) {
       for (const curve of wr.curves) {
         for (const pt of curve.burial_path) {
           if (Number.isFinite(pt.age_ma) && pt.age_ma < min) min = pt.age_ma
@@ -111,11 +139,11 @@ export function MultiWellPanel() {
       }
     }
     return Number.isFinite(min) ? Math.max(0, min) : 0
-  }, [wellResults])
+  }, [visibleWellResults])
 
   const autoDepthExtentM = useMemo(() => {
-    return paddedDepthExtent(curveDepthExtent(wellResults.flatMap((wr) => wr.curves)))
-  }, [wellResults])
+    return paddedDepthExtent(curveDepthExtent(visibleWellResults.flatMap((wr) => wr.curves)))
+  }, [visibleWellResults])
 
   const depthRangeM = resolveRange(autoDepthExtentM, subsidenceDepthMinM, subsidenceDepthMaxM)
   const autoAgeExtentMa = { min: minAge, max: maxAge }
@@ -311,8 +339,8 @@ export function MultiWellPanel() {
 
     const plotW = width - PADDING.left - PADDING.right
     const plotH = height - PADDING.top - PADDING.bottom
-    if (plotW <= 0 || plotH <= 0 || wellResults.length === 0) {
-      if (wellResults.length === 0) {
+    if (plotW <= 0 || plotH <= 0 || visibleWellResults.length === 0) {
+      if (visibleWellResults.length === 0) {
         ctx.fillStyle = '#94a3b8'
         ctx.font = '11px system-ui, sans-serif'
         ctx.textAlign = 'center'
@@ -403,8 +431,8 @@ export function MultiWellPanel() {
     ctx.rect(PADDING.left, PADDING.top, plotW, plotH)
     ctx.clip()
 
-    for (let i = 0; i < wellResults.length; i++) {
-      const wr = wellResults[i]
+    for (let i = 0; i < visibleWellResults.length; i++) {
+      const wr = visibleWellResults[i]
       if (wr.curves.length === 0) continue
       const color = wellColorById.get(wr.wellId) ?? WELL_COLORS[i % WELL_COLORS.length]
       const isActive = wr.wellId === activeWellId
@@ -439,8 +467,8 @@ export function MultiWellPanel() {
     ctx.textAlign = 'left'
     ctx.textBaseline = 'middle'
 
-    for (let i = 0; i < wellResults.length; i++) {
-      const wr = wellResults[i]
+    for (let i = 0; i < visibleWellResults.length; i++) {
+      const wr = visibleWellResults[i]
       const color = wellColorById.get(wr.wellId) ?? WELL_COLORS[i % WELL_COLORS.length]
       const isActive = wr.wellId === activeWellId
       const y = PADDING.top + 10 + i * 18
@@ -454,12 +482,12 @@ export function MultiWellPanel() {
       ctx.font = isActive ? 'bold 10px system-ui, sans-serif' : '10px system-ui, sans-serif'
       ctx.fillText(wr.wellName, legendX + 16, y)
     }
-  }, [wellResults, activeWellId, effectiveMinAgeMa, effectiveMaxAgeMa, effectiveMinDepthM, effectiveMaxDepthM, wellColorById])
+  }, [visibleWellResults, activeWellId, effectiveMinAgeMa, effectiveMaxAgeMa, effectiveMinDepthM, effectiveMaxDepthM, wellColorById])
 
   const canvasRef = useCanvasRenderer(draw, [draw])
 
   const handleClick = useCallback((e: React.MouseEvent<HTMLDivElement>) => {
-    if (wellResults.length === 0) return
+    if (visibleWellResults.length === 0) return
     const rect = e.currentTarget.getBoundingClientRect()
     const cssX = e.clientX - rect.left
     const cssY = e.clientY - rect.top
@@ -467,14 +495,14 @@ export function MultiWellPanel() {
     const legendX = rect.width - PADDING.right + 8
     if (cssX < legendX) return
 
-    for (let i = 0; i < wellResults.length; i++) {
+    for (let i = 0; i < visibleWellResults.length; i++) {
       const itemY = PADDING.top + 10 + i * 18
       if (Math.abs(cssY - itemY) < 10) {
-        void useWellDataStore.getState().loadWell(wellResults[i].wellId)
+        void useWellDataStore.getState().loadWell(visibleWellResults[i].wellId)
         return
       }
     }
-  }, [wellResults])
+  }, [visibleWellResults])
 
   return (
     <div className="multi-well-panel">

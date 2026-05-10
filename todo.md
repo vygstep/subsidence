@@ -11,7 +11,7 @@ Active contract: `docs/contracts/subsidence-chart-domains-zoom-marker-cutoff.md`
 | S3 | Shared chart-domain helper and Fit data | done |
 | S4 | Zoom single/multi charts | done |
 | S5 | Per-well Compare by marker settings | done |
-| S6 | Apply marker cutoff in charts | todo |
+| S6 | Apply marker cutoff in charts | in progress |
 
 ## Implemented Contracts
 

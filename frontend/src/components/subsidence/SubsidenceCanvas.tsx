@@ -9,7 +9,7 @@ import { formationDisplayColor } from '@/types'
 import type { SeaLevelPoint } from '@/types'
 import type { SubsidenceResult } from '@/types/subsidence'
 import { logDiagnosticEvent } from '@/utils/diagnostics'
-import { clampRangeToBounds, curveAgeExtent, curveDepthExtent, paddedDepthExtent, panRange, resolveRange, zoomRangeAround } from '@/utils/subsidenceChartDomain'
+import { applyChartCutoff, clampRangeToBounds, curveAgeExtent, curveDepthExtent, paddedDepthExtent, panRange, resolveRange, zoomRangeAround } from '@/utils/subsidenceChartDomain'
 import { GeologicalTimescale } from './GeologicalTimescale'
 
 const TIMESCALE_HEIGHT = 52
@@ -204,6 +204,8 @@ export function SubsidenceCanvas() {
   const subsidenceDepthMaxM = useViewStore((s) => s.subsidenceSingleDepthMax)
   const subsidenceAgeMinMa = useViewStore((s) => s.subsidenceSingleAgeMin)
   const subsidenceAgeMaxMa = useViewStore((s) => s.subsidenceSingleAgeMax)
+  const compareByMarkerByWellId = useViewStore((s) => s.subsidenceCompareByMarkerByWellId)
+  const compareMarkerHorizonIdByWellId = useViewStore((s) => s.subsidenceCompareMarkerHorizonIdByWellId)
   const setSubsidenceDepthMinM = useViewStore((s) => s.setSubsidenceSingleDepthMin)
   const setSubsidenceDepthMaxM = useViewStore((s) => s.setSubsidenceSingleDepthMax)
   const setSubsidenceAgeMinMa = useViewStore((s) => s.setSubsidenceSingleAgeMin)
@@ -215,6 +217,7 @@ export function SubsidenceCanvas() {
 
   const wellName = useWellDataStore((s) => s.well?.well_name ?? null)
   const formations = useWellDataStore((s) => s.formations)
+  const topSets = useWellDataStore((s) => s.topSets)
   const wellInventories = useWellDataStore((s) => s.wellInventories)
   const well = useWellDataStore((s) => s.well)
   const loadSeaLevelPoints = useWellDataStore((s) => s.loadSeaLevelPoints)
@@ -224,12 +227,33 @@ export function SubsidenceCanvas() {
     [formations],
   )
 
+  const markerCutoff = useMemo(() => {
+    const wellId = well?.well_id
+    if (!wellId || !compareByMarkerByWellId[wellId]) return null
+    const horizonId = compareMarkerHorizonIdByWellId[wellId]
+    if (horizonId === null || horizonId === undefined) return null
+    const horizon = topSets.flatMap((topSet) => topSet.horizons ?? []).find((item) => item.id === horizonId)
+    const pick = formations.find((formation) => formation.horizon_id === horizonId)
+    const maxAgeMa = horizon?.age_ma ?? pick?.age_ma
+    const maxDepthM = pick?.depth_md ?? undefined
+    if (maxAgeMa === undefined && maxDepthM === undefined) return null
+    return {
+      maxAgeMa,
+      maxDepthM,
+    }
+  }, [compareByMarkerByWellId, compareMarkerHorizonIdByWellId, formations, topSets, well?.well_id])
+
+  const visibleSubsidenceCurves = useMemo(
+    () => applyChartCutoff(subsidenceCurves, markerCutoff),
+    [markerCutoff, subsidenceCurves],
+  )
+
   const coloredCurves = useMemo(
-    () => subsidenceCurves.map((c) => ({
+    () => visibleSubsidenceCurves.map((c) => ({
       ...c,
       color: formationColorByName.get(c.formation_name) ?? c.color,
     })),
-    [subsidenceCurves, formationColorByName],
+    [visibleSubsidenceCurves, formationColorByName],
   )
 
   const selectedObject = useWorkspaceStore((s) => s.selectedObject)

@@ -4,7 +4,7 @@ Branch: `feature/subsidence-chart-domains-zoom-marker-cutoff`
 
 ## Status
 
-`todo`
+`in progress`
 
 ## Goal
 
@@ -185,6 +185,8 @@ Verification:
   - apply each well's cutoff before drawing and domain calculation.
 - Geological timescale uses the effective age range.
 - Crosshair uses the effective age/depth range.
+
+Status: in progress.
 
 Verification:
 
