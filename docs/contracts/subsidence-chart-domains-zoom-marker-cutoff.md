@@ -186,7 +186,7 @@ Verification:
 - Geological timescale uses the effective age range.
 - Crosshair uses the effective age/depth range.
 
-Status: in progress.
+Status: done.
 
 Verification:
 
@@ -229,7 +229,7 @@ Verification:
   - age range;
   - depth range.
 
-Status: todo.
+Status: in progress.
 
 Verification:
 

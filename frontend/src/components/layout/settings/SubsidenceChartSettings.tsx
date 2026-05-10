@@ -1,6 +1,7 @@
 import { useComputedStore, useViewStore } from '@/stores'
 import { useMultiWellStore } from '@/stores/multiWellStore'
-import { curveAgeExtent, curveDepthExtent, paddedDepthExtent } from '@/utils/subsidenceChartDomain'
+import { useWellDataStore } from '@/stores/wellDataStore'
+import { applyChartCutoff, curveAgeExtent, curveDepthExtent, paddedDepthExtent } from '@/utils/subsidenceChartDomain'
 
 interface SubsidenceChartSettingsProps {
   chartType: 'single' | 'multi'
@@ -11,10 +12,16 @@ export function SubsidenceChartSettings({ chartType }: SubsidenceChartSettingsPr
 
   const singleCurves = useComputedStore((s) => s.subsidenceCurves)
   const multiResults = useMultiWellStore((s) => s.wellResults)
+  const currentWellId = useWellDataStore((s) => s.well?.well_id ?? null)
+  const formations = useWellDataStore((s) => s.formations)
+  const wellInventories = useWellDataStore((s) => s.wellInventories)
+  const topSets = useWellDataStore((s) => s.topSets)
   const depthMin = useViewStore((s) => single ? s.subsidenceSingleDepthMin : s.subsidenceMultiDepthMin)
   const depthMax = useViewStore((s) => single ? s.subsidenceSingleDepthMax : s.subsidenceMultiDepthMax)
   const ageMin = useViewStore((s) => single ? s.subsidenceSingleAgeMin : s.subsidenceMultiAgeMin)
   const ageMax = useViewStore((s) => single ? s.subsidenceSingleAgeMax : s.subsidenceMultiAgeMax)
+  const compareByMarkerByWellId = useViewStore((s) => s.subsidenceCompareByMarkerByWellId)
+  const compareMarkerHorizonIdByWellId = useViewStore((s) => s.subsidenceCompareMarkerHorizonIdByWellId)
   const setDepthMin = useViewStore((s) => single ? s.setSubsidenceSingleDepthMin : s.setSubsidenceMultiDepthMin)
   const setDepthMax = useViewStore((s) => single ? s.setSubsidenceSingleDepthMax : s.setSubsidenceMultiDepthMax)
   const setAgeMin = useViewStore((s) => single ? s.setSubsidenceSingleAgeMin : s.setSubsidenceMultiAgeMin)
@@ -24,7 +31,35 @@ export function SubsidenceChartSettings({ chartType }: SubsidenceChartSettingsPr
     return value === '' ? null : Number(value)
   }
 
-  const curves = single ? singleCurves : multiResults.flatMap((result) => result.curves)
+  const horizonById = new Map(topSets.flatMap((topSet) => topSet.horizons ?? []).map((horizon) => [horizon.id, horizon]))
+  const inventoryByWellId = new Map(wellInventories.map((well) => [well.well_id, well]))
+  const singleHorizonId = currentWellId ? compareMarkerHorizonIdByWellId[currentWellId] : null
+  const singleHorizon = singleHorizonId !== null && singleHorizonId !== undefined ? horizonById.get(singleHorizonId) : undefined
+  const singlePick = singleHorizonId !== null && singleHorizonId !== undefined
+    ? formations.find((formation) => formation.horizon_id === singleHorizonId)
+    : undefined
+
+  const curves = single
+    ? applyChartCutoff(
+      singleCurves,
+      currentWellId && compareByMarkerByWellId[currentWellId] && singleHorizonId !== null && singleHorizonId !== undefined
+        ? {
+          maxAgeMa: singleHorizon?.age_ma ?? undefined,
+          maxDepthM: singlePick?.depth_md ?? undefined,
+        }
+        : null,
+    )
+    : multiResults.flatMap((result) => {
+      if (!compareByMarkerByWellId[result.wellId]) return result.curves
+      const horizonId = compareMarkerHorizonIdByWellId[result.wellId]
+      if (horizonId === null || horizonId === undefined) return result.curves
+      const horizon = horizonById.get(horizonId)
+      const pick = inventoryByWellId.get(result.wellId)?.formations.find((formation) => formation.horizon_id === horizonId)
+      const maxAgeMa = horizon?.age_ma ?? undefined
+      const maxDepthM = pick?.depth_md ?? undefined
+      if (maxAgeMa === undefined && maxDepthM === undefined) return result.curves
+      return applyChartCutoff(result.curves, { maxAgeMa, maxDepthM })
+    })
   const autoDepth = paddedDepthExtent(curveDepthExtent(curves))
   const autoAge = curveAgeExtent(curves) ?? { min: 0, max: 100 }
   const depthMinPlaceholder = Number.isFinite(autoDepth.min) ? autoDepth.min.toFixed(0) : 'auto'

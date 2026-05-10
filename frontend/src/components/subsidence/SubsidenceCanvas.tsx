@@ -204,12 +204,11 @@ export function SubsidenceCanvas() {
   const subsidenceDepthMaxM = useViewStore((s) => s.subsidenceSingleDepthMax)
   const subsidenceAgeMinMa = useViewStore((s) => s.subsidenceSingleAgeMin)
   const subsidenceAgeMaxMa = useViewStore((s) => s.subsidenceSingleAgeMax)
+  const subsidenceViewport = useViewStore((s) => s.subsidenceSingleViewport)
   const compareByMarkerByWellId = useViewStore((s) => s.subsidenceCompareByMarkerByWellId)
   const compareMarkerHorizonIdByWellId = useViewStore((s) => s.subsidenceCompareMarkerHorizonIdByWellId)
-  const setSubsidenceDepthMinM = useViewStore((s) => s.setSubsidenceSingleDepthMin)
-  const setSubsidenceDepthMaxM = useViewStore((s) => s.setSubsidenceSingleDepthMax)
-  const setSubsidenceAgeMinMa = useViewStore((s) => s.setSubsidenceSingleAgeMin)
-  const setSubsidenceAgeMaxMa = useViewStore((s) => s.setSubsidenceSingleAgeMax)
+  const setSubsidenceViewport = useViewStore((s) => s.setSubsidenceSingleViewport)
+  const setSubsidenceDisplayedRange = useViewStore((s) => s.setSubsidenceSingleDisplayedRange)
   const showSeaLevel = useViewStore((s) => s.subsidenceSingleShowSeaLevel)
   const overlayCurveIds = useViewStore((s) => s.subsidenceSingleSeaLevelOverlayCurveIds)
   const seaLevelOverlayStyles = useViewStore((s) => s.seaLevelOverlayStyles)
@@ -343,9 +342,21 @@ export function SubsidenceCanvas() {
     return padded
   }, [coloredCurves])
 
-  const depthRangeM = resolveRange(autoDepthExtentM, subsidenceDepthMinM, subsidenceDepthMaxM)
+  const baseDepthRangeM = resolveRange(autoDepthExtentM, subsidenceDepthMinM, subsidenceDepthMaxM)
   const autoAgeExtentMa = { min: minAge, max: maxAge }
-  const ageRangeMa = resolveRange(autoAgeExtentMa, subsidenceAgeMinMa, subsidenceAgeMaxMa)
+  const baseAgeRangeMa = resolveRange(autoAgeExtentMa, subsidenceAgeMinMa, subsidenceAgeMaxMa)
+  const viewportDepthRangeM = subsidenceViewport
+    ? clampRangeToBounds({ min: subsidenceViewport.depthMinM, max: subsidenceViewport.depthMaxM }, baseDepthRangeM)
+    : null
+  const viewportAgeRangeMa = subsidenceViewport
+    ? clampRangeToBounds({ min: subsidenceViewport.ageMinMa, max: subsidenceViewport.ageMaxMa }, baseAgeRangeMa)
+    : null
+  const depthRangeM = viewportDepthRangeM
+    ? viewportDepthRangeM
+    : baseDepthRangeM
+  const ageRangeMa = viewportAgeRangeMa
+    ? viewportAgeRangeMa
+    : baseAgeRangeMa
   const effectiveMinDepthM = depthRangeM.min
   const effectiveMaxDepthM = depthRangeM.max
   const effectiveMinAgeMa = ageRangeMa.min
@@ -356,7 +367,13 @@ export function SubsidenceCanvas() {
     minDepthMRef.current = effectiveMinDepthM
     maxDepthMRef.current = effectiveMaxDepthM
     paddingRightRef.current = PADDING_BASE.right
-  }, [effectiveMaxAgeMa, effectiveMinDepthM, effectiveMaxDepthM])
+    setSubsidenceDisplayedRange({
+      ageMinMa: effectiveMinAgeMa,
+      ageMaxMa: effectiveMaxAgeMa,
+      depthMinM: effectiveMinDepthM,
+      depthMaxM: effectiveMaxDepthM,
+    })
+  }, [effectiveMaxAgeMa, effectiveMaxDepthM, effectiveMinAgeMa, effectiveMinDepthM, setSubsidenceDisplayedRange])
 
   const drawCrosshair = useCallback((cssX: number | null, cssY: number | null) => {
     const canvas = crosshairRef.current
@@ -459,28 +476,27 @@ export function SubsidenceCanvas() {
     const depthAnchor = (cssY - PADDING_BASE.top) / plotH
     const nextAge = clampRangeToBounds(
       zoomRangeAround({ min: effectiveMinAgeMa, max: effectiveMaxAgeMa }, ageAnchor, zoomFactor, 0.1),
-      autoAgeExtentMa,
+      baseAgeRangeMa,
     )
     const nextDepth = clampRangeToBounds(
       zoomRangeAround({ min: effectiveMinDepthM, max: effectiveMaxDepthM }, depthAnchor, zoomFactor, 1),
-      autoDepthExtentM,
+      baseDepthRangeM,
     )
 
-    setSubsidenceAgeMinMa(nextAge.min)
-    setSubsidenceAgeMaxMa(nextAge.max)
-    setSubsidenceDepthMinM(nextDepth.min)
-    setSubsidenceDepthMaxM(nextDepth.max)
+    setSubsidenceViewport({
+      ageMinMa: nextAge.min,
+      ageMaxMa: nextAge.max,
+      depthMinM: nextDepth.min,
+      depthMaxM: nextDepth.max,
+    })
   }, [
-    autoAgeExtentMa,
-    autoDepthExtentM,
+    baseAgeRangeMa,
+    baseDepthRangeM,
     effectiveMaxAgeMa,
     effectiveMaxDepthM,
     effectiveMinAgeMa,
     effectiveMinDepthM,
-    setSubsidenceAgeMaxMa,
-    setSubsidenceAgeMinMa,
-    setSubsidenceDepthMaxM,
-    setSubsidenceDepthMinM,
+    setSubsidenceViewport,
   ])
 
   const handleMouseDown = useCallback((e: React.MouseEvent<HTMLDivElement>) => {
@@ -511,12 +527,14 @@ export function SubsidenceCanvas() {
       const depthSpan = start.depth.max - start.depth.min
       const ageDelta = dx / plotW * ageSpan
       const depthDelta = -dy / plotH * depthSpan
-      const nextAge = panRange(start.age, ageDelta, autoAgeExtentMa)
-      const nextDepth = panRange(start.depth, depthDelta, autoDepthExtentM)
-      setSubsidenceAgeMinMa(nextAge.min)
-      setSubsidenceAgeMaxMa(nextAge.max)
-      setSubsidenceDepthMinM(nextDepth.min)
-      setSubsidenceDepthMaxM(nextDepth.max)
+      const nextAge = panRange(start.age, ageDelta, baseAgeRangeMa)
+      const nextDepth = panRange(start.depth, depthDelta, baseDepthRangeM)
+      setSubsidenceViewport({
+        ageMinMa: nextAge.min,
+        ageMaxMa: nextAge.max,
+        depthMinM: nextDepth.min,
+        depthMaxM: nextDepth.max,
+      })
     }
     const onUp = () => {
       panStartRef.current = null
@@ -526,16 +544,13 @@ export function SubsidenceCanvas() {
     document.addEventListener('mousemove', onMove)
     document.addEventListener('mouseup', onUp)
   }, [
-    autoAgeExtentMa,
-    autoDepthExtentM,
+    baseAgeRangeMa,
+    baseDepthRangeM,
     effectiveMaxAgeMa,
     effectiveMaxDepthM,
     effectiveMinAgeMa,
     effectiveMinDepthM,
-    setSubsidenceAgeMaxMa,
-    setSubsidenceAgeMinMa,
-    setSubsidenceDepthMaxM,
-    setSubsidenceDepthMinM,
+    setSubsidenceViewport,
   ])
 
   const draw = useCallback((ctx: CanvasRenderingContext2D, width: number, height: number) => {

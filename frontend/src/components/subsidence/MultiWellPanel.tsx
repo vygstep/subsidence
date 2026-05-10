@@ -38,12 +38,11 @@ export function MultiWellPanel() {
   const subsidenceDepthMaxM = useViewStore((s) => s.subsidenceMultiDepthMax)
   const subsidenceAgeMinMa = useViewStore((s) => s.subsidenceMultiAgeMin)
   const subsidenceAgeMaxMa = useViewStore((s) => s.subsidenceMultiAgeMax)
+  const subsidenceViewport = useViewStore((s) => s.subsidenceMultiViewport)
   const compareByMarkerByWellId = useViewStore((s) => s.subsidenceCompareByMarkerByWellId)
   const compareMarkerHorizonIdByWellId = useViewStore((s) => s.subsidenceCompareMarkerHorizonIdByWellId)
-  const setSubsidenceDepthMinM = useViewStore((s) => s.setSubsidenceMultiDepthMin)
-  const setSubsidenceDepthMaxM = useViewStore((s) => s.setSubsidenceMultiDepthMax)
-  const setSubsidenceAgeMinMa = useViewStore((s) => s.setSubsidenceMultiAgeMin)
-  const setSubsidenceAgeMaxMa = useViewStore((s) => s.setSubsidenceMultiAgeMax)
+  const setSubsidenceViewport = useViewStore((s) => s.setSubsidenceMultiViewport)
+  const setSubsidenceDisplayedRange = useViewStore((s) => s.setSubsidenceMultiDisplayedRange)
 
   const selectedObject = useWorkspaceStore((s) => s.selectedObject)
   const setSelectedObject = useWorkspaceStore((s) => s.setSelectedObject)
@@ -145,17 +144,37 @@ export function MultiWellPanel() {
     return paddedDepthExtent(curveDepthExtent(visibleWellResults.flatMap((wr) => wr.curves)))
   }, [visibleWellResults])
 
-  const depthRangeM = resolveRange(autoDepthExtentM, subsidenceDepthMinM, subsidenceDepthMaxM)
+  const baseDepthRangeM = resolveRange(autoDepthExtentM, subsidenceDepthMinM, subsidenceDepthMaxM)
   const autoAgeExtentMa = { min: minAge, max: maxAge }
-  const ageRangeMa = resolveRange(autoAgeExtentMa, subsidenceAgeMinMa, subsidenceAgeMaxMa)
+  const baseAgeRangeMa = resolveRange(autoAgeExtentMa, subsidenceAgeMinMa, subsidenceAgeMaxMa)
+  const viewportDepthRangeM = subsidenceViewport
+    ? clampRangeToBounds({ min: subsidenceViewport.depthMinM, max: subsidenceViewport.depthMaxM }, baseDepthRangeM)
+    : null
+  const viewportAgeRangeMa = subsidenceViewport
+    ? clampRangeToBounds({ min: subsidenceViewport.ageMinMa, max: subsidenceViewport.ageMaxMa }, baseAgeRangeMa)
+    : null
+  const depthRangeM = viewportDepthRangeM
+    ? viewportDepthRangeM
+    : baseDepthRangeM
+  const ageRangeMa = viewportAgeRangeMa
+    ? viewportAgeRangeMa
+    : baseAgeRangeMa
   const effectiveMinDepthM = depthRangeM.min
   const effectiveMaxDepthM = depthRangeM.max
   const effectiveMinAgeMa = ageRangeMa.min
   const effectiveMaxAgeMa = ageRangeMa.max
 
-  maxAgeRef.current = effectiveMaxAgeMa
-  minDepthMRef.current = effectiveMinDepthM
-  maxDepthMRef.current = effectiveMaxDepthM
+  useEffect(() => {
+    maxAgeRef.current = effectiveMaxAgeMa
+    minDepthMRef.current = effectiveMinDepthM
+    maxDepthMRef.current = effectiveMaxDepthM
+    setSubsidenceDisplayedRange({
+      ageMinMa: effectiveMinAgeMa,
+      ageMaxMa: effectiveMaxAgeMa,
+      depthMinM: effectiveMinDepthM,
+      depthMaxM: effectiveMaxDepthM,
+    })
+  }, [effectiveMaxAgeMa, effectiveMaxDepthM, effectiveMinAgeMa, effectiveMinDepthM, setSubsidenceDisplayedRange])
 
   const drawCrosshair = useCallback((cssX: number | null, cssY: number | null) => {
     const canvas = crosshairRef.current
@@ -254,28 +273,27 @@ export function MultiWellPanel() {
     const depthAnchor = (cssY - PADDING.top) / plotH
     const nextAge = clampRangeToBounds(
       zoomRangeAround({ min: effectiveMinAgeMa, max: effectiveMaxAgeMa }, ageAnchor, zoomFactor, 0.1),
-      autoAgeExtentMa,
+      baseAgeRangeMa,
     )
     const nextDepth = clampRangeToBounds(
       zoomRangeAround({ min: effectiveMinDepthM, max: effectiveMaxDepthM }, depthAnchor, zoomFactor, 1),
-      autoDepthExtentM,
+      baseDepthRangeM,
     )
 
-    setSubsidenceAgeMinMa(nextAge.min)
-    setSubsidenceAgeMaxMa(nextAge.max)
-    setSubsidenceDepthMinM(nextDepth.min)
-    setSubsidenceDepthMaxM(nextDepth.max)
+    setSubsidenceViewport({
+      ageMinMa: nextAge.min,
+      ageMaxMa: nextAge.max,
+      depthMinM: nextDepth.min,
+      depthMaxM: nextDepth.max,
+    })
   }, [
-    autoAgeExtentMa,
-    autoDepthExtentM,
+    baseAgeRangeMa,
+    baseDepthRangeM,
     effectiveMaxAgeMa,
     effectiveMaxDepthM,
     effectiveMinAgeMa,
     effectiveMinDepthM,
-    setSubsidenceAgeMaxMa,
-    setSubsidenceAgeMinMa,
-    setSubsidenceDepthMaxM,
-    setSubsidenceDepthMinM,
+    setSubsidenceViewport,
   ])
 
   const handleMouseDown = useCallback((e: React.MouseEvent<HTMLDivElement>) => {
@@ -306,12 +324,14 @@ export function MultiWellPanel() {
       const depthSpan = start.depth.max - start.depth.min
       const ageDelta = dx / plotW * ageSpan
       const depthDelta = -dy / plotH * depthSpan
-      const nextAge = panRange(start.age, ageDelta, autoAgeExtentMa)
-      const nextDepth = panRange(start.depth, depthDelta, autoDepthExtentM)
-      setSubsidenceAgeMinMa(nextAge.min)
-      setSubsidenceAgeMaxMa(nextAge.max)
-      setSubsidenceDepthMinM(nextDepth.min)
-      setSubsidenceDepthMaxM(nextDepth.max)
+      const nextAge = panRange(start.age, ageDelta, baseAgeRangeMa)
+      const nextDepth = panRange(start.depth, depthDelta, baseDepthRangeM)
+      setSubsidenceViewport({
+        ageMinMa: nextAge.min,
+        ageMaxMa: nextAge.max,
+        depthMinM: nextDepth.min,
+        depthMaxM: nextDepth.max,
+      })
     }
     const onUp = () => {
       panStartRef.current = null
@@ -321,16 +341,13 @@ export function MultiWellPanel() {
     document.addEventListener('mousemove', onMove)
     document.addEventListener('mouseup', onUp)
   }, [
-    autoAgeExtentMa,
-    autoDepthExtentM,
+    baseAgeRangeMa,
+    baseDepthRangeM,
     effectiveMaxAgeMa,
     effectiveMaxDepthM,
     effectiveMinAgeMa,
     effectiveMinDepthM,
-    setSubsidenceAgeMaxMa,
-    setSubsidenceAgeMinMa,
-    setSubsidenceDepthMaxM,
-    setSubsidenceDepthMinM,
+    setSubsidenceViewport,
   ])
 
   const draw = useCallback((ctx: CanvasRenderingContext2D, width: number, height: number) => {
