@@ -1,3 +1,5 @@
+import { useEffect, useState } from 'react'
+
 import { useComputedStore, useViewStore } from '@/stores'
 import { useMultiWellStore } from '@/stores/multiWellStore'
 import { useWellDataStore } from '@/stores/wellDataStore'
@@ -5,6 +7,60 @@ import { applyChartCutoff, curveAgeExtent, curveDepthExtent, paddedDepthExtent }
 
 interface SubsidenceChartSettingsProps {
   chartType: 'single' | 'multi'
+}
+
+interface CommitNumberInputProps {
+  value: number | null
+  placeholder: string
+  step: string
+  min: string
+  onCommit: (value: number | null) => void
+}
+
+function numberToDraft(value: number | null): string {
+  return value === null ? '' : String(value)
+}
+
+function CommitNumberInput({ value, placeholder, step, min, onCommit }: CommitNumberInputProps) {
+  const [draft, setDraft] = useState(numberToDraft(value))
+
+  useEffect(() => {
+    setDraft(numberToDraft(value))
+  }, [value])
+
+  function commit(): void {
+    if (draft.trim() === '') {
+      onCommit(null)
+      return
+    }
+    const parsed = Number(draft)
+    if (Number.isFinite(parsed)) {
+      onCommit(parsed)
+    } else {
+      setDraft(numberToDraft(value))
+    }
+  }
+
+  return (
+    <input
+      type="number"
+      step={step}
+      min={min}
+      placeholder={placeholder}
+      value={draft}
+      onChange={(event) => setDraft(event.target.value)}
+      onKeyDown={(event) => {
+        if (event.key === 'Enter') {
+          commit()
+          event.currentTarget.blur()
+        } else if (event.key === 'Escape') {
+          setDraft(numberToDraft(value))
+          event.currentTarget.blur()
+        }
+      }}
+      onBlur={() => setDraft(numberToDraft(value))}
+    />
+  )
 }
 
 export function SubsidenceChartSettings({ chartType }: SubsidenceChartSettingsProps) {
@@ -26,10 +82,6 @@ export function SubsidenceChartSettings({ chartType }: SubsidenceChartSettingsPr
   const setDepthMax = useViewStore((s) => single ? s.setSubsidenceSingleDepthMax : s.setSubsidenceMultiDepthMax)
   const setAgeMin = useViewStore((s) => single ? s.setSubsidenceSingleAgeMin : s.setSubsidenceMultiAgeMin)
   const setAgeMax = useViewStore((s) => single ? s.setSubsidenceSingleAgeMax : s.setSubsidenceMultiAgeMax)
-
-  function parseNumber(value: string): number | null {
-    return value === '' ? null : Number(value)
-  }
 
   const horizonById = new Map(topSets.flatMap((topSet) => topSet.horizons ?? []).map((horizon) => [horizon.id, horizon]))
   const inventoryByWellId = new Map(wellInventories.map((well) => [well.well_id, well]))
@@ -77,24 +129,22 @@ export function SubsidenceChartSettings({ chartType }: SubsidenceChartSettingsPr
       </div>
       <div className="sf-row">
         <span>Depth min (m)</span>
-        <input
-          type="number"
+        <CommitNumberInput
           step="100"
           min="0"
           placeholder={depthMinPlaceholder}
-          value={depthMin ?? ''}
-          onChange={(e) => setDepthMin(parseNumber(e.target.value))}
+          value={depthMin}
+          onCommit={setDepthMin}
         />
       </div>
       <div className="sf-row">
         <span>Depth max (m)</span>
-        <input
-          type="number"
+        <CommitNumberInput
           step="100"
           min="0"
           placeholder={depthMaxPlaceholder}
-          value={depthMax ?? ''}
-          onChange={(e) => setDepthMax(parseNumber(e.target.value))}
+          value={depthMax}
+          onCommit={setDepthMax}
         />
       </div>
       <div className="sf-row">
@@ -103,24 +153,22 @@ export function SubsidenceChartSettings({ chartType }: SubsidenceChartSettingsPr
       </div>
       <div className="sf-row">
         <span>Age min (Ma)</span>
-        <input
-          type="number"
+        <CommitNumberInput
           step="10"
           min="0"
           placeholder={ageMinPlaceholder}
-          value={ageMin ?? ''}
-          onChange={(e) => setAgeMin(parseNumber(e.target.value))}
+          value={ageMin}
+          onCommit={setAgeMin}
         />
       </div>
       <div className="sf-row">
         <span>Age max (Ma)</span>
-        <input
-          type="number"
+        <CommitNumberInput
           step="10"
           min="0"
           placeholder={ageMaxPlaceholder}
-          value={ageMax ?? ''}
-          onChange={(e) => setAgeMax(parseNumber(e.target.value))}
+          value={ageMax}
+          onCommit={setAgeMax}
         />
       </div>
       <div className="sf-row">
