@@ -28,7 +28,7 @@ Improve single-well and multi-well subsidence chart navigation and comparison:
 - Auto depth range uses visible chart data with padding:
   - top padding = `min(10% of visible depth span, 300 m)`;
   - bottom padding = `min(10% of visible depth span, 300 m)`;
-  - final minimum depth must not be less than `0 m` unless plotted data itself is negative.
+  - final minimum depth may be above KB/0 by the allowed top padding.
 - Auto age range uses visible chart data after marker cutoff.
 - Depth and age settings must be saved in project visual config.
 
@@ -144,10 +144,19 @@ Verification:
 - Zoom around cursor using current effective age/depth ranges.
 - Store explicit min/max in `viewStore`.
 - Clamp invalid/inverted ranges.
+- Middle mouse drag pans the chart.
+- Panning and zoom-out are clamped to the current auto data bounds:
+  - age cannot move outside visible data age extent;
+  - depth cannot move outside visible data extent with the allowed auto padding.
+- Middle-drag pan must preserve the current scale; when it reaches a bound, it stops instead of rescaling.
+
+Status: done.
 
 Verification:
 
 - Helper tests for zoom range math.
+- Helper tests for pan/clamp range math.
+- Frontend tests: `63 passed`.
 - Manual smoke test: wheel zoom works on both charts, Fit data restores auto.
 
 ### S5: Models settings Compare by marker

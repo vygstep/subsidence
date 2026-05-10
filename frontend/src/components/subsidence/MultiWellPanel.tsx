@@ -6,7 +6,7 @@ import { useMultiWellStore } from '@/stores/multiWellStore'
 import { useViewStore } from '@/stores/viewStore'
 import { useWellDataStore } from '@/stores/wellDataStore'
 import { useWorkspaceStore } from '@/stores/workspaceStore'
-import { curveDepthExtent, paddedDepthExtent, resolveRange } from '@/utils/subsidenceChartDomain'
+import { clampRangeToBounds, curveDepthExtent, paddedDepthExtent, panRange, resolveRange, zoomRangeAround } from '@/utils/subsidenceChartDomain'
 import { GeologicalTimescale } from './GeologicalTimescale'
 
 const PADDING = { top: 12, right: 120, bottom: 40, left: 64 }
@@ -37,6 +37,10 @@ export function MultiWellPanel() {
   const subsidenceDepthMaxM = useViewStore((s) => s.subsidenceMultiDepthMax)
   const subsidenceAgeMinMa = useViewStore((s) => s.subsidenceMultiAgeMin)
   const subsidenceAgeMaxMa = useViewStore((s) => s.subsidenceMultiAgeMax)
+  const setSubsidenceDepthMinM = useViewStore((s) => s.setSubsidenceMultiDepthMin)
+  const setSubsidenceDepthMaxM = useViewStore((s) => s.setSubsidenceMultiDepthMax)
+  const setSubsidenceAgeMinMa = useViewStore((s) => s.setSubsidenceMultiAgeMin)
+  const setSubsidenceAgeMaxMa = useViewStore((s) => s.setSubsidenceMultiAgeMax)
 
   const selectedObject = useWorkspaceStore((s) => s.selectedObject)
   const setSelectedObject = useWorkspaceStore((s) => s.setSelectedObject)
@@ -54,6 +58,12 @@ export function MultiWellPanel() {
   const maxAgeRef = useRef(100)
   const minDepthMRef = useRef(0)
   const maxDepthMRef = useRef(3000)
+  const panStartRef = useRef<{
+    x: number
+    y: number
+    age: { min: number; max: number }
+    depth: { min: number; max: number }
+  } | null>(null)
 
   useEffect(() => {
     void fetchResults()
@@ -108,7 +118,8 @@ export function MultiWellPanel() {
   }, [wellResults])
 
   const depthRangeM = resolveRange(autoDepthExtentM, subsidenceDepthMinM, subsidenceDepthMaxM)
-  const ageRangeMa = resolveRange({ min: minAge, max: maxAge }, subsidenceAgeMinMa, subsidenceAgeMaxMa)
+  const autoAgeExtentMa = { min: minAge, max: maxAge }
+  const ageRangeMa = resolveRange(autoAgeExtentMa, subsidenceAgeMinMa, subsidenceAgeMaxMa)
   const effectiveMinDepthM = depthRangeM.min
   const effectiveMaxDepthM = depthRangeM.max
   const effectiveMinAgeMa = ageRangeMa.min
@@ -197,6 +208,102 @@ export function MultiWellPanel() {
   const handleMouseLeave = useCallback(() => {
     drawCrosshair(null, null)
   }, [drawCrosshair])
+
+  const handleWheel = useCallback((e: React.WheelEvent<HTMLDivElement>) => {
+    const rect = e.currentTarget.getBoundingClientRect()
+    const plotW = rect.width - PADDING.left - PADDING.right
+    const plotH = rect.height - PADDING.top - PADDING.bottom
+    if (plotW <= 0 || plotH <= 0) return
+
+    const cssX = e.clientX - rect.left
+    const cssY = e.clientY - rect.top
+    if (cssX < PADDING.left || cssX > PADDING.left + plotW) return
+    if (cssY < PADDING.top || cssY > PADDING.top + plotH) return
+
+    e.preventDefault()
+    const zoomFactor = e.deltaY < 0 ? 0.85 : 1.15
+    const ageAnchor = 1 - ((cssX - PADDING.left) / plotW)
+    const depthAnchor = (cssY - PADDING.top) / plotH
+    const nextAge = clampRangeToBounds(
+      zoomRangeAround({ min: effectiveMinAgeMa, max: effectiveMaxAgeMa }, ageAnchor, zoomFactor, 0.1),
+      autoAgeExtentMa,
+    )
+    const nextDepth = clampRangeToBounds(
+      zoomRangeAround({ min: effectiveMinDepthM, max: effectiveMaxDepthM }, depthAnchor, zoomFactor, 1),
+      autoDepthExtentM,
+    )
+
+    setSubsidenceAgeMinMa(nextAge.min)
+    setSubsidenceAgeMaxMa(nextAge.max)
+    setSubsidenceDepthMinM(nextDepth.min)
+    setSubsidenceDepthMaxM(nextDepth.max)
+  }, [
+    autoAgeExtentMa,
+    autoDepthExtentM,
+    effectiveMaxAgeMa,
+    effectiveMaxDepthM,
+    effectiveMinAgeMa,
+    effectiveMinDepthM,
+    setSubsidenceAgeMaxMa,
+    setSubsidenceAgeMinMa,
+    setSubsidenceDepthMaxM,
+    setSubsidenceDepthMinM,
+  ])
+
+  const handleMouseDown = useCallback((e: React.MouseEvent<HTMLDivElement>) => {
+    if (e.button !== 1) return
+    const rect = e.currentTarget.getBoundingClientRect()
+    const plotW = rect.width - PADDING.left - PADDING.right
+    const plotH = rect.height - PADDING.top - PADDING.bottom
+    if (plotW <= 0 || plotH <= 0) return
+    const cssX = e.clientX - rect.left
+    const cssY = e.clientY - rect.top
+    if (cssX < PADDING.left || cssX > PADDING.left + plotW) return
+    if (cssY < PADDING.top || cssY > PADDING.top + plotH) return
+
+    e.preventDefault()
+    panStartRef.current = {
+      x: e.clientX,
+      y: e.clientY,
+      age: { min: effectiveMinAgeMa, max: effectiveMaxAgeMa },
+      depth: { min: effectiveMinDepthM, max: effectiveMaxDepthM },
+    }
+
+    const onMove = (event: MouseEvent) => {
+      const start = panStartRef.current
+      if (start === null) return
+      const dx = event.clientX - start.x
+      const dy = event.clientY - start.y
+      const ageSpan = start.age.max - start.age.min
+      const depthSpan = start.depth.max - start.depth.min
+      const ageDelta = dx / plotW * ageSpan
+      const depthDelta = -dy / plotH * depthSpan
+      const nextAge = panRange(start.age, ageDelta, autoAgeExtentMa)
+      const nextDepth = panRange(start.depth, depthDelta, autoDepthExtentM)
+      setSubsidenceAgeMinMa(nextAge.min)
+      setSubsidenceAgeMaxMa(nextAge.max)
+      setSubsidenceDepthMinM(nextDepth.min)
+      setSubsidenceDepthMaxM(nextDepth.max)
+    }
+    const onUp = () => {
+      panStartRef.current = null
+      document.removeEventListener('mousemove', onMove)
+      document.removeEventListener('mouseup', onUp)
+    }
+    document.addEventListener('mousemove', onMove)
+    document.addEventListener('mouseup', onUp)
+  }, [
+    autoAgeExtentMa,
+    autoDepthExtentM,
+    effectiveMaxAgeMa,
+    effectiveMaxDepthM,
+    effectiveMinAgeMa,
+    effectiveMinDepthM,
+    setSubsidenceAgeMaxMa,
+    setSubsidenceAgeMinMa,
+    setSubsidenceDepthMaxM,
+    setSubsidenceDepthMinM,
+  ])
 
   const draw = useCallback((ctx: CanvasRenderingContext2D, width: number, height: number) => {
     ctx.fillStyle = '#ffffff'
@@ -388,6 +495,8 @@ export function MultiWellPanel() {
         onMouseMove={handleMouseMove}
         onMouseLeave={handleMouseLeave}
         onClick={handleClick}
+        onMouseDown={handleMouseDown}
+        onWheel={handleWheel}
         style={{ cursor: 'pointer' }}
       >
         <canvas ref={canvasRef} className="subsidence-canvas" />

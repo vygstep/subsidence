@@ -48,10 +48,8 @@ export function paddedDepthExtent(extent: NumericExtent | null, fallbackMax = 30
 
   const span = Math.max(1, extent.max - extent.min)
   const padding = Math.min(span * 0.1, 300)
-  const paddedMin = extent.min - padding
-  const min = extent.min < 0 ? paddedMin : Math.max(0, paddedMin)
   return {
-    min,
+    min: extent.min - padding,
     max: extent.max + padding,
   }
 }
@@ -67,4 +65,51 @@ export function resolveRange(
     return { min, max }
   }
   return { min, max: min + 1 }
+}
+
+export function zoomRangeAround(
+  range: NumericExtent,
+  anchorFraction: number,
+  zoomFactor: number,
+  minSpan = 1,
+): NumericExtent {
+  const span = Math.max(minSpan, range.max - range.min)
+  const anchor = range.min + span * Math.min(1, Math.max(0, anchorFraction))
+  const nextSpan = Math.max(minSpan, span * zoomFactor)
+  const left = anchor - range.min
+  const right = range.max - anchor
+  const leftRatio = span > 0 ? left / span : 0.5
+  const rightRatio = span > 0 ? right / span : 0.5
+  return {
+    min: anchor - nextSpan * leftRatio,
+    max: anchor + nextSpan * rightRatio,
+  }
+}
+
+export function clampRangeToBounds(range: NumericExtent, bounds: NumericExtent): NumericExtent {
+  const boundsSpan = bounds.max - bounds.min
+  const rangeSpan = range.max - range.min
+  if (boundsSpan <= 0 || rangeSpan <= 0 || rangeSpan >= boundsSpan) {
+    return { ...bounds }
+  }
+
+  if (range.min < bounds.min) {
+    return { min: bounds.min, max: bounds.min + rangeSpan }
+  }
+  if (range.max > bounds.max) {
+    return { min: bounds.max - rangeSpan, max: bounds.max }
+  }
+  return range
+}
+
+export function panRange(range: NumericExtent, delta: number, bounds: NumericExtent): NumericExtent {
+  const rangeSpan = range.max - range.min
+  const boundsSpan = bounds.max - bounds.min
+  if (rangeSpan <= 0 || boundsSpan <= 0 || rangeSpan >= boundsSpan) {
+    return range
+  }
+  return clampRangeToBounds({
+    min: range.min + delta,
+    max: range.max + delta,
+  }, bounds)
 }
