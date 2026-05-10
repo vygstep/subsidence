@@ -27,6 +27,7 @@ function drawAxes(
   ctx: CanvasRenderingContext2D,
   width: number,
   height: number,
+  minAge: number,
   maxAge: number,
   minDepthM: number,
   maxDepthM: number,
@@ -77,8 +78,9 @@ function drawAxes(
   ctx.textBaseline = 'top'
 
   // X tick marks — age Ma, right=0, left=maxAge
-  const ageStep = niceStep(maxAge, 5)
-  for (let age = 0; age <= maxAge + ageStep * 0.01; age += ageStep) {
+  const ageStep = niceStep(maxAge - minAge, 5)
+  const firstAgeTick = Math.ceil(minAge / ageStep) * ageStep
+  for (let age = firstAgeTick; age <= maxAge + ageStep * 0.01; age += ageStep) {
     const x = timeToX(age)
     ctx.beginPath()
     ctx.moveTo(x, padding.top + plotH)
@@ -194,6 +196,8 @@ export function SubsidenceCanvas() {
 
   const subsidenceDepthMinM = useViewStore((s) => s.subsidenceSingleDepthMin)
   const subsidenceDepthMaxM = useViewStore((s) => s.subsidenceSingleDepthMax)
+  const subsidenceAgeMinMa = useViewStore((s) => s.subsidenceSingleAgeMin)
+  const subsidenceAgeMaxMa = useViewStore((s) => s.subsidenceSingleAgeMax)
   const showSeaLevel = useViewStore((s) => s.subsidenceSingleShowSeaLevel)
   const overlayCurveIds = useViewStore((s) => s.subsidenceSingleSeaLevelOverlayCurveIds)
   const seaLevelOverlayStyles = useViewStore((s) => s.seaLevelOverlayStyles)
@@ -275,6 +279,10 @@ export function SubsidenceCanvas() {
     const extent = curveAgeExtent(coloredCurves)
     return extent !== null && extent.max > 0 ? extent.max : 100
   }, [coloredCurves])
+  const minAge = useMemo(() => {
+    const extent = curveAgeExtent(coloredCurves)
+    return extent !== null ? Math.max(0, extent.min) : 0
+  }, [coloredCurves])
 
   const autoMaxDepthM = useMemo(() => {
     let max = 0
@@ -307,13 +315,15 @@ export function SubsidenceCanvas() {
 
   const effectiveMinDepthM = subsidenceDepthMinM ?? 0
   const effectiveMaxDepthM = subsidenceDepthMaxM ?? autoMaxDepthM
+  const effectiveMinAgeMa = subsidenceAgeMinMa ?? minAge
+  const effectiveMaxAgeMa = subsidenceAgeMaxMa ?? maxAge
 
   useEffect(() => {
-    maxAgeRef.current = maxAge
+    maxAgeRef.current = effectiveMaxAgeMa
     minDepthMRef.current = effectiveMinDepthM
     maxDepthMRef.current = effectiveMaxDepthM
     paddingRightRef.current = PADDING_BASE.right
-  }, [maxAge, effectiveMinDepthM, effectiveMaxDepthM])
+  }, [effectiveMaxAgeMa, effectiveMinDepthM, effectiveMaxDepthM])
 
   const drawCrosshair = useCallback((cssX: number | null, cssY: number | null) => {
     const canvas = crosshairRef.current
@@ -343,7 +353,7 @@ export function SubsidenceCanvas() {
     if (cssX < PADDING_BASE.left || cssX > PADDING_BASE.left + plotW) return
     if (cssY < PADDING_BASE.top || cssY > PADDING_BASE.top + plotH) return
 
-    const age = currentMaxAge * (1 - (cssX - PADDING_BASE.left) / plotW)
+    const age = effectiveMinAgeMa + (currentMaxAge - effectiveMinAgeMa) * (1 - (cssX - PADDING_BASE.left) / plotW)
     const depthM = currentMinDepthM + (currentMaxDepthM - currentMinDepthM) * (cssY - PADDING_BASE.top) / plotH
 
     ctx.save()
@@ -388,7 +398,7 @@ export function SubsidenceCanvas() {
     ctx.fillText(ageLabel, cssX, PADDING_BASE.top + plotH + 4)
 
     ctx.restore()
-  }, [])
+  }, [effectiveMinAgeMa])
 
   const handleMouseMove = useCallback((e: React.MouseEvent<HTMLDivElement>) => {
     const rect = e.currentTarget.getBoundingClientRect()
@@ -409,14 +419,15 @@ export function SubsidenceCanvas() {
     const plotH = height - pad.top - pad.bottom
     if (plotW <= 0 || plotH <= 0) return
 
+    const ageRange = effectiveMaxAgeMa - effectiveMinAgeMa || 1
     const timeToX = (age: number) =>
-      pad.left + ((maxAge - age) / (maxAge || 1)) * plotW
+      pad.left + ((effectiveMaxAgeMa - age) / ageRange) * plotW
 
     const depthRange = effectiveMaxDepthM - effectiveMinDepthM || 1
     const depthToY = (depthM: number) =>
       pad.top + ((depthM - effectiveMinDepthM) / depthRange) * plotH
 
-    drawAxes(ctx, width, height, maxAge, effectiveMinDepthM, effectiveMaxDepthM, timeToX, depthToY, pad)
+    drawAxes(ctx, width, height, effectiveMinAgeMa, effectiveMaxAgeMa, effectiveMinDepthM, effectiveMaxDepthM, timeToX, depthToY, pad)
 
     ctx.save()
     ctx.beginPath()
@@ -430,7 +441,7 @@ export function SubsidenceCanvas() {
     // Sea-level overlay lines (inside clip). These are display-only curves.
     seaLevelOverlays.forEach((overlay) => {
       const slPoints = [...overlay.points]
-        .filter((p) => p.age_ma >= 0 && p.age_ma <= maxAge)
+        .filter((p) => p.age_ma >= effectiveMinAgeMa && p.age_ma <= effectiveMaxAgeMa)
         .sort((a, b) => a.age_ma - b.age_ma)
       if (slPoints.length === 0) return
 
@@ -452,7 +463,7 @@ export function SubsidenceCanvas() {
     ctx.restore()
 
     drawFormationLabels(ctx, coloredCurves, pad.left + plotW, depthToY)
-  }, [coloredCurves, maxAge, effectiveMinDepthM, effectiveMaxDepthM, showFormationFills, showBurialCurves, seaLevelOverlays])
+  }, [coloredCurves, effectiveMinAgeMa, effectiveMaxAgeMa, effectiveMinDepthM, effectiveMaxDepthM, showFormationFills, showBurialCurves, seaLevelOverlays])
 
   const canvasRef = useCanvasRenderer(draw, [draw])
 
@@ -469,7 +480,7 @@ export function SubsidenceCanvas() {
         </div>
       )}
       <GeologicalTimescale
-        timeRange={{ min_ma: 0, max_ma: maxAge }}
+        timeRange={{ min_ma: effectiveMinAgeMa, max_ma: effectiveMaxAgeMa }}
         height={TIMESCALE_HEIGHT}
         paddingLeft={PADDING_BASE.left}
         paddingRight={paddingRight}

@@ -35,6 +35,10 @@ interface VisualConfigPayload {
   subsidenceSingleDepthMax?: number | null
   subsidenceMultiDepthMin?: number | null
   subsidenceMultiDepthMax?: number | null
+  subsidenceSingleAgeMin?: number | null
+  subsidenceSingleAgeMax?: number | null
+  subsidenceMultiAgeMin?: number | null
+  subsidenceMultiAgeMax?: number | null
   activeSubsidenceModelType?: SubsidenceModelType
   subsidenceModelConfigs?: Partial<Record<SubsidenceModelType, Partial<SubsidenceModelConfig> & { seaLevelCurveId?: number | null }>>
   subsidenceSingleShowSeaLevel?: boolean
@@ -86,6 +90,10 @@ export interface ViewStore {
   subsidenceSingleDepthMax: number | null
   subsidenceMultiDepthMin: number | null
   subsidenceMultiDepthMax: number | null
+  subsidenceSingleAgeMin: number | null
+  subsidenceSingleAgeMax: number | null
+  subsidenceMultiAgeMin: number | null
+  subsidenceMultiAgeMax: number | null
   activeSubsidenceModelType: SubsidenceModelType
   subsidenceModelConfigs: Record<SubsidenceModelType, SubsidenceModelConfig>
   subsidenceSingleShowSeaLevel: boolean
@@ -112,6 +120,10 @@ export interface ViewStore {
   setSubsidenceSingleDepthMax: (v: number | null) => void
   setSubsidenceMultiDepthMin: (v: number | null) => void
   setSubsidenceMultiDepthMax: (v: number | null) => void
+  setSubsidenceSingleAgeMin: (v: number | null) => void
+  setSubsidenceSingleAgeMax: (v: number | null) => void
+  setSubsidenceMultiAgeMin: (v: number | null) => void
+  setSubsidenceMultiAgeMax: (v: number | null) => void
   setActiveSubsidenceModelType: (t: SubsidenceModelType) => void
   updateSubsidenceModelConfig: (modelType: SubsidenceModelType, patch: Partial<SubsidenceModelConfig>) => void
   setSubsidenceSingleShowSeaLevel: (v: boolean) => void
@@ -227,6 +239,10 @@ export const useViewStore = create<ViewStore>((set) => ({
   subsidenceSingleDepthMax: null,
   subsidenceMultiDepthMin: null,
   subsidenceMultiDepthMax: null,
+  subsidenceSingleAgeMin: null,
+  subsidenceSingleAgeMax: null,
+  subsidenceMultiAgeMin: null,
+  subsidenceMultiAgeMax: null,
   activeSubsidenceModelType: 'total' as SubsidenceModelType,
   subsidenceModelConfigs: defaultModelConfigs(),
   subsidenceSingleShowSeaLevel: false,
@@ -316,6 +332,10 @@ export const useViewStore = create<ViewStore>((set) => ({
   setSubsidenceSingleDepthMax(v) { set({ subsidenceSingleDepthMax: v }) },
   setSubsidenceMultiDepthMin(v) { set({ subsidenceMultiDepthMin: v }) },
   setSubsidenceMultiDepthMax(v) { set({ subsidenceMultiDepthMax: v }) },
+  setSubsidenceSingleAgeMin(v) { set({ subsidenceSingleAgeMin: v }) },
+  setSubsidenceSingleAgeMax(v) { set({ subsidenceSingleAgeMax: v }) },
+  setSubsidenceMultiAgeMin(v) { set({ subsidenceMultiAgeMin: v }) },
+  setSubsidenceMultiAgeMax(v) { set({ subsidenceMultiAgeMax: v }) },
   setActiveSubsidenceModelType(t) { set({ activeSubsidenceModelType: t }) },
   setSubsidenceSingleShowSeaLevel(v) { set({ subsidenceSingleShowSeaLevel: v }) },
   setSubsidenceSingleSeaLevelOverlayCurveIds(ids) {
@@ -404,6 +424,10 @@ export const useViewStore = create<ViewStore>((set) => ({
         subsidenceSingleDepthMax: 'subsidenceSingleDepthMax' in config ? config.subsidenceSingleDepthMax ?? null : state.subsidenceSingleDepthMax,
         subsidenceMultiDepthMin: 'subsidenceMultiDepthMin' in config ? config.subsidenceMultiDepthMin ?? null : state.subsidenceMultiDepthMin,
         subsidenceMultiDepthMax: 'subsidenceMultiDepthMax' in config ? config.subsidenceMultiDepthMax ?? null : state.subsidenceMultiDepthMax,
+        subsidenceSingleAgeMin: 'subsidenceSingleAgeMin' in config ? config.subsidenceSingleAgeMin ?? null : state.subsidenceSingleAgeMin,
+        subsidenceSingleAgeMax: 'subsidenceSingleAgeMax' in config ? config.subsidenceSingleAgeMax ?? null : state.subsidenceSingleAgeMax,
+        subsidenceMultiAgeMin: 'subsidenceMultiAgeMin' in config ? config.subsidenceMultiAgeMin ?? null : state.subsidenceMultiAgeMin,
+        subsidenceMultiAgeMax: 'subsidenceMultiAgeMax' in config ? config.subsidenceMultiAgeMax ?? null : state.subsidenceMultiAgeMax,
         activeSubsidenceModelType: config.activeSubsidenceModelType ?? state.activeSubsidenceModelType,
         subsidenceModelConfigs: mergedModelConfigs,
         subsidenceSingleShowSeaLevel: config.subsidenceSingleShowSeaLevel ?? state.subsidenceSingleShowSeaLevel,
@@ -427,6 +451,10 @@ export const useViewStore = create<ViewStore>((set) => ({
       subsidenceSingleDepthMax: null,
       subsidenceMultiDepthMin: null,
       subsidenceMultiDepthMax: null,
+      subsidenceSingleAgeMin: null,
+      subsidenceSingleAgeMax: null,
+      subsidenceMultiAgeMin: null,
+      subsidenceMultiAgeMax: null,
       activeSubsidenceModelType: 'total',
       subsidenceModelConfigs: defaultModelConfigs(),
       subsidenceSingleShowSeaLevel: false,

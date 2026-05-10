@@ -23,6 +23,10 @@ describe('Project visual config hydration', () => {
           trackWidths: { depth: 120, formations: 180 },
           curveColors: { GR: '#ff0000' },
           subsidenceWidth: 360,
+          subsidenceSingleAgeMin: 10,
+          subsidenceSingleAgeMax: 120,
+          subsidenceMultiAgeMin: 5,
+          subsidenceMultiAgeMax: 160,
           depthTrackConfig: { majorInterval: 250 },
           formationsTrackConfig: { nameSource: 'linked-strat-unit' },
         },
@@ -36,6 +40,10 @@ describe('Project visual config hydration', () => {
     expect(useViewStore.getState().trackWidths.depth).toBe(120)
     expect(useViewStore.getState().trackWidths.formations).toBe(180)
     expect(useViewStore.getState().subsidenceWidth).toBe(360)
+    expect(useViewStore.getState().subsidenceSingleAgeMin).toBe(10)
+    expect(useViewStore.getState().subsidenceSingleAgeMax).toBe(120)
+    expect(useViewStore.getState().subsidenceMultiAgeMin).toBe(5)
+    expect(useViewStore.getState().subsidenceMultiAgeMax).toBe(160)
     expect(useViewStore.getState().depthTrackConfig.majorInterval).toBe(250)
     expect(useViewStore.getState().formationsTrackConfig.nameSource).toBe('linked-strat-unit')
     expect(useWellDataStore.getState().colorOverrides.GR).toBe('#ff0000')

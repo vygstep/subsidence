@@ -111,9 +111,12 @@ Verification:
   - `Age max (Ma)`;
   - age `Auto`.
 
+Status: done.
+
 Verification:
 
 - Frontend visual config hydration test covers new fields.
+- Frontend tests: `59 passed`.
 
 ### S3: Shared chart-domain helper and Fit data
 

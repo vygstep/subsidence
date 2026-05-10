@@ -34,6 +34,8 @@ export function MultiWellPanel() {
   const wellInventories = useWellDataStore((s) => s.wellInventories)
   const subsidenceDepthMinM = useViewStore((s) => s.subsidenceMultiDepthMin)
   const subsidenceDepthMaxM = useViewStore((s) => s.subsidenceMultiDepthMax)
+  const subsidenceAgeMinMa = useViewStore((s) => s.subsidenceMultiAgeMin)
+  const subsidenceAgeMaxMa = useViewStore((s) => s.subsidenceMultiAgeMax)
 
   const selectedObject = useWorkspaceStore((s) => s.selectedObject)
   const setSelectedObject = useWorkspaceStore((s) => s.setSelectedObject)
@@ -88,6 +90,17 @@ export function MultiWellPanel() {
     }
     return max > 0 ? max : 100
   }, [wellResults])
+  const minAge = useMemo(() => {
+    let min = Infinity
+    for (const wr of wellResults) {
+      for (const curve of wr.curves) {
+        for (const pt of curve.burial_path) {
+          if (Number.isFinite(pt.age_ma) && pt.age_ma < min) min = pt.age_ma
+        }
+      }
+    }
+    return Number.isFinite(min) ? Math.max(0, min) : 0
+  }, [wellResults])
 
   const autoMaxDepthM = useMemo(() => {
     let max = 0
@@ -103,8 +116,10 @@ export function MultiWellPanel() {
 
   const effectiveMinDepthM = subsidenceDepthMinM ?? 0
   const effectiveMaxDepthM = subsidenceDepthMaxM ?? autoMaxDepthM
+  const effectiveMinAgeMa = subsidenceAgeMinMa ?? minAge
+  const effectiveMaxAgeMa = subsidenceAgeMaxMa ?? maxAge
 
-  maxAgeRef.current = maxAge
+  maxAgeRef.current = effectiveMaxAgeMa
   minDepthMRef.current = effectiveMinDepthM
   maxDepthMRef.current = effectiveMaxDepthM
 
@@ -135,7 +150,7 @@ export function MultiWellPanel() {
     if (cssX < PADDING.left || cssX > PADDING.left + plotW) return
     if (cssY < PADDING.top || cssY > PADDING.top + plotH) return
 
-    const age = currentMaxAge * (1 - (cssX - PADDING.left) / plotW)
+    const age = effectiveMinAgeMa + (currentMaxAge - effectiveMinAgeMa) * (1 - (cssX - PADDING.left) / plotW)
     const depthM = currentMinDepthM + (currentMaxDepthM - currentMinDepthM) * (cssY - PADDING.top) / plotH
 
     ctx.save()
@@ -177,7 +192,7 @@ export function MultiWellPanel() {
     ctx.fillText(ageLabel, cssX, PADDING.top + plotH + 4)
 
     ctx.restore()
-  }, [])
+  }, [effectiveMinAgeMa])
 
   const handleMouseMove = useCallback((e: React.MouseEvent<HTMLDivElement>) => {
     const rect = e.currentTarget.getBoundingClientRect()
@@ -205,8 +220,9 @@ export function MultiWellPanel() {
       return
     }
 
+    const ageRange = effectiveMaxAgeMa - effectiveMinAgeMa || 1
     const timeToX = (age: number) =>
-      PADDING.left + ((maxAge - age) / (maxAge || 1)) * plotW
+      PADDING.left + ((effectiveMaxAgeMa - age) / ageRange) * plotW
 
     const depthRange = effectiveMaxDepthM - effectiveMinDepthM || 1
     const depthToY = (depthM: number) =>
@@ -247,10 +263,11 @@ export function MultiWellPanel() {
     }
 
     // X ticks (age Ma)
-    const ageStep = niceStep(maxAge, 5)
+    const ageStep = niceStep(effectiveMaxAgeMa - effectiveMinAgeMa, 5)
     ctx.textAlign = 'center'
     ctx.textBaseline = 'top'
-    for (let age = 0; age <= maxAge + ageStep * 0.01; age += ageStep) {
+    const firstAgeTick = Math.ceil(effectiveMinAgeMa / ageStep) * ageStep
+    for (let age = firstAgeTick; age <= effectiveMaxAgeMa + ageStep * 0.01; age += ageStep) {
       const x = timeToX(age)
       ctx.beginPath()
       ctx.moveTo(x, PADDING.top + plotH)
@@ -335,7 +352,7 @@ export function MultiWellPanel() {
       ctx.font = isActive ? 'bold 10px system-ui, sans-serif' : '10px system-ui, sans-serif'
       ctx.fillText(wr.wellName, legendX + 16, y)
     }
-  }, [wellResults, activeWellId, maxAge, effectiveMinDepthM, effectiveMaxDepthM, wellColorById])
+  }, [wellResults, activeWellId, effectiveMinAgeMa, effectiveMaxAgeMa, effectiveMinDepthM, effectiveMaxDepthM, wellColorById])
 
   const canvasRef = useCanvasRenderer(draw, [draw])
 
@@ -366,7 +383,7 @@ export function MultiWellPanel() {
         Multi-well subsidence chart
       </div>
       <GeologicalTimescale
-        timeRange={{ min_ma: 0, max_ma: maxAge }}
+        timeRange={{ min_ma: effectiveMinAgeMa, max_ma: effectiveMaxAgeMa }}
         height={TIMESCALE_HEIGHT}
         paddingLeft={PADDING.left}
         paddingRight={PADDING.right}

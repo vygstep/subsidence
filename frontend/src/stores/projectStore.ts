@@ -59,6 +59,10 @@ interface VisualConfigPayload {
   subsidenceSingleDepthMax?: number | null
   subsidenceMultiDepthMin?: number | null
   subsidenceMultiDepthMax?: number | null
+  subsidenceSingleAgeMin?: number | null
+  subsidenceSingleAgeMax?: number | null
+  subsidenceMultiAgeMin?: number | null
+  subsidenceMultiAgeMax?: number | null
   activeSubsidenceModelType?: string
   subsidenceModelConfigs?: Record<string, { zoneSetId?: number | null; seaLevelCurveId?: number | null }>
   subsidenceSingleShowSeaLevel?: boolean
@@ -196,6 +200,10 @@ function applyVisualConfigPayload(config: Record<string, unknown>): void {
     subsidenceSingleDepthMax: payload.subsidenceSingleDepthMax,
     subsidenceMultiDepthMin: payload.subsidenceMultiDepthMin,
     subsidenceMultiDepthMax: payload.subsidenceMultiDepthMax,
+    subsidenceSingleAgeMin: payload.subsidenceSingleAgeMin,
+    subsidenceSingleAgeMax: payload.subsidenceSingleAgeMax,
+    subsidenceMultiAgeMin: payload.subsidenceMultiAgeMin,
+    subsidenceMultiAgeMax: payload.subsidenceMultiAgeMax,
     activeSubsidenceModelType: payload.activeSubsidenceModelType as SubsidenceModelType | undefined,
     subsidenceModelConfigs: payload.subsidenceModelConfigs as Partial<Record<SubsidenceModelType, SubsidenceModelConfig>> | undefined,
     subsidenceSingleShowSeaLevel: payload.subsidenceSingleShowSeaLevel,
@@ -233,6 +241,10 @@ export function collectProjectVisualConfig(): VisualConfigPayload {
     subsidenceSingleDepthMax: vs.subsidenceSingleDepthMax,
     subsidenceMultiDepthMin: vs.subsidenceMultiDepthMin,
     subsidenceMultiDepthMax: vs.subsidenceMultiDepthMax,
+    subsidenceSingleAgeMin: vs.subsidenceSingleAgeMin,
+    subsidenceSingleAgeMax: vs.subsidenceSingleAgeMax,
+    subsidenceMultiAgeMin: vs.subsidenceMultiAgeMin,
+    subsidenceMultiAgeMax: vs.subsidenceMultiAgeMax,
     activeSubsidenceModelType: vs.activeSubsidenceModelType,
     subsidenceModelConfigs: vs.subsidenceModelConfigs,
     subsidenceSingleShowSeaLevel: vs.subsidenceSingleShowSeaLevel,

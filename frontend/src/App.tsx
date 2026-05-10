@@ -49,6 +49,10 @@ function App() {
   const subsidenceSingleDepthMax = useViewStore((state) => state.subsidenceSingleDepthMax)
   const subsidenceMultiDepthMin = useViewStore((state) => state.subsidenceMultiDepthMin)
   const subsidenceMultiDepthMax = useViewStore((state) => state.subsidenceMultiDepthMax)
+  const subsidenceSingleAgeMin = useViewStore((state) => state.subsidenceSingleAgeMin)
+  const subsidenceSingleAgeMax = useViewStore((state) => state.subsidenceSingleAgeMax)
+  const subsidenceMultiAgeMin = useViewStore((state) => state.subsidenceMultiAgeMin)
+  const subsidenceMultiAgeMax = useViewStore((state) => state.subsidenceMultiAgeMax)
   const activeSubsidenceModelType = useViewStore((state) => state.activeSubsidenceModelType)
   const subsidenceModelConfigs = useViewStore((state) => state.subsidenceModelConfigs)
   const subsidenceSingleShowSeaLevel = useViewStore((state) => state.subsidenceSingleShowSeaLevel)
@@ -290,6 +294,10 @@ function App() {
     subsidenceSingleSeaLevelOverlayCurveIds,
     subsidenceMultiDepthMax,
     subsidenceMultiDepthMin,
+    subsidenceMultiAgeMax,
+    subsidenceMultiAgeMin,
+    subsidenceSingleAgeMax,
+    subsidenceSingleAgeMin,
     subsidenceSingleDepthMax,
     subsidenceSingleDepthMin,
     subsidenceSingleShowSeaLevel,
