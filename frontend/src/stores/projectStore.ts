@@ -59,11 +59,17 @@ interface VisualConfigPayload {
   subsidenceSingleDepthMax?: number | null
   subsidenceMultiDepthMin?: number | null
   subsidenceMultiDepthMax?: number | null
+  subsidenceSingleAgeMin?: number | null
+  subsidenceSingleAgeMax?: number | null
+  subsidenceMultiAgeMin?: number | null
+  subsidenceMultiAgeMax?: number | null
   activeSubsidenceModelType?: string
   subsidenceModelConfigs?: Record<string, { zoneSetId?: number | null; seaLevelCurveId?: number | null }>
   subsidenceSingleShowSeaLevel?: boolean
   subsidenceSingleSeaLevelOverlayCurveIds?: number[]
   seaLevelOverlayStyles?: Record<string, Partial<SeaLevelOverlayStyle>>
+  subsidenceCompareByMarkerByWellId?: Record<string, boolean>
+  subsidenceCompareMarkerHorizonIdByWellId?: Record<string, number | null>
 }
 
 interface ProjectStatusResponse {
@@ -196,11 +202,17 @@ function applyVisualConfigPayload(config: Record<string, unknown>): void {
     subsidenceSingleDepthMax: payload.subsidenceSingleDepthMax,
     subsidenceMultiDepthMin: payload.subsidenceMultiDepthMin,
     subsidenceMultiDepthMax: payload.subsidenceMultiDepthMax,
+    subsidenceSingleAgeMin: payload.subsidenceSingleAgeMin,
+    subsidenceSingleAgeMax: payload.subsidenceSingleAgeMax,
+    subsidenceMultiAgeMin: payload.subsidenceMultiAgeMin,
+    subsidenceMultiAgeMax: payload.subsidenceMultiAgeMax,
     activeSubsidenceModelType: payload.activeSubsidenceModelType as SubsidenceModelType | undefined,
     subsidenceModelConfigs: payload.subsidenceModelConfigs as Partial<Record<SubsidenceModelType, SubsidenceModelConfig>> | undefined,
     subsidenceSingleShowSeaLevel: payload.subsidenceSingleShowSeaLevel,
     subsidenceSingleSeaLevelOverlayCurveIds: payload.subsidenceSingleSeaLevelOverlayCurveIds,
     seaLevelOverlayStyles: payload.seaLevelOverlayStyles,
+    subsidenceCompareByMarkerByWellId: payload.subsidenceCompareByMarkerByWellId,
+    subsidenceCompareMarkerHorizonIdByWellId: payload.subsidenceCompareMarkerHorizonIdByWellId,
   })
   useWellDataStore.getState().setColorOverrides(payload.curveColors ?? {})
 }
@@ -233,11 +245,17 @@ export function collectProjectVisualConfig(): VisualConfigPayload {
     subsidenceSingleDepthMax: vs.subsidenceSingleDepthMax,
     subsidenceMultiDepthMin: vs.subsidenceMultiDepthMin,
     subsidenceMultiDepthMax: vs.subsidenceMultiDepthMax,
+    subsidenceSingleAgeMin: vs.subsidenceSingleAgeMin,
+    subsidenceSingleAgeMax: vs.subsidenceSingleAgeMax,
+    subsidenceMultiAgeMin: vs.subsidenceMultiAgeMin,
+    subsidenceMultiAgeMax: vs.subsidenceMultiAgeMax,
     activeSubsidenceModelType: vs.activeSubsidenceModelType,
     subsidenceModelConfigs: vs.subsidenceModelConfigs,
     subsidenceSingleShowSeaLevel: vs.subsidenceSingleShowSeaLevel,
     subsidenceSingleSeaLevelOverlayCurveIds: vs.subsidenceSingleSeaLevelOverlayCurveIds,
     seaLevelOverlayStyles: vs.seaLevelOverlayStyles,
+    subsidenceCompareByMarkerByWellId: vs.subsidenceCompareByMarkerByWellId,
+    subsidenceCompareMarkerHorizonIdByWellId: vs.subsidenceCompareMarkerHorizonIdByWellId,
   }
 }
 

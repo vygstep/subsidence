@@ -7,6 +7,13 @@ interface VisibleDepthRange {
   max: number
 }
 
+export interface SubsidenceChartViewport {
+  ageMinMa: number
+  ageMaxMa: number
+  depthMinM: number
+  depthMaxM: number
+}
+
 export type SubsidenceModelType = 'total' | 'decompaction' | 'airy' | 'stepwise' | 'thermal'
 export type SeaLevelOverlayLineStyle = 'solid' | 'dashed' | 'dotted'
 
@@ -35,11 +42,17 @@ interface VisualConfigPayload {
   subsidenceSingleDepthMax?: number | null
   subsidenceMultiDepthMin?: number | null
   subsidenceMultiDepthMax?: number | null
+  subsidenceSingleAgeMin?: number | null
+  subsidenceSingleAgeMax?: number | null
+  subsidenceMultiAgeMin?: number | null
+  subsidenceMultiAgeMax?: number | null
   activeSubsidenceModelType?: SubsidenceModelType
   subsidenceModelConfigs?: Partial<Record<SubsidenceModelType, Partial<SubsidenceModelConfig> & { seaLevelCurveId?: number | null }>>
   subsidenceSingleShowSeaLevel?: boolean
   subsidenceSingleSeaLevelOverlayCurveIds?: number[]
   seaLevelOverlayStyles?: Record<string, Partial<SeaLevelOverlayStyle>>
+  subsidenceCompareByMarkerByWellId?: Record<string, boolean>
+  subsidenceCompareMarkerHorizonIdByWellId?: Record<string, number | null>
 }
 
 export type SelectedElementType = 'curve' | 'track' | 'formation'
@@ -86,11 +99,21 @@ export interface ViewStore {
   subsidenceSingleDepthMax: number | null
   subsidenceMultiDepthMin: number | null
   subsidenceMultiDepthMax: number | null
+  subsidenceSingleAgeMin: number | null
+  subsidenceSingleAgeMax: number | null
+  subsidenceMultiAgeMin: number | null
+  subsidenceMultiAgeMax: number | null
+  subsidenceSingleViewport: SubsidenceChartViewport | null
+  subsidenceMultiViewport: SubsidenceChartViewport | null
+  subsidenceSingleDisplayedRange: SubsidenceChartViewport | null
+  subsidenceMultiDisplayedRange: SubsidenceChartViewport | null
   activeSubsidenceModelType: SubsidenceModelType
   subsidenceModelConfigs: Record<SubsidenceModelType, SubsidenceModelConfig>
   subsidenceSingleShowSeaLevel: boolean
   subsidenceSingleSeaLevelOverlayCurveIds: number[]
   seaLevelOverlayStyles: Record<number, SeaLevelOverlayStyle>
+  subsidenceCompareByMarkerByWellId: Record<string, boolean>
+  subsidenceCompareMarkerHorizonIdByWellId: Record<string, number | null>
   setScroll: (depth: number) => void
   setScale: (dpp: number) => void
   setCursorDepth: (depth: number | null) => void
@@ -112,12 +135,22 @@ export interface ViewStore {
   setSubsidenceSingleDepthMax: (v: number | null) => void
   setSubsidenceMultiDepthMin: (v: number | null) => void
   setSubsidenceMultiDepthMax: (v: number | null) => void
+  setSubsidenceSingleAgeMin: (v: number | null) => void
+  setSubsidenceSingleAgeMax: (v: number | null) => void
+  setSubsidenceMultiAgeMin: (v: number | null) => void
+  setSubsidenceMultiAgeMax: (v: number | null) => void
+  setSubsidenceSingleViewport: (v: SubsidenceChartViewport | null) => void
+  setSubsidenceMultiViewport: (v: SubsidenceChartViewport | null) => void
+  setSubsidenceSingleDisplayedRange: (v: SubsidenceChartViewport | null) => void
+  setSubsidenceMultiDisplayedRange: (v: SubsidenceChartViewport | null) => void
   setActiveSubsidenceModelType: (t: SubsidenceModelType) => void
   updateSubsidenceModelConfig: (modelType: SubsidenceModelType, patch: Partial<SubsidenceModelConfig>) => void
   setSubsidenceSingleShowSeaLevel: (v: boolean) => void
   setSubsidenceSingleSeaLevelOverlayCurveIds: (ids: number[]) => void
   toggleSubsidenceSingleSeaLevelOverlayCurve: (id: number, visible: boolean) => void
   updateSeaLevelOverlayStyle: (id: number, patch: Partial<SeaLevelOverlayStyle>) => void
+  setSubsidenceCompareByMarkerForWell: (wellId: string, enabled: boolean) => void
+  setSubsidenceCompareMarkerForWell: (wellId: string, horizonId: number | null) => void
   lodEnabled: boolean
   setLodEnabled: (v: boolean) => void
   applyActiveWellTrackWidths: (trackWidths: Record<string, number>) => void
@@ -227,11 +260,21 @@ export const useViewStore = create<ViewStore>((set) => ({
   subsidenceSingleDepthMax: null,
   subsidenceMultiDepthMin: null,
   subsidenceMultiDepthMax: null,
+  subsidenceSingleAgeMin: null,
+  subsidenceSingleAgeMax: null,
+  subsidenceMultiAgeMin: null,
+  subsidenceMultiAgeMax: null,
+  subsidenceSingleViewport: null,
+  subsidenceMultiViewport: null,
+  subsidenceSingleDisplayedRange: null,
+  subsidenceMultiDisplayedRange: null,
   activeSubsidenceModelType: 'total' as SubsidenceModelType,
   subsidenceModelConfigs: defaultModelConfigs(),
   subsidenceSingleShowSeaLevel: false,
   subsidenceSingleSeaLevelOverlayCurveIds: [],
   seaLevelOverlayStyles: {},
+  subsidenceCompareByMarkerByWellId: {},
+  subsidenceCompareMarkerHorizonIdByWellId: {},
   lodEnabled: false,
   setScroll(depth) {
     set((state) => ({
@@ -312,10 +355,18 @@ export const useViewStore = create<ViewStore>((set) => ({
   setDepthType(t) {
     set({ depthType: t })
   },
-  setSubsidenceSingleDepthMin(v) { set({ subsidenceSingleDepthMin: v }) },
-  setSubsidenceSingleDepthMax(v) { set({ subsidenceSingleDepthMax: v }) },
-  setSubsidenceMultiDepthMin(v) { set({ subsidenceMultiDepthMin: v }) },
-  setSubsidenceMultiDepthMax(v) { set({ subsidenceMultiDepthMax: v }) },
+  setSubsidenceSingleDepthMin(v) { set({ subsidenceSingleDepthMin: v, subsidenceSingleViewport: null }) },
+  setSubsidenceSingleDepthMax(v) { set({ subsidenceSingleDepthMax: v, subsidenceSingleViewport: null }) },
+  setSubsidenceMultiDepthMin(v) { set({ subsidenceMultiDepthMin: v, subsidenceMultiViewport: null }) },
+  setSubsidenceMultiDepthMax(v) { set({ subsidenceMultiDepthMax: v, subsidenceMultiViewport: null }) },
+  setSubsidenceSingleAgeMin(v) { set({ subsidenceSingleAgeMin: v, subsidenceSingleViewport: null }) },
+  setSubsidenceSingleAgeMax(v) { set({ subsidenceSingleAgeMax: v, subsidenceSingleViewport: null }) },
+  setSubsidenceMultiAgeMin(v) { set({ subsidenceMultiAgeMin: v, subsidenceMultiViewport: null }) },
+  setSubsidenceMultiAgeMax(v) { set({ subsidenceMultiAgeMax: v, subsidenceMultiViewport: null }) },
+  setSubsidenceSingleViewport(v) { set({ subsidenceSingleViewport: v }) },
+  setSubsidenceMultiViewport(v) { set({ subsidenceMultiViewport: v }) },
+  setSubsidenceSingleDisplayedRange(v) { set({ subsidenceSingleDisplayedRange: v }) },
+  setSubsidenceMultiDisplayedRange(v) { set({ subsidenceMultiDisplayedRange: v }) },
   setActiveSubsidenceModelType(t) { set({ activeSubsidenceModelType: t }) },
   setSubsidenceSingleShowSeaLevel(v) { set({ subsidenceSingleShowSeaLevel: v }) },
   setSubsidenceSingleSeaLevelOverlayCurveIds(ids) {
@@ -351,6 +402,26 @@ export const useViewStore = create<ViewStore>((set) => ({
         },
       }
     })
+  },
+  setSubsidenceCompareByMarkerForWell(wellId, enabled) {
+    set((state) => ({
+      subsidenceCompareByMarkerByWellId: {
+        ...state.subsidenceCompareByMarkerByWellId,
+        [wellId]: enabled,
+      },
+      subsidenceSingleViewport: null,
+      subsidenceMultiViewport: null,
+    }))
+  },
+  setSubsidenceCompareMarkerForWell(wellId, horizonId) {
+    set((state) => ({
+      subsidenceCompareMarkerHorizonIdByWellId: {
+        ...state.subsidenceCompareMarkerHorizonIdByWellId,
+        [wellId]: horizonId,
+      },
+      subsidenceSingleViewport: null,
+      subsidenceMultiViewport: null,
+    }))
   },
   updateSubsidenceModelConfig(modelType, patch) {
     set((state) => ({
@@ -404,6 +475,14 @@ export const useViewStore = create<ViewStore>((set) => ({
         subsidenceSingleDepthMax: 'subsidenceSingleDepthMax' in config ? config.subsidenceSingleDepthMax ?? null : state.subsidenceSingleDepthMax,
         subsidenceMultiDepthMin: 'subsidenceMultiDepthMin' in config ? config.subsidenceMultiDepthMin ?? null : state.subsidenceMultiDepthMin,
         subsidenceMultiDepthMax: 'subsidenceMultiDepthMax' in config ? config.subsidenceMultiDepthMax ?? null : state.subsidenceMultiDepthMax,
+        subsidenceSingleAgeMin: 'subsidenceSingleAgeMin' in config ? config.subsidenceSingleAgeMin ?? null : state.subsidenceSingleAgeMin,
+        subsidenceSingleAgeMax: 'subsidenceSingleAgeMax' in config ? config.subsidenceSingleAgeMax ?? null : state.subsidenceSingleAgeMax,
+        subsidenceMultiAgeMin: 'subsidenceMultiAgeMin' in config ? config.subsidenceMultiAgeMin ?? null : state.subsidenceMultiAgeMin,
+        subsidenceMultiAgeMax: 'subsidenceMultiAgeMax' in config ? config.subsidenceMultiAgeMax ?? null : state.subsidenceMultiAgeMax,
+        subsidenceSingleViewport: null,
+        subsidenceMultiViewport: null,
+        subsidenceSingleDisplayedRange: null,
+        subsidenceMultiDisplayedRange: null,
         activeSubsidenceModelType: config.activeSubsidenceModelType ?? state.activeSubsidenceModelType,
         subsidenceModelConfigs: mergedModelConfigs,
         subsidenceSingleShowSeaLevel: config.subsidenceSingleShowSeaLevel ?? state.subsidenceSingleShowSeaLevel,
@@ -411,6 +490,8 @@ export const useViewStore = create<ViewStore>((set) => ({
         seaLevelOverlayStyles: config.seaLevelOverlayStyles
           ? normalizeSeaLevelOverlayStyles(config.seaLevelOverlayStyles)
           : state.seaLevelOverlayStyles,
+        subsidenceCompareByMarkerByWellId: config.subsidenceCompareByMarkerByWellId ?? state.subsidenceCompareByMarkerByWellId,
+        subsidenceCompareMarkerHorizonIdByWellId: config.subsidenceCompareMarkerHorizonIdByWellId ?? state.subsidenceCompareMarkerHorizonIdByWellId,
         visibleDepthRange: deriveVisibleDepthRange(state.scrollDepth, nextDepthPerPixel, state.viewportHeight),
       }
     })
@@ -427,11 +508,21 @@ export const useViewStore = create<ViewStore>((set) => ({
       subsidenceSingleDepthMax: null,
       subsidenceMultiDepthMin: null,
       subsidenceMultiDepthMax: null,
+      subsidenceSingleAgeMin: null,
+      subsidenceSingleAgeMax: null,
+      subsidenceMultiAgeMin: null,
+      subsidenceMultiAgeMax: null,
+      subsidenceSingleViewport: null,
+      subsidenceMultiViewport: null,
+      subsidenceSingleDisplayedRange: null,
+      subsidenceMultiDisplayedRange: null,
       activeSubsidenceModelType: 'total',
       subsidenceModelConfigs: defaultModelConfigs(),
       subsidenceSingleShowSeaLevel: false,
       subsidenceSingleSeaLevelOverlayCurveIds: [],
       seaLevelOverlayStyles: {},
+      subsidenceCompareByMarkerByWellId: {},
+      subsidenceCompareMarkerHorizonIdByWellId: {},
       visibleDepthRange: deriveVisibleDepthRange(state.scrollDepth, initialDepthPerPixel, state.viewportHeight),
     }))
   },
