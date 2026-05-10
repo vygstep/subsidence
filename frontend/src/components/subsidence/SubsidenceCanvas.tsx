@@ -9,6 +9,7 @@ import { formationDisplayColor } from '@/types'
 import type { SeaLevelPoint } from '@/types'
 import type { SubsidenceResult } from '@/types/subsidence'
 import { logDiagnosticEvent } from '@/utils/diagnostics'
+import { curveAgeExtent } from '@/utils/subsidenceChartDomain'
 import { GeologicalTimescale } from './GeologicalTimescale'
 
 const TIMESCALE_HEIGHT = 52
@@ -271,12 +272,9 @@ export function SubsidenceCanvas() {
 
   // X axis: 0 (present, right) → oldest formation age (left)
   const maxAge = useMemo(() => {
-    let max = 0
-    for (const f of formations) {
-      if (f.age_ma != null && f.age_ma > max) max = f.age_ma
-    }
-    return max > 0 ? max : 100
-  }, [formations])
+    const extent = curveAgeExtent(coloredCurves)
+    return extent !== null && extent.max > 0 ? extent.max : 100
+  }, [coloredCurves])
 
   const autoMaxDepthM = useMemo(() => {
     let max = 0

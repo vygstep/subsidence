@@ -88,9 +88,11 @@ subsidenceCompareMarkerHorizonIdByWellId: Record<string, number | null>
 - Do not use unrelated/global formation inventory for chart age domain.
 - Preserve existing fallback when there are no curves.
 
+Status: done.
+
 Verification:
 
-- Unit/helper test or focused integration test proving single chart age domain follows only active-well curves.
+- Unit/helper test proves single chart age domain follows rendered curves only: `2 passed`.
 
 ### S2: Add age range settings and Auto controls
 
