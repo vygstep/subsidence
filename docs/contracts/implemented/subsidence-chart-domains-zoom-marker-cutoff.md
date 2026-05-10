@@ -4,7 +4,7 @@ Branch: `feature/subsidence-chart-domains-zoom-marker-cutoff`
 
 ## Status
 
-`in progress`
+`done`
 
 ## Goal
 
@@ -229,7 +229,7 @@ Verification:
   - age range;
   - depth range.
 
-Status: in progress.
+Status: done.
 
 Verification:
 
