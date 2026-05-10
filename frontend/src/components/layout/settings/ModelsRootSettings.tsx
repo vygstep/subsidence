@@ -1,18 +1,17 @@
 import { useEffect, useState } from 'react'
 
-import { useWellDataStore } from '@/stores'
-
-interface TopSetSummary {
-  id: number
-  name: string
-  horizon_count: number
-}
+import { useViewStore, useWellDataStore } from '@/stores'
+import type { TopSetSummary } from '@/types'
 
 export function ModelsRootSettings() {
   const wellInventories = useWellDataStore((s) => s.wellInventories)
   const seaLevelCurves = useWellDataStore((s) => s.seaLevelCurves)
   const setWellActiveTopSet = useWellDataStore((s) => s.setWellActiveTopSet)
   const setWellActiveSeaLevelCurve = useWellDataStore((s) => s.setWellActiveSeaLevelCurve)
+  const compareByMarkerByWellId = useViewStore((s) => s.subsidenceCompareByMarkerByWellId)
+  const compareMarkerHorizonIdByWellId = useViewStore((s) => s.subsidenceCompareMarkerHorizonIdByWellId)
+  const setCompareByMarkerForWell = useViewStore((s) => s.setSubsidenceCompareByMarkerForWell)
+  const setCompareMarkerForWell = useViewStore((s) => s.setSubsidenceCompareMarkerForWell)
 
   const [selectedWellId, setSelectedWellId] = useState<string>('')
   const [topSets, setTopSets] = useState<TopSetSummary[]>([])
@@ -31,6 +30,22 @@ export function ModelsRootSettings() {
   }, [])
 
   const selectedInventory = wellInventories.find((w) => w.well_id === selectedWellId) ?? null
+  const selectedTopSet = topSets.find((ts) => ts.id === selectedInventory?.active_top_set_id) ?? null
+  const selectedHorizons = [...(selectedTopSet?.horizons ?? [])].sort((a, b) => {
+    const ageA = a.age_ma ?? -Infinity
+    const ageB = b.age_ma ?? -Infinity
+    if (ageA !== ageB) return ageA - ageB
+    return a.sort_order - b.sort_order
+  })
+  const compareByMarker = selectedWellId ? compareByMarkerByWellId[selectedWellId] ?? false : false
+  const compareMarkerId = selectedWellId ? compareMarkerHorizonIdByWellId[selectedWellId] ?? null : null
+  const oldestMarker = selectedHorizons.reduce<typeof selectedHorizons[number] | null>((best, horizon) => {
+    if (best === null) return horizon
+    const bestAge = best.age_ma ?? -Infinity
+    const horizonAge = horizon.age_ma ?? -Infinity
+    if (horizonAge !== bestAge) return horizonAge > bestAge ? horizon : best
+    return horizon.sort_order > best.sort_order ? horizon : best
+  }, null)
 
   async function handleTopSetChange(value: string) {
     if (!selectedWellId || !value) return
@@ -51,6 +66,25 @@ export function ModelsRootSettings() {
     } finally {
       setIsSaving(false)
     }
+  }
+
+  function handleCompareByMarkerChange(enabled: boolean) {
+    if (!selectedWellId) return
+    setCompareByMarkerForWell(selectedWellId, enabled)
+    if (enabled && compareMarkerId === null && oldestMarker !== null) {
+      setCompareMarkerForWell(selectedWellId, oldestMarker.id)
+    }
+  }
+
+  function handleMarkerChange(value: string) {
+    if (!selectedWellId) return
+    setCompareMarkerForWell(selectedWellId, value === '' ? null : Number(value))
+  }
+
+  function handleMarkerReset() {
+    if (!selectedWellId || oldestMarker === null) return
+    setCompareByMarkerForWell(selectedWellId, true)
+    setCompareMarkerForWell(selectedWellId, oldestMarker.id)
   }
 
   return (
@@ -102,6 +136,43 @@ export function ModelsRootSettings() {
                 <option key={c.id} value={c.id}>{c.name}</option>
               ))}
             </select>
+          </div>
+
+          <label className="sf-row">
+            <span>Compare by marker</span>
+            <input
+              type="checkbox"
+              checked={compareByMarker}
+              disabled={!selectedWellId || selectedHorizons.length === 0}
+              onChange={(e) => handleCompareByMarkerChange(e.target.checked)}
+            />
+          </label>
+
+          <div className="sf-row">
+            <span>Marker</span>
+            <select
+              value={compareMarkerId ?? ''}
+              disabled={!compareByMarker || selectedHorizons.length === 0}
+              onChange={(e) => handleMarkerChange(e.target.value)}
+            >
+              <option value="">None</option>
+              {selectedHorizons.map((horizon) => (
+                <option key={horizon.id} value={horizon.id}>
+                  {horizon.name}{horizon.age_ma !== null ? ` (${horizon.age_ma} Ma)` : ''}
+                </option>
+              ))}
+            </select>
+          </div>
+
+          <div className="sf-row">
+            <span>Marker cutoff</span>
+            <button
+              type="button"
+              disabled={!selectedWellId || oldestMarker === null}
+              onClick={handleMarkerReset}
+            >
+              Reset
+            </button>
           </div>
         </>
       )}

@@ -168,9 +168,13 @@ Verification:
 - Disable marker dropdown when no active TopSet is selected or Compare by marker is off.
 - Persist per-well compare settings in visual config.
 
+Status: done.
+
 Verification:
 
 - Frontend test for viewStore persistence if practical.
+- Visual config hydration test covers compare settings.
+- Frontend tests: `63 passed`.
 - Manual smoke: switch selected well in Models settings and verify each well keeps its own marker setting.
 
 ### S6: Apply marker cutoff in charts

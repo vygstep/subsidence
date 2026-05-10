@@ -57,6 +57,8 @@ function App() {
   const subsidenceModelConfigs = useViewStore((state) => state.subsidenceModelConfigs)
   const subsidenceSingleShowSeaLevel = useViewStore((state) => state.subsidenceSingleShowSeaLevel)
   const subsidenceSingleSeaLevelOverlayCurveIds = useViewStore((state) => state.subsidenceSingleSeaLevelOverlayCurveIds)
+  const subsidenceCompareByMarkerByWellId = useViewStore((state) => state.subsidenceCompareByMarkerByWellId)
+  const subsidenceCompareMarkerHorizonIdByWellId = useViewStore((state) => state.subsidenceCompareMarkerHorizonIdByWellId)
   const seaLevelOverlayStyles = useViewStore((state) => state.seaLevelOverlayStyles)
   const applyActiveWellTrackWidths = useViewStore((state) => state.applyActiveWellTrackWidths)
   const resetVisualConfig = useViewStore((state) => state.resetVisualConfig)
@@ -301,6 +303,8 @@ function App() {
     subsidenceSingleDepthMax,
     subsidenceSingleDepthMin,
     subsidenceSingleShowSeaLevel,
+    subsidenceCompareByMarkerByWellId,
+    subsidenceCompareMarkerHorizonIdByWellId,
     subsidenceWidth,
     trackWidths,
     wellViewStates,

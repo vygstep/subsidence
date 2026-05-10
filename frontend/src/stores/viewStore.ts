@@ -44,6 +44,8 @@ interface VisualConfigPayload {
   subsidenceSingleShowSeaLevel?: boolean
   subsidenceSingleSeaLevelOverlayCurveIds?: number[]
   seaLevelOverlayStyles?: Record<string, Partial<SeaLevelOverlayStyle>>
+  subsidenceCompareByMarkerByWellId?: Record<string, boolean>
+  subsidenceCompareMarkerHorizonIdByWellId?: Record<string, number | null>
 }
 
 export type SelectedElementType = 'curve' | 'track' | 'formation'
@@ -99,6 +101,8 @@ export interface ViewStore {
   subsidenceSingleShowSeaLevel: boolean
   subsidenceSingleSeaLevelOverlayCurveIds: number[]
   seaLevelOverlayStyles: Record<number, SeaLevelOverlayStyle>
+  subsidenceCompareByMarkerByWellId: Record<string, boolean>
+  subsidenceCompareMarkerHorizonIdByWellId: Record<string, number | null>
   setScroll: (depth: number) => void
   setScale: (dpp: number) => void
   setCursorDepth: (depth: number | null) => void
@@ -130,6 +134,8 @@ export interface ViewStore {
   setSubsidenceSingleSeaLevelOverlayCurveIds: (ids: number[]) => void
   toggleSubsidenceSingleSeaLevelOverlayCurve: (id: number, visible: boolean) => void
   updateSeaLevelOverlayStyle: (id: number, patch: Partial<SeaLevelOverlayStyle>) => void
+  setSubsidenceCompareByMarkerForWell: (wellId: string, enabled: boolean) => void
+  setSubsidenceCompareMarkerForWell: (wellId: string, horizonId: number | null) => void
   lodEnabled: boolean
   setLodEnabled: (v: boolean) => void
   applyActiveWellTrackWidths: (trackWidths: Record<string, number>) => void
@@ -248,6 +254,8 @@ export const useViewStore = create<ViewStore>((set) => ({
   subsidenceSingleShowSeaLevel: false,
   subsidenceSingleSeaLevelOverlayCurveIds: [],
   seaLevelOverlayStyles: {},
+  subsidenceCompareByMarkerByWellId: {},
+  subsidenceCompareMarkerHorizonIdByWellId: {},
   lodEnabled: false,
   setScroll(depth) {
     set((state) => ({
@@ -372,6 +380,22 @@ export const useViewStore = create<ViewStore>((set) => ({
       }
     })
   },
+  setSubsidenceCompareByMarkerForWell(wellId, enabled) {
+    set((state) => ({
+      subsidenceCompareByMarkerByWellId: {
+        ...state.subsidenceCompareByMarkerByWellId,
+        [wellId]: enabled,
+      },
+    }))
+  },
+  setSubsidenceCompareMarkerForWell(wellId, horizonId) {
+    set((state) => ({
+      subsidenceCompareMarkerHorizonIdByWellId: {
+        ...state.subsidenceCompareMarkerHorizonIdByWellId,
+        [wellId]: horizonId,
+      },
+    }))
+  },
   updateSubsidenceModelConfig(modelType, patch) {
     set((state) => ({
       subsidenceModelConfigs: {
@@ -435,6 +459,8 @@ export const useViewStore = create<ViewStore>((set) => ({
         seaLevelOverlayStyles: config.seaLevelOverlayStyles
           ? normalizeSeaLevelOverlayStyles(config.seaLevelOverlayStyles)
           : state.seaLevelOverlayStyles,
+        subsidenceCompareByMarkerByWellId: config.subsidenceCompareByMarkerByWellId ?? state.subsidenceCompareByMarkerByWellId,
+        subsidenceCompareMarkerHorizonIdByWellId: config.subsidenceCompareMarkerHorizonIdByWellId ?? state.subsidenceCompareMarkerHorizonIdByWellId,
         visibleDepthRange: deriveVisibleDepthRange(state.scrollDepth, nextDepthPerPixel, state.viewportHeight),
       }
     })
@@ -460,6 +486,8 @@ export const useViewStore = create<ViewStore>((set) => ({
       subsidenceSingleShowSeaLevel: false,
       subsidenceSingleSeaLevelOverlayCurveIds: [],
       seaLevelOverlayStyles: {},
+      subsidenceCompareByMarkerByWellId: {},
+      subsidenceCompareMarkerHorizonIdByWellId: {},
       visibleDepthRange: deriveVisibleDepthRange(state.scrollDepth, initialDepthPerPixel, state.viewportHeight),
     }))
   },
