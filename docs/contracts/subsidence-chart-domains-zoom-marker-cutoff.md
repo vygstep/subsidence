@@ -197,6 +197,51 @@ Verification:
   - auto depth/age update after cutoff;
   - missing marker does not break chart rendering.
 
+### S7: Separate chart range settings from interactive viewport
+
+- Split persistent chart range settings from transient chart viewport state.
+- Persistent settings remain the user-facing values in Settings:
+  - depth min/max;
+  - age min/max;
+  - `null` means Auto.
+- Zoom and pan must not write into persistent range settings.
+- Add non-persisted viewport state for each chart:
+  - single-well viewport;
+  - multi-well viewport.
+- Base chart domain is resolved from persistent settings:
+  - Auto uses visible data after marker cutoff, with depth padding;
+  - Manual uses the saved manual range.
+- Effective chart domain is:
+  - viewport domain when viewport exists;
+  - base domain when viewport is `null`.
+- Wheel zoom and middle-button pan update only viewport state.
+- Zoom/pan clamp to the base chart domain:
+  - Auto base clamps to visible data after marker cutoff;
+  - Manual base clamps to manual settings.
+- Settings inputs must stay stable while zooming and panning.
+- Settings placeholders must use the same post-cutoff auto domain as the chart.
+- Settings `Auto` buttons clear the corresponding persistent setting and reset the chart viewport.
+- `Fit data` keeps the existing product behavior:
+  - clears persistent depth and age settings for the target chart;
+  - resets the target chart viewport.
+- Status bar shows the current selected chart viewport when a subsidence chart is selected:
+  - chart type;
+  - age range;
+  - depth range.
+
+Status: todo.
+
+Verification:
+
+- Frontend tests pass.
+- Manual smoke:
+  - manual Settings values do not change after zoom/pan;
+  - zoom/pan changes only the visible chart viewport;
+  - pan stops at manual bounds when manual settings are active;
+  - pan stops at auto data bounds when settings are Auto;
+  - Auto and Fit data reset viewport as specified;
+  - status bar reflects the current selected chart viewport.
+
 ## Non-goals
 
 - No backend calculation changes.
