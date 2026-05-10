@@ -1,4 +1,6 @@
-import { useViewStore } from '@/stores'
+import { useComputedStore, useViewStore } from '@/stores'
+import { useMultiWellStore } from '@/stores/multiWellStore'
+import { curveAgeExtent, curveDepthExtent, paddedDepthExtent } from '@/utils/subsidenceChartDomain'
 
 interface SubsidenceChartSettingsProps {
   chartType: 'single' | 'multi'
@@ -7,6 +9,8 @@ interface SubsidenceChartSettingsProps {
 export function SubsidenceChartSettings({ chartType }: SubsidenceChartSettingsProps) {
   const single = chartType === 'single'
 
+  const singleCurves = useComputedStore((s) => s.subsidenceCurves)
+  const multiResults = useMultiWellStore((s) => s.wellResults)
   const depthMin = useViewStore((s) => single ? s.subsidenceSingleDepthMin : s.subsidenceMultiDepthMin)
   const depthMax = useViewStore((s) => single ? s.subsidenceSingleDepthMax : s.subsidenceMultiDepthMax)
   const ageMin = useViewStore((s) => single ? s.subsidenceSingleAgeMin : s.subsidenceMultiAgeMin)
@@ -19,6 +23,14 @@ export function SubsidenceChartSettings({ chartType }: SubsidenceChartSettingsPr
   function parseNumber(value: string): number | null {
     return value === '' ? null : Number(value)
   }
+
+  const curves = single ? singleCurves : multiResults.flatMap((result) => result.curves)
+  const autoDepth = paddedDepthExtent(curveDepthExtent(curves))
+  const autoAge = curveAgeExtent(curves) ?? { min: 0, max: 100 }
+  const depthMinPlaceholder = Number.isFinite(autoDepth.min) ? autoDepth.min.toFixed(0) : 'auto'
+  const depthMaxPlaceholder = Number.isFinite(autoDepth.max) ? autoDepth.max.toFixed(0) : 'auto'
+  const ageMinPlaceholder = Number.isFinite(autoAge.min) ? autoAge.min.toFixed(1) : 'auto'
+  const ageMaxPlaceholder = Number.isFinite(autoAge.max) ? autoAge.max.toFixed(1) : 'auto'
 
   return (
     <div className="template-panel">
@@ -34,7 +46,7 @@ export function SubsidenceChartSettings({ chartType }: SubsidenceChartSettingsPr
           type="number"
           step="100"
           min="0"
-          placeholder="auto"
+          placeholder={depthMinPlaceholder}
           value={depthMin ?? ''}
           onChange={(e) => setDepthMin(parseNumber(e.target.value))}
         />
@@ -45,7 +57,7 @@ export function SubsidenceChartSettings({ chartType }: SubsidenceChartSettingsPr
           type="number"
           step="100"
           min="0"
-          placeholder="auto"
+          placeholder={depthMaxPlaceholder}
           value={depthMax ?? ''}
           onChange={(e) => setDepthMax(parseNumber(e.target.value))}
         />
@@ -60,7 +72,7 @@ export function SubsidenceChartSettings({ chartType }: SubsidenceChartSettingsPr
           type="number"
           step="10"
           min="0"
-          placeholder="auto"
+          placeholder={ageMinPlaceholder}
           value={ageMin ?? ''}
           onChange={(e) => setAgeMin(parseNumber(e.target.value))}
         />
@@ -71,7 +83,7 @@ export function SubsidenceChartSettings({ chartType }: SubsidenceChartSettingsPr
           type="number"
           step="10"
           min="0"
-          placeholder="auto"
+          placeholder={ageMaxPlaceholder}
           value={ageMax ?? ''}
           onChange={(e) => setAgeMax(parseNumber(e.target.value))}
         />

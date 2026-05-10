@@ -6,6 +6,7 @@ import { useMultiWellStore } from '@/stores/multiWellStore'
 import { useViewStore } from '@/stores/viewStore'
 import { useWellDataStore } from '@/stores/wellDataStore'
 import { useWorkspaceStore } from '@/stores/workspaceStore'
+import { curveDepthExtent, paddedDepthExtent, resolveRange } from '@/utils/subsidenceChartDomain'
 import { GeologicalTimescale } from './GeologicalTimescale'
 
 const PADDING = { top: 12, right: 120, bottom: 40, left: 64 }
@@ -102,22 +103,16 @@ export function MultiWellPanel() {
     return Number.isFinite(min) ? Math.max(0, min) : 0
   }, [wellResults])
 
-  const autoMaxDepthM = useMemo(() => {
-    let max = 0
-    for (const wr of wellResults) {
-      for (const curve of wr.curves) {
-        for (const pt of curve.burial_path) {
-          if (pt.depth_m > max) max = pt.depth_m
-        }
-      }
-    }
-    return max > 0 ? max : 3000
+  const autoDepthExtentM = useMemo(() => {
+    return paddedDepthExtent(curveDepthExtent(wellResults.flatMap((wr) => wr.curves)))
   }, [wellResults])
 
-  const effectiveMinDepthM = subsidenceDepthMinM ?? 0
-  const effectiveMaxDepthM = subsidenceDepthMaxM ?? autoMaxDepthM
-  const effectiveMinAgeMa = subsidenceAgeMinMa ?? minAge
-  const effectiveMaxAgeMa = subsidenceAgeMaxMa ?? maxAge
+  const depthRangeM = resolveRange(autoDepthExtentM, subsidenceDepthMinM, subsidenceDepthMaxM)
+  const ageRangeMa = resolveRange({ min: minAge, max: maxAge }, subsidenceAgeMinMa, subsidenceAgeMaxMa)
+  const effectiveMinDepthM = depthRangeM.min
+  const effectiveMaxDepthM = depthRangeM.max
+  const effectiveMinAgeMa = ageRangeMa.min
+  const effectiveMaxAgeMa = ageRangeMa.max
 
   maxAgeRef.current = effectiveMaxAgeMa
   minDepthMRef.current = effectiveMinDepthM

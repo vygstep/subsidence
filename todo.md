@@ -8,7 +8,7 @@ Active contract: `docs/contracts/subsidence-chart-domains-zoom-marker-cutoff.md`
 |---|---|---|
 | S1 | Fix single-well age domain | done |
 | S2 | Add age range settings and Auto controls | done |
-| S3 | Shared chart-domain helper and Fit data | todo |
+| S3 | Shared chart-domain helper and Fit data | done |
 | S4 | Zoom single/multi charts | todo |
 | S5 | Per-well Compare by marker settings | todo |
 | S6 | Apply marker cutoff in charts | todo |

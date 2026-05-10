@@ -9,7 +9,7 @@ import { formationDisplayColor } from '@/types'
 import type { SeaLevelPoint } from '@/types'
 import type { SubsidenceResult } from '@/types/subsidence'
 import { logDiagnosticEvent } from '@/utils/diagnostics'
-import { curveAgeExtent } from '@/utils/subsidenceChartDomain'
+import { curveAgeExtent, curveDepthExtent, paddedDepthExtent, resolveRange } from '@/utils/subsidenceChartDomain'
 import { GeologicalTimescale } from './GeologicalTimescale'
 
 const TIMESCALE_HEIGHT = 52
@@ -284,13 +284,9 @@ export function SubsidenceCanvas() {
     return extent !== null ? Math.max(0, extent.min) : 0
   }, [coloredCurves])
 
-  const autoMaxDepthM = useMemo(() => {
-    let max = 0
-    for (const c of coloredCurves) {
-      for (const pt of c.burial_path) {
-        if (pt.depth_m > max) max = pt.depth_m
-      }
-    }
+  const autoDepthExtentM = useMemo(() => {
+    const extent = curveDepthExtent(coloredCurves)
+    const padded = paddedDepthExtent(extent)
     if (coloredCurves.length > 0) {
       const ageMin = Math.min(...coloredCurves.flatMap(c => c.burial_path.map(p => p.age_ma)))
       const ageMax = Math.max(...coloredCurves.flatMap(c => c.burial_path.map(p => p.age_ma)))
@@ -301,7 +297,7 @@ export function SubsidenceCanvas() {
         details: {
           curveCount: coloredCurves.length,
           ageRangeMa: [ageMin, ageMax],
-          maxDepthM: max,
+          maxDepthM: padded.max,
           curves: coloredCurves.map(c => ({
             name: c.formation_name,
             ageMa: [Math.min(...c.burial_path.map(p => p.age_ma)), Math.max(...c.burial_path.map(p => p.age_ma))],
@@ -310,13 +306,15 @@ export function SubsidenceCanvas() {
         },
       })
     }
-    return max > 0 ? max : 3000
+    return padded
   }, [coloredCurves])
 
-  const effectiveMinDepthM = subsidenceDepthMinM ?? 0
-  const effectiveMaxDepthM = subsidenceDepthMaxM ?? autoMaxDepthM
-  const effectiveMinAgeMa = subsidenceAgeMinMa ?? minAge
-  const effectiveMaxAgeMa = subsidenceAgeMaxMa ?? maxAge
+  const depthRangeM = resolveRange(autoDepthExtentM, subsidenceDepthMinM, subsidenceDepthMaxM)
+  const ageRangeMa = resolveRange({ min: minAge, max: maxAge }, subsidenceAgeMinMa, subsidenceAgeMaxMa)
+  const effectiveMinDepthM = depthRangeM.min
+  const effectiveMaxDepthM = depthRangeM.max
+  const effectiveMinAgeMa = ageRangeMa.min
+  const effectiveMaxAgeMa = ageRangeMa.max
 
   useEffect(() => {
     maxAgeRef.current = effectiveMaxAgeMa

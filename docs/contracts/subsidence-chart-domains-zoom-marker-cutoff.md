@@ -128,10 +128,15 @@ Verification:
 - Add Fit data action:
   - resets selected chart depth and age ranges to `null`;
   - keeps marker cutoff settings unchanged.
+- When a range field is set to auto (`null`), its input placeholder shows the current
+  computed auto value instead of the literal word `auto`.
+
+Status: done.
 
 Verification:
 
 - Helper tests for auto depth padding and manual override behavior.
+- Frontend tests: `61 passed`.
 
 ### S4: Zoom
 
