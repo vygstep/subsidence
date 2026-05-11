@@ -705,6 +705,22 @@ export function WellDataPanel({
                   : visibleStateItems.every(Boolean)
                     ? 'all'
                     : 'partial'
+                const selectedFormationObjectId = selectedObject?.type === 'top-pick' && typeof selectedObject.formationId === 'string'
+                  ? selectedObject.formationId
+                  : null
+                const selectedWell = selectedWellId
+                  ? wells.find((item) => item.well_id === selectedWellId) ?? null
+                  : null
+                const selectedWellFormationById = new Map((selectedWell?.formations ?? []).map((formation) => [formation.id, formation]))
+                const visibleZoneSetMarkers = isActiveForCurrentWell
+                  ? zoneSet.markers.filter((marker) => {
+                    const markerFormationIds = selectedWellId ? marker.formation_ids_by_well_id[selectedWellId] ?? [] : []
+                    if (markerFormationIds.length === 0) return false
+                    const hasRealPick = markerFormationIds.some((id) => selectedWellFormationById.get(id)?.depth_md !== null)
+                    const isSelectedGhost = selectedFormationObjectId !== null && markerFormationIds.includes(selectedFormationObjectId)
+                    return hasRealPick || isSelectedGhost
+                  })
+                  : zoneSet.markers
                 return (
                   <div key={zoneSet.id} className="tree-node">
                     <div
@@ -745,16 +761,13 @@ export function WellDataPanel({
                     </div>
                     {isOpen(`zones:${zoneSet.id}`) ? (
                       <div className="tree-node__children">
-                        {zoneSet.markers.length === 0 ? (
+                        {visibleZoneSetMarkers.length === 0 ? (
                           <p className="sidebar-panel__empty">No markers loaded.</p>
-                        ) : zoneSet.markers.map((marker) => {
+                        ) : visibleZoneSetMarkers.map((marker) => {
                           const zoneBelow = marker.zone_below
                           const markerNodeId = `zones:${zoneSet.id}:marker:${markerTreeKey(marker.horizon_id, marker.name)}`
                           const markerFormationIds = selectedWellId ? marker.formation_ids_by_well_id[selectedWellId] ?? [] : []
                           const markerChecked = markerFormationIds.length > 0 && markerFormationIds.every((id) => selectedVisibleFormationIds.includes(id))
-                          const selectedFormationObjectId = selectedObject?.type === 'top-pick' && typeof selectedObject.formationId === 'string'
-                            ? selectedObject.formationId
-                            : null
                           const selectedMarkerFormationId = selectedFormationObjectId && markerFormationIds.includes(selectedFormationObjectId)
                             ? selectedFormationObjectId
                             : null
