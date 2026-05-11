@@ -1,77 +1,85 @@
-﻿# SUBSIDENCE
+# SUBSIDENCE
 
-SUBSIDENCE is a local web application for well-log visualization, stratigraphic data management, and 1D subsidence/burial-history workflows.
+A local desktop application for 1D burial history analysis and tectonic subsidence / backstripping of sedimentary basins.
 
-The current implementation uses:
+Runs as a local web application: the backend serves data and calculations, and the browser is the UI. No cloud, no account, no data leaves your machine.
 
-- FastAPI backend in `app/`
-- React + TypeScript frontend in `frontend/`
-- SQLite + Parquet project bundles on disk
-- Canvas/SVG hybrid rendering for well-log visualization
-- WebSocket recalculation for subsidence results
+---
 
-The legacy implementation has been preserved in:
+## What it does
 
-- `subsidence_archive/legacy_reset_2026-04-16/`
+- Import well data: LAS log curves, formation tops (CSV), deviation surveys.
+- Visualise well logs in a depth-track viewer with curve fills and lithology columns.
+- Build stratigraphic frameworks: shared marker sets (TopSets) and regional stratigraphic charts.
+- Assign lithology zones and compaction model parameters per zone.
+- Run **1D backstripping** per well and view tectonic subsidence, total subsidence, water depth, and burial curves through geological time.
+- Compare results across multiple wells on a shared time axis.
 
-## Current Scope
+The project state is stored as a `.subsidence` folder on disk — a SQLite database plus Parquet files for log curves and JSON files for computed results.
 
-Phase 5 and the post-Phase 5 maintenance/refactor cycle are complete. Current active planning is in `todo.md`.
+---
 
-## Active Documents
+## Scientific basis
 
-- [Documentation Index](docs/documentation-index.md)
-- [Architecture](docs/architecture.md)
-- [Codebase Map](docs/codebase-map.md)
-- [Engineering Maintenance Contract](docs/contracts/implemented/engineering-maintenance-contract.md)
-- [Historical Compass Strategy](docs/contracts/implemented/app_compass.md)
-- [Reference Sources](docs/reference-sources.md)
-- [Execution Backlog](todo.md)
+The backstripping and decompaction methodology follows:
 
-## Environment Rule
+- **pyBacktrack** — Müller et al. (2018), EarthByte.  
+  Reconstructs paleo-water depth through tectonic subsidence modelling and decompaction.  
+  [doi:10.1029/2017GC007313](https://doi.org/10.1029/2017GC007313) · [docs](http://pybacktrack.readthedocs.io/)
 
-- The active project environment is local to this repository.
-- Python backend work uses the local `.venv`.
-- Frontend work uses the local system `node` and `npm`.
-- The `ds` environment is not used for SUBSIDENCE.
+- **PyBasin** — Luijendijk et al. (2011), University of Bergen.  
+  Burial history, compaction, and thermal modelling.  
+  [doi:10.1029/2010JB008071](https://doi.org/10.1029/2010JB008071) · [Zenodo](https://doi.org/10.5281/zenodo.4263427)
 
-## Frontend Run
+- **py_lopatin** — burial history reconstruction from formation age and thickness data.
 
-From the project root:
+- **Stratya2D** — Harikrishnan Nalina Kumar.  
+  2D kinematic decompaction and backstripping methodology.  
+  [GitHub](https://github.com/harikrishnannalinakumar/Stratya2D)
 
-```powershell
-cd d:\github\subsidence\frontend
-$env:Path = "C:\Program Files\nodejs;" + $env:Path
-npm run dev -- --host 127.0.0.1
-```
+Sea level curves included: Haq composite, Van der Meer et al. (2017), Kocsis & Scotese (2020), Verard (2015).
 
-Then open:
+Lithology SVG patterns from the [Equinor lithology-patterns](https://github.com/equinor/lithology-patterns) library (MIT).
 
-```text
-http://127.0.0.1:5173
-```
+Reference implementations are in `repos/`.
 
-## Backend Run
+---
 
-From the project root:
+## How to run
+
+**Backend** (terminal 1):
 
 ```powershell
 cd d:\github\subsidence
-Set-ExecutionPolicy -Scope Process -ExecutionPolicy RemoteSigned
-& .\.venv\Scripts\Activate.ps1
+.\.venv\Scripts\Activate.ps1
 $env:PYTHONPATH = "d:\github\subsidence\app\src"
 python -m uvicorn subsidence.api.main:app --host 127.0.0.1 --port 8000
 ```
 
-Then open:
-
-```text
-http://127.0.0.1:8000/health
-http://127.0.0.1:8000/docs
-```
-
-Direct API check:
+**Frontend** (terminal 2):
 
 ```powershell
-curl http://127.0.0.1:8000/api/wells/sample
+cd d:\github\subsidence\frontend
+npm run dev -- --host 127.0.0.1
 ```
+
+Open **http://127.0.0.1:5173** in a browser.
+
+---
+
+## How it works
+
+1. **Create or open a project** — a `.subsidence` folder on disk.
+2. **Import data** — LAS log files, formation tops CSV, deviation surveys.
+3. **Build a stratigraphic framework** — create a TopSet with named horizon markers and link it to a regional stratigraphic chart.
+4. **Configure zones** — assign lithology fractions and compaction model parameters to each stratigraphic zone.
+5. **Run backstripping** — the backend decompacts each zone, removes water and sediment load, and reconstructs tectonic subsidence through time.
+6. **Explore results** — view burial and subsidence curves per well or compare across wells on a shared age axis.
+
+---
+
+## Documentation
+
+- [Architecture overview](docs/architecture.md)
+- [Codebase map — where to look by bug type](docs/codebase-map.md)
+- [Documentation index](docs/documentation-index.md)
