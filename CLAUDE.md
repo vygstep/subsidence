@@ -23,6 +23,8 @@ cd frontend && npm run dev
 app/src/subsidence/
   api/          ← HTTP роуты (тонкий слой): main.py, wells.py, formations.py,
                   top_sets.py, projects*.py, subsidence.py, sea_level.py, ...
+                  _deps.py ← общие зависимости: get_manager, require_open_project,
+                             manager_project_path (используются во всех роут-модулях)
   data/         ← бизнес-логика: schema.py, zone_service.py, undo.py,
                   project_manager.py, engine.py, importers/, backstrip.py, ...
 frontend/src/
@@ -69,6 +71,7 @@ aggregate_zone_lithology_from_curve(session, path, well_id)  # 3. литолог
 
 - Нет Alembic. Миграции — лёгкие `ALTER TABLE` в `data/engine.py`.
 - Любое новое поле в `schema.py` требует миграции в `engine.py`.
+- Текущий `SCHEMA_VERSION = 14` в `schema.py`.
 
 ---
 
@@ -86,8 +89,21 @@ aggregate_zone_lithology_from_curve(session, path, well_id)  # 3. литолог
 - ❌ Вызывать `rebuild_horizon_links` при открытии проекта — сбросит все `horizon_id`.
 - ❌ Менять URL роутов без обновления фронтенда — 404 молча игнорируются в некоторых местах (`if (!response.ok) return`).
 - ❌ Делать async роуты с нативными диалогами (`pick-file`, `pick-folder`) — блокируют event loop.
+- ❌ Добавлять `_require_open_project`/`_manager` helper напрямую в новый роут-модуль — импортировать из `api/_deps.py`.
 
 ---
+
+---
+
+## Зоны: слияние и разделение
+
+`merge_zones_on_horizon_delete` и `apply_split_zone_lithology` сохраняют `lithology_source`:
+- `auto + auto` → merged `auto`
+- `manual + auto` → merged `manual` (сохраняет manual-фракции)
+- `manual + manual` → merged `manual` (взвешенное среднее по толщинам)
+- split manual-зоны → обе копии получают `manual` с исходными фракциями
+
+`floor_match_horizon` — публичная функция в `zone_service.py` (не `_floor_match_horizon`).
 
 ---
 
@@ -101,3 +117,4 @@ aggregate_zone_lithology_from_curve(session, path, well_id)  # 3. литолог
 | Маркеры двигаются, погружение не обновляется | `computedStore.triggerRecalculation`, WebSocket `/api/ws/recalculate` |
 | Undo не работает | операция не обёрнута в `manager.execute_command` |
 | Пики без horizon_id | `link_picks_to_horizons` не вызван или имена не совпали |
+| Литология зоны не обновляется после изменений | `ZoneWellData.lithology_source == 'manual'` — auto-агрегация пропускает manual-зоны |
