@@ -64,6 +64,9 @@ subsidence zones overlap and make marker ordering unstable.
 - Single-well subsidence inputs must be built from adjacent real picks in the
   selected well's active TopSet order. Ghost-only horizons from other wells must
   not split or hide sparse-well intervals.
+- Formation track zone fills must use the same sparse-well rule: use shared
+  TopSet order, but draw intervals between adjacent real picks for the current
+  well.
 
 ## Implementation Plan
 
@@ -125,6 +128,15 @@ Status: backend tests passed; manual smoke pending.
   TopSet.
 - Build subsidence zone-layer inputs from adjacent real picks per well in shared
   TopSet order, skipping ghost-only horizons for that well.
+
+Status: done.
+
+### S7: Sparse-well formation track zone fills
+
+- Draw formation-track zone fills between adjacent real picks in shared TopSet
+  order.
+- Ghost-only horizons from another well must not make a sparse well lose its
+  visible zone fill.
 
 Status: done.
 

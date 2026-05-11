@@ -86,6 +86,26 @@ export function FormationColumn({
     () => [...(zones ?? [])].sort((left, right) => left.sort_order - right.sort_order),
     [zones],
   )
+  const orderedDrawableZoneIntervals = useMemo(() => {
+    if (orderedZones.length === 0) return []
+
+    const orderedHorizonIds: number[] = []
+    for (const zone of orderedZones) {
+      if (orderedHorizonIds[orderedHorizonIds.length - 1] !== zone.upper_horizon.id) {
+        orderedHorizonIds.push(zone.upper_horizon.id)
+      }
+      orderedHorizonIds.push(zone.lower_horizon.id)
+    }
+
+    const realFormations = orderedHorizonIds
+      .map((horizonId) => formationByHorizonId.get(horizonId) ?? null)
+      .filter((formation): formation is FormationTop => formation !== null && formation.depth_md !== null)
+
+    return realFormations.slice(0, -1).map((formation, index) => ({
+      formation,
+      lowerFormation: realFormations[index + 1],
+    }))
+  }, [formationByHorizonId, orderedZones])
 
   useEffect(() => {
     let cancelled = false
@@ -135,10 +155,7 @@ export function FormationColumn({
       })
 
       if (orderedZones.length > 0) {
-        orderedZones.forEach((zone) => {
-          const formation = formationByHorizonId.get(zone.upper_horizon.id)
-          const lowerFormation = formationByHorizonId.get(zone.lower_horizon.id)
-          if (!formation || !lowerFormation || formation.depth_md === null || lowerFormation.depth_md === null) return
+        orderedDrawableZoneIntervals.forEach(({ formation, lowerFormation }) => {
           const nextDepth = getFormationTopDepth(lowerFormation)
           const blockTop = Math.max(getFormationTopDepth(formation), visibleDepthRange.min)
           const blockBottom = Math.min(nextDepth, visibleDepthRange.max)
@@ -248,6 +265,7 @@ export function FormationColumn({
       formationsTrackConfig.zoneLabelPosition,
       maxDepth,
       formationByHorizonId,
+      orderedDrawableZoneIntervals,
       orderedFormations,
       orderedZones,
       patternByCode,
