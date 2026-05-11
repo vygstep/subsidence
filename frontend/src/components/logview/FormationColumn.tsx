@@ -38,7 +38,6 @@ function toRenderableLithology(lithology: LithologyType | undefined) {
 
 export function FormationColumn({
   formations,
-  visibleMarkerFormations = formations,
   zones,
   height,
   maxDepth,
@@ -132,27 +131,6 @@ export function FormationColumn({
         drawWellPaddingZones(ctx, depthScale, canvasWidth, canvasHeight, wellTopDepth, wellBottomDepth)
         return
       }
-
-      // Render "not picked" badges at top for unpicked formations
-      let notPickedOffset = 2
-      visibleMarkerFormations.forEach((formation) => {
-        if (formation.depth_md !== null) return
-        const color = formationDisplayColor(formation)
-        const badgeH = 16
-        ctx.save()
-        ctx.fillStyle = color
-        ctx.globalAlpha = 0.7
-        ctx.fillRect(2, notPickedOffset, canvasWidth - 4, badgeH)
-        ctx.globalAlpha = 1
-        ctx.fillStyle = '#ffffff'
-        ctx.font = '500 10px Segoe UI'
-        ctx.textAlign = 'left'
-        ctx.textBaseline = 'middle'
-        const label = formation.name
-        ctx.fillText(label, 5, notPickedOffset + badgeH / 2, canvasWidth - 12)
-        ctx.restore()
-        notPickedOffset += badgeH + 1
-      })
 
       if (orderedZones.length > 0) {
         orderedDrawableZoneIntervals.forEach(({ formation, lowerFormation }) => {
@@ -271,7 +249,6 @@ export function FormationColumn({
       patternByCode,
       patternRenderTick,
       getFormationTopDepth,
-      visibleMarkerFormations,
       visibleDepthRange.max,
       visibleDepthRange.min,
       wellTopDepth,

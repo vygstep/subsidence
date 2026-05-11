@@ -13,6 +13,7 @@ Active contract: `docs/contracts/bug-topset-cross-well-import-order.md`
 | S5 | Verification | backend tests passed; manual smoke pending |
 | S6 | Sparse-well subsidence intervals after cross-well merge | done |
 | S7 | Sparse-well formation track zone fills | done |
+| S8 | Hide ghost markers on tracks | done |
 
 ## Implemented Contracts
 

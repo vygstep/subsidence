@@ -44,8 +44,6 @@ export function InteractionOverlay({
   const clipPathId = `${useId().replace(/:/g, '')}-track-bounds`
   const editableFormations = formations.filter((formation) => editableFormationIds.has(formation.id))
 
-  // Collect not-picked formations for indicator strip at top
-  const notPickedFormations = editableFormations.filter((f) => f.depth_md === null)
   const activePick = effectiveActivePickId === null ? null : editableFormations.find((f) => f.id === effectiveActivePickId) ?? null
   const cursorY = cursorDepth === null ? null : depthToPixel(cursorDepth)
   const cursorInsideWell = cursorDepth !== null && cursorDepth >= wellTopDepth && cursorDepth <= wellBottomDepth
@@ -120,36 +118,6 @@ export function InteractionOverlay({
           </g>
         ) : null}
         {cursorDepth !== null && <DepthCursor yPosition={cursorY ?? depthToPixel(cursorDepth)} depth={cursorDepth} />}
-        {/* Not-picked formation tap targets near the top */}
-        {topsEditable && notPickedFormations.map((formation, i) => {
-          const color = formationDisplayColor(formation)
-          const isActive = effectiveActivePickId === formation.id
-          const rowH = 18
-          const rowY = i * (rowH + 2) + 2
-          return (
-            <g
-              key={formation.id}
-              style={{ pointerEvents: 'auto', cursor: 'crosshair' }}
-              onClick={(event) => {
-                event.stopPropagation()
-                setActivePickId(formation.id)
-              }}
-            >
-              <rect x={2} y={rowY} width={120} height={rowH} fill={color} opacity={isActive ? 1 : 0.6} rx={2} />
-              <text
-                x={6}
-                y={rowY + rowH / 2}
-                dominantBaseline="middle"
-                fill="#ffffff"
-                fontSize={10}
-                fontWeight={isActive ? 700 : 500}
-                style={{ userSelect: 'none' }}
-              >
-                {formation.name} (not picked)
-              </text>
-            </g>
-          )
-        })}
       </svg>
       {mouseClient !== null && cursorDepth !== null && (
         <CurveTooltip

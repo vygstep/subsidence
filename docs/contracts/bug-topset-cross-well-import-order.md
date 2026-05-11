@@ -67,6 +67,9 @@ subsidence zones overlap and make marker ordering unstable.
 - Formation track zone fills must use the same sparse-well rule: use shared
   TopSet order, but draw intervals between adjacent real picks for the current
   well.
+- Track view must not draw all ghost/not-picked markers as badges or tap
+  targets. If a ghost pick is selected from Data Manager, the cursor placement
+  aid may still be shown.
 
 ## Implementation Plan
 
@@ -137,6 +140,14 @@ Status: done.
   order.
 - Ghost-only horizons from another well must not make a sparse well lose its
   visible zone fill.
+
+Status: done.
+
+### S8: Hide ghost markers on tracks
+
+- Remove not-picked marker badges from the formations track.
+- Remove not-picked marker tap targets from the interaction overlay.
+- Keep selected ghost pick cursor placement behavior available.
 
 Status: done.
 
