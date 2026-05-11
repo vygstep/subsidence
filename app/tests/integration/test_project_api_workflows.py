@@ -1850,9 +1850,14 @@ def test_tops_import_can_attach_to_existing_zone_set_by_top_names(api_client: Te
     well = next(w for w in response.json() if w['well_id'] == well_id)
     assert well['active_top_set_id'] == top_set_id
     assert len(well['zones']) == 3
-    assert well['zones'][0]['thickness_md'] == 150.0
-    assert well['zones'][1]['thickness_md'] is None
-    assert well['zones'][2]['thickness_md'] is None
+    assert [
+        (zone['upper_horizon']['name'], zone['lower_horizon']['name'], zone['thickness_md'])
+        for zone in well['zones']
+    ] == [
+        ('H1', 'H2', 150.0),
+        ('H2', 'HX', 50.0),
+        ('HX', 'H3', None),
+    ]
 
 
 def test_tops_import_into_top_set_is_idempotent(api_client: TestClient, tmp_path: Path) -> None:
@@ -1914,6 +1919,155 @@ def test_tops_import_into_top_set_is_idempotent(api_client: TestClient, tmp_path
     assert len(horizons) == 2
     assert [pick.depth_md for pick in picks] == [110.0, 260.0]
     assert [pick.color for pick in picks] == ['#aaaaaa', '#bbbbbb']
+
+
+def test_tops_import_into_existing_top_set_preserves_cross_well_order(api_client: TestClient, tmp_path: Path) -> None:
+    _create_project(api_client, tmp_path, 'tops-cross-well-order')
+    bur_response = api_client.post('/api/projects/wells', json={
+        'name': 'BUR-2',
+        'x': 0.0,
+        'y': 0.0,
+        'kb': 0.0,
+        'td': 10000.0,
+        'crs': 'local',
+    })
+    assert bur_response.status_code == 200, bur_response.text
+    bur_id = bur_response.json()['well_id']
+
+    dun_response = api_client.post('/api/projects/wells', json={
+        'name': 'DUN-99',
+        'x': 0.0,
+        'y': 0.0,
+        'kb': 0.0,
+        'td': 4000.0,
+        'crs': 'local',
+    })
+    assert dun_response.status_code == 200, dun_response.text
+    dun_id = dun_response.json()['well_id']
+
+    bur_csv = tmp_path / 'BUR-2_tops.txt'
+    bur_csv.write_text(
+        'well\tsurface\tmd\tage_ma\n'
+        'BUR-2\tQ\t0\t0\n'
+        'BUR-2\tP1uf\t98.45\t273.01\n'
+        'BUR-2\tP1kg\t303.91\t278\n'
+        'BUR-2\tC3\t529.85\t299\n'
+        'BUR-2\tC2vr\t890.81\t313\n'
+        'BUR-2\tC2b\t932.93\t315.2\n'
+        'BUR-2\tC1bb\t1316.52\t337\n'
+        'BUR-2\tC1t\t1362.71\t346.7\n'
+        'BUR-2\tD3fm\t1399.05\t358.9\n'
+        'BUR-2\tD2gv\t1807.39\t382.7\n'
+        'BUR-2\tV\t1856.46\t539\n'
+        'BUR-2\tRF3\t2356.46\t600\n'
+        'BUR-2\tRF12\t4106.46\t1030\n'
+        'BUR-2\tBase_RF12\t9606.46\t1650\n',
+        encoding='utf-8',
+    )
+    dun_csv = tmp_path / 'DUN-99_tops.txt'
+    dun_csv.write_text(
+        'well\tsurface\tmd\tage_ma\n'
+        'DUN-99\tQ\t0\t0\n'
+        'DUN-99\tP3t\t20\t251.9\n'
+        'DUN-99\tP2ur\t310\t264.28\n'
+        'DUN-99\tP2kz\t480\t266.9\n'
+        'DUN-99\tP1uf\t620\t273.01\n'
+        'DUN-99\tP1kg\t660\t278\n'
+        'DUN-99\tP1ar\t740\t283.5\n'
+        'DUN-99\tC3\t980\t299\n'
+        'DUN-99\tC2m\t1280\t307\n'
+        'DUN-99\tC2vr\t1670\t313\n'
+        'DUN-99\tC2b\t1730\t315.2\n'
+        'DUN-99\tC1s\t1810\t323.2\n'
+        'DUN-99\tC1ok\t2040\t331\n'
+        'DUN-99\tC1tl\t2260\t334\n'
+        'DUN-99\tC1bb\t2320\t337\n'
+        'DUN-99\tC1t\t2660\t346.7\n'
+        'DUN-99\tD3fm\t2875\t358.9\n'
+        'DUN-99\tD3f3\t2960\t372.2\n'
+        'DUN-99\tD2gv\t3150\t382.7\n'
+        'DUN-99\tD2ef1\t3250\t387.7\n'
+        'DUN-99\tBase_RF12\t3260\t1650\n',
+        encoding='utf-8',
+    )
+    column_map = {
+        'well_name': 'well',
+        'top_name': 'surface',
+        'depth_md': 'md',
+        'age_ma': 'age_ma',
+    }
+
+    first = api_client.post('/api/projects/import-tops', json={
+        'csv_path': str(bur_csv),
+        'well_id': bur_id,
+        'create_zone_set': True,
+        'zone_set_name': 'Regional TopSet',
+        'column_map': column_map,
+    })
+    assert first.status_code == 200, first.text
+    top_set_id = first.json()['zone_set_id']
+
+    second = api_client.post('/api/projects/import-tops', json={
+        'csv_path': str(dun_csv),
+        'well_id': dun_id,
+        'zone_set_id': top_set_id,
+        'column_map': column_map,
+    })
+    assert second.status_code == 200, second.text
+
+    response = api_client.get('/api/top-sets')
+    assert response.status_code == 200, response.text
+    top_set = next(item for item in response.json() if item['id'] == top_set_id)
+    horizon_names = [horizon['name'] for horizon in top_set['horizons']]
+
+    assert horizon_names == [
+        'Q',
+        'P3t',
+        'P2ur',
+        'P2kz',
+        'P1uf',
+        'P1kg',
+        'P1ar',
+        'C3',
+        'C2m',
+        'C2vr',
+        'C2b',
+        'C1s',
+        'C1ok',
+        'C1tl',
+        'C1bb',
+        'C1t',
+        'D3fm',
+        'D3f3',
+        'D2gv',
+        'D2ef1',
+        'V',
+        'RF3',
+        'RF12',
+        'Base_RF12',
+    ]
+
+    inventory = api_client.get('/api/wells/inventory')
+    assert inventory.status_code == 200, inventory.text
+    bur_well = next(well for well in inventory.json() if well['well_id'] == bur_id)
+    assert bur_well['active_top_set_id'] == top_set_id
+    expected_pairs = list(zip(horizon_names, horizon_names[1:]))
+    visible_pairs = [
+        (zone['upper_horizon']['name'], zone['lower_horizon']['name'])
+        for zone in bur_well['zones']
+    ]
+    assert all(pair in expected_pairs for pair in visible_pairs)
+    assert all(
+        zone['thickness_md'] is None or zone['thickness_md'] > 0.0
+        for zone in bur_well['zones']
+    )
+
+    bur_subsidence = api_client.post(f'/api/wells/{bur_id}/subsidence')
+    assert bur_subsidence.status_code == 200, bur_subsidence.text
+    bur_curve_names = [curve['formation_name'] for curve in bur_subsidence.json()]
+    assert 'Q → P1uf' in bur_curve_names
+    assert 'P1uf → P1kg' in bur_curve_names
+    assert 'P1uf → P1ar' not in bur_curve_names
 
 
 def test_deviation_import_with_column_map(api_client: TestClient, tmp_path: Path) -> None:

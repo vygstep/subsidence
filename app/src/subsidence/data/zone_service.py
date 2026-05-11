@@ -435,6 +435,66 @@ def activate_top_set_for_well(
     return linked
 
 
+def normalize_top_set_horizon_order(session: Session, top_set_id: int) -> int:
+    """Keep TopSet horizons ordered by stratigraphic age after cross-well imports."""
+    horizons = session.scalars(
+        select(TopSetHorizon).where(TopSetHorizon.top_set_id == top_set_id)
+    ).all()
+    ordered = sorted(
+        horizons,
+        key=lambda h: (
+            h.age_ma is None,
+            h.age_ma if h.age_ma is not None and math.isfinite(h.age_ma) else math.inf,
+            h.sort_order,
+            h.id or 0,
+        ),
+    )
+
+    changed = 0
+    for index, horizon in enumerate(ordered):
+        if horizon.sort_order != index:
+            horizon.sort_order = index
+            changed += 1
+    session.flush()
+    return changed
+
+
+def linked_well_ids_for_top_set(
+    session: Session,
+    top_set_id: int,
+    *,
+    include_well_id: str | None = None,
+) -> list[str]:
+    """Return wells that need refresh when a shared TopSet changes."""
+    linked: list[str] = []
+    seen: set[str] = set()
+
+    def add(well_id: str | None) -> None:
+        if well_id and well_id not in seen:
+            seen.add(well_id)
+            linked.append(well_id)
+
+    add(include_well_id)
+
+    for row in session.scalars(
+        select(WellActiveTopSet).where(WellActiveTopSet.top_set_id == top_set_id)
+    ).all():
+        add(row.well_id)
+
+    horizon_ids = list(session.scalars(
+        select(TopSetHorizon.id).where(TopSetHorizon.top_set_id == top_set_id)
+    ).all())
+    if horizon_ids:
+        for well_id in session.scalars(
+            select(FormationTopModel.well_id)
+            .where(FormationTopModel.horizon_id.in_(horizon_ids))
+            .distinct()
+        ).all():
+            add(well_id)
+
+    return linked
+
+
 def rebuild_zones_for_top_set(session: Session, top_set_id: int) -> None:
     horizons = session.scalars(
         select(TopSetHorizon)
@@ -749,17 +809,36 @@ def build_zone_layer_inputs(
         },
     }})
 
+    zone_by_pair = {
+        (zone.upper_horizon_id, zone.lower_horizon_id): zone
+        for zone in zones
+    }
+    horizons_by_id = {
+        horizon.id: horizon
+        for zone in zones
+        for horizon in (zone.upper_horizon, zone.lower_horizon)
+    }
+    real_horizon_ids = {
+        horizon_id
+        for horizon_id, pick in picks_by_horizon.items()
+        if pick.depth_md is not None
+    }
+    ordered_real_horizons = [
+        horizon
+        for horizon in sorted(horizons_by_id.values(), key=lambda h: (h.sort_order, h.id or 0))
+        if horizon.id in real_horizon_ids
+    ]
+
     result: list[ZoneLayerInput] = []
     skipped: list[dict] = []
-    for zone in zones:
-        upper = zone.upper_horizon
-        lower = zone.lower_horizon
+    for upper, lower in zip(ordered_real_horizons, ordered_real_horizons[1:]):
         upper_pick = picks_by_horizon.get(upper.id)
         lower_pick = picks_by_horizon.get(lower.id)
 
         if (
             upper_pick is None or lower_pick is None
             or upper_pick.depth_md is None or lower_pick.depth_md is None
+            or lower_pick.depth_md <= upper_pick.depth_md
         ):
             skipped.append({
                 'zone': f'{upper.name} → {lower.name}',
@@ -770,7 +849,8 @@ def build_zone_layer_inputs(
             })
             continue
 
-        zwd = zwd_by_zone.get(zone.id)
+        zone = zone_by_pair.get((upper.id, lower.id))
+        zwd = zwd_by_zone.get(zone.id) if zone is not None else None
         fractions: dict[str, float] = {}
         if zwd is not None and zwd.lithology_fractions:
             try:
@@ -809,6 +889,7 @@ def build_zone_layer_inputs(
         'skipped': len(skipped),
         'skipped_zones': skipped,
         'included_zones': [r.name for r in result],
+        'real_horizon_order': [h.name for h in ordered_real_horizons],
     }})
 
     return result

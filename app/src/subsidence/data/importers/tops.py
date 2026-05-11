@@ -66,9 +66,12 @@ def _load_or_create_horizon(
     key = _top_name_key(name)
     horizon = horizon_by_name.get(key)
     if horizon is not None:
-        horizon.kind = kind
-        horizon.age_ma = age_ma
-        horizon.color = color
+        if horizon.age_ma is None and age_ma is not None:
+            horizon.age_ma = age_ma
+        if not horizon.kind:
+            horizon.kind = kind
+        if not horizon.color:
+            horizon.color = color
         return horizon
 
     horizon = TopSetHorizon(

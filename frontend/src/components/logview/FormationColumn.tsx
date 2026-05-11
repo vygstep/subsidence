@@ -38,7 +38,6 @@ function toRenderableLithology(lithology: LithologyType | undefined) {
 
 export function FormationColumn({
   formations,
-  visibleMarkerFormations = formations,
   zones,
   height,
   maxDepth,
@@ -86,6 +85,26 @@ export function FormationColumn({
     () => [...(zones ?? [])].sort((left, right) => left.sort_order - right.sort_order),
     [zones],
   )
+  const orderedDrawableZoneIntervals = useMemo(() => {
+    if (orderedZones.length === 0) return []
+
+    const orderedHorizonIds: number[] = []
+    for (const zone of orderedZones) {
+      if (orderedHorizonIds[orderedHorizonIds.length - 1] !== zone.upper_horizon.id) {
+        orderedHorizonIds.push(zone.upper_horizon.id)
+      }
+      orderedHorizonIds.push(zone.lower_horizon.id)
+    }
+
+    const realFormations = orderedHorizonIds
+      .map((horizonId) => formationByHorizonId.get(horizonId) ?? null)
+      .filter((formation): formation is FormationTop => formation !== null && formation.depth_md !== null)
+
+    return realFormations.slice(0, -1).map((formation, index) => ({
+      formation,
+      lowerFormation: realFormations[index + 1],
+    }))
+  }, [formationByHorizonId, orderedZones])
 
   useEffect(() => {
     let cancelled = false
@@ -113,32 +132,8 @@ export function FormationColumn({
         return
       }
 
-      // Render "not picked" badges at top for unpicked formations
-      let notPickedOffset = 2
-      visibleMarkerFormations.forEach((formation) => {
-        if (formation.depth_md !== null) return
-        const color = formationDisplayColor(formation)
-        const badgeH = 16
-        ctx.save()
-        ctx.fillStyle = color
-        ctx.globalAlpha = 0.7
-        ctx.fillRect(2, notPickedOffset, canvasWidth - 4, badgeH)
-        ctx.globalAlpha = 1
-        ctx.fillStyle = '#ffffff'
-        ctx.font = '500 10px Segoe UI'
-        ctx.textAlign = 'left'
-        ctx.textBaseline = 'middle'
-        const label = formation.name
-        ctx.fillText(label, 5, notPickedOffset + badgeH / 2, canvasWidth - 12)
-        ctx.restore()
-        notPickedOffset += badgeH + 1
-      })
-
       if (orderedZones.length > 0) {
-        orderedZones.forEach((zone) => {
-          const formation = formationByHorizonId.get(zone.upper_horizon.id)
-          const lowerFormation = formationByHorizonId.get(zone.lower_horizon.id)
-          if (!formation || !lowerFormation || formation.depth_md === null || lowerFormation.depth_md === null) return
+        orderedDrawableZoneIntervals.forEach(({ formation, lowerFormation }) => {
           const nextDepth = getFormationTopDepth(lowerFormation)
           const blockTop = Math.max(getFormationTopDepth(formation), visibleDepthRange.min)
           const blockBottom = Math.min(nextDepth, visibleDepthRange.max)
@@ -248,12 +243,12 @@ export function FormationColumn({
       formationsTrackConfig.zoneLabelPosition,
       maxDepth,
       formationByHorizonId,
+      orderedDrawableZoneIntervals,
       orderedFormations,
       orderedZones,
       patternByCode,
       patternRenderTick,
       getFormationTopDepth,
-      visibleMarkerFormations,
       visibleDepthRange.max,
       visibleDepthRange.min,
       wellTopDepth,
