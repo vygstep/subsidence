@@ -11,6 +11,7 @@ Active contract: `docs/contracts/bug-topset-cross-well-import-order.md`
 | S3 | Insert new imported horizons into correct order | done |
 | S4 | Refresh all linked wells after TopSet structure changes | done |
 | S5 | Verification | backend tests passed; manual smoke pending |
+| S6 | Sparse-well subsidence intervals after cross-well merge | done |
 
 ## Implemented Contracts
 

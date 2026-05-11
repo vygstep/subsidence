@@ -809,17 +809,36 @@ def build_zone_layer_inputs(
         },
     }})
 
+    zone_by_pair = {
+        (zone.upper_horizon_id, zone.lower_horizon_id): zone
+        for zone in zones
+    }
+    horizons_by_id = {
+        horizon.id: horizon
+        for zone in zones
+        for horizon in (zone.upper_horizon, zone.lower_horizon)
+    }
+    real_horizon_ids = {
+        horizon_id
+        for horizon_id, pick in picks_by_horizon.items()
+        if pick.depth_md is not None
+    }
+    ordered_real_horizons = [
+        horizon
+        for horizon in sorted(horizons_by_id.values(), key=lambda h: (h.sort_order, h.id or 0))
+        if horizon.id in real_horizon_ids
+    ]
+
     result: list[ZoneLayerInput] = []
     skipped: list[dict] = []
-    for zone in zones:
-        upper = zone.upper_horizon
-        lower = zone.lower_horizon
+    for upper, lower in zip(ordered_real_horizons, ordered_real_horizons[1:]):
         upper_pick = picks_by_horizon.get(upper.id)
         lower_pick = picks_by_horizon.get(lower.id)
 
         if (
             upper_pick is None or lower_pick is None
             or upper_pick.depth_md is None or lower_pick.depth_md is None
+            or lower_pick.depth_md <= upper_pick.depth_md
         ):
             skipped.append({
                 'zone': f'{upper.name} → {lower.name}',
@@ -830,7 +849,8 @@ def build_zone_layer_inputs(
             })
             continue
 
-        zwd = zwd_by_zone.get(zone.id)
+        zone = zone_by_pair.get((upper.id, lower.id))
+        zwd = zwd_by_zone.get(zone.id) if zone is not None else None
         fractions: dict[str, float] = {}
         if zwd is not None and zwd.lithology_fractions:
             try:
@@ -869,6 +889,7 @@ def build_zone_layer_inputs(
         'skipped': len(skipped),
         'skipped_zones': skipped,
         'included_zones': [r.name for r in result],
+        'real_horizon_order': [h.name for h in ordered_real_horizons],
     }})
 
     return result

@@ -2062,6 +2062,13 @@ def test_tops_import_into_existing_top_set_preserves_cross_well_order(api_client
         for zone in bur_well['zones']
     )
 
+    bur_subsidence = api_client.post(f'/api/wells/{bur_id}/subsidence')
+    assert bur_subsidence.status_code == 200, bur_subsidence.text
+    bur_curve_names = [curve['formation_name'] for curve in bur_subsidence.json()]
+    assert 'Q → P1uf' in bur_curve_names
+    assert 'P1uf → P1kg' in bur_curve_names
+    assert 'P1uf → P1ar' not in bur_curve_names
+
 
 def test_deviation_import_with_column_map(api_client: TestClient, tmp_path: Path) -> None:
     _create_project(api_client, tmp_path, 'deviation-column-map')

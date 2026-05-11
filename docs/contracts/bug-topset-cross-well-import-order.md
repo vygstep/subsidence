@@ -61,6 +61,9 @@ subsidence zones overlap and make marker ordering unstable.
   - auto lithology aggregation.
 - Refresh must include wells where the TopSet is active and wells that already
   have picks linked to any horizon in the TopSet.
+- Single-well subsidence inputs must be built from adjacent real picks in the
+  selected well's active TopSet order. Ghost-only horizons from other wells must
+  not split or hide sparse-well intervals.
 
 ## Implementation Plan
 
@@ -114,6 +117,16 @@ Status: done.
   - both wells show expected active TopSet markers/zones.
 
 Status: backend tests passed; manual smoke pending.
+
+### S6: Sparse-well subsidence intervals after cross-well merge
+
+- Add a regression assertion that BUR-2 subsidence still includes the
+  `Q -> P1uf` interval after DUN-99-only horizons are inserted into the shared
+  TopSet.
+- Build subsidence zone-layer inputs from adjacent real picks per well in shared
+  TopSet order, skipping ghost-only horizons for that well.
+
+Status: done.
 
 ## Non-goals
 
