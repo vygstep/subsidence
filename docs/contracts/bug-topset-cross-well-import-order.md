@@ -4,7 +4,7 @@ Branch: `bug/topset-cross-well-import-order`
 
 ## Status
 
-`todo`
+`in_progress`
 
 ## Problem
 
@@ -73,7 +73,7 @@ subsidence zones overlap and make marker ordering unstable.
   append order.
 - Assert that BUR-2 still has valid zone inputs after DUN-99 import.
 
-Status: todo.
+Status: done.
 
 ### S2: Stabilize existing horizon updates during import
 
@@ -82,7 +82,7 @@ Status: todo.
 - Imported pick values for the target well still update normally.
 - Keep duplicate-age normalization for imported picks.
 
-Status: todo.
+Status: done.
 
 ### S3: Insert new imported horizons into correct order
 
@@ -92,7 +92,7 @@ Status: todo.
 - Use age ordering fallback when neighbor context is incomplete.
 - Normalize resulting `sort_order` values to contiguous integers.
 
-Status: todo.
+Status: done.
 
 ### S4: Refresh all linked wells after TopSet structure changes
 
@@ -100,7 +100,7 @@ Status: todo.
 - Refresh all wells connected to the TopSet, not only the imported target well.
 - Preserve manual zone lithology where existing merge/split policies already do.
 
-Status: todo.
+Status: done.
 
 ### S5: Verification
 
@@ -113,7 +113,7 @@ Status: todo.
   - single-well subsidence for BUR-2 does not overlap after DUN-99 import;
   - both wells show expected active TopSet markers/zones.
 
-Status: todo.
+Status: backend tests passed; manual smoke pending.
 
 ## Non-goals
 
@@ -121,4 +121,3 @@ Status: todo.
 - No changes to TopSet UI interactions except data correctness.
 - No change to the duplicate-age import rule unless tests prove the existing
   behavior is inconsistent with the desired stratigraphic order.
-

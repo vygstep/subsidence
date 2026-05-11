@@ -17,6 +17,8 @@ from subsidence.data.deviation_transform import deviation_extrapolation_warning_
 from subsidence.data.schema import CurveMetadata, FormationTopModel, FormationZone, TopSet, TopSetHorizon, WellModel
 from subsidence.data.zone_service import (
     activate_top_set_for_well,
+    linked_well_ids_for_top_set,
+    normalize_top_set_horizon_order,
     rebuild_zones_for_top_set,
 )
 from subsidence.observability import operation_log
@@ -237,9 +239,11 @@ def import_tops(payload: ImportTopsRequest, request: Request) -> ImportTopsRespo
                 horizon_count = 0
                 zone_count = 0
                 if zone_set_id is not None:
+                    normalize_top_set_horizon_order(session, zone_set_id)
                     rebuild_zones_for_top_set(session, zone_set_id)
                     qc_warnings.extend(_zone_set_qc_warnings(session, zone_set_id, imported, target_well_id))
-                    activate_top_set_for_well(session, manager.project_path, target_well_id, zone_set_id)
+                    for linked_well_id in linked_well_ids_for_top_set(session, zone_set_id, include_well_id=target_well_id):
+                        activate_top_set_for_well(session, manager.project_path, linked_well_id, zone_set_id)
                     horizon_count = len(list(session.scalars(select(TopSetHorizon).where(TopSetHorizon.top_set_id == zone_set_id))))
                     zone_count = len(list(session.scalars(select(FormationZone).where(FormationZone.top_set_id == zone_set_id))))
                 formation_count = len(list(session.scalars(select(FormationTopModel).where(FormationTopModel.well_id == target_well_id))))

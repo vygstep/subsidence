@@ -6,11 +6,11 @@ Active contract: `docs/contracts/bug-topset-cross-well-import-order.md`
 
 | Item | Title | Status |
 |---|---|---|
-| S1 | Reproduce and lock the failure | todo |
-| S2 | Stabilize existing horizon updates during import | todo |
-| S3 | Insert new imported horizons into correct order | todo |
-| S4 | Refresh all linked wells after TopSet structure changes | todo |
-| S5 | Verification | todo |
+| S1 | Reproduce and lock the failure | done |
+| S2 | Stabilize existing horizon updates during import | done |
+| S3 | Insert new imported horizons into correct order | done |
+| S4 | Refresh all linked wells after TopSet structure changes | done |
+| S5 | Verification | backend tests passed; manual smoke pending |
 
 ## Implemented Contracts
 

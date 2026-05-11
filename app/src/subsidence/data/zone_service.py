@@ -435,6 +435,66 @@ def activate_top_set_for_well(
     return linked
 
 
+def normalize_top_set_horizon_order(session: Session, top_set_id: int) -> int:
+    """Keep TopSet horizons ordered by stratigraphic age after cross-well imports."""
+    horizons = session.scalars(
+        select(TopSetHorizon).where(TopSetHorizon.top_set_id == top_set_id)
+    ).all()
+    ordered = sorted(
+        horizons,
+        key=lambda h: (
+            h.age_ma is None,
+            h.age_ma if h.age_ma is not None and math.isfinite(h.age_ma) else math.inf,
+            h.sort_order,
+            h.id or 0,
+        ),
+    )
+
+    changed = 0
+    for index, horizon in enumerate(ordered):
+        if horizon.sort_order != index:
+            horizon.sort_order = index
+            changed += 1
+    session.flush()
+    return changed
+
+
+def linked_well_ids_for_top_set(
+    session: Session,
+    top_set_id: int,
+    *,
+    include_well_id: str | None = None,
+) -> list[str]:
+    """Return wells that need refresh when a shared TopSet changes."""
+    linked: list[str] = []
+    seen: set[str] = set()
+
+    def add(well_id: str | None) -> None:
+        if well_id and well_id not in seen:
+            seen.add(well_id)
+            linked.append(well_id)
+
+    add(include_well_id)
+
+    for row in session.scalars(
+        select(WellActiveTopSet).where(WellActiveTopSet.top_set_id == top_set_id)
+    ).all():
+        add(row.well_id)
+
+    horizon_ids = list(session.scalars(
+        select(TopSetHorizon.id).where(TopSetHorizon.top_set_id == top_set_id)
+    ).all())
+    if horizon_ids:
+        for well_id in session.scalars(
+            select(FormationTopModel.well_id)
+            .where(FormationTopModel.horizon_id.in_(horizon_ids))
+            .distinct()
+        ).all():
+            add(well_id)
+
+    return linked
+
+
 def rebuild_zones_for_top_set(session: Session, top_set_id: int) -> None:
     horizons = session.scalars(
         select(TopSetHorizon)
