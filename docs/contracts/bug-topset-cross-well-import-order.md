@@ -67,9 +67,6 @@ subsidence zones overlap and make marker ordering unstable.
 - Formation track zone fills must use the same sparse-well rule: use shared
   TopSet order, but draw intervals between adjacent real picks for the current
   well.
-- Data Manager must not list every ghost marker for sparse wells. Show real
-  markers for the current well, and show a ghost marker only while that ghost
-  top-pick is selected.
 
 ## Implementation Plan
 
@@ -140,14 +137,6 @@ Status: done.
   order.
 - Ghost-only horizons from another well must not make a sparse well lose its
   visible zone fill.
-
-Status: done.
-
-### S8: Data Manager ghost marker visibility
-
-- Hide inactive ghost markers from the TopSet marker list for the selected well.
-- Keep real picked markers visible.
-- Keep a ghost marker visible when that exact top-pick is selected/active.
 
 Status: done.
 
