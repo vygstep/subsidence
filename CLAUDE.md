@@ -62,8 +62,10 @@ aggregate_zone_lithology_from_curve(session, path, well_id)  # 3. литолог
 **`recalculate_zone_thickness` НЕ вызывает `ensure_zone_well_data` сам** — если пропустить шаг 1, `zwd is None` → `continue` → ничего не пересчитается, молча.
 
 
-### `rebuild_horizon_links(session, top_set_id)` — деструктивный
-Сбрасывает все `horizon_id` у пиков, затем перепривязывает по `age_top_ma`. Вызывать только когда пользователь явно меняет `age_ma` у горизонта — не при открытии проекта.
+### После кросс-скважинного импорта: порядок горизонтов
+`normalize_top_set_horizon_order(session, top_set_id)` — пересортирует горизонты TopSet по `age_ma` после импорта нескольких скважин. Вызывать после добавления новых горизонтов в существующий TopSet.
+
+Привязка пиков к горизонтам — **только по имени** (`link_picks_to_horizons`). Функции `rebuild_horizon_links` больше не существует — не ссылаться на неё.
 
 ---
 
@@ -86,7 +88,7 @@ aggregate_zone_lithology_from_curve(session, path, well_id)  # 3. литолог
 ## Антипаттерны
 
 - ❌ Вызывать `recalculate_zone_thickness` без `ensure_zone_well_data` перед ним — молча не сработает.
-- ❌ Вызывать `rebuild_horizon_links` при открытии проекта — сбросит все `horizon_id`.
+- ❌ Вызывать несуществующую `rebuild_horizon_links` — функция удалена; привязка пиков теперь только через `link_picks_to_horizons` (по имени).
 - ❌ Менять URL роутов без обновления фронтенда — 404 молча игнорируются в некоторых местах (`if (!response.ok) return`).
 - ❌ Делать async роуты с нативными диалогами (`pick-file`, `pick-folder`) — блокируют event loop.
 - ❌ Добавлять `_require_open_project`/`_manager` helper напрямую в новый роут-модуль — импортировать из `api/_deps.py`.
@@ -117,4 +119,5 @@ aggregate_zone_lithology_from_curve(session, path, well_id)  # 3. литолог
 | Маркеры двигаются, погружение не обновляется | `computedStore.triggerRecalculation`, WebSocket `/api/ws/recalculate` |
 | Undo не работает | операция не обёрнута в `manager.execute_command` |
 | Пики без horizon_id | `link_picks_to_horizons` не вызван или имена не совпали |
+| Горизонты TopSet в неверном порядке после импорта | `normalize_top_set_horizon_order` не вызван после кросс-скважинного импорта (`data/zone_service.py`) |
 | Литология зоны не обновляется после изменений | `ZoneWellData.lithology_source == 'manual'` — auto-агрегация пропускает manual-зоны |
