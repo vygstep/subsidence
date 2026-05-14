@@ -42,7 +42,7 @@ legacy sample data, and public attribution.
   and the file has no well name.
 - Preserve active-well targeting when `activeWellId` exists.
 
-Status: pending.
+Status: done. Verified by `pytest tests/integration/test_project_api_workflows.py -k "fallback_well or las_import_auto_creates_well"`.
 
 ### S2: Create Well placeholder
 

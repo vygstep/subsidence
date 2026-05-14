@@ -6,7 +6,7 @@ Active contract: `docs/contracts/ui-sample-template-cleanup.md`
 
 | Item | Title | Status |
 |---|---|---|
-| S1 | Import fallback well naming | pending |
+| S1 | Import fallback well naming | done |
 | S2 | Create Well placeholder | pending |
 | S3 | Legacy `app/data` cleanup | pending |
 | S4 | Templates tab counters | pending |
