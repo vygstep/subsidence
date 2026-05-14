@@ -59,6 +59,7 @@ export type SelectedElementType = 'curve' | 'track' | 'formation'
 
 export interface DepthTrackConfig {
   backgroundColor: string
+  gridStepMode: 'auto' | 'manual'
   majorInterval: number
   minorInterval: number
   unit: 'm' | 'km' | 'ft'
@@ -178,6 +179,7 @@ const MAX_SUBSIDENCE_BOTTOM = 500
 const minimumTrackWidth = 80
 const initialDepthTrackConfig: DepthTrackConfig = {
   backgroundColor: '#ffffff',
+  gridStepMode: 'auto',
   majorInterval: 100,
   minorInterval: 10,
   unit: 'm',

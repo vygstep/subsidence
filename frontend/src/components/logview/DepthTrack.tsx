@@ -4,6 +4,7 @@ import { useCanvasRenderer, useDepthScale } from '@/hooks'
 import { drawDepthGridlines, drawDepthLabels, drawWellPaddingZones } from '@/renderers'
 import { useViewStore, useWellDataStore } from '@/stores'
 import { mdToTvd } from '@/utils/depthTransform'
+import { resolveDepthGridIntervals } from '@/utils/depthGrid'
 
 interface DepthTrackProps {
   height: number
@@ -23,8 +24,12 @@ export function DepthTrack({ height, width = 60, isSelected = false, wellTopDept
   const { scale: depthScale } = useDepthScale(visibleDepthRange, height)
 
   const unitFactor = depthTrackConfig.unit === 'km' ? 1000 : depthTrackConfig.unit === 'ft' ? 0.3048 : 1
-  const majorInterval = Math.max(depthTrackConfig.majorInterval * unitFactor, unitFactor)
-  const minorInterval = Math.max(depthTrackConfig.minorInterval * unitFactor, unitFactor / 10)
+  const { majorInterval, minorInterval } = resolveDepthGridIntervals(
+    depthTrackConfig.gridStepMode,
+    visibleDepthRange.max - visibleDepthRange.min,
+    depthTrackConfig.majorInterval * unitFactor,
+    depthTrackConfig.minorInterval * unitFactor,
+  )
 
   const labelTransform = useMemo(() => {
     // In full coordinate mode scroll and ticks are already in target space — no transform needed
