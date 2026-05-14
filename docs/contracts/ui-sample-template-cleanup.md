@@ -76,7 +76,7 @@ Status: done.
 
 - Add `Created by Stepan Vygovskiy` to README near the project intro.
 
-Status: pending.
+Status: done.
 
 ### S6: Verification
 

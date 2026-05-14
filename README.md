@@ -2,6 +2,8 @@
 
 ## A desktop tool for reconstructing sedimentary basin subsidence from well data
 
+Created by Stepan Vygovskiy
+
 SUBSIDENCE is a local application for 1D burial history analysis and tectonic subsidence / backstripping. It runs entirely on your machine — no cloud, no account required. Import well logs and formation tops, build a stratigraphic framework, assign lithology parameters, and reconstruct how sedimentary layers were buried and compacted through geological time.
 
 ---
