@@ -14,16 +14,16 @@ from .common import (
     _CSV_EXCLUDED_COLUMNS,
     _DEPTH_MNEMONICS,
     _coerce_float,
-    _extract_text,
-    _find_existing_well_by_identity,
+    _group_rows_by_well_name,
+    _has_multi_well_rows,
     _read_csv_rows,
+    _resolve_or_create_well_from_rows,
     _resolve_well,
     _sha256,
     _validate_strictly_increasing_depth,
     _write_curve_payloads,
     apply_imported_well_metadata,
     compute_sampling_kind,
-    create_empty_well,
     extend_well_td_for_import,
     run_curve_qc,
 )
@@ -66,28 +66,13 @@ def _detect_log_csv_depth_column(fieldnames: list[str], explicit_depth_column: s
     raise ValueError('CSV log file must contain a depth column: DEPT, DEPTH, MD, TVD, or TVDSS')
 
 
-def _resolve_or_create_well_for_logs(
-    session: Session,
-    rows: list[dict[str, str]],
-    *,
-    well_id: str | None,
-    create_new_well: bool = False,
-) -> object:
-    if well_id:
-        return _resolve_well(session, well_id)
-
-    first_name = _extract_text(rows[0], 'well_name') if rows else None
-    if not create_new_well:
-        existing = _find_existing_well_by_identity(session, name=first_name)
-        if existing is not None:
-            return existing
-    return create_empty_well(session, name=first_name or DEFAULT_WELL_NAME, kb=DEFAULT_WELL_KB)
-
-
-def import_logs_csv(
+def _import_logs_rows(
     session: Session,
     project_path: Path | str,
-    csv_path: Path | str,
+    source_path: Path,
+    source_hash: str,
+    fieldnames: list[str],
+    rows: list[dict[str, str]],
     *,
     well_id: str | None = None,
     depth_column: str | None = None,
@@ -95,9 +80,6 @@ def import_logs_csv(
     trusted_depth_reference: str = 'MD',
 ) -> tuple[object, list[str], float | None]:
     bundle_path = Path(project_path)
-    source_path = Path(csv_path)
-    source_hash = _sha256(source_path)
-    fieldnames, rows = _read_csv_rows(source_path)
     if not rows:
         raise ValueError(f'{source_path}: log CSV is empty')
 
@@ -106,7 +88,7 @@ def import_logs_csv(
     _depth_mnemonic, depth_unit = _header_curve_parts(resolved_depth_column)
     depths = convert_depth_values_to_meters(session, raw_depths, depth_unit or 'm')
     final_depth = depths[-1] if depths else None
-    well = _resolve_or_create_well_for_logs(session, rows, well_id=well_id, create_new_well=create_new_well)
+    well = _resolve_or_create_well_from_rows(session, rows, well_id=well_id, create_new_well=create_new_well)
     td_before_import = well.td_md
     apply_imported_well_metadata(well, td=final_depth)
     td_warning = extend_well_td_for_import(well, final_depth, previous_td=td_before_import)
@@ -192,3 +174,79 @@ def import_logs_csv(
             qc_warnings.extend(summary.get('messages', []))
 
     return well, qc_warnings, final_depth
+
+
+def import_logs_csv(
+    session: Session,
+    project_path: Path | str,
+    csv_path: Path | str,
+    *,
+    well_id: str | None = None,
+    depth_column: str | None = None,
+    create_new_well: bool = False,
+    trusted_depth_reference: str = 'MD',
+) -> tuple[object, list[str], float | None]:
+    source_path = Path(csv_path)
+    source_hash = _sha256(source_path)
+    fieldnames, rows = _read_csv_rows(source_path)
+    return _import_logs_rows(
+        session,
+        project_path,
+        source_path,
+        source_hash,
+        fieldnames,
+        rows,
+        well_id=well_id,
+        depth_column=depth_column,
+        create_new_well=create_new_well,
+        trusted_depth_reference=trusted_depth_reference,
+    )
+
+
+def import_logs_csv_multi(
+    session: Session,
+    project_path: Path | str,
+    csv_path: Path | str,
+    *,
+    depth_column: str | None = None,
+    create_new_well: bool = False,
+    trusted_depth_reference: str = 'MD',
+) -> tuple[list[object], list[str], dict[str, float | None], int]:
+    source_path = Path(csv_path)
+    source_hash = _sha256(source_path)
+    fieldnames, rows = _read_csv_rows(source_path)
+    if not _has_multi_well_rows(rows):
+        well, warnings, final_depth = _import_logs_rows(
+            session,
+            project_path,
+            source_path,
+            source_hash,
+            fieldnames,
+            rows,
+            well_id=None,
+            depth_column=depth_column,
+            create_new_well=create_new_well,
+            trusted_depth_reference=trusted_depth_reference,
+        )
+        return [well], warnings, {well.id: final_depth}, len(rows)
+
+    imported_wells: list[object] = []
+    qc_warnings: list[str] = []
+    imported_max_by_well: dict[str, float | None] = {}
+    for _name, group_rows in _group_rows_by_well_name(rows):
+        well, warnings, final_depth = _import_logs_rows(
+            session,
+            project_path,
+            source_path,
+            source_hash,
+            fieldnames,
+            group_rows,
+            well_id=None,
+            depth_column=depth_column,
+            create_new_well=create_new_well,
+            trusted_depth_reference=trusted_depth_reference,
+        )
+        imported_wells.append(well)
+        qc_warnings.extend(warnings)
+        imported_max_by_well[well.id] = final_depth
+    return imported_wells, qc_warnings, imported_max_by_well, len(rows)

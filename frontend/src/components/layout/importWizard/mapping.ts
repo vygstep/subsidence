@@ -53,6 +53,7 @@ export const TOPS_FIELDS: FieldDefinition[] = [
 ]
 
 export const DEVIATION_FIELDS: FieldDefinition[] = [
+  { id: 'well_name', label: 'Well name', required: false, aliases: ['well_name', 'well', 'wellname', 'well_id', 'uwi'] },
   { id: 'md', label: 'Depth (MD)', required: false, aliases: ['md', 'measured_depth', 'depth_md', 'dept', 'depth'] },
   { id: 'tvd', label: 'Depth (TVD)', required: false, aliases: ['tvd', 'true_vertical_depth', 'tvdkb'] },
   { id: 'tvdss', label: 'Depth (TVDSS)', required: false, aliases: ['tvdss', 'tvd_ss', 'depth_tvdss'] },
@@ -66,11 +67,42 @@ export const DEVIATION_FIELDS: FieldDefinition[] = [
 
 export const LOGS_CSV_FIELDS: FieldDefinition[] = [
   {
+    id: 'well_name',
+    label: 'Well name',
+    required: false,
+    aliases: ['well_name', 'well', 'wellname', 'well_id', 'uwi'],
+  },
+  {
     id: 'depth',
     label: 'Depth column',
     required: true,
     aliases: ['dept', 'depth', 'md', 'tvd', 'tvdss', 'depth_md', 'measured_depth'],
   },
+]
+
+export const WELLS_FIELDS: FieldDefinition[] = [
+  { id: 'well_name', label: 'Well name', required: true, aliases: ['well_name', 'well', 'wellname', 'name'] },
+  { id: 'uwi', label: 'UWI', required: false, aliases: ['uwi', 'api', 'well_id'] },
+  { id: 'kb', label: 'KB', required: false, aliases: ['kb', 'kb_elev', 'kb_elevation'] },
+  { id: 'td', label: 'TD', required: false, aliases: ['td', 'td_md', 'total_depth'] },
+  { id: 'x', label: 'X', required: false, aliases: ['x', 'lon', 'longitude', 'easting'] },
+  { id: 'y', label: 'Y', required: false, aliases: ['y', 'lat', 'latitude', 'northing'] },
+  { id: 'crs', label: 'CRS', required: false, aliases: ['crs', 'coordinate_reference_system'] },
+]
+
+export const STRAT_CHART_FIELDS: FieldDefinition[] = [
+  { id: 'unit_id', label: 'Unit ID', required: true, aliases: ['unit_id', 'id'] },
+  { id: 'parent_unit_id', label: 'Parent unit ID', required: false, aliases: ['parent_unit_id', 'parent_id'] },
+  { id: 'unit_name', label: 'Unit name', required: true, aliases: ['unit_name', 'name', 'strat_unit', 'unit'] },
+  { id: 'rank_name', label: 'Rank name', required: false, aliases: ['rank_name', 'rank'] },
+  { id: 'start_age_ma', label: 'Start age (Ma)', required: true, aliases: ['start_age_ma', 'start_age', 'age_base_ma', 'base_age_ma'] },
+  { id: 'end_age_ma', label: 'End age (Ma)', required: true, aliases: ['end_age_ma', 'end_age', 'age_top_ma', 'top_age_ma'] },
+  { id: 'color', label: 'Color', required: false, aliases: ['html_rgb_hash', 'rgb', 'cmyk', 'color', 'color_hex', 'hex'] },
+]
+
+export const SEA_LEVEL_CURVE_FIELDS: FieldDefinition[] = [
+  { id: 'age_ma', label: 'Age (Ma)', required: true, aliases: ['age_ma', 'age', 'age_ma_bp', 'time_ma'] },
+  { id: 'sea_level_m', label: 'Sea level (m)', required: true, aliases: ['sea_level_m', 'sea_level', 'level_m', 'sl_m', 'eustatic_m'] },
 ]
 
 function normalizeKey(s: string): string {
@@ -115,6 +147,24 @@ export function validateDeviationMapping(mapping: ColumnMapping): string[] {
 
 export function validateLogsCsvMapping(mapping: ColumnMapping): string[] {
   return LOGS_CSV_FIELDS.filter((f) => f.required && !mapping[f.id]).map(
+    (f) => `Required field "${f.label}" is not mapped.`,
+  )
+}
+
+export function validateWellsMapping(mapping: ColumnMapping): string[] {
+  return WELLS_FIELDS.filter((f) => f.required && !mapping[f.id]).map(
+    (f) => `Required field "${f.label}" is not mapped.`,
+  )
+}
+
+export function validateStratChartMapping(mapping: ColumnMapping): string[] {
+  return STRAT_CHART_FIELDS.filter((f) => f.required && !mapping[f.id]).map(
+    (f) => `Required field "${f.label}" is not mapped.`,
+  )
+}
+
+export function validateSeaLevelCurveMapping(mapping: ColumnMapping): string[] {
+  return SEA_LEVEL_CURVE_FIELDS.filter((f) => f.required && !mapping[f.id]).map(
     (f) => `Required field "${f.label}" is not mapped.`,
   )
 }

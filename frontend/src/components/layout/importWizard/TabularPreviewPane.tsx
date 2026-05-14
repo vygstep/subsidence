@@ -1,3 +1,5 @@
+import { useEffect, useState } from 'react'
+
 import { type CurveType, CURVE_TYPES } from '@/utils/curveTypes'
 import type { FieldDefinition, ColumnMapping } from './mapping'
 import type { TabularDelimiter, TabularParserSettings, TabularPreviewResponse } from './types'
@@ -7,6 +9,7 @@ const DELIMITER_LABELS: Record<TabularDelimiter, string> = {
   ',': 'Comma',
   '\t': 'Tab',
   ';': 'Semicolon',
+  ' ': 'Space',
 }
 
 interface TabularPreviewPaneProps {
@@ -21,6 +24,7 @@ interface TabularPreviewPaneProps {
   onMappingChange?: (fieldId: string, colName: string | null) => void
   curveTypes?: Record<string, CurveType>
   onCurveTypeChange?: (col: string, type: CurveType) => void
+  curveTypeExcludedColumns?: string[]
 }
 
 export function TabularPreviewPane({
@@ -35,11 +39,31 @@ export function TabularPreviewPane({
   onMappingChange,
   curveTypes,
   onCurveTypeChange,
+  curveTypeExcludedColumns = [],
 }: TabularPreviewPaneProps) {
+  const [headerRowDraft, setHeaderRowDraft] = useState(String(settings.headerRow))
   const depthColIndex = depthColumn != null && preview ? preview.columns.indexOf(depthColumn) : -1
   const showMapping = fields != null && mapping != null && onMappingChange != null && preview != null
   const showCurveTypes = curveTypes != null && onCurveTypeChange != null && preview != null
   const missingRequired = showMapping ? fields.filter((f) => f.required && !mapping[f.id]) : []
+
+  useEffect(() => {
+    setHeaderRowDraft(String(settings.headerRow))
+  }, [settings.headerRow])
+
+  const commitHeaderRowDraft = () => {
+    const trimmed = headerRowDraft.trim()
+    if (!trimmed) {
+      setHeaderRowDraft(String(settings.headerRow))
+      return
+    }
+    const parsed = Number(trimmed)
+    if (!Number.isFinite(parsed)) {
+      setHeaderRowDraft(String(settings.headerRow))
+      return
+    }
+    onSettingsChange({ headerRow: Math.max(0, Math.trunc(parsed)) })
+  }
 
   return (
     <div className="import-preview">
@@ -61,8 +85,15 @@ export function TabularPreviewPane({
           <input
             type="number"
             min={0}
-            value={settings.headerRow}
-            onChange={(e) => onSettingsChange({ headerRow: Math.max(0, Number(e.target.value)) })}
+            value={headerRowDraft}
+            onChange={(e) => setHeaderRowDraft(e.target.value)}
+            onBlur={commitHeaderRowDraft}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter') {
+                e.preventDefault()
+                commitHeaderRowDraft()
+              }
+            }}
           />
         </label>
 
@@ -127,9 +158,10 @@ export function TabularPreviewPane({
                   <th className="import-preview__row-num" />
                   {preview.columns.map((col, colIdx) => {
                     const isDepth = colIdx === depthColIndex
+                    const isExcluded = curveTypeExcludedColumns.includes(col)
                     return (
                       <th key={colIdx} className={isDepth ? 'import-preview__col--depth' : undefined}>
-                        {isDepth ? null : (
+                        {isDepth || isExcluded ? null : (
                           <select
                             value={curveTypes[col] ?? 'continuous'}
                             onChange={(e) => onCurveTypeChange(col, e.target.value as CurveType)}

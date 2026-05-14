@@ -46,7 +46,7 @@ class LasPreviewResult:
 
 def _detect_delimiter(sample: str) -> str:
     try:
-        dialect = csv.Sniffer().sniff(sample, delimiters=',;\t')
+        dialect = csv.Sniffer().sniff(sample, delimiters=',;\t ')
         return dialect.delimiter
     except csv.Error:
         return ','

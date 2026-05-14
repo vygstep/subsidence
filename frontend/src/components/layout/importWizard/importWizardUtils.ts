@@ -1,4 +1,6 @@
 import type { ImportWizardStep } from './types'
+import type { ColumnMapping } from './mapping'
+import type { TabularPreviewResponse } from './types'
 
 const DEFAULT_STEP_LABELS = ['File', 'Preview']
 
@@ -35,4 +37,21 @@ export async function readImportError(response: Response, fallback: string): Pro
     // Ignore non-JSON errors.
   }
   return fallback
+}
+
+export function distinctMappedValues(
+  preview: TabularPreviewResponse | null,
+  mapping: ColumnMapping,
+  fieldId: string,
+): string[] {
+  const column = mapping[fieldId]
+  if (!preview || !column) return []
+  const columnIndex = preview.columns.indexOf(column)
+  if (columnIndex < 0) return []
+  const values = new Set<string>()
+  for (const row of preview.rows) {
+    const value = (row[columnIndex] ?? '').trim()
+    if (value) values.add(value)
+  }
+  return [...values].sort((a, b) => a.localeCompare(b))
 }

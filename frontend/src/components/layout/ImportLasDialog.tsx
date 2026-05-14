@@ -12,6 +12,7 @@ import {
   LasPreviewPane,
   TabularPreviewPane,
   buildImportWizardSteps,
+  distinctMappedValues,
   importWizardPresets,
   readImportError,
   useImportPreview,
@@ -19,6 +20,7 @@ import {
 import {
   LOGS_CSV_FIELDS,
   autoMap,
+  validateLogsCsvMapping,
 } from './importWizard/mapping'
 import type { ColumnMapping } from './importWizard/mapping'
 import { getLastImportRoot, pickFile, rememberImportPath } from './pathMemory'
@@ -155,9 +157,11 @@ export function ImportLasDialog({ wells, activeWellId, onClose, onSuccess }: Imp
   useEffect(() => {
     if (!tabularPreview || sourceType !== 'csv') return
     const depthCol = mapping['depth']
+    const wellNameCol = mapping['well_name']
     const detected: Record<string, 'continuous' | 'discrete'> = {}
     tabularPreview.columns.forEach((col, idx) => {
       if (col === depthCol) return
+      if (col === wellNameCol) return
       detected[col] = detectColumnCurveType(idx, tabularPreview.rows)
     })
     setCurveTypes(detected)
@@ -187,7 +191,14 @@ export function ImportLasDialog({ wells, activeWellId, onClose, onSuccess }: Imp
 
   const canSubmit = sourceType === 'las'
     ? sourceIsValid && previewReady && hasImportableLogCurves
-    : sourceIsValid && tabularPreview !== null && !!mapping['depth'] && hasImportableLogCurves
+    : sourceIsValid && tabularPreview !== null && validateLogsCsvMapping(mapping).length === 0 && hasImportableLogCurves
+  const csvWellNames = sourceType === 'csv' ? distinctMappedValues(tabularPreview, mapping, 'well_name') : []
+  const isCsvMultiWell = csvWellNames.length > 1
+
+  useEffect(() => {
+    if (sourceType !== 'csv') return
+    setWellSelection(csvWellNames.length > 0 ? '' : (activeWellId ?? ''))
+  }, [activeWellId, csvWellNames.length, sourceType])
 
   const handleSubmit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault()
@@ -222,9 +233,10 @@ export function ImportLasDialog({ wells, activeWellId, onClose, onSuccess }: Imp
                 }
               : {
                   csv_path: nextPath,
-                  well_id: resolvedWellId,
+                  well_id: isCsvMultiWell ? null : resolvedWellId,
                   depth_column: mapping['depth'] ?? null,
                   create_new_well: createNewWell,
+                  multi_well: isCsvMultiWell,
                   trusted_depth_reference: trustedDepthRef,
                   depth_unit: depthUnit,
                   curve_types: curveTypes,
@@ -360,18 +372,27 @@ export function ImportLasDialog({ wells, activeWellId, onClose, onSuccess }: Imp
               settings={parserSettings}
               onSettingsChange={updateParserSettings}
               depthColumn={mapping['depth'] ?? null}
+              fields={LOGS_CSV_FIELDS}
+              mapping={mapping}
+              onMappingChange={(fieldId, colName) => setMapping((prev) => ({ ...prev, [fieldId]: colName }))}
               curveTypes={curveTypes}
               onCurveTypeChange={(col, type) => setCurveTypes((prev) => ({ ...prev, [col]: type }))}
+              curveTypeExcludedColumns={[mapping['well_name']].filter(Boolean) as string[]}
             />
             {!previewLoading && tabularPreview && (
               <div className="import-wizard__options">
+                {isCsvMultiWell ? (
+                  <p className="import-preview__status">Multi-well mode: {csvWellNames.length} wells detected.</p>
+                ) : null}
                 <div className="import-wizard__options-row">
-                  <ImportWizardTargetWellSelect
-                    value={wellSelection}
-                    wells={wells}
-                    onChange={setWellSelection}
-                    emptyLabel="Use file well_name / create from defaults"
-                  />
+                  {!isCsvMultiWell ? (
+                    <ImportWizardTargetWellSelect
+                      value={wellSelection}
+                      wells={wells}
+                      onChange={setWellSelection}
+                      emptyLabel="Use file well_name / create from defaults"
+                    />
+                  ) : null}
                   <label className="project-dialog__field project-dialog__field--inline import-wizard__field">
                     <span>Depth reference</span>
                     <select value={trustedDepthRef} onChange={(e) => setTrustedDepthRef(e.target.value as 'MD' | 'TVD' | 'TVDSS')}>

@@ -593,7 +593,18 @@ def test_tops_deviation_and_strat_chart_workflows(api_client: TestClient, tmp_pa
         '2,1,Stage A,stage,25,0,#abcdef\n',
         encoding='utf-8',
     )
-    response = api_client.post('/api/strat-charts/import', json={'csv_path': str(chart_csv)})
+    response = api_client.post('/api/strat-charts/import', json={
+        'csv_path': str(chart_csv),
+        'column_map': {
+            'unit_id': 'unit_id',
+            'parent_unit_id': 'parent_unit_id',
+            'unit_name': 'unit_name',
+            'rank_name': 'rank_name',
+            'start_age_ma': 'start_age_ma',
+            'end_age_ma': 'end_age_ma',
+            'color': 'html_rgb_hash',
+        },
+    })
     assert response.status_code == 200, response.text
     assert response.json()['units_imported'] == 2
 
@@ -614,6 +625,92 @@ def test_tops_deviation_and_strat_chart_workflows(api_client: TestClient, tmp_pa
     well = response.json()[0]
     assert len(well['formations']) == 2
     assert well['deviation']['mode'] == 'INCL_AZIM'
+
+
+def test_strat_chart_import_requires_mapping_and_validates_parent_age_interval(api_client: TestClient, tmp_path: Path) -> None:
+    _create_project(api_client, tmp_path, 'strat-chart-mapping')
+
+    chart_csv = tmp_path / 'mapped_chart.csv'
+    chart_csv.write_text(
+        'id,parent,name,rank,base,top,color\n'
+        '1,,System A,system,50,0,#123456\n'
+        '2,1,Stage A,stage,25,5,#abcdef\n',
+        encoding='utf-8',
+    )
+    column_map = {
+        'unit_id': 'id',
+        'parent_unit_id': 'parent',
+        'unit_name': 'name',
+        'rank_name': 'rank',
+        'start_age_ma': 'base',
+        'end_age_ma': 'top',
+        'color': 'color',
+    }
+
+    response = api_client.post('/api/strat-charts/import', json={'csv_path': str(chart_csv), 'column_map': column_map})
+    assert response.status_code == 200, response.text
+    assert response.json()['units_imported'] == 2
+
+    invalid_csv = tmp_path / 'invalid_chart.csv'
+    invalid_csv.write_text(
+        'id,parent,name,rank,base,top,color\n'
+        '1,,System A,system,50,0,#123456\n'
+        '2,1,Stage Outside,stage,60,5,#abcdef\n',
+        encoding='utf-8',
+    )
+
+    response = api_client.post('/api/strat-charts/import', json={'csv_path': str(invalid_csv), 'column_map': column_map})
+    assert response.status_code == 422, response.text
+    assert 'outside parent' in response.json()['detail']
+
+
+def test_strat_chart_import_accepts_rgb_and_cmyk_color_columns(api_client: TestClient, tmp_path: Path) -> None:
+    _create_project(api_client, tmp_path, 'strat-chart-colors')
+
+    rgb_csv = tmp_path / 'rgb_chart.csv'
+    rgb_csv.write_text(
+        'id,name,base,top,rgb\n'
+        '1,RGB Unit,10,0,255/128/0\n',
+        encoding='utf-8',
+    )
+    response = api_client.post('/api/strat-charts/import', json={
+        'csv_path': str(rgb_csv),
+        'column_map': {
+            'unit_id': 'id',
+            'unit_name': 'name',
+            'start_age_ma': 'base',
+            'end_age_ma': 'top',
+            'color': 'rgb',
+        },
+    })
+    assert response.status_code == 200, response.text
+
+    cmyk_csv = tmp_path / 'cmyk_chart.csv'
+    cmyk_csv.write_text(
+        'id,name,base,top,cmyk\n'
+        '1,CMYK Unit,10,0,0/100/100/0\n',
+        encoding='utf-8',
+    )
+    response = api_client.post('/api/strat-charts/import', json={
+        'csv_path': str(cmyk_csv),
+        'column_map': {
+            'unit_id': 'id',
+            'unit_name': 'name',
+            'start_age_ma': 'base',
+            'end_age_ma': 'top',
+            'color': 'cmyk',
+        },
+    })
+    assert response.status_code == 200, response.text
+
+    manager = app.state.project_manager
+    with manager.get_session() as session:
+        rgb_unit = session.scalar(sa_select(StratUnit).where(StratUnit.name == 'RGB Unit'))
+        cmyk_unit = session.scalar(sa_select(StratUnit).where(StratUnit.name == 'CMYK Unit'))
+        assert rgb_unit is not None
+        assert cmyk_unit is not None
+        assert rgb_unit.color_hex == '#ff8000'
+        assert cmyk_unit.color_hex == '#ff0000'
 
 
 def test_builtin_ics_chart_cannot_be_deleted(api_client: TestClient, tmp_path: Path):
@@ -3217,6 +3314,45 @@ def test_bstrip001_sea_level_crud(api_client: TestClient, tmp_path: Path):
     api_client.put(f'/api/wells/{well_id}/active-sea-level-curve', json={'curve_id': None})
     resp = api_client.delete(f'/api/sea-level-curves/{curve_id}')
     assert resp.status_code == 204
+
+
+def test_bstrip001_import_sea_level_curve_from_csv(api_client: TestClient, tmp_path: Path):
+    _create_project(api_client, tmp_path, 'sl-import')
+    csv_path = tmp_path / 'sea_level.csv'
+    csv_path.write_text(
+        'metadata line\n'
+        'age;level\n'
+        '0;0\n'
+        '10;15\n'
+        '20;-25\n',
+        encoding='utf-8',
+    )
+
+    resp = api_client.post('/api/sea-level-curves/import', json={
+        'csv_path': str(csv_path),
+        'curve_name': 'Imported SL',
+        'column_map': {'age_ma': 'age', 'sea_level_m': 'level'},
+        'delimiter': ';',
+        'header_row': 1,
+    })
+    assert resp.status_code == 200, resp.text
+    payload = resp.json()
+    assert payload['point_count'] == 3
+
+    resp = api_client.get('/api/sea-level-curves')
+    assert resp.status_code == 200, resp.text
+    curve = next(c for c in resp.json() if c['id'] == payload['curve_id'])
+    assert curve['name'] == 'Imported SL'
+    assert curve['is_builtin'] is False
+    assert curve['point_count'] == 3
+
+    resp = api_client.get(f"/api/sea-level-curves/{payload['curve_id']}/points")
+    assert resp.status_code == 200, resp.text
+    assert resp.json() == [
+        {'age_ma': 20.0, 'sea_level_m': -25.0},
+        {'age_ma': 10.0, 'sea_level_m': 15.0},
+        {'age_ma': 0.0, 'sea_level_m': 0.0},
+    ]
 
 
 def test_builtin_sea_level_curve_points_are_read_only(api_client: TestClient, tmp_path: Path):

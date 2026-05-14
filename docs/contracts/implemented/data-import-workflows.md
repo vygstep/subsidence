@@ -1,7 +1,12 @@
 # Data Import Workflows
 
 Status: Active
-Branch: `feature/data-import-workflows`
+Current branch: `feature/import-multiwell-foundation`
+
+Merged baseline:
+
+- `feature/data-import-workflows` was merged to `main` with Stage 1 and Stage 2 completed.
+- Remaining work continues in smaller stage branches from `main`.
 
 ## Goal
 
@@ -25,6 +30,13 @@ This contract covers import only. Data export is intentionally out of scope and 
 - No changes to already working import behavior before user UX review confirms them.
 
 ## Stage 1 - UX Review of Existing Imports
+
+Status: Completed.
+
+Result:
+
+- User manually checked the normalized logs, tops, and deviation import UX.
+- No additional UX blockers were reported before continuing.
 
 User will manually run the currently working imports and report UX issues before new import work starts:
 
@@ -55,6 +67,16 @@ Expected output of this stage:
 Implementation does not begin until this stage is discussed and confirmed.
 
 ## Stage 2 - Existing Wizard UX Cleanup
+
+Status: Completed and merged to `main`.
+
+Result:
+
+- Shared import wizard file step now uses bottom primary `Browse...`.
+- File selection opens preview directly.
+- Inner file-field browse/previous-path controls were removed from logs, tops, and deviation import dialogs.
+- Import wizard target-well selection and file field components were centralized.
+- Existing import wizard frontend tests were updated and passed before merge.
 
 Normalize and lightly centralize the shared import wizard behavior before adding new data importers.
 
@@ -90,6 +112,51 @@ Likely files:
 - `frontend/src/styles/dialogs.css`
 
 ## Stage 3 - Target Well and Multi-Well CSV Foundation
+
+Status: Completed on `feature/import-multiwell-foundation`.
+
+Result:
+
+- Added common backend row grouping by `well_name`.
+- Added `Load wells` CSV import.
+- Added multi-well CSV import for logs, tops, and deviation.
+- Kept single-well imports compatible when `well_name` is absent or not mapped.
+- Added frontend multi-well detection/summary in existing import wizards.
+- Added parser fixes discovered during manual review:
+  - explicit space delimiter;
+  - header row input applies on Enter/blur;
+  - restored Open/New Project path action button styling.
+- Verification passed:
+  - `cd app && pytest tests` - 121 passed.
+  - `cd frontend && npm run test -- --run` - 64 passed.
+
+Implementation sequence:
+
+- Stage 3A - Common multi-well backend foundation:
+  - Add shared CSV row grouping by mapped or native `well_name`.
+  - Resolve existing wells by name/identity or create wells from project defaults.
+  - Validate depth monotonicity per well group, not globally across the whole file.
+  - Keep existing single-well importer behavior unchanged when no `well_name` is mapped or present.
+- Stage 3B - `Load wells` import:
+  - Add well metadata CSV importer and API route.
+  - Add frontend wizard action for importing well metadata.
+  - Support required `well_name` and optional `uwi`, `kb`, `td`, `x`, `y`, `crs`.
+- Stage 3C - Tops CSV multi-well:
+  - Allow one TopSet import file to populate picks for multiple wells when `well_name` is mapped/present.
+  - Preserve TopSet horizon identity/order and rebuild/activate zones for all affected wells.
+  - Keep single-well TopSet behavior unchanged.
+- Stage 3D - Deviation CSV multi-well:
+  - Group surveys by well when `well_name` is mapped/present.
+  - Validate each well's depth sequence independently.
+  - Write/update one deviation survey parquet per well.
+- Stage 3E - Logs CSV multi-well:
+  - Group curves by well when `well_name` is mapped/present.
+  - Write/update one curve parquet/metadata set per well.
+  - Apply selected curve types consistently across groups.
+- Stage 3F - UI summary and tests:
+  - Add visible multi-well mode/summary where the preview can infer multiple wells.
+  - Return import summaries with affected well count and row count.
+  - Update focused backend/frontend tests.
 
 Unify target well behavior and add multi-well CSV import support.
 
@@ -154,6 +221,34 @@ Likely files:
 
 ## Stage 4 - StratChart Import Wizard
 
+Status: Completed on `feature/import-multiwell-foundation`.
+
+Result:
+
+- Replaced the path-only StratChart import with the shared import wizard.
+- Added required column mapping for unit ID, unit name, start age, and end age.
+- Added optional parent, rank, and color mapping.
+- Added simple parent reference and age interval validation.
+- Added color parsing for hex, RGB, and CMYK input.
+
+Implementation plan:
+
+- Replace the path-only StratChart import dialog with the shared import wizard.
+- Require explicit column mapping from the wizard.
+- Required fields:
+  - `unit_id`
+  - `unit_name`
+  - `start_age_ma`
+  - `end_age_ma`
+- Optional fields:
+  - `parent_unit_id`
+  - `rank_name`
+  - `html_rgb_hash`
+- Keep hierarchy validation simple for this stage:
+  - parent references must resolve;
+  - when parent and child ages are present, child age interval must fit inside the parent age interval.
+- Do not add rank hierarchy validation in this stage.
+
 Replace the current one-step `LoadStratChartDialog` flow with the shared import wizard pattern.
 
 Expected behavior:
@@ -175,6 +270,19 @@ Likely files:
 
 ## Stage 5 - Sea Level Curve Import
 
+Status: Completed on `feature/import-multiwell-foundation`.
+
+Result:
+
+- Added `Load Sea Level Curve` in the StratCharts toolbar.
+- Added a shared wizard flow with Browse, preview, parser settings, column mapping, and curve name.
+- Added backend import endpoint `POST /api/sea-level-curves/import`.
+- Required mapped fields are `age_ma` and `sea_level_m`.
+- Import respects selected delimiter and header row.
+- Imported curves are user-defined, appear under `SEA LEVEL CURVES`, and can be assigned in Models settings.
+- Built-in curves remain read-only.
+- Added backend regression coverage for CSV import.
+
 Add a visible frontend import path for sea level curves.
 
 Expected behavior:
@@ -189,6 +297,12 @@ Expected behavior:
 - Built-in curves remain read-only.
 - Imported curve appears in the Sea Level Curves tree and can be assigned in Models settings.
 
+Implementation notes:
+
+- Add a small backend import endpoint instead of sending all CSV rows through frontend preview.
+- Reuse existing sea level curve tables and keep built-in curves read-only.
+- Keep frontend flow aligned with the shared tabular import wizard.
+
 Likely files:
 
 - `frontend/src/components/layout/ProjectToolbar.tsx`
@@ -198,6 +312,14 @@ Likely files:
 - `app/src/subsidence/api/sea_level.py`
 
 ## Stage 6 - Link Marker to Stratigraphy
+
+Status: Deferred by user.
+
+Reason:
+
+- Current marker behavior is acceptable for now: marker ages resolve colors from the active stratigraphic chart.
+- If the active stratigraphic chart changes, marker color resolution can change with that active chart.
+- Explicit marker-to-stratigraphy linking needs a clearer UX decision before implementation.
 
 Expose the existing marker-to-stratigraphy link workflow in the UI.
 
@@ -217,6 +339,17 @@ Likely files:
 - `app/src/subsidence/api/formations.py`
 
 ## Stage 7 - Tests and Documentation
+
+Status: Completed for implemented stages.
+
+Verification:
+
+- `cd app && pytest tests` - 124 passed.
+- `cd frontend && npm run test -- --run` - 64 passed.
+
+Documentation:
+
+- Stage 6 remains deferred and should be moved to a future contract if it becomes needed.
 
 Expected checks:
 

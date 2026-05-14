@@ -71,6 +71,7 @@ class ImportLogsCsvRequest(BaseModel):
     well_id: str | None = None
     depth_column: str | None = None
     create_new_well: bool = False
+    multi_well: bool = False
     trusted_depth_reference: str = 'MD'
     depth_unit: str = 'm'
     curve_types: dict[str, str] = {}
@@ -82,6 +83,7 @@ class ImportTopsRequest(BaseModel):
     depth_ref: str = 'MD'
     depth_unit: str = 'm'
     create_new_well: bool = False
+    multi_well: bool = False
     column_map: dict[str, str] | None = None
     zone_set_id: int | None = None
     create_zone_set: bool = False
@@ -93,6 +95,12 @@ class ImportDeviationRequest(BaseModel):
     csv_path: str
     depth_unit: str = 'm'
     create_new_well: bool = False
+    multi_well: bool = False
+    column_map: dict[str, str] | None = None
+
+
+class ImportWellsRequest(BaseModel):
+    csv_path: str
     column_map: dict[str, str] | None = None
 
 
@@ -186,6 +194,9 @@ class ImportLasResponse(BaseModel):
     well_name: str
     curve_count: int
     qc_warnings: list[str] = []
+    well_ids: list[str] = []
+    imported_well_count: int = 1
+    imported_row_count: int | None = None
 
 
 class ImportTopsResponse(BaseModel):
@@ -196,6 +207,9 @@ class ImportTopsResponse(BaseModel):
     horizon_count: int = 0
     zone_count: int = 0
     qc_warnings: list[str] = []
+    well_ids: list[str] = []
+    imported_well_count: int = 1
+    imported_row_count: int | None = None
 
 
 class ImportDeviationResponse(BaseModel):
@@ -203,6 +217,17 @@ class ImportDeviationResponse(BaseModel):
     reference: str
     mode: str
     data_uri: str
+    qc_warnings: list[str] = []
+    well_ids: list[str] = []
+    imported_well_count: int = 1
+    imported_row_count: int | None = None
+
+
+class ImportWellsResponse(BaseModel):
+    well_id: str
+    well_ids: list[str]
+    imported_well_count: int
+    imported_row_count: int
     qc_warnings: list[str] = []
 
 

@@ -10,18 +10,16 @@ from sqlalchemy.orm import Session
 
 from ..schema import DeviationSurveyModel
 from .common import (
-    DEFAULT_WELL_KB,
-    DEFAULT_WELL_NAME,
     _apply_column_map,
     _coerce_float,
-    _extract_text,
-    _find_existing_well_by_identity,
+    _group_rows_by_well_name,
+    _has_multi_well_rows,
     _read_csv_rows,
+    _resolve_or_create_well_from_rows,
     _resolve_well,
     _sha256,
     _validate_strictly_increasing_depth,
     apply_imported_well_metadata,
-    create_empty_well,
     extend_well_td_for_import,
 )
 
@@ -54,49 +52,27 @@ def _detect_deviation_mode(fieldnames: list[str]) -> tuple[str, tuple[str, str]]
     raise ValueError('Deviation CSV must contain incl_deg/azim_deg, x/y, or dx/dy columns')
 
 
-def _resolve_or_create_well_for_deviation(
-    session: Session,
-    rows: list[dict[str, str]],
-    depth_column: str,
-    well_id: str | None,
-    *,
-    create_new_well: bool = False,
-) -> object:
-    if well_id:
-        return _resolve_well(session, well_id)
-
-    first_name = _extract_text(rows[0], 'well_name', 'well', 'well_name_header') if rows else None
-    if not create_new_well:
-        existing = _find_existing_well_by_identity(session, name=first_name)
-        if existing is not None:
-            return existing
-    return create_empty_well(session, name=first_name or DEFAULT_WELL_NAME, kb=DEFAULT_WELL_KB)
-
-
-def import_deviation_csv(
+def _import_deviation_rows(
     session: Session,
     project_path: Path | str,
     well_id: str | None,
-    csv_path: Path | str,
+    path: Path,
+    fieldnames: list[str],
+    rows: list[dict[str, str]],
     *,
-    column_map: dict[str, str] | None = None,
     create_new_well: bool = False,
 ) -> tuple[DeviationSurveyModel, list[str]]:
     bundle_path = Path(project_path)
-    path = Path(csv_path)
     deviation_dir = bundle_path / 'deviation'
     deviation_dir.mkdir(parents=True, exist_ok=True)
 
-    fieldnames, rows = _read_csv_rows(path)
-    if column_map:
-        fieldnames, rows = _apply_column_map(fieldnames, rows, column_map)
     if not rows:
         raise ValueError(f'{path}: deviation CSV is empty')
 
     reference, depth_column = _detect_deviation_reference(fieldnames)
     mode, value_columns = _detect_deviation_mode(fieldnames)
     depths = _validate_strictly_increasing_depth(rows, depth_column, path)
-    well = _resolve_or_create_well_for_deviation(session, rows, depth_column, well_id, create_new_well=create_new_well)
+    well = _resolve_or_create_well_from_rows(session, rows, well_id=well_id, create_new_well=create_new_well)
     td_before_import = well.td_md
     if depths:
         apply_imported_well_metadata(well, td=depths[-1])
@@ -146,3 +122,68 @@ def import_deviation_csv(
     session.flush()
     qc_warnings = [td_warning] if td_warning is not None else []
     return survey, qc_warnings
+
+
+def import_deviation_csv(
+    session: Session,
+    project_path: Path | str,
+    well_id: str | None,
+    csv_path: Path | str,
+    *,
+    column_map: dict[str, str] | None = None,
+    create_new_well: bool = False,
+) -> tuple[DeviationSurveyModel, list[str]]:
+    path = Path(csv_path)
+    fieldnames, rows = _read_csv_rows(path)
+    if column_map:
+        fieldnames, rows = _apply_column_map(fieldnames, rows, column_map)
+    return _import_deviation_rows(
+        session,
+        project_path,
+        well_id,
+        path,
+        fieldnames,
+        rows,
+        create_new_well=create_new_well,
+    )
+
+
+def import_deviation_csv_multi(
+    session: Session,
+    project_path: Path | str,
+    csv_path: Path | str,
+    *,
+    column_map: dict[str, str] | None = None,
+    create_new_well: bool = False,
+) -> tuple[list[DeviationSurveyModel], list[str], int]:
+    path = Path(csv_path)
+    fieldnames, rows = _read_csv_rows(path)
+    if column_map:
+        fieldnames, rows = _apply_column_map(fieldnames, rows, column_map)
+    if not _has_multi_well_rows(rows):
+        survey, warnings = _import_deviation_rows(
+            session,
+            project_path,
+            None,
+            path,
+            fieldnames,
+            rows,
+            create_new_well=create_new_well,
+        )
+        return [survey], warnings, len(rows)
+
+    surveys: list[DeviationSurveyModel] = []
+    qc_warnings: list[str] = []
+    for _name, group_rows in _group_rows_by_well_name(rows):
+        survey, warnings = _import_deviation_rows(
+            session,
+            project_path,
+            None,
+            path,
+            fieldnames,
+            group_rows,
+            create_new_well=create_new_well,
+        )
+        surveys.append(survey)
+        qc_warnings.extend(warnings)
+    return surveys, qc_warnings, len(rows)

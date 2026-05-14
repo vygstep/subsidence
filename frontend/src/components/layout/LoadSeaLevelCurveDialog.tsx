@@ -14,31 +14,41 @@ import {
   useImportPreview,
 } from './importWizard'
 import {
-  STRAT_CHART_FIELDS,
+  SEA_LEVEL_CURVE_FIELDS,
   autoMap,
   isMappingValid,
-  validateStratChartMapping,
+  validateSeaLevelCurveMapping,
 } from './importWizard/mapping'
 import type { ColumnMapping } from './importWizard/mapping'
 import { getLastImportRoot, pickFile, rememberImportPath } from './pathMemory'
 
 const STEP_LABELS = ['File', 'Preview']
 
-interface LoadStratChartDialogProps {
+interface LoadSeaLevelCurveDialogProps {
   onClose: () => void
-  onSuccess: (unitsImported: number) => void
+  onSuccess: (pointCount: number) => void
 }
 
-export function LoadStratChartDialog({ onClose, onSuccess }: LoadStratChartDialogProps) {
+function defaultCurveName(path: string): string {
+  const trimmed = path.trim()
+  if (!trimmed) return ''
+  const filename = trimmed.split(/[\\/]/).filter(Boolean).pop() ?? trimmed
+  return filename.replace(/\.[^.]+$/, '') || filename
+}
+
+export function LoadSeaLevelCurveDialog({ onClose, onSuccess }: LoadSeaLevelCurveDialogProps) {
   const projectPath = useProjectStore((state) => state.projectPath)
   const [csvPath, setCsvPath] = useState(() => getLastImportRoot())
+  const [curveName, setCurveName] = useState('')
+  const [curveNameEdited, setCurveNameEdited] = useState(false)
   const [mapping, setMapping] = useState<ColumnMapping>({})
   const [currentStepIndex, setCurrentStepIndex] = useState(0)
   const [error, setError] = useState<string | null>(null)
   const [isSubmitting, setIsSubmitting] = useState(false)
   const lastImportRoot = getLastImportRoot()
-  const preset = importWizardPresets.stratChart
+  const preset = importWizardPresets.seaLevelCurve
   const sourceIsValid = csvPath.trim().length > 0
+  const curveNameIsValid = curveName.trim().length > 0
   const isOnPreviewStep = currentStepIndex === 1
 
   const { isLoading: previewLoading, error: previewError, tabularPreview, parserSettings, updateParserSettings } = useImportPreview(
@@ -48,21 +58,35 @@ export function LoadStratChartDialog({ onClose, onSuccess }: LoadStratChartDialo
   )
 
   useEffect(() => {
+    if (!curveNameEdited) {
+      setCurveName(defaultCurveName(csvPath))
+    }
+  }, [csvPath, curveNameEdited])
+
+  useEffect(() => {
     if (tabularPreview) {
-      setMapping(autoMap(tabularPreview.columns, STRAT_CHART_FIELDS))
+      setMapping(autoMap(tabularPreview.columns, SEA_LEVEL_CURVE_FIELDS))
     }
   }, [tabularPreview])
 
-  const mappingErrors = validateStratChartMapping(mapping)
+  const mappingErrors = validateSeaLevelCurveMapping(mapping)
   const mappingOk = isMappingValid(mappingErrors)
   const steps = buildImportWizardSteps(currentStepIndex, sourceIsValid, STEP_LABELS)
-  const validationMessages = currentStepIndex === 0 && !sourceIsValid ? ['CSV path is required.'] : []
+  const validationMessages = [
+    ...(currentStepIndex === 0 && !sourceIsValid ? ['CSV path is required.'] : []),
+    ...(currentStepIndex === 1 && !curveNameIsValid ? ['Curve name is required.'] : []),
+  ]
 
   const handleSubmit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault()
     const nextPath = csvPath.trim()
+    const nextName = curveName.trim()
     if (!nextPath) {
       setError('CSV path is required')
+      return
+    }
+    if (!nextName) {
+      setError('Curve name is required')
       return
     }
 
@@ -80,15 +104,18 @@ export function LoadStratChartDialog({ onClose, onSuccess }: LoadStratChartDialo
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
             csv_path: nextPath,
+            curve_name: nextName,
             column_map: columnMap,
+            delimiter: parserSettings.delimiter,
+            header_row: parserSettings.headerRow,
           }),
         })
         if (!response.ok) {
           throw new Error(await readImportError(response, `Import failed (${response.status})`))
         }
-        const payload = (await response.json()) as { units_imported: number }
+        const payload = (await response.json()) as { curve_id: number; point_count: number }
         rememberImportPath(nextPath)
-        onSuccess(payload.units_imported)
+        onSuccess(payload.point_count)
         onClose()
       }, { projectPath, details: { inputPath: nextPath } })
     } catch (cause) {
@@ -114,13 +141,13 @@ export function LoadStratChartDialog({ onClose, onSuccess }: LoadStratChartDialo
   return (
     <ImportWizardShell
       preset={preset}
-      titleId="load-strat-chart-title"
+      titleId="load-sea-level-curve-title"
       steps={steps}
       currentStepIndex={currentStepIndex}
       error={error}
       isSubmitting={isSubmitting}
       canAdvance={sourceIsValid}
-      canSubmit={sourceIsValid && mappingOk}
+      canSubmit={sourceIsValid && curveNameIsValid && mappingOk}
       validationMessages={validationMessages}
       onClose={onClose}
       onSubmit={handleSubmit}
@@ -129,24 +156,36 @@ export function LoadStratChartDialog({ onClose, onSuccess }: LoadStratChartDialo
     >
       {currentStepIndex === 0 ? (
         <ImportWizardFileField
-          label="StratChart CSV path"
+          label="Sea level CSV path"
           value={csvPath}
-          placeholder="D:\\data\\ics_chart2023.csv"
+          placeholder="D:\\data\\sea_level.csv"
           onChange={setCsvPath}
         />
       ) : null}
 
       {currentStepIndex === 1 ? (
-        <TabularPreviewPane
-          isLoading={previewLoading}
-          error={previewError}
-          preview={tabularPreview}
-          settings={parserSettings}
-          onSettingsChange={updateParserSettings}
-          fields={STRAT_CHART_FIELDS}
-          mapping={mapping}
-          onMappingChange={(fieldId, col) => setMapping((prev) => ({ ...prev, [fieldId]: col }))}
-        />
+        <>
+          <label className="project-dialog__field">
+            <span>Curve name</span>
+            <input
+              value={curveName}
+              onChange={(event) => {
+                setCurveNameEdited(true)
+                setCurveName(event.target.value)
+              }}
+            />
+          </label>
+          <TabularPreviewPane
+            isLoading={previewLoading}
+            error={previewError}
+            preview={tabularPreview}
+            settings={parserSettings}
+            onSettingsChange={updateParserSettings}
+            fields={SEA_LEVEL_CURVE_FIELDS}
+            mapping={mapping}
+            onMappingChange={(fieldId, col) => setMapping((prev) => ({ ...prev, [fieldId]: col }))}
+          />
+        </>
       ) : null}
     </ImportWizardShell>
   )
