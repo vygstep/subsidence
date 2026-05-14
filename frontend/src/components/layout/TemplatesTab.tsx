@@ -37,10 +37,6 @@ interface TemplatesTabProps {
   onSelectLithologyPatternPalette: (paletteId: number) => void
 }
 
-function CountBadge({ count }: { count: number }) {
-  return <span className="template-section__count">{count}</span>
-}
-
 export function TemplatesTab({
   mnemonicSets,
   unitDimensions,
@@ -94,7 +90,6 @@ export function TemplatesTab({
             >
               Compaction Presets
             </button>
-            <CountBadge count={compactionPresets.length} />
           </div>
           {isExpanded('template:compaction-presets') ? (
             <div className="tree-node__children">
@@ -142,7 +137,6 @@ export function TemplatesTab({
             >
               Curve Mnemonics
             </button>
-            <CountBadge count={mnemonicSets.length} />
           </div>
           {isExpanded('template:curve-mnemonics') ? (
             <div className="tree-node__children">
@@ -154,7 +148,7 @@ export function TemplatesTab({
                 >
                   <div className="tree-checkbox-leaf">
                     <span className="tree-checkbox-leaf__label">{set.name}</span>
-                    <span className="tree-checkbox-leaf__meta">{set.is_builtin ? 'built-in' : set.entry_count}</span>
+                    <span className="tree-checkbox-leaf__meta">{set.is_builtin ? 'built-in' : 'user'}</span>
                   </div>
                 </div>
               ))}
@@ -190,7 +184,6 @@ export function TemplatesTab({
             >
               Measurement Units
             </button>
-            <CountBadge count={unitDimensions.length} />
           </div>
           {isExpanded('template:measurement-units') ? (
             <div className="tree-node__children">
@@ -202,7 +195,6 @@ export function TemplatesTab({
                 >
                   <div className="tree-checkbox-leaf">
                     <span className="tree-checkbox-leaf__label">{dimension.display_name}</span>
-                    <span className="tree-checkbox-leaf__meta">{dimension.unit_count}</span>
                   </div>
                 </div>
               ))}
@@ -228,7 +220,6 @@ export function TemplatesTab({
             >
               Pattern Palettes
             </button>
-            <CountBadge count={lithologyPatternPalettes.length} />
           </div>
           {isExpanded('template:pattern-palettes') ? (
             <div className="tree-node__children">
@@ -240,7 +231,7 @@ export function TemplatesTab({
                 >
                   <div className="tree-checkbox-leaf">
                     <span className="tree-checkbox-leaf__label">{palette.name}</span>
-                    <span className="tree-checkbox-leaf__meta">{palette.is_builtin ? 'built-in' : palette.entry_count}</span>
+                    <span className="tree-checkbox-leaf__meta">{palette.is_builtin ? 'built-in' : 'user'}</span>
                   </div>
                 </div>
               ))}
@@ -266,7 +257,6 @@ export function TemplatesTab({
             >
               Lithologies
             </button>
-            <CountBadge count={lithologySets.length} />
           </div>
           {isExpanded('template:lithologies') ? (
             <div className="tree-node__children">
@@ -278,7 +268,6 @@ export function TemplatesTab({
                 >
                   <div className="tree-checkbox-leaf">
                     <span className="tree-checkbox-leaf__label">{set.name}</span>
-                    <span className="tree-checkbox-leaf__meta">{set.entry_count}</span>
                   </div>
                 </div>
               ))}

@@ -9,6 +9,7 @@ from fastapi.testclient import TestClient
 from sqlalchemy import select as sa_select
 
 from subsidence.api.main import app
+from subsidence.data.importers import DEFAULT_WELL_NAME
 from subsidence.data.schema import (
     CalculationResult,
     CompactionModel,
@@ -79,6 +80,28 @@ def _write_minimal_las(path: Path, well_name: str = 'LAS Well') -> Path:
         '100.0 80.0 2.35\n'
         '200.0 85.0 2.40\n'
         '300.0 90.0 2.45\n',
+        encoding='utf-8',
+    )
+    return path
+
+
+def _write_minimal_las_without_well_name(path: Path) -> Path:
+    path.write_text(
+        '~Version Information\n'
+        ' VERS. 2.0 : CWLS LOG ASCII STANDARD\n'
+        ' WRAP. NO  : One line per depth step\n'
+        '~Well Information\n'
+        ' STRT.M 100.0 : Start depth\n'
+        ' STOP.M 300.0 : Stop depth\n'
+        ' STEP.M 100.0 : Step\n'
+        ' NULL. -999.25 : Null value\n'
+        '~Curve Information\n'
+        ' DEPT.M : Depth\n'
+        ' GR.API : Gamma ray\n'
+        '~ASCII\n'
+        '100.0 80.0\n'
+        '200.0 85.0\n'
+        '300.0 90.0\n',
         encoding='utf-8',
     )
     return path
@@ -414,6 +437,79 @@ def test_las_import_auto_creates_well_and_survives_reopen(api_client: TestClient
     assert [well['well_id'] for well in wells] == [well_id]
     assert wells[0]['well_name'] == 'LAS Well'
     assert [curve['mnemonic'] for curve in wells[0]['curves']] == ['GR', 'RHOB']
+
+
+@pytest.mark.parametrize(
+    ('endpoint', 'payload_factory', 'expected_data_count'),
+    [
+        (
+            '/api/projects/import-las',
+            lambda path: {'las_path': str(_write_minimal_las_without_well_name(path / 'fallback.las'))},
+            ('curve_count', 1),
+        ),
+        (
+            '/api/projects/import-logs-csv',
+            lambda path: {
+                'csv_path': str(path / 'fallback_logs.csv'),
+                'depth_column': 'DEPT',
+                '_write': (
+                    path / 'fallback_logs.csv',
+                    'DEPT,GR\n100,80\n200,82\n300,85\n',
+                ),
+            },
+            ('curve_count', 1),
+        ),
+        (
+            '/api/projects/import-tops',
+            lambda path: {
+                'csv_path': str(path / 'fallback_tops.csv'),
+                'depth_ref': 'MD',
+                '_write': (
+                    path / 'fallback_tops.csv',
+                    'top_name,depth_md,strat_age_ma\nTop A,100,10\nTop B,200,20\n',
+                ),
+            },
+            ('formation_count', 2),
+        ),
+        (
+            '/api/projects/import-deviation',
+            lambda path: {
+                'csv_path': str(path / 'fallback_deviation.csv'),
+                '_write': (
+                    path / 'fallback_deviation.csv',
+                    'md,incl_deg,azim_deg\n0,0,0\n100,1,90\n200,2,95\n',
+                ),
+            },
+            ('mode', 'INCL_AZIM'),
+        ),
+    ],
+)
+def test_imports_without_target_or_file_well_name_use_central_fallback_well(
+    api_client: TestClient,
+    tmp_path: Path,
+    endpoint: str,
+    payload_factory,
+    expected_data_count: tuple[str, object],
+) -> None:
+    _create_project(api_client, tmp_path, f'fallback-{endpoint.rsplit("/", 1)[-1]}')
+    payload = payload_factory(tmp_path)
+    write_spec = payload.pop('_write', None)
+    if write_spec is not None:
+        path, content = write_spec
+        path.write_text(content, encoding='utf-8')
+
+    response = api_client.post(endpoint, json=payload)
+    assert response.status_code == 200, response.text
+    result = response.json()
+    key, expected_value = expected_data_count
+    assert result[key] == expected_value
+
+    response = api_client.get('/api/wells/inventory')
+    assert response.status_code == 200, response.text
+    wells = response.json()
+    assert len(wells) == 1
+    assert wells[0]['well_id'] == result['well_id']
+    assert wells[0]['well_name'] == DEFAULT_WELL_NAME
 
 
 def test_las_import_uses_unit_registry_for_depth_and_curve_units(api_client: TestClient, tmp_path: Path) -> None:

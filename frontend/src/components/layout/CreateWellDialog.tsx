@@ -104,7 +104,7 @@ export function CreateWellDialog({ onClose, onSuccess }: CreateWellDialogProps) 
             type="text"
             value={name}
             onChange={(event) => setName(event.target.value)}
-            placeholder="Pleshet 01"
+            placeholder="well-1"
             autoFocus
           />
         </label>
