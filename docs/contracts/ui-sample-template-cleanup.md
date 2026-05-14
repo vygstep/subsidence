@@ -27,8 +27,7 @@ legacy sample data, and public attribution.
 - The Templates tab must not show numeric counters on section headers or object
   rows.
 - `built-in` and `user` labels are status labels, not counters, and may stay.
-- `app/data/sample.las` is legacy unless runtime, tests, or active docs prove
-  otherwise.
+- `app/data` is legacy unless runtime, tests, or active docs prove otherwise.
 - Public attribution should be visible in README: `Created by Stepan Vygovskiy`.
 
 ## Implementation Plan
@@ -54,13 +53,12 @@ Status: done.
 
 ### S3: Legacy `app/data` cleanup
 
-- Verify active runtime, tests, and active docs do not depend on
-  `app/data/sample.las`.
-- Remove `app/data/sample.las` if it is only legacy sample data.
+- Verify active runtime, tests, and active docs do not depend on `app/data`.
+- Remove the tracked `app/data` folder if it is only legacy sample data.
 - Keep historical implemented contracts unchanged unless they incorrectly appear
   in active navigation.
 
-Status: pending.
+Status: done. Active references outside this contract were not found.
 
 ### S4: Templates tab counters
 
