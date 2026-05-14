@@ -73,6 +73,33 @@
   gap: 8px;
 }
 
+.project-dialog__path-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.project-dialog__path-action {
+  border: 1px solid #cbd5e1;
+  border-radius: 6px;
+  padding: 5px 9px;
+  background: #f8fbff;
+  color: #314155;
+  font-size: 0.76rem;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.project-dialog__path-action:hover:not(:disabled) {
+  border-color: #7cb8e8;
+  background: #f1f7fc;
+}
+
+.project-dialog__path-action:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
 .project-dialog__field input {
   width: 100%;
   min-height: 22px;

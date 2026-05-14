@@ -29,7 +29,7 @@ export interface ImportWizardWellOption {
   well_name: string
 }
 
-export type TabularDelimiter = 'auto' | ',' | '\t' | ';'
+export type TabularDelimiter = 'auto' | ',' | '\t' | ';' | ' '
 
 export interface TabularParserSettings {
   delimiter: TabularDelimiter
