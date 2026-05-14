@@ -1,5 +1,6 @@
 repos/
 projects/
+subsidence_archive/
 
 # Python artifacts
 __pycache__/
@@ -15,3 +16,5 @@ logs/
 # Local agent/context files
 AGENTS.md
 CLAUDE.md
+
+

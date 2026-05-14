@@ -17,6 +17,7 @@ import { drawLithologyComposition, drawLithologyDiscrete, type CompositionBand }
 import type { LithologyFillStyle } from '@/renderers/lithologyRenderer'
 import type { CurveConfig, CurveData, LithologyPatternEntry, TrackConfig } from '@/types'
 import { useViewStore, useWellDataStore } from '@/stores'
+import { resolveDepthGridIntervals } from '@/utils/depthGrid'
 
 interface DataTrackProps {
   config: TrackConfig
@@ -104,6 +105,7 @@ function interpolateAtDepth(depths: Float32Array, values: Float32Array, target: 
 
 export function DataTrack({ config, curves, width, height, wellTopDepth, wellBottomDepth }: DataTrackProps) {
   const visibleDepthRange = useViewStore((state) => state.visibleDepthRange)
+  const depthTrackConfig = useViewStore((state) => state.depthTrackConfig)
   const selectedElementId = useViewStore((state) => state.selectedElementId)
   const selectedElementType = useViewStore((state) => state.selectedElementType)
   const selectElement = useViewStore((state) => state.selectElement)
@@ -177,6 +179,12 @@ export function DataTrack({ config, curves, width, height, wellTopDepth, wellBot
   )
 
   const { scale: depthScale } = useDepthScale(visibleDepthRange, height)
+  const { majorInterval, minorInterval } = resolveDepthGridIntervals(
+    depthTrackConfig.gridStepMode,
+    visibleDepthRange.max - visibleDepthRange.min,
+    depthTrackConfig.majorInterval,
+    depthTrackConfig.minorInterval,
+  )
 
   const curveScales = useMemo(() => {
     return new Map<string, ScaleLinear<number, number> | ScaleLogarithmic<number, number>>(
@@ -210,7 +218,7 @@ export function DataTrack({ config, curves, width, height, wellTopDepth, wellBot
       ctx.fillRect(0, 0, canvasWidth, canvasHeight)
 
       if (isLithologyTrack) {
-        drawDepthGridlines(ctx, depthScale, canvasWidth, 100, 10)
+        drawDepthGridlines(ctx, depthScale, canvasWidth, majorInterval, minorInterval)
         if (compositionBands.length > 0) {
           drawLithologyComposition(
             ctx, compositionBands, depthScale, canvasWidth, canvasHeight,
@@ -249,7 +257,7 @@ export function DataTrack({ config, curves, width, height, wellTopDepth, wellBot
       }
 
       if (config.showHorizontalGrid ?? true) {
-        drawDepthGridlines(ctx, depthScale, canvasWidth, 100, 10, config.gridColor)
+        drawDepthGridlines(ctx, depthScale, canvasWidth, majorInterval, minorInterval, config.gridColor)
       }
 
       clippedCurves.forEach(({ curve, style }) => {
@@ -353,8 +361,13 @@ export function DataTrack({ config, curves, width, height, wellTopDepth, wellBot
       config.track_type,
       curveGapThresholds,
       curveScales,
+      depthTrackConfig.gridStepMode,
+      depthTrackConfig.majorInterval,
+      depthTrackConfig.minorInterval,
       depthScale,
       isLithologyTrack,
+      majorInterval,
+      minorInterval,
       patternRenderTick,
       selectedElementId,
       selectedElementType,

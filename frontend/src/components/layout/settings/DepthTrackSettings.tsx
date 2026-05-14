@@ -1,12 +1,20 @@
 import { useViewStore, useWellDataStore } from '@/stores'
+import { resolveDepthGridIntervals } from '@/utils/depthGrid'
 
 export function DepthTrackSettings() {
   const depthTrackConfig = useViewStore((state) => state.depthTrackConfig)
   const updateDepthTrackConfig = useViewStore((state) => state.updateDepthTrackConfig)
   const depthType = useViewStore((state) => state.depthType)
   const setDepthType = useViewStore((state) => state.setDepthType)
+  const visibleDepthRange = useViewStore((state) => state.visibleDepthRange)
   const tvdTable = useWellDataStore((state) => state.tvdTable)
   const kbElev = useWellDataStore((state) => state.well?.kb_elev ?? 0)
+  const autoIntervals = resolveDepthGridIntervals(
+    'auto',
+    visibleDepthRange.max - visibleDepthRange.min,
+    depthTrackConfig.majorInterval,
+    depthTrackConfig.minorInterval,
+  )
 
   return (
     <div className="template-panel">
@@ -46,12 +54,23 @@ export function DepthTrackSettings() {
         </select>
       </div>
       <div className="sf-row">
+        <span>Grid step</span>
+        <select
+          value={depthTrackConfig.gridStepMode ?? 'auto'}
+          onChange={(event) => updateDepthTrackConfig({ gridStepMode: event.target.value as 'auto' | 'manual' })}
+        >
+          <option value="auto">Auto</option>
+          <option value="manual">Manual</option>
+        </select>
+      </div>
+      <div className="sf-row">
         <span>Major ticks</span>
         <input
           type="number"
           min="0.01"
           step="0.01"
-          value={depthTrackConfig.majorInterval}
+          value={depthTrackConfig.gridStepMode === 'manual' ? depthTrackConfig.majorInterval : autoIntervals.majorInterval}
+          disabled={depthTrackConfig.gridStepMode !== 'manual'}
           onChange={(event) => updateDepthTrackConfig({ majorInterval: Number(event.target.value) })}
         />
       </div>
@@ -61,7 +80,8 @@ export function DepthTrackSettings() {
           type="number"
           min="0.001"
           step="0.001"
-          value={depthTrackConfig.minorInterval}
+          value={depthTrackConfig.gridStepMode === 'manual' ? depthTrackConfig.minorInterval : autoIntervals.minorInterval}
+          disabled={depthTrackConfig.gridStepMode !== 'manual'}
           onChange={(event) => updateDepthTrackConfig({ minorInterval: Number(event.target.value) })}
         />
       </div>

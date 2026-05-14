@@ -19,6 +19,7 @@ export function TrackHeaderRow({ tracks, trackOrder }: TrackHeaderRowProps) {
   const trackWidths = useViewStore((state) => state.trackWidths)
   const selectedTrackId = useViewStore((state) => state.selectedTrackId)
   const selectTrack = useViewStore((state) => state.selectTrack)
+  const setSelectedObject = useWorkspaceStore((state) => state.setSelectedObject)
   const updateWellViewState = useWorkspaceStore((state) => state.updateWellViewState)
   const activeWellId = useWellDataStore((state) => state.well?.well_id ?? null)
   const depthType = useViewStore((state) => state.depthType)
@@ -29,6 +30,23 @@ export function TrackHeaderRow({ tracks, trackOrder }: TrackHeaderRowProps) {
   const [contextMenu, setContextMenu] = useState<{ x: number; y: number; trackId: string } | null>(null)
   const contextMenuRef = useRef<HTMLDivElement>(null)
   const tracksById = new Map(tracks.map((track) => [track.id, track]))
+
+  const selectHeaderTrack = (trackId: string) => {
+    selectTrack(trackId)
+    if (!activeWellId) return
+
+    if (trackId === DEPTH_TRACK_ID) {
+      setSelectedObject({ type: 'depth-track', wellId: activeWellId })
+      return
+    }
+
+    if (trackId === FORMATION_TRACK_ID) {
+      setSelectedObject({ type: 'formations-track', wellId: activeWellId })
+      return
+    }
+
+    setSelectedObject({ type: 'curve-track', wellId: activeWellId, trackId })
+  }
 
   const handleDrop = (targetTrackId: string) => {
     if (!activeWellId || !draggedTrackId || draggedTrackId === targetTrackId) {
@@ -53,7 +71,7 @@ export function TrackHeaderRow({ tracks, trackOrder }: TrackHeaderRowProps) {
       }
     })
 
-    selectTrack(draggedTrackId)
+    selectHeaderTrack(draggedTrackId)
     setDraggedTrackId(null)
     setDropTargetTrackId(null)
   }
@@ -121,7 +139,7 @@ export function TrackHeaderRow({ tracks, trackOrder }: TrackHeaderRowProps) {
                 draggable
                 className={`track-header-row__depth-header ${selectedTrackId === DEPTH_TRACK_ID ? 'track-header-row__special-header--selected' : ''} ${dropTargetTrackId === trackId && draggedTrackId !== trackId ? 'track-header-row__special-header--drag-over' : ''}`}
                 style={{ width: depthWidth }}
-                onClick={() => selectTrack(DEPTH_TRACK_ID)}
+                onClick={() => selectHeaderTrack(DEPTH_TRACK_ID)}
                 {...sharedDragProps}
               >
                 {depthType}
@@ -139,7 +157,7 @@ export function TrackHeaderRow({ tracks, trackOrder }: TrackHeaderRowProps) {
                 draggable
                 className={`track-header-row__formation-header ${selectedTrackId === FORMATION_TRACK_ID ? 'track-header-row__special-header--selected' : ''} ${dropTargetTrackId === trackId && draggedTrackId !== trackId ? 'track-header-row__special-header--drag-over' : ''}`}
                 style={{ width: formationWidth }}
-                onClick={() => selectTrack(FORMATION_TRACK_ID)}
+                onClick={() => selectHeaderTrack(FORMATION_TRACK_ID)}
                 {...sharedDragProps}
               >
                 Formations
@@ -161,7 +179,7 @@ export function TrackHeaderRow({ tracks, trackOrder }: TrackHeaderRowProps) {
               width={trackWidths[track.id] ?? track.width}
               isSelected={selectedTrackId === track.id}
               isDragOver={dropTargetTrackId === track.id && draggedTrackId !== track.id}
-              onSelect={() => selectTrack(track.id)}
+              onSelect={() => selectHeaderTrack(track.id)}
               onContextMenu={(e) => {
                 e.preventDefault()
                 setContextMenu({ x: e.clientX, y: e.clientY, trackId: track.id })
