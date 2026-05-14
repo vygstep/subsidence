@@ -1,7 +1,12 @@
 # Data Import Workflows
 
 Status: Active
-Branch: `feature/data-import-workflows`
+Current branch: `feature/import-multiwell-foundation`
+
+Merged baseline:
+
+- `feature/data-import-workflows` was merged to `main` with Stage 1 and Stage 2 completed.
+- Remaining work continues in smaller stage branches from `main`.
 
 ## Goal
 
@@ -25,6 +30,13 @@ This contract covers import only. Data export is intentionally out of scope and 
 - No changes to already working import behavior before user UX review confirms them.
 
 ## Stage 1 - UX Review of Existing Imports
+
+Status: Completed.
+
+Result:
+
+- User manually checked the normalized logs, tops, and deviation import UX.
+- No additional UX blockers were reported before continuing.
 
 User will manually run the currently working imports and report UX issues before new import work starts:
 
@@ -55,6 +67,16 @@ Expected output of this stage:
 Implementation does not begin until this stage is discussed and confirmed.
 
 ## Stage 2 - Existing Wizard UX Cleanup
+
+Status: Completed and merged to `main`.
+
+Result:
+
+- Shared import wizard file step now uses bottom primary `Browse...`.
+- File selection opens preview directly.
+- Inner file-field browse/previous-path controls were removed from logs, tops, and deviation import dialogs.
+- Import wizard target-well selection and file field components were centralized.
+- Existing import wizard frontend tests were updated and passed before merge.
 
 Normalize and lightly centralize the shared import wizard behavior before adding new data importers.
 
