@@ -1,7 +1,7 @@
 # Auto Depth Grid Step
 
-Status: Active
-Current branch: `fix/auto-depth-grid-step`
+Status: Implemented
+Merged: `fix/auto-depth-grid-step` → `main`
 
 ## Goal
 
