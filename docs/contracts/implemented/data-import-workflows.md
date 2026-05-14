@@ -270,7 +270,18 @@ Likely files:
 
 ## Stage 5 - Sea Level Curve Import
 
-Status: In progress on `feature/import-multiwell-foundation`.
+Status: Completed on `feature/import-multiwell-foundation`.
+
+Result:
+
+- Added `Load Sea Level Curve` in the StratCharts toolbar.
+- Added a shared wizard flow with Browse, preview, parser settings, column mapping, and curve name.
+- Added backend import endpoint `POST /api/sea-level-curves/import`.
+- Required mapped fields are `age_ma` and `sea_level_m`.
+- Import respects selected delimiter and header row.
+- Imported curves are user-defined, appear under `SEA LEVEL CURVES`, and can be assigned in Models settings.
+- Built-in curves remain read-only.
+- Added backend regression coverage for CSV import.
 
 Add a visible frontend import path for sea level curves.
 
@@ -302,6 +313,14 @@ Likely files:
 
 ## Stage 6 - Link Marker to Stratigraphy
 
+Status: Deferred by user.
+
+Reason:
+
+- Current marker behavior is acceptable for now: marker ages resolve colors from the active stratigraphic chart.
+- If the active stratigraphic chart changes, marker color resolution can change with that active chart.
+- Explicit marker-to-stratigraphy linking needs a clearer UX decision before implementation.
+
 Expose the existing marker-to-stratigraphy link workflow in the UI.
 
 Expected behavior:
@@ -320,6 +339,17 @@ Likely files:
 - `app/src/subsidence/api/formations.py`
 
 ## Stage 7 - Tests and Documentation
+
+Status: Completed for implemented stages.
+
+Verification:
+
+- `cd app && pytest tests` - 124 passed.
+- `cd frontend && npm run test -- --run` - 64 passed.
+
+Documentation:
+
+- Stage 6 remains deferred and should be moved to a future contract if it becomes needed.
 
 Expected checks:
 
