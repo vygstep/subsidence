@@ -70,7 +70,7 @@ Status: done. Active references outside this contract were not found.
   - lithology set `entry_count`.
 - Keep `built-in` and `user` labels.
 
-Status: pending.
+Status: done.
 
 ### S5: Attribution
 
