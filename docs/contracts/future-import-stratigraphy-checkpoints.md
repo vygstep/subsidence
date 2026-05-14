@@ -1,0 +1,54 @@
+# Future Import, Stratigraphy, and Checkpoint Work
+
+Status: Draft
+Branch: TBD
+
+## Goal
+
+Keep related future work visible without mixing it into the active data import workflow branch.
+
+This contract is intentionally short. Each item needs a proper code review and detailed implementation plan before work starts.
+
+## Items
+
+### 1. Stratigraphy Model Improvements
+
+- Review how StratChart hierarchy should work beyond simple `unit_id` / `parent_unit_id`.
+- Decide whether ranks should stay as text or become a normalized model.
+- Decide how loaded StratCharts should drive the geological timescale shown on subsidence charts.
+- Add validation rules for impossible parent-child relationships.
+
+### 2. Multi-File Import
+
+- Support selecting and importing multiple files in one import workflow.
+- Decide per data type whether mapping is shared across files or configured per file.
+- Show per-file success/error summary.
+- Keep this separate from the current multi-well CSV foundation.
+
+### 3. Import Mapping UX
+
+- Improve column mapping behavior.
+- If a user assigns a field to a new source column, automatically clear the previous source column for that field.
+- The user should not need to manually set the old column back to `-` before choosing a new one.
+
+### 4. User Attributes From Extra Columns
+
+- Preserve imported columns that are not part of the core schema as user-defined attributes.
+- Store them in the database first; decide later where and how they should be displayed or used.
+- Apply this consistently across relevant importers after reviewing the schema.
+
+### 5. Checkpoint Revert
+
+- Add a user-facing way to revert/open from an existing checkpoint.
+- Define whether revert replaces the current project state or creates a new checkpoint first.
+- Make sure undo/redo and dirty-state behavior are clear.
+
+### 6. Checkpoint Comments
+
+- When creating a checkpoint, allow the user to save a short comment/description.
+- Show that comment in the checkpoint list/history.
+
+## Non-Goals
+
+- No implementation in the current branch until explicitly approved.
+- No schema changes before the detailed design is reviewed.

@@ -11,3 +11,7 @@ __pycache__/
 
 # Log files
 logs/
+
+# Local agent/context files
+AGENTS.md
+CLAUDE.md
