@@ -1,6 +1,6 @@
 import type { FormEvent, ReactNode } from 'react'
 
-export type ImportWizardDataType = 'logs' | 'tops' | 'deviation' | 'wells' | 'strat-chart'
+export type ImportWizardDataType = 'logs' | 'tops' | 'deviation' | 'wells' | 'strat-chart' | 'sea-level-curve'
 export type ImportWizardPreviewMode = 'las' | 'tabular'
 export type ImportWizardTargetWellPolicy = 'optional' | 'required' | 'none'
 

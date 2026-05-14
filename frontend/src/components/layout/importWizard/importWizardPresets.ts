@@ -90,4 +90,16 @@ export const importWizardPresets = {
     executeOperation: 'strat_chart.import',
     executeEndpoint: '/api/strat-charts/import',
   },
+  seaLevelCurve: {
+    id: 'sea-level-curve',
+    title: 'Load Sea Level Curve',
+    eyebrow: 'Import Wizard',
+    submitLabel: 'Load curve',
+    busyLabel: 'Importing...',
+    previewMode: 'tabular',
+    targetWellPolicy: 'none',
+    acceptedFileFilters: DELIMITED_TEXT_FILTERS,
+    executeOperation: 'sea_level.import',
+    executeEndpoint: '/api/sea-level-curves/import',
+  },
 } satisfies Record<string, ImportWizardPreset>

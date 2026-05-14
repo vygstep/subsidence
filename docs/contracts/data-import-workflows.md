@@ -221,7 +221,15 @@ Likely files:
 
 ## Stage 4 - StratChart Import Wizard
 
-Status: In progress on `feature/import-multiwell-foundation`.
+Status: Completed on `feature/import-multiwell-foundation`.
+
+Result:
+
+- Replaced the path-only StratChart import with the shared import wizard.
+- Added required column mapping for unit ID, unit name, start age, and end age.
+- Added optional parent, rank, and color mapping.
+- Added simple parent reference and age interval validation.
+- Added color parsing for hex, RGB, and CMYK input.
 
 Implementation plan:
 
@@ -262,6 +270,8 @@ Likely files:
 
 ## Stage 5 - Sea Level Curve Import
 
+Status: In progress on `feature/import-multiwell-foundation`.
+
 Add a visible frontend import path for sea level curves.
 
 Expected behavior:
@@ -275,6 +285,12 @@ Expected behavior:
 - Import creates a user-defined curve and uploads/replaces its points.
 - Built-in curves remain read-only.
 - Imported curve appears in the Sea Level Curves tree and can be assigned in Models settings.
+
+Implementation notes:
+
+- Add a small backend import endpoint instead of sending all CSV rows through frontend preview.
+- Reuse existing sea level curve tables and keep built-in curves read-only.
+- Keep frontend flow aligned with the shared tabular import wizard.
 
 Likely files:
 

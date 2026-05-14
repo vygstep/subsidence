@@ -100,6 +100,11 @@ export const STRAT_CHART_FIELDS: FieldDefinition[] = [
   { id: 'color', label: 'Color', required: false, aliases: ['html_rgb_hash', 'rgb', 'cmyk', 'color', 'color_hex', 'hex'] },
 ]
 
+export const SEA_LEVEL_CURVE_FIELDS: FieldDefinition[] = [
+  { id: 'age_ma', label: 'Age (Ma)', required: true, aliases: ['age_ma', 'age', 'age_ma_bp', 'time_ma'] },
+  { id: 'sea_level_m', label: 'Sea level (m)', required: true, aliases: ['sea_level_m', 'sea_level', 'level_m', 'sl_m', 'eustatic_m'] },
+]
+
 function normalizeKey(s: string): string {
   return s.toLowerCase().replace(/[\s[\]()\-_,./\\]+/g, '').replace(/unit[s]?$/, '')
 }
@@ -154,6 +159,12 @@ export function validateWellsMapping(mapping: ColumnMapping): string[] {
 
 export function validateStratChartMapping(mapping: ColumnMapping): string[] {
   return STRAT_CHART_FIELDS.filter((f) => f.required && !mapping[f.id]).map(
+    (f) => `Required field "${f.label}" is not mapped.`,
+  )
+}
+
+export function validateSeaLevelCurveMapping(mapping: ColumnMapping): string[] {
+  return SEA_LEVEL_CURVE_FIELDS.filter((f) => f.required && !mapping[f.id]).map(
     (f) => `Required field "${f.label}" is not mapped.`,
   )
 }

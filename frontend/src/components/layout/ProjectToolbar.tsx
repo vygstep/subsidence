@@ -6,12 +6,13 @@ import { ImportDeviationDialog } from './ImportDeviationDialog'
 import { ImportLasDialog } from './ImportLasDialog'
 import { ImportTopsDialog } from './ImportTopsDialog'
 import { ImportWellsDialog } from './ImportWellsDialog'
+import { LoadSeaLevelCurveDialog } from './LoadSeaLevelCurveDialog'
 import { LoadStratChartDialog } from './LoadStratChartDialog'
 import { NewProjectDialog } from './NewProjectDialog'
 import { useProjectStore, useViewStore, useWellDataStore, useWorkspaceStore } from '@/stores'
 import { buildDiagnosticSnapshot } from '@/utils/diagnostics'
 
-type DialogKind = 'project-open' | 'project-new' | 'create-well' | 'load-wells' | 'load-las' | 'load-tops' | 'load-deviation' | 'load-strat-chart' | null
+type DialogKind = 'project-open' | 'project-new' | 'create-well' | 'load-wells' | 'load-las' | 'load-tops' | 'load-deviation' | 'load-strat-chart' | 'load-sea-level-curve' | null
 
 interface UnsavedChangesDialogProps {
   projectName: string | null
@@ -58,6 +59,7 @@ export function ProjectToolbar() {
   const error = useWellDataStore((state) => state.error)
   const loadWell = useWellDataStore((state) => state.loadWell)
   const loadStratCharts = useWellDataStore((state) => state.loadStratCharts)
+  const loadSeaLevelCurves = useWellDataStore((state) => state.loadSeaLevelCurves)
   const deleteChart = useWellDataStore((state) => state.deleteChart)
   const refreshWell = useWellDataStore((state) => state.refreshWell)
 
@@ -237,6 +239,16 @@ export function ProjectToolbar() {
             }}
           />
         )
+      case 'load-sea-level-curve':
+        return (
+          <LoadSeaLevelCurveDialog
+            onClose={() => setActiveDialog(null)}
+            onSuccess={async (_count) => {
+              setActiveDialog(null)
+              await loadSeaLevelCurves()
+            }}
+          />
+        )
       default:
         return null
     }
@@ -261,6 +273,7 @@ export function ProjectToolbar() {
   const stratChartModeActions = (
     <>
       <button type="button" className="app-action-button" onClick={() => setActiveDialog('load-strat-chart')}>Load StratChart</button>
+      <button type="button" className="app-action-button" onClick={() => setActiveDialog('load-sea-level-curve')}>Load Sea Level Curve</button>
       <button
         type="button"
         className="app-action-button"

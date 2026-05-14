@@ -3316,6 +3316,45 @@ def test_bstrip001_sea_level_crud(api_client: TestClient, tmp_path: Path):
     assert resp.status_code == 204
 
 
+def test_bstrip001_import_sea_level_curve_from_csv(api_client: TestClient, tmp_path: Path):
+    _create_project(api_client, tmp_path, 'sl-import')
+    csv_path = tmp_path / 'sea_level.csv'
+    csv_path.write_text(
+        'metadata line\n'
+        'age;level\n'
+        '0;0\n'
+        '10;15\n'
+        '20;-25\n',
+        encoding='utf-8',
+    )
+
+    resp = api_client.post('/api/sea-level-curves/import', json={
+        'csv_path': str(csv_path),
+        'curve_name': 'Imported SL',
+        'column_map': {'age_ma': 'age', 'sea_level_m': 'level'},
+        'delimiter': ';',
+        'header_row': 1,
+    })
+    assert resp.status_code == 200, resp.text
+    payload = resp.json()
+    assert payload['point_count'] == 3
+
+    resp = api_client.get('/api/sea-level-curves')
+    assert resp.status_code == 200, resp.text
+    curve = next(c for c in resp.json() if c['id'] == payload['curve_id'])
+    assert curve['name'] == 'Imported SL'
+    assert curve['is_builtin'] is False
+    assert curve['point_count'] == 3
+
+    resp = api_client.get(f"/api/sea-level-curves/{payload['curve_id']}/points")
+    assert resp.status_code == 200, resp.text
+    assert resp.json() == [
+        {'age_ma': 20.0, 'sea_level_m': -25.0},
+        {'age_ma': 10.0, 'sea_level_m': 15.0},
+        {'age_ma': 0.0, 'sea_level_m': 0.0},
+    ]
+
+
 def test_builtin_sea_level_curve_points_are_read_only(api_client: TestClient, tmp_path: Path):
     _create_project(api_client, tmp_path, 'sl-builtin-readonly')
 
