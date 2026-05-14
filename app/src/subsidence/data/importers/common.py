@@ -56,6 +56,10 @@ def _extract_text(row: dict[str, str], *candidates: str) -> str | None:
     return None
 
 
+def _extract_well_name(row: dict[str, str]) -> str | None:
+    return _extract_text(row, 'well_name', 'well', 'well_id', 'uwi')
+
+
 def _extract_float(row: dict[str, str], *candidates: str) -> float | None:
     for key in candidates:
         value = _extract_text(row, key)
@@ -227,6 +231,56 @@ def _find_existing_well_by_identity(
         if normalized_name and _normalize_text(well.name) == normalized_name:
             return well
     return None
+
+
+def _resolve_or_create_well_from_rows(
+    session: Session,
+    rows: list[dict[str, str]],
+    *,
+    well_id: str | None = None,
+    create_new_well: bool = False,
+) -> WellModel:
+    if well_id:
+        return _resolve_well(session, well_id)
+
+    first_name = _extract_well_name(rows[0]) if rows else None
+    if not create_new_well:
+        existing = _find_existing_well_by_identity(session, name=first_name, uwi=first_name)
+        if existing is not None:
+            return existing
+    return create_empty_well(session, name=first_name or DEFAULT_WELL_NAME, kb=DEFAULT_WELL_KB)
+
+
+def _group_rows_by_well_name(
+    rows: list[dict[str, str]],
+) -> list[tuple[str | None, list[dict[str, str]]]]:
+    groups: dict[str, tuple[str, list[dict[str, str]]]] = {}
+    missing: list[dict[str, str]] = []
+    for row in rows:
+        name = _extract_well_name(row)
+        if not name:
+            missing.append(row)
+            continue
+        key = _normalize_text(name)
+        if key not in groups:
+            groups[key] = (name, [])
+        groups[key][1].append(row)
+
+    if not groups:
+        return [(None, rows)]
+    if missing:
+        raise ValueError('CSV contains a mix of rows with and without well_name; fill well_name for every row or import as a single target well.')
+    return [(name, group_rows) for name, group_rows in groups.values()]
+
+
+def _has_multi_well_rows(rows: list[dict[str, str]]) -> bool:
+    names = {
+        _normalize_text(_extract_well_name(row))
+        for row in rows
+        if _extract_well_name(row)
+    }
+    names.discard('')
+    return len(names) > 1
 
 
 def _apply_column_map(

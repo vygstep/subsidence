@@ -21,6 +21,7 @@ interface TabularPreviewPaneProps {
   onMappingChange?: (fieldId: string, colName: string | null) => void
   curveTypes?: Record<string, CurveType>
   onCurveTypeChange?: (col: string, type: CurveType) => void
+  curveTypeExcludedColumns?: string[]
 }
 
 export function TabularPreviewPane({
@@ -35,6 +36,7 @@ export function TabularPreviewPane({
   onMappingChange,
   curveTypes,
   onCurveTypeChange,
+  curveTypeExcludedColumns = [],
 }: TabularPreviewPaneProps) {
   const depthColIndex = depthColumn != null && preview ? preview.columns.indexOf(depthColumn) : -1
   const showMapping = fields != null && mapping != null && onMappingChange != null && preview != null
@@ -127,9 +129,10 @@ export function TabularPreviewPane({
                   <th className="import-preview__row-num" />
                   {preview.columns.map((col, colIdx) => {
                     const isDepth = colIdx === depthColIndex
+                    const isExcluded = curveTypeExcludedColumns.includes(col)
                     return (
                       <th key={colIdx} className={isDepth ? 'import-preview__col--depth' : undefined}>
-                        {isDepth ? null : (
+                        {isDepth || isExcluded ? null : (
                           <select
                             value={curveTypes[col] ?? 'continuous'}
                             onChange={(e) => onCurveTypeChange(col, e.target.value as CurveType)}

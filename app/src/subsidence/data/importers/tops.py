@@ -11,41 +11,21 @@ from ..strat_link import auto_link_to_active_chart
 
 _log = logging.getLogger('subsidence.import.tops')
 from .common import (
-    DEFAULT_WELL_KB,
-    DEFAULT_WELL_NAME,
     _DEFAULT_TOP_COLOR,
     _apply_column_map,
     _ensure_row_targets_well,
     _extract_float,
     _extract_text,
-    _find_existing_well_by_identity,
+    _group_rows_by_well_name,
+    _has_multi_well_rows,
     _load_ics_units,
     _read_csv_rows,
+    _resolve_or_create_well_from_rows,
     _resolve_ics_color,
-    _resolve_well,
     apply_imported_well_metadata,
-    create_empty_well,
     extend_well_td_for_import,
     run_top_qc,
 )
-
-
-def _resolve_or_create_well_for_tops(
-    session: Session,
-    rows: list[dict[str, str]],
-    well_id: str | None,
-    *,
-    create_new_well: bool = False,
-) -> object:
-    if well_id:
-        return _resolve_well(session, well_id)
-
-    first_name = _extract_text(rows[0], 'well_name') if rows else None
-    if not create_new_well:
-        existing = _find_existing_well_by_identity(session, name=first_name)
-        if existing is not None:
-            return existing
-    return create_empty_well(session, name=first_name or DEFAULT_WELL_NAME, kb=DEFAULT_WELL_KB)
 
 
 def _top_name_key(name: str | None) -> str:
@@ -107,13 +87,14 @@ def _normalize_duplicate_imported_ages(imported: list[FormationTopModel]) -> Non
             duplicate.age_top_ma = None
 
 
-def import_tops_csv(
+def _import_tops_rows(
     session: Session,
     well_id: str | None,
-    csv_path: Path | str,
+    path: Path,
+    fieldnames: list[str],
+    rows: list[dict[str, str]],
     depth_ref: str = 'MD',
     *,
-    column_map: dict[str, str] | None = None,
     strat_units_path: Path | str | None = None,
     strat_ranks_path: Path | str | None = None,
     create_new_well: bool = False,
@@ -124,10 +105,6 @@ def import_tops_csv(
         raise ValueError(
             f'depth_ref={depth_ref!r} is not supported; valid values: MD, TVD, TVDSS'
         )
-    path = Path(csv_path)
-    fieldnames, rows = _read_csv_rows(path)
-    if column_map:
-        fieldnames, rows = _apply_column_map(fieldnames, rows, column_map)
     required = {'top_name', 'depth_md'}
     missing = required.difference(set(fieldnames))
     if missing:
@@ -142,7 +119,7 @@ def import_tops_csv(
         'well_id': well_id,
     }})
 
-    well = _resolve_or_create_well_for_tops(session, rows, well_id, create_new_well=create_new_well)
+    well = _resolve_or_create_well_from_rows(session, rows, well_id=well_id, create_new_well=create_new_well)
     max_depth = max((_extract_float(row, 'depth_md', 'depth') or 0.0) for row in rows) if rows else None
     td_before_import = well.td_md
     if max_depth is not None:
@@ -318,3 +295,85 @@ def import_tops_csv(
         }})
 
     return imported, qc_warnings
+
+
+def import_tops_csv(
+    session: Session,
+    well_id: str | None,
+    csv_path: Path | str,
+    depth_ref: str = 'MD',
+    *,
+    column_map: dict[str, str] | None = None,
+    strat_units_path: Path | str | None = None,
+    strat_ranks_path: Path | str | None = None,
+    create_new_well: bool = False,
+    top_set_id: int | None = None,
+) -> tuple[list[FormationTopModel], list[str]]:
+    path = Path(csv_path)
+    fieldnames, rows = _read_csv_rows(path)
+    if column_map:
+        fieldnames, rows = _apply_column_map(fieldnames, rows, column_map)
+    return _import_tops_rows(
+        session,
+        well_id,
+        path,
+        fieldnames,
+        rows,
+        depth_ref,
+        strat_units_path=strat_units_path,
+        strat_ranks_path=strat_ranks_path,
+        create_new_well=create_new_well,
+        top_set_id=top_set_id,
+    )
+
+
+def import_tops_csv_multi(
+    session: Session,
+    csv_path: Path | str,
+    depth_ref: str = 'MD',
+    *,
+    column_map: dict[str, str] | None = None,
+    strat_units_path: Path | str | None = None,
+    strat_ranks_path: Path | str | None = None,
+    create_new_well: bool = False,
+    top_set_id: int | None = None,
+) -> tuple[list[FormationTopModel], list[str], list[str], int]:
+    path = Path(csv_path)
+    fieldnames, rows = _read_csv_rows(path)
+    if column_map:
+        fieldnames, rows = _apply_column_map(fieldnames, rows, column_map)
+    if not _has_multi_well_rows(rows):
+        imported, warnings = _import_tops_rows(
+            session,
+            None,
+            path,
+            fieldnames,
+            rows,
+            depth_ref,
+            strat_units_path=strat_units_path,
+            strat_ranks_path=strat_ranks_path,
+            create_new_well=create_new_well,
+            top_set_id=top_set_id,
+        )
+        well_ids = sorted({top.well_id for top in imported})
+        return imported, warnings, well_ids, len(rows)
+
+    imported_all: list[FormationTopModel] = []
+    qc_warnings: list[str] = []
+    for _name, group_rows in _group_rows_by_well_name(rows):
+        imported, warnings = _import_tops_rows(
+            session,
+            None,
+            path,
+            fieldnames,
+            group_rows,
+            depth_ref,
+            strat_units_path=strat_units_path,
+            strat_ranks_path=strat_ranks_path,
+            create_new_well=create_new_well,
+            top_set_id=top_set_id,
+        )
+        imported_all.extend(imported)
+        qc_warnings.extend(warnings)
+    well_ids = sorted({top.well_id for top in imported_all})
+    return imported_all, qc_warnings, well_ids, len(rows)

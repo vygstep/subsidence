@@ -113,6 +113,36 @@ Likely files:
 
 ## Stage 3 - Target Well and Multi-Well CSV Foundation
 
+Status: In progress on `feature/import-multiwell-foundation`.
+
+Implementation sequence:
+
+- Stage 3A - Common multi-well backend foundation:
+  - Add shared CSV row grouping by mapped or native `well_name`.
+  - Resolve existing wells by name/identity or create wells from project defaults.
+  - Validate depth monotonicity per well group, not globally across the whole file.
+  - Keep existing single-well importer behavior unchanged when no `well_name` is mapped or present.
+- Stage 3B - `Load wells` import:
+  - Add well metadata CSV importer and API route.
+  - Add frontend wizard action for importing well metadata.
+  - Support required `well_name` and optional `uwi`, `kb`, `td`, `x`, `y`, `crs`.
+- Stage 3C - Tops CSV multi-well:
+  - Allow one TopSet import file to populate picks for multiple wells when `well_name` is mapped/present.
+  - Preserve TopSet horizon identity/order and rebuild/activate zones for all affected wells.
+  - Keep single-well TopSet behavior unchanged.
+- Stage 3D - Deviation CSV multi-well:
+  - Group surveys by well when `well_name` is mapped/present.
+  - Validate each well's depth sequence independently.
+  - Write/update one deviation survey parquet per well.
+- Stage 3E - Logs CSV multi-well:
+  - Group curves by well when `well_name` is mapped/present.
+  - Write/update one curve parquet/metadata set per well.
+  - Apply selected curve types consistently across groups.
+- Stage 3F - UI summary and tests:
+  - Add visible multi-well mode/summary where the preview can infer multiple wells.
+  - Return import summaries with affected well count and row count.
+  - Update focused backend/frontend tests.
+
 Unify target well behavior and add multi-well CSV import support.
 
 Expected target well behavior:

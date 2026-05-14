@@ -5,12 +5,13 @@ import { FileOpenDialog } from './FileOpenDialog'
 import { ImportDeviationDialog } from './ImportDeviationDialog'
 import { ImportLasDialog } from './ImportLasDialog'
 import { ImportTopsDialog } from './ImportTopsDialog'
+import { ImportWellsDialog } from './ImportWellsDialog'
 import { LoadStratChartDialog } from './LoadStratChartDialog'
 import { NewProjectDialog } from './NewProjectDialog'
 import { useProjectStore, useViewStore, useWellDataStore, useWorkspaceStore } from '@/stores'
 import { buildDiagnosticSnapshot } from '@/utils/diagnostics'
 
-type DialogKind = 'project-open' | 'project-new' | 'create-well' | 'load-las' | 'load-tops' | 'load-deviation' | 'load-strat-chart' | null
+type DialogKind = 'project-open' | 'project-new' | 'create-well' | 'load-wells' | 'load-las' | 'load-tops' | 'load-deviation' | 'load-strat-chart' | null
 
 interface UnsavedChangesDialogProps {
   projectName: string | null
@@ -217,6 +218,8 @@ export function ProjectToolbar() {
         return <NewProjectDialog onSwitchToOpen={() => setActiveDialog('project-open')} onClose={isProjectOpen ? () => setActiveDialog(null) : undefined} />
       case 'create-well':
         return <CreateWellDialog onClose={() => setActiveDialog(null)} onSuccess={handleWellMutation} />
+      case 'load-wells':
+        return <ImportWellsDialog onClose={() => setActiveDialog(null)} onSuccess={handleWellMutation} />
       case 'load-las':
         return <ImportLasDialog wells={wellOptions} activeWellId={well?.well_id} onClose={() => setActiveDialog(null)} onSuccess={handleWellMutation} />
       case 'load-tops':
@@ -272,6 +275,7 @@ export function ProjectToolbar() {
   const wellsModeActions = (
     <>
       <button type="button" className="app-action-button" onClick={() => setActiveDialog('create-well')}>Create well</button>
+      <button type="button" className="app-action-button" onClick={() => setActiveDialog('load-wells')}>Load wells</button>
       <button type="button" className="app-action-button" onClick={() => setActiveDialog('load-las')}>Load logs</button>
       <button type="button" className="app-action-button" onClick={() => setActiveDialog('load-tops')}>Load tops</button>
       <button type="button" className="app-action-button" onClick={() => setActiveDialog('load-deviation')}>Load deviation</button>

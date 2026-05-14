@@ -5,57 +5,45 @@ import { useNotificationStore, useProjectStore } from '@/stores'
 import { recordOperation } from '@/utils/diagnostics'
 
 import {
-  ImportWizardShell,
   ImportWizardFileField,
-  ImportWizardTargetWellSelect,
-  IMPORT_WIZARD_CREATE_NEW_WELL,
+  ImportWizardShell,
   TabularPreviewPane,
   buildImportWizardSteps,
-  distinctMappedValues,
   importWizardPresets,
   readImportError,
   useImportPreview,
 } from './importWizard'
 import {
-  DEVIATION_FIELDS,
+  WELLS_FIELDS,
   autoMap,
   isMappingValid,
-  validateDeviationMapping,
+  validateWellsMapping,
 } from './importWizard/mapping'
 import type { ColumnMapping } from './importWizard/mapping'
 import { getLastImportRoot, pickFile, rememberImportPath } from './pathMemory'
 
 const STEP_LABELS = ['File', 'Preview']
 
-interface WellOption {
-  well_id: string
-  well_name: string
-}
-
-interface ImportDeviationDialogProps {
-  wells: WellOption[]
-  activeWellId?: string | null
+interface ImportWellsDialogProps {
   onClose: () => void
   onSuccess: (wellId: string) => Promise<void> | void
 }
 
-interface ImportDeviationResponse {
+interface ImportWellsResponse {
   well_id: string
   qc_warnings?: string[]
 }
 
-export function ImportDeviationDialog({ wells, activeWellId, onClose, onSuccess }: ImportDeviationDialogProps) {
+export function ImportWellsDialog({ onClose, onSuccess }: ImportWellsDialogProps) {
   const projectPath = useProjectStore((state) => state.projectPath)
   const addQcWarnings = useNotificationStore((state) => state.addQcWarnings)
-  const [wellSelection, setWellSelection] = useState(activeWellId ?? '')
   const [csvPath, setCsvPath] = useState(() => getLastImportRoot())
-  const [depthUnit, setDepthUnit] = useState<'m' | 'ft' | 'km'>('m')
   const [mapping, setMapping] = useState<ColumnMapping>({})
   const [currentStepIndex, setCurrentStepIndex] = useState(0)
   const [error, setError] = useState<string | null>(null)
   const [isSubmitting, setIsSubmitting] = useState(false)
   const lastImportRoot = getLastImportRoot()
-  const preset = importWizardPresets.deviation
+  const preset = importWizardPresets.wells
   const sourceIsValid = csvPath.trim().length > 0
   const isOnPreviewStep = currentStepIndex === 1
 
@@ -67,19 +55,12 @@ export function ImportDeviationDialog({ wells, activeWellId, onClose, onSuccess 
 
   useEffect(() => {
     if (tabularPreview) {
-      setMapping(autoMap(tabularPreview.columns, DEVIATION_FIELDS))
+      setMapping(autoMap(tabularPreview.columns, WELLS_FIELDS))
     }
   }, [tabularPreview])
 
-  const mappingErrors = validateDeviationMapping(mapping)
+  const mappingErrors = validateWellsMapping(mapping)
   const mappingOk = isMappingValid(mappingErrors)
-  const fileWellNames = distinctMappedValues(tabularPreview, mapping, 'well_name')
-  const isMultiWell = fileWellNames.length > 1
-
-  useEffect(() => {
-    setWellSelection(fileWellNames.length > 0 ? '' : (activeWellId ?? ''))
-  }, [activeWellId, fileWellNames.length])
-
   const steps = buildImportWizardSteps(currentStepIndex, sourceIsValid, STEP_LABELS)
   const validationMessages = currentStepIndex === 0 && !sourceIsValid ? ['CSV path is required.'] : []
 
@@ -95,8 +76,6 @@ export function ImportDeviationDialog({ wells, activeWellId, onClose, onSuccess 
     for (const [fieldId, col] of Object.entries(mapping)) {
       if (col) columnMap[fieldId] = col
     }
-    const createNewWell = wellSelection === IMPORT_WIZARD_CREATE_NEW_WELL
-    const resolvedWellId = isMultiWell || createNewWell ? null : (wellSelection || null)
 
     setIsSubmitting(true)
     setError(null)
@@ -106,19 +85,15 @@ export function ImportDeviationDialog({ wells, activeWellId, onClose, onSuccess 
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
-            well_id: resolvedWellId,
             csv_path: nextPath,
-            depth_unit: depthUnit,
-            create_new_well: createNewWell,
-            multi_well: isMultiWell,
             column_map: Object.keys(columnMap).length > 0 ? columnMap : null,
           }),
         })
         if (!response.ok) {
-          throw new Error(await readImportError(response, `Failed to import deviation (${response.status})`))
+          throw new Error(await readImportError(response, `Failed to import wells (${response.status})`))
         }
 
-        const payload = (await response.json()) as ImportDeviationResponse
+        const payload = (await response.json()) as ImportWellsResponse
         rememberImportPath(nextPath)
         const warnings = payload.qc_warnings ?? []
         await onSuccess(payload.well_id)
@@ -128,11 +103,11 @@ export function ImportDeviationDialog({ wells, activeWellId, onClose, onSuccess 
         }
       }, {
         projectPath,
-        activeWellId: resolvedWellId || activeWellId || null,
-        details: { inputPath: nextPath, depthUnit, createNewWell },
+        activeWellId: null,
+        details: { inputPath: nextPath },
       })
     } catch (cause) {
-      setError(cause instanceof Error ? cause.message : 'Failed to import deviation')
+      setError(cause instanceof Error ? cause.message : 'Failed to import wells')
     } finally {
       setIsSubmitting(false)
     }
@@ -154,7 +129,7 @@ export function ImportDeviationDialog({ wells, activeWellId, onClose, onSuccess 
   return (
     <ImportWizardShell
       preset={preset}
-      titleId="import-deviation-title"
+      titleId="import-wells-title"
       steps={steps}
       currentStepIndex={currentStepIndex}
       error={error}
@@ -169,52 +144,24 @@ export function ImportDeviationDialog({ wells, activeWellId, onClose, onSuccess 
     >
       {currentStepIndex === 0 ? (
         <ImportWizardFileField
-          label="Deviation CSV path"
+          label="Wells CSV path"
           value={csvPath}
-          placeholder="D:\\data\\deviation.csv"
+          placeholder="D:\\data\\wells.csv"
           onChange={setCsvPath}
         />
       ) : null}
 
       {currentStepIndex === 1 ? (
-        <>
-          <TabularPreviewPane
-            isLoading={previewLoading}
-            error={previewError}
-            preview={tabularPreview}
-            settings={parserSettings}
-            onSettingsChange={updateParserSettings}
-            fields={DEVIATION_FIELDS}
-            mapping={mapping}
-            onMappingChange={(fieldId, col) => setMapping((prev) => ({ ...prev, [fieldId]: col }))}
-          />
-
-          {!previewLoading && tabularPreview && (
-            <div className="import-wizard__options">
-              {isMultiWell ? (
-                <p className="import-preview__status">Multi-well mode: {fileWellNames.length} wells detected.</p>
-              ) : null}
-              <div className="import-wizard__options-row">
-                {!isMultiWell ? (
-                  <ImportWizardTargetWellSelect
-                    wells={wells}
-                    value={wellSelection}
-                    emptyLabel="Use file well_name / create from defaults"
-                    onChange={setWellSelection}
-                  />
-                ) : null}
-                <label className="project-dialog__field project-dialog__field--inline import-wizard__field">
-                  <span>Depth unit</span>
-                  <select value={depthUnit} onChange={(e) => setDepthUnit(e.target.value as 'm' | 'ft' | 'km')}>
-                    <option value="m">m</option>
-                    <option value="ft">ft</option>
-                    <option value="km">km</option>
-                  </select>
-                </label>
-              </div>
-            </div>
-          )}
-        </>
+        <TabularPreviewPane
+          isLoading={previewLoading}
+          error={previewError}
+          preview={tabularPreview}
+          settings={parserSettings}
+          onSettingsChange={updateParserSettings}
+          fields={WELLS_FIELDS}
+          mapping={mapping}
+          onMappingChange={(fieldId, col) => setMapping((prev) => ({ ...prev, [fieldId]: col }))}
+        />
       ) : null}
     </ImportWizardShell>
   )

@@ -65,4 +65,17 @@ export const importWizardPresets = {
     executeEndpoint: '/api/projects/import-deviation',
     resultWellField: 'well_id',
   },
+  wells: {
+    id: 'wells',
+    title: 'Load wells',
+    eyebrow: 'Import Wizard',
+    submitLabel: 'Load wells',
+    busyLabel: 'Importing...',
+    previewMode: 'tabular',
+    targetWellPolicy: 'none',
+    acceptedFileFilters: DELIMITED_TEXT_FILTERS,
+    executeOperation: 'import.wells',
+    executeEndpoint: '/api/projects/import-wells',
+    resultWellField: 'well_id',
+  },
 } satisfies Record<string, ImportWizardPreset>

@@ -12,6 +12,7 @@ import {
   IMPORT_WIZARD_CREATE_NEW_WELL,
   TabularPreviewPane,
   buildImportWizardSteps,
+  distinctMappedValues,
   importWizardPresets,
   readImportError,
   useImportPreview,
@@ -115,6 +116,8 @@ export function ImportTopsDialog({ wells, activeWellId, onClose, onSuccess }: Im
   }, [projectPath])
 
   const fileWellSource = mapping['well_name'] ?? null
+  const fileWellNames = distinctMappedValues(tabularPreview, mapping, 'well_name')
+  const isMultiWell = fileWellNames.length > 1
 
   useEffect(() => {
     setWellPolicy(fileWellSource ? 'file' : 'override')
@@ -156,6 +159,7 @@ export function ImportTopsDialog({ wells, activeWellId, onClose, onSuccess }: Im
             depth_ref: depthRef,
             depth_unit: depthUnit,
             create_new_well: createNewWell,
+            multi_well: isMultiWell,
             column_map: Object.keys(columnMap).length > 0 ? columnMap : null,
             zone_set_id: zoneSetPolicy === 'existing' ? Number(zoneSetId) : null,
             create_zone_set: zoneSetPolicy === 'create',
@@ -239,6 +243,9 @@ export function ImportTopsDialog({ wells, activeWellId, onClose, onSuccess }: Im
 
           {!previewLoading && tabularPreview && (
             <div className="import-wizard__options">
+              {isMultiWell ? (
+                <p className="import-preview__status">Multi-well mode: {fileWellNames.length} wells detected.</p>
+              ) : null}
               <div className="import-wizard__options-row">
                 <label className="project-dialog__field project-dialog__field--inline import-wizard__field import-wizard__field--wide">
                   <span>TopSet</span>
@@ -269,30 +276,32 @@ export function ImportTopsDialog({ wells, activeWellId, onClose, onSuccess }: Im
                 )}
               </div>
               <div className="import-wizard__options-row">
-                <ImportWizardTargetWellSelect
-                  value={
-                    wellPolicy === 'file'
-                      ? '__file__'
-                      : wellPolicy === 'create'
-                        ? IMPORT_WIZARD_CREATE_NEW_WELL
-                        : wellId
-                  }
-                  wells={wells}
-                  onChange={(value) => {
-                    if (value === '__file__') {
-                      setWellPolicy('file')
-                      setWellId('')
-                    } else if (value === IMPORT_WIZARD_CREATE_NEW_WELL) {
-                      setWellPolicy('create')
-                      setWellId('')
-                    } else {
-                      setWellPolicy('override')
-                      setWellId(value)
+                {!isMultiWell ? (
+                  <ImportWizardTargetWellSelect
+                    value={
+                      wellPolicy === 'file'
+                        ? '__file__'
+                        : wellPolicy === 'create'
+                          ? IMPORT_WIZARD_CREATE_NEW_WELL
+                          : wellId
                     }
-                  }}
-                  emptyLabel={!fileWellSource ? 'Match or create by file well_name' : undefined}
-                  extraOptions={fileWellSource ? [{ value: '__file__', label: `Use file well name: ${fileWellSource}` }] : []}
-                />
+                    wells={wells}
+                    onChange={(value) => {
+                      if (value === '__file__') {
+                        setWellPolicy('file')
+                        setWellId('')
+                      } else if (value === IMPORT_WIZARD_CREATE_NEW_WELL) {
+                        setWellPolicy('create')
+                        setWellId('')
+                      } else {
+                        setWellPolicy('override')
+                        setWellId(value)
+                      }
+                    }}
+                    emptyLabel={!fileWellSource ? 'Match or create by file well_name' : undefined}
+                    extraOptions={fileWellSource ? [{ value: '__file__', label: `Use file well name: ${fileWellSource}` }] : []}
+                  />
+                ) : null}
                 <label className="project-dialog__field project-dialog__field--inline import-wizard__field">
                   <span>Depth reference</span>
                   <select value={depthRef} onChange={(e) => setDepthRef(e.target.value as 'MD' | 'TVD' | 'TVDSS')}>
