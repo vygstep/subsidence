@@ -56,7 +56,7 @@ Implementation does not begin until this stage is discussed and confirmed.
 
 ## Stage 2 - Existing Wizard UX Cleanup
 
-Normalize the shared import wizard behavior before adding new data importers.
+Normalize and lightly centralize the shared import wizard behavior before adding new data importers.
 
 Expected behavior:
 
@@ -72,9 +72,18 @@ Expected behavior:
   - Deviation: target well and depth unit in one row; extra options below.
 - Empty or non-importable files should not crash the app. The UI should show a clear error such as `No importable curves were found in selected file`.
 
+Implementation notes:
+
+- Keep navigation, stepper, error/validation display, and primary action behavior in `ImportWizardShell`.
+- Extract the repeated file path selector into a shared import wizard component instead of duplicating Browse/previous path logic across import dialogs.
+- Replace the deviation-only checkbox target well UI with the same dropdown pattern used by the other imports.
+- Extract or reuse a shared target-well selector so logs, tops, and deviation do not keep separate target well behavior.
+- Keep object-specific option rows in their dialogs, but use common compact row CSS.
+
 Likely files:
 
 - `frontend/src/components/layout/importWizard/ImportWizardShell.tsx`
+- new shared import wizard field components under `frontend/src/components/layout/importWizard/`
 - `frontend/src/components/layout/ImportLasDialog.tsx`
 - `frontend/src/components/layout/ImportTopsDialog.tsx`
 - `frontend/src/components/layout/ImportDeviationDialog.tsx`
