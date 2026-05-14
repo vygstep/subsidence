@@ -11,7 +11,7 @@ Active contract: `docs/contracts/ui-sample-template-cleanup.md`
 | S3 | Legacy `app/data` cleanup | done |
 | S4 | Templates tab counters | done |
 | S5 | Attribution | done |
-| S6 | Verification | pending |
+| S6 | Verification | done |
 
 ## Implemented Contracts
 

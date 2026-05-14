@@ -84,4 +84,4 @@ Status: done.
 - Run frontend tests covering templates/import UI.
 - Report any intentionally skipped tests.
 
-Status: pending.
+Status: done. Verified with `pytest tests/integration/test_project_api_workflows.py` and `npm run test -- --run`.
