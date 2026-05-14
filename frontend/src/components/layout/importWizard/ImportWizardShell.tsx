@@ -13,6 +13,7 @@ export function ImportWizardShell({
   onClose,
   onSubmit,
   onStepChange,
+  onBrowse,
   children,
 }: ImportWizardShellProps) {
   const finalStepIndex = steps.length - 1
@@ -28,6 +29,14 @@ export function ImportWizardShell({
     onStepChange(currentStepIndex + 1)
   }
 
+  const handlePrimaryStepAction = () => {
+    if (onBrowse) {
+      onBrowse()
+      return
+    }
+    goNext()
+  }
+
   return (
     <section className="project-dialog" aria-labelledby={titleId}>
       <header className="project-dialog__header">
@@ -35,9 +44,6 @@ export function ImportWizardShell({
           <p className="project-dialog__eyebrow">{preset.eyebrow}</p>
           <h2 id={titleId} className="project-dialog__title">{preset.title}</h2>
         </div>
-      </header>
-
-      <form className="project-dialog__body" onSubmit={onSubmit}>
         <div className="project-dialog__steps" aria-label="Import steps">
           {steps.map((step) => (
             <span key={step.id} className={`project-dialog__step project-dialog__step--${step.status ?? 'blocked'}`}>
@@ -45,7 +51,9 @@ export function ImportWizardShell({
             </span>
           ))}
         </div>
+      </header>
 
+      <form className="project-dialog__body" onSubmit={onSubmit}>
         {children}
 
         {validationMessages.length > 0 ? (
@@ -79,10 +87,10 @@ export function ImportWizardShell({
             <button
               type="button"
               className="project-dialog__button project-dialog__button--primary"
-              disabled={isSubmitting || !canAdvance}
-              onClick={goNext}
+              disabled={isSubmitting || !onBrowse}
+              onClick={handlePrimaryStepAction}
             >
-              Next
+              Browse...
             </button>
           )}
         </div>

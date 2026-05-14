@@ -36,6 +36,12 @@ const LAS_PREVIEW_RESPONSE = {
 
 function mockFetch(lasResponse = LAS_PREVIEW_RESPONSE, tabularResponse = TABULAR_PREVIEW_RESPONSE) {
   vi.stubGlobal('fetch', vi.fn().mockImplementation((url: string) => {
+    if (url === '/api/projects/pick-file') {
+      return Promise.resolve({
+        ok: true,
+        json: async () => ({ path: 'D:\\data\\imports\\selected-file.csv' }),
+      })
+    }
     if (url === '/api/top-sets') {
       return Promise.resolve({
         ok: true,
@@ -54,9 +60,9 @@ function mockFetch(lasResponse = LAS_PREVIEW_RESPONSE, tabularResponse = TABULAR
 }
 
 async function advanceToPreview(user: ReturnType<typeof userEvent.setup>) {
-  await user.click(screen.getByRole('button', { name: 'Next' }))
+  await user.click(screen.getByRole('button', { name: 'Browse...' }))
   await waitFor(() => {
-    expect(screen.queryByRole('button', { name: 'Next' })).toBeNull()
+    expect(screen.queryByRole('button', { name: 'Browse...' })).toBeNull()
   })
 }
 
@@ -146,7 +152,7 @@ describe('Import dialogs target active well by default', () => {
     )
 
     expect(screen.getByText('CSV path is required.')).toBeTruthy()
-    expect((screen.getByRole('button', { name: 'Next' }) as HTMLButtonElement).disabled).toBe(true)
+    expect(screen.getByRole('button', { name: 'Browse...' })).toBeTruthy()
     await waitFor(() => {
       const fetchMock = fetch as unknown as ReturnType<typeof vi.fn>
       expect(fetchMock.mock.calls.some(([url]) => url === '/api/top-sets')).toBe(true)
@@ -182,6 +188,12 @@ describe('Import dialogs target active well by default', () => {
   it('adds tops import QC warnings to the notification store', async () => {
     const user = userEvent.setup()
     vi.stubGlobal('fetch', vi.fn().mockImplementation((url: string) => {
+      if (url === '/api/projects/pick-file') {
+        return Promise.resolve({
+          ok: true,
+          json: async () => ({ path: 'D:\\data\\imports\\tops.csv' }),
+        })
+      }
       if (url === '/api/top-sets') {
         return Promise.resolve({
           ok: true,
