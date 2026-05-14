@@ -6,7 +6,9 @@ import { recordOperation } from '@/utils/diagnostics'
 
 import {
   ImportWizardShell,
-  ImportWizardTargetWellFields,
+  ImportWizardFileField,
+  ImportWizardTargetWellSelect,
+  IMPORT_WIZARD_CREATE_NEW_WELL,
   TabularPreviewPane,
   buildImportWizardSteps,
   importWizardPresets,
@@ -44,8 +46,7 @@ interface ImportDeviationResponse {
 export function ImportDeviationDialog({ wells, activeWellId, onClose, onSuccess }: ImportDeviationDialogProps) {
   const projectPath = useProjectStore((state) => state.projectPath)
   const addQcWarnings = useNotificationStore((state) => state.addQcWarnings)
-  const [wellId, setWellId] = useState(activeWellId ?? '')
-  const [createNewWell, setCreateNewWell] = useState(false)
+  const [wellSelection, setWellSelection] = useState(activeWellId ?? '')
   const [csvPath, setCsvPath] = useState(() => getLastImportRoot())
   const [depthUnit, setDepthUnit] = useState<'m' | 'ft' | 'km'>('m')
   const [mapping, setMapping] = useState<ColumnMapping>({})
@@ -87,6 +88,8 @@ export function ImportDeviationDialog({ wells, activeWellId, onClose, onSuccess 
     for (const [fieldId, col] of Object.entries(mapping)) {
       if (col) columnMap[fieldId] = col
     }
+    const createNewWell = wellSelection === IMPORT_WIZARD_CREATE_NEW_WELL
+    const resolvedWellId = createNewWell ? null : (wellSelection || null)
 
     setIsSubmitting(true)
     setError(null)
@@ -96,10 +99,10 @@ export function ImportDeviationDialog({ wells, activeWellId, onClose, onSuccess 
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
-            well_id: wellId || null,
+            well_id: resolvedWellId,
             csv_path: nextPath,
             depth_unit: depthUnit,
-            create_new_well: !wellId && createNewWell,
+            create_new_well: createNewWell,
             column_map: Object.keys(columnMap).length > 0 ? columnMap : null,
           }),
         })
@@ -117,7 +120,7 @@ export function ImportDeviationDialog({ wells, activeWellId, onClose, onSuccess 
         }
       }, {
         projectPath,
-        activeWellId: wellId || activeWellId || null,
+        activeWellId: resolvedWellId || activeWellId || null,
         details: { inputPath: nextPath, depthUnit, createNewWell },
       })
     } catch (cause) {
@@ -131,7 +134,10 @@ export function ImportDeviationDialog({ wells, activeWellId, onClose, onSuccess 
     setError(null)
     try {
       const picked = await pickFile(csvPath || lastImportRoot, preset.acceptedFileFilters)
-      if (picked) setCsvPath(picked)
+      if (picked) {
+        setCsvPath(picked)
+        setCurrentStepIndex(1)
+      }
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : 'Failed to open file picker')
     }
@@ -151,28 +157,15 @@ export function ImportDeviationDialog({ wells, activeWellId, onClose, onSuccess 
       onClose={onClose}
       onSubmit={handleSubmit}
       onStepChange={setCurrentStepIndex}
+      onBrowse={handleBrowse}
     >
       {currentStepIndex === 0 ? (
-        <label className="project-dialog__field">
-          <span>Deviation CSV path</span>
-          <div className="project-dialog__field-row">
-            <input
-              type="text"
-              value={csvPath}
-              onChange={(event) => setCsvPath(event.target.value)}
-              placeholder="D:\\data\\deviation.csv"
-              autoFocus
-            />
-            <div className="project-dialog__path-actions">
-              <button type="button" className="project-dialog__path-action" disabled={!lastImportRoot} onClick={() => setCsvPath(lastImportRoot)}>
-                Use last folder
-              </button>
-              <button type="button" className="project-dialog__path-action" onClick={() => void handleBrowse()}>
-                Browse...
-              </button>
-            </div>
-          </div>
-        </label>
+        <ImportWizardFileField
+          label="Deviation CSV path"
+          value={csvPath}
+          placeholder="D:\\data\\deviation.csv"
+          onChange={setCsvPath}
+        />
       ) : null}
 
       {currentStepIndex === 1 ? (
@@ -190,22 +183,22 @@ export function ImportDeviationDialog({ wells, activeWellId, onClose, onSuccess 
 
           {!previewLoading && tabularPreview && (
             <div className="import-wizard__options">
-              <ImportWizardTargetWellFields
-                wells={wells}
-                wellId={wellId}
-                createNewWell={createNewWell}
-                emptyLabel="Reuse by file well_name / create from defaults"
-                onWellIdChange={setWellId}
-                onCreateNewWellChange={setCreateNewWell}
-              />
-              <label className="project-dialog__field project-dialog__field--inline">
-                <span>Depth unit</span>
-                <select value={depthUnit} onChange={(e) => setDepthUnit(e.target.value as 'm' | 'ft' | 'km')}>
-                  <option value="m">m</option>
-                  <option value="ft">ft</option>
-                  <option value="km">km</option>
-                </select>
-              </label>
+              <div className="import-wizard__options-row">
+                <ImportWizardTargetWellSelect
+                  wells={wells}
+                  value={wellSelection}
+                  emptyLabel="Use file well_name / create from defaults"
+                  onChange={setWellSelection}
+                />
+                <label className="project-dialog__field project-dialog__field--inline import-wizard__field">
+                  <span>Depth unit</span>
+                  <select value={depthUnit} onChange={(e) => setDepthUnit(e.target.value as 'm' | 'ft' | 'km')}>
+                    <option value="m">m</option>
+                    <option value="ft">ft</option>
+                    <option value="km">km</option>
+                  </select>
+                </label>
+              </div>
             </div>
           )}
         </>

@@ -7,7 +7,7 @@
 }
 
 .project-dialog {
-  width: min(100%, 640px);
+  width: min(100%, 760px);
   display: flex;
   flex-direction: column;
   background: rgba(255, 255, 255, 0.97);
@@ -19,7 +19,7 @@
 
 .project-dialog__header {
   display: flex;
-  align-items: flex-start;
+  align-items: center;
   justify-content: space-between;
   gap: 12px;
   padding: 14px 18px 10px;
@@ -54,15 +54,15 @@
 .project-dialog__body {
   display: flex;
   flex-direction: column;
-  gap: 12px;
+  gap: 10px;
   padding: 14px 18px 18px;
 }
 
 .project-dialog__field {
   display: flex;
   flex-direction: column;
-  gap: 6px;
-  font-size: 0.82rem;
+  gap: 4px;
+  font-size: 0.78rem;
   font-weight: 600;
   color: #314155;
 }
@@ -75,50 +75,30 @@
 
 .project-dialog__field input {
   width: 100%;
-  padding: 7px 10px;
+  min-height: 22px;
+  padding: 2px 7px;
   border: 1px solid #cbd5e1;
-  border-radius: 8px;
+  border-radius: 4px;
   background: #ffffff;
   color: #17212b;
+  font-size: 0.78rem;
 }
 
 .project-dialog__field select {
   width: 100%;
-  padding: 7px 10px;
+  min-height: 22px;
+  padding: 2px 22px 2px 7px;
   border: 1px solid #cbd5e1;
-  border-radius: 8px;
+  border-radius: 4px;
   background: #ffffff;
   color: #17212b;
+  font-size: 0.78rem;
 }
 
 .project-dialog__field input:focus,
 .project-dialog__field select:focus {
   outline: 2px solid rgba(37, 99, 235, 0.22);
   border-color: #2563eb;
-}
-
-.project-dialog__path-actions {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  flex-wrap: wrap;
-}
-
-.project-dialog__path-action {
-  border: 1px solid #cbd5e1;
-  background: #ffffff;
-  color: #314155;
-  font-size: 0.72rem;
-  font-weight: 700;
-  line-height: 1;
-  padding: 7px 10px;
-  border-radius: 999px;
-  cursor: pointer;
-}
-
-.project-dialog__path-action:disabled {
-  opacity: 0.5;
-  cursor: not-allowed;
 }
 
 .project-dialog__grid {
@@ -134,16 +114,16 @@
 }
 
 .project-dialog__steps {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(0, 1fr));
+  display: flex;
+  flex-shrink: 0;
   gap: 6px;
 }
 
 .project-dialog__step {
   min-width: 0;
-  padding: 7px 8px;
+  padding: 4px 8px;
   border: 1px solid #d8e2ec;
-  border-radius: 10px;
+  border-radius: 4px;
   background: #f8fbff;
   font-size: 0.74rem;
   font-weight: 700;
@@ -286,9 +266,9 @@
 
 .project-dialog__button {
   border: 0;
-  border-radius: 999px;
-  padding: 10px 16px;
-  font-size: 0.84rem;
+  border-radius: 4px;
+  padding: 6px 12px;
+  font-size: 0.78rem;
   font-weight: 700;
   cursor: pointer;
   background: rgba(148, 163, 184, 0.16);
@@ -438,12 +418,12 @@
 .import-well-policy select {
   margin-top: 4px;
   width: 100%;
-  padding: 11px 12px;
+  padding: 2px 7px;
   border: 1px solid #cbd5e1;
-  border-radius: 10px;
+  border-radius: 4px;
   background: #ffffff;
   color: #17212b;
-  font-size: 0.82rem;
+  font-size: 0.78rem;
 }
 
 .import-well-policy em {
@@ -560,7 +540,21 @@
 
 .import-wizard__options-row {
   display: flex;
-  gap: 12px;
+  gap: 10px;
   align-items: center;
   flex-wrap: wrap;
+}
+
+.import-wizard__field {
+  flex: 1 1 150px;
+}
+
+.import-wizard__field--wide {
+  flex-basis: 240px;
+}
+
+.import-wizard__field select,
+.import-wizard__field input {
+  width: 100%;
+  min-width: 0;
 }

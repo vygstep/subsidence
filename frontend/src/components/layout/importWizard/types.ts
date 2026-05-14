@@ -76,5 +76,6 @@ export interface ImportWizardShellProps {
   onClose: () => void
   onSubmit: (event: FormEvent<HTMLFormElement>) => void
   onStepChange?: (stepIndex: number) => void
+  onBrowse?: () => void
   children: ReactNode
 }

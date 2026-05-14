@@ -6,6 +6,9 @@ import { recordOperation } from '@/utils/diagnostics'
 
 import {
   ImportWizardShell,
+  ImportWizardFileField,
+  ImportWizardTargetWellSelect,
+  IMPORT_WIZARD_CREATE_NEW_WELL,
   LasPreviewPane,
   TabularPreviewPane,
   buildImportWizardSteps,
@@ -24,7 +27,6 @@ const STEP_LABELS = ['File', 'Preview']
 
 // Sentinel values for the target well dropdown
 const CREATE_FROM_FILE = '__create_from_file__'
-const CREATE_NEW = '__create_new__'
 
 interface WellOption {
   well_id: string
@@ -76,7 +78,7 @@ function detectColumnCurveType(colIndex: number, rows: string[][]): 'continuous'
 export function ImportLasDialog({ wells, activeWellId, onClose, onSuccess }: ImportLasDialogProps) {
   const projectPath = useProjectStore((state) => state.projectPath)
   const addQcWarnings = useNotificationStore((state) => state.addQcWarnings)
-  // Single selection value: well_id | CREATE_FROM_FILE | CREATE_NEW | ''
+  // Single selection value: well_id | CREATE_FROM_FILE | IMPORT_WIZARD_CREATE_NEW_WELL | ''
   const [wellSelection, setWellSelection] = useState(activeWellId ?? '')
   const [sourceType, setSourceType] = useState<LogSourceType>('las')
   const [sourcePath, setSourcePath] = useState(() => getLastImportRoot())
@@ -176,6 +178,7 @@ export function ImportLasDialog({ wells, activeWellId, onClose, onSuccess }: Imp
     : preset.previewMode === 'las'
       ? lasPreview !== null
       : tabularPreview !== null
+  const hasImportableLogCurves = Object.keys(curveTypes).length > 0
 
   const steps = buildImportWizardSteps(currentStepIndex, sourceIsValid, STEP_LABELS)
   const validationMessages = currentStepIndex === 0 && !sourceIsValid
@@ -183,8 +186,8 @@ export function ImportLasDialog({ wells, activeWellId, onClose, onSuccess }: Imp
     : []
 
   const canSubmit = sourceType === 'las'
-    ? sourceIsValid && previewReady
-    : sourceIsValid && tabularPreview !== null && !!mapping['depth']
+    ? sourceIsValid && previewReady && hasImportableLogCurves
+    : sourceIsValid && tabularPreview !== null && !!mapping['depth'] && hasImportableLogCurves
 
   const handleSubmit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault()
@@ -196,7 +199,7 @@ export function ImportLasDialog({ wells, activeWellId, onClose, onSuccess }: Imp
 
     // Resolve selection to API params
     const isCreateFromFile = wellSelection === CREATE_FROM_FILE
-    const isCreateNew = wellSelection === CREATE_NEW
+    const isCreateNew = wellSelection === IMPORT_WIZARD_CREATE_NEW_WELL
     const resolvedWellId = (!isCreateFromFile && !isCreateNew && wellSelection) ? wellSelection : null
     const createNewWell = isCreateNew
 
@@ -261,7 +264,10 @@ export function ImportLasDialog({ wells, activeWellId, onClose, onSuccess }: Imp
     setError(null)
     try {
       const picked = await pickFile(sourcePath || lastImportRoot, preset.acceptedFileFilters)
-      if (picked) setSourcePath(picked)
+      if (picked) {
+        setSourcePath(picked)
+        setCurrentStepIndex(1)
+      }
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : 'Failed to open file picker')
     }
@@ -281,6 +287,7 @@ export function ImportLasDialog({ wells, activeWellId, onClose, onSuccess }: Imp
       onClose={onClose}
       onSubmit={handleSubmit}
       onStepChange={setCurrentStepIndex}
+      onBrowse={handleBrowse}
     >
       {currentStepIndex === 0 ? (
         <>
@@ -292,26 +299,12 @@ export function ImportLasDialog({ wells, activeWellId, onClose, onSuccess }: Imp
             </select>
           </label>
 
-          <label className="project-dialog__field">
-            <span>{sourceType === 'las' ? 'LAS file path' : 'CSV file path'}</span>
-            <div className="project-dialog__field-row">
-              <input
-                type="text"
-                value={sourcePath}
-                onChange={(event) => setSourcePath(event.target.value)}
-                placeholder={sourceType === 'las' ? 'D:\\data\\well.las' : 'D:\\data\\well_logs.csv'}
-                autoFocus
-              />
-              <div className="project-dialog__path-actions">
-                <button type="button" className="project-dialog__path-action" disabled={!lastImportRoot} onClick={() => setSourcePath(lastImportRoot)}>
-                  Use last folder
-                </button>
-                <button type="button" className="project-dialog__path-action" onClick={() => void handleBrowse()}>
-                  Browse...
-                </button>
-              </div>
-            </div>
-          </label>
+          <ImportWizardFileField
+            label={sourceType === 'las' ? 'LAS file path' : 'CSV file path'}
+            value={sourcePath}
+            placeholder={sourceType === 'las' ? 'D:\\data\\well.las' : 'D:\\data\\well_logs.csv'}
+            onChange={setSourcePath}
+          />
         </>
       ) : null}
 
@@ -327,20 +320,15 @@ export function ImportLasDialog({ wells, activeWellId, onClose, onSuccess }: Imp
             />
             {!previewLoading && (lasPreview !== null || previewError !== null) && (
               <div className="import-wizard__options">
-                <label className="project-dialog__field project-dialog__field--inline">
-                  <span>Target well</span>
-                  <select value={wellSelection} onChange={(e) => setWellSelection(e.target.value)}>
-                    {wells.map((w) => (
-                      <option key={w.well_id} value={w.well_id}>{w.well_name}</option>
-                    ))}
-                    {lasWellName && (
-                      <option value={CREATE_FROM_FILE}>Create new well &quot;{lasWellName}&quot;</option>
-                    )}
-                    <option value={CREATE_NEW}>Create new well</option>
-                  </select>
-                </label>
                 <div className="import-wizard__options-row">
-                  <label className="project-dialog__field project-dialog__field--inline">
+                  <ImportWizardTargetWellSelect
+                    value={wellSelection}
+                    wells={wells}
+                    onChange={setWellSelection}
+                    emptyLabel="Use file well name / create from defaults"
+                    extraOptions={lasWellName ? [{ value: CREATE_FROM_FILE, label: `Create new well "${lasWellName}"` }] : []}
+                  />
+                  <label className="project-dialog__field project-dialog__field--inline import-wizard__field">
                     <span>Depth reference</span>
                     <select value={trustedDepthRef} onChange={(e) => setTrustedDepthRef(e.target.value as 'MD' | 'TVD' | 'TVDSS')}>
                       <option value="MD">MD</option>
@@ -348,7 +336,7 @@ export function ImportLasDialog({ wells, activeWellId, onClose, onSuccess }: Imp
                       <option value="TVDSS">TVDSS</option>
                     </select>
                   </label>
-                  <label className="project-dialog__field project-dialog__field--inline">
+                  <label className="project-dialog__field project-dialog__field--inline import-wizard__field">
                     <span>Depth unit</span>
                     <select value={depthUnit} onChange={(e) => setDepthUnit(e.target.value as 'm' | 'ft' | 'km')}>
                       <option value="m">m</option>
@@ -358,6 +346,9 @@ export function ImportLasDialog({ wells, activeWellId, onClose, onSuccess }: Imp
                   </label>
                 </div>
               </div>
+            )}
+            {!previewLoading && lasPreview !== null && !hasImportableLogCurves && (
+              <p className="project-dialog__error">No importable log curves were found in selected file.</p>
             )}
           </>
         ) : (
@@ -374,17 +365,14 @@ export function ImportLasDialog({ wells, activeWellId, onClose, onSuccess }: Imp
             />
             {!previewLoading && tabularPreview && (
               <div className="import-wizard__options">
-                <label className="project-dialog__field project-dialog__field--inline">
-                  <span>Target well</span>
-                  <select value={wellSelection} onChange={(e) => setWellSelection(e.target.value)}>
-                    {wells.map((w) => (
-                      <option key={w.well_id} value={w.well_id}>{w.well_name}</option>
-                    ))}
-                    <option value={CREATE_NEW}>Create new well</option>
-                  </select>
-                </label>
                 <div className="import-wizard__options-row">
-                  <label className="project-dialog__field project-dialog__field--inline">
+                  <ImportWizardTargetWellSelect
+                    value={wellSelection}
+                    wells={wells}
+                    onChange={setWellSelection}
+                    emptyLabel="Use file well_name / create from defaults"
+                  />
+                  <label className="project-dialog__field project-dialog__field--inline import-wizard__field">
                     <span>Depth reference</span>
                     <select value={trustedDepthRef} onChange={(e) => setTrustedDepthRef(e.target.value as 'MD' | 'TVD' | 'TVDSS')}>
                       <option value="MD">MD</option>
@@ -392,7 +380,7 @@ export function ImportLasDialog({ wells, activeWellId, onClose, onSuccess }: Imp
                       <option value="TVDSS">TVDSS</option>
                     </select>
                   </label>
-                  <label className="project-dialog__field project-dialog__field--inline">
+                  <label className="project-dialog__field project-dialog__field--inline import-wizard__field">
                     <span>Depth unit</span>
                     <select value={depthUnit} onChange={(e) => setDepthUnit(e.target.value as 'm' | 'ft' | 'km')}>
                       <option value="m">m</option>
@@ -407,6 +395,9 @@ export function ImportLasDialog({ wells, activeWellId, onClose, onSuccess }: Imp
               <p className="project-dialog__error">
                 No depth column detected. Rename a column to DEPT, DEPTH, MD, TVD, or TVDSS and reload.
               </p>
+            )}
+            {!previewLoading && tabularPreview && mapping['depth'] && !hasImportableLogCurves && (
+              <p className="project-dialog__error">No importable log curves were found in selected file.</p>
             )}
           </>
         )
