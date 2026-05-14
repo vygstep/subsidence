@@ -23,7 +23,7 @@ legacy sample data, and public attribution.
   importers.
 - If a project already has an active well, import dialogs must continue to
   target the active well by default.
-- Manual Create Well UI should suggest `New well`, not `Pleshet 01`.
+- Manual Create Well UI should suggest `well-1`, not `Pleshet 01`.
 - The Templates tab must not show numeric counters on section headers or object
   rows.
 - `built-in` and `user` labels are status labels, not counters, and may stay.
@@ -47,9 +47,10 @@ Status: done. Verified by `pytest tests/integration/test_project_api_workflows.p
 ### S2: Create Well placeholder
 
 - Change the manual Create Well dialog placeholder from `Pleshet 01` to
-  `New well`.
+  `well-1`.
+- Keep this as UI guidance only; users can still enter any well name.
 
-Status: pending.
+Status: done.
 
 ### S3: Legacy `app/data` cleanup
 
