@@ -78,4 +78,16 @@ export const importWizardPresets = {
     executeEndpoint: '/api/projects/import-wells',
     resultWellField: 'well_id',
   },
+  stratChart: {
+    id: 'strat-chart',
+    title: 'Load Stratigraphic Chart',
+    eyebrow: 'Import Wizard',
+    submitLabel: 'Load chart',
+    busyLabel: 'Importing...',
+    previewMode: 'tabular',
+    targetWellPolicy: 'none',
+    acceptedFileFilters: DELIMITED_TEXT_FILTERS,
+    executeOperation: 'strat_chart.import',
+    executeEndpoint: '/api/strat-charts/import',
+  },
 } satisfies Record<string, ImportWizardPreset>

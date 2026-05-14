@@ -113,7 +113,22 @@ Likely files:
 
 ## Stage 3 - Target Well and Multi-Well CSV Foundation
 
-Status: In progress on `feature/import-multiwell-foundation`.
+Status: Completed on `feature/import-multiwell-foundation`.
+
+Result:
+
+- Added common backend row grouping by `well_name`.
+- Added `Load wells` CSV import.
+- Added multi-well CSV import for logs, tops, and deviation.
+- Kept single-well imports compatible when `well_name` is absent or not mapped.
+- Added frontend multi-well detection/summary in existing import wizards.
+- Added parser fixes discovered during manual review:
+  - explicit space delimiter;
+  - header row input applies on Enter/blur;
+  - restored Open/New Project path action button styling.
+- Verification passed:
+  - `cd app && pytest tests` - 121 passed.
+  - `cd frontend && npm run test -- --run` - 64 passed.
 
 Implementation sequence:
 
@@ -205,6 +220,26 @@ Likely files:
 - `frontend/src/components/layout/ImportDeviationDialog.tsx`
 
 ## Stage 4 - StratChart Import Wizard
+
+Status: In progress on `feature/import-multiwell-foundation`.
+
+Implementation plan:
+
+- Replace the path-only StratChart import dialog with the shared import wizard.
+- Require explicit column mapping from the wizard.
+- Required fields:
+  - `unit_id`
+  - `unit_name`
+  - `start_age_ma`
+  - `end_age_ma`
+- Optional fields:
+  - `parent_unit_id`
+  - `rank_name`
+  - `html_rgb_hash`
+- Keep hierarchy validation simple for this stage:
+  - parent references must resolve;
+  - when parent and child ages are present, child age interval must fit inside the parent age interval.
+- Do not add rank hierarchy validation in this stage.
 
 Replace the current one-step `LoadStratChartDialog` flow with the shared import wizard pattern.
 

@@ -90,6 +90,16 @@ export const WELLS_FIELDS: FieldDefinition[] = [
   { id: 'crs', label: 'CRS', required: false, aliases: ['crs', 'coordinate_reference_system'] },
 ]
 
+export const STRAT_CHART_FIELDS: FieldDefinition[] = [
+  { id: 'unit_id', label: 'Unit ID', required: true, aliases: ['unit_id', 'id'] },
+  { id: 'parent_unit_id', label: 'Parent unit ID', required: false, aliases: ['parent_unit_id', 'parent_id'] },
+  { id: 'unit_name', label: 'Unit name', required: true, aliases: ['unit_name', 'name', 'strat_unit', 'unit'] },
+  { id: 'rank_name', label: 'Rank name', required: false, aliases: ['rank_name', 'rank'] },
+  { id: 'start_age_ma', label: 'Start age (Ma)', required: true, aliases: ['start_age_ma', 'start_age', 'age_base_ma', 'base_age_ma'] },
+  { id: 'end_age_ma', label: 'End age (Ma)', required: true, aliases: ['end_age_ma', 'end_age', 'age_top_ma', 'top_age_ma'] },
+  { id: 'color', label: 'Color', required: false, aliases: ['html_rgb_hash', 'rgb', 'cmyk', 'color', 'color_hex', 'hex'] },
+]
+
 function normalizeKey(s: string): string {
   return s.toLowerCase().replace(/[\s[\]()\-_,./\\]+/g, '').replace(/unit[s]?$/, '')
 }
@@ -138,6 +148,12 @@ export function validateLogsCsvMapping(mapping: ColumnMapping): string[] {
 
 export function validateWellsMapping(mapping: ColumnMapping): string[] {
   return WELLS_FIELDS.filter((f) => f.required && !mapping[f.id]).map(
+    (f) => `Required field "${f.label}" is not mapped.`,
+  )
+}
+
+export function validateStratChartMapping(mapping: ColumnMapping): string[] {
+  return STRAT_CHART_FIELDS.filter((f) => f.required && !mapping[f.id]).map(
     (f) => `Required field "${f.label}" is not mapped.`,
   )
 }
