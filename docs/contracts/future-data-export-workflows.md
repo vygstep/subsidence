@@ -33,6 +33,7 @@ Export should be available for the main project objects:
 - Data Manager already has object context menus, so export actions can be added there incrementally.
 - Data Manager context-menu wiring lives primarily in `DataManagerPane.tsx` and `WellDataPanel.tsx`.
 - `pathMemory.ts` remembers import/project paths, but first-pass export can rely on browser download behavior.
+- `projects.py` already exposes cross-platform `pick-folder` through the backend. It normalizes the initial directory and uses `mustexist=True`.
 - Existing notification UI is QC-warning oriented. If success toasts are needed, add a small general notification path instead of overloading QC warnings.
 
 ## UX Direction
@@ -41,7 +42,11 @@ Export should be available for the main project objects:
 - Start with single-object export before batch export.
 - Keep export labels explicit, for example `Export tops CSV`, `Export curve CSV`, `Export sea level curve CSV`.
 - Show success/error messages in the existing notification area.
-- Use browser downloads first. Explicit export-folder workflows are deferred unless the user asks for them.
+- Export workflows should support both:
+  - writing to a user-selected folder;
+  - browser download fallback when no folder is selected.
+- Folder selection should reuse the existing backend `pick-folder` mechanism so Windows and macOS behavior matches import/project dialogs.
+- Remember export folders separately from import folders.
 - For well-scoped data, expose both:
   - `Export current well ...`
   - `Export all wells ...`
@@ -87,6 +92,32 @@ Examples:
 - `Export all well heads CSV` with `One file by well` -> multiple `*_well_head.csv` files, or `well_heads.zip` if `Export to ZIP` is checked.
 - `Export current well LAS` -> `well-1_logs.las`
 - `Export all wells LAS` -> multiple `*_logs.las` files, or `logs_las.zip` if `Export to ZIP` is checked.
+
+## Export Location
+
+Every export dialog/action that writes files should have a consistent location model:
+
+- `Export folder`: optional path selected through `pickFolder(...)`.
+- `Use browser download`: fallback when export folder is empty.
+- `Remember export folder`: store the last selected export folder separately, for example `subsidence:last-export-root`.
+- `Reveal in Explorer/Finder`: available after folder-based export using the existing `revealInExplorer(...)` helper.
+
+Backend endpoint behavior:
+
+- If `output_dir` is provided:
+  - validate that it exists and is a directory;
+  - write the generated file(s) into that directory;
+  - return JSON with written file paths and counts.
+- If `output_dir` is omitted:
+  - return a file/ZIP response for browser download.
+- Do not create arbitrary nested directories in the first pass.
+- Do not use native blocking save dialogs in export routes.
+
+Batch behavior:
+
+- If `Export to ZIP` is enabled, write/return one ZIP.
+- If `Export to ZIP` is disabled and `output_dir` is set, write multiple files into the selected folder.
+- If `Export to ZIP` is disabled and `output_dir` is empty, frontend may trigger multiple browser downloads sequentially, but should warn when this may be blocked by browser settings.
 
 ## Source Of Truth
 
@@ -164,8 +195,11 @@ Status: Planned
 - Add a small CSV response helper with stable filename handling.
 - Add a ZIP response helper for optional batch exports.
 - Add shared filename sanitization.
+- Add shared output directory validation and file write result payloads.
 - Register the router in `api/main.py`.
 - Add a frontend download helper that saves CSV/LAS/ZIP responses via `Blob`.
+- Extend `pathMemory.ts` with export-folder helpers.
+- Add a small shared export location UI/helper instead of duplicating folder controls per exporter.
 - Add batch download helper behavior:
   - if ZIP is enabled, one response downloads one archive;
   - if ZIP is disabled, frontend may trigger multiple per-well downloads sequentially;
