@@ -242,7 +242,7 @@ Status: Implemented
 
 ## Stage 3 - Logs And Curves Export
 
-Status: Planned
+Status: Implemented
 
 - Add current-well logs CSV export.
 - Add all-wells logs CSV export as one file per well only, with optional ZIP.
@@ -275,12 +275,50 @@ Status: Planned
 
 Status: Planned
 
-- Add export for per-well picks/tops.
-- Add export for a TopSet horizon list.
-- Add export for per-well active TopSet zones and `ZoneWellData`.
-- Include IDs where useful, but keep stable names readable.
-- Add UI actions from TopSet, marker, tops group, and zone contexts only where the object is clear.
-- Verify multi-well TopSet behavior.
+- Add export for per-well picks/tops as the main round-trip format for TopSet data.
+- Do not add a separate zones export in this stage. Zones are derived from TopSet horizons plus per-well picks and are rebuilt after tops import.
+- Include TopSet, horizon, pick, and zone-related attributes in the tops export so one tops file can restore the stratigraphic well state where possible.
+- Export stable names instead of internal IDs:
+  - `well_name`
+  - `topset_name`
+  - `top_name`
+  - horizon/pick names and readable attributes.
+- Export importer-compatible tops columns:
+  - `depth_md`
+  - `age_ma`
+  - `boundary_type`
+  - `hiatus_duration_ma`
+  - `eroded_thickness_m`
+  - `water_depth_m`
+  - `sea_level_m_override`
+  - `lithology`
+  - `lithology_fractions`
+  - `lithology_source`
+  - `color`
+  - `note`
+- Export calculated fields only as informational QA columns, not as import source of truth:
+  - `depth_tvd`
+  - `depth_tvdss`
+  - `zone_thickness_md`
+  - `zone_thickness_tvd`
+  - `lower_top_name`
+- Extend tops import before shipping this stage when needed so exported files can be automatically imported back without manual column mapping or metadata repair.
+- Tops import should use `topset_name` from the file when present, and should restore project-relevant attributes such as paleobathymetry, sea-level override, erosion, hiatus, lithology, and lithology fractions.
+- Keep calculated fields recalculated after import:
+  - TVD/TVDSS from deviation and well metadata;
+  - zone rows from TopSet horizon order;
+  - zone thickness from pick depths and zone service logic.
+- Add UI actions from the WELLS toolbar `Export` menu:
+  - `Export current well tops CSV`
+  - `Export all wells tops CSV`
+- Support table packaging:
+  - one file by well;
+  - one file for all wells;
+  - ZIP only for one file by well.
+- Verify multi-well TopSet behavior:
+  - exporting/importing picks from multiple wells into the same `topset_name` does not duplicate horizons incorrectly;
+  - zones are rebuilt per well after import;
+  - existing automatic zone creation remains the source of truth.
 
 ## Stage 5 - Deviation Export
 
