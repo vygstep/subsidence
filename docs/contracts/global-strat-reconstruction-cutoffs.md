@@ -77,6 +77,8 @@ This applies to both reconstruction and truncation.
 
 ## Stage 1 - Contract and Store State
 
+Status: Implemented
+
 - Add global view-store fields:
   - `subsidenceReconstructStratUnitId: number | null`
   - `subsidenceTruncateBelowStratUnitId: number | null`
@@ -85,6 +87,8 @@ This applies to both reconstruction and truncation.
 - Keep old projects compatible.
 
 ## Stage 2 - Shared Chart Transforms
+
+Status: Implemented
 
 - Replace the current `applyChartCutoff` marker helper with a clearer transform helper.
 - Add pure utilities for:
@@ -101,6 +105,8 @@ This applies to both reconstruction and truncation.
   - `Reconstruct to strat unit`.
 
 ## Stage 3 - Models Settings UI
+
+Status: Implemented
 
 In `ModelsRootSettings`, directly below:
 
@@ -125,6 +131,8 @@ Behavior:
 
 ## Stage 4 - Single-Well Chart
 
+Status: Implemented
+
 - Apply both global transforms in `SubsidenceCanvas`.
 - `Truncate below strat unit` removes older/deeper portions below the selected age.
 - `Reconstruct to strat unit` removes younger/present portions above the selected age.
@@ -133,6 +141,8 @@ Behavior:
 - Sea-level overlay is clipped to the visible transformed age domain.
 
 ## Stage 5 - Multi-Well Chart
+
+Status: Implemented
 
 - Apply the same global transforms in `MultiWellPanel`.
 - The selected active strat chart unit is global.
@@ -168,4 +178,3 @@ For future decompaction reconstruction, backend calculation must accept a `recon
 - sea level at reconstruction age;
 - erosion/unconformity behavior at reconstruction age;
 - stored result metadata for reconstruction parameters.
-

@@ -3,7 +3,8 @@ import { useEffect, useState } from 'react'
 import { useComputedStore, useViewStore } from '@/stores'
 import { useMultiWellStore } from '@/stores/multiWellStore'
 import { useWellDataStore } from '@/stores/wellDataStore'
-import { applyChartCutoff, curveAgeExtent, curveDepthExtent, paddedDepthExtent } from '@/utils/subsidenceChartDomain'
+import type { StratUnitOption } from '@/types'
+import { applyGlobalStratCutoffs, curveAgeExtent, curveDepthExtent, paddedDepthExtent } from '@/utils/subsidenceChartDomain'
 
 interface SubsidenceChartSettingsProps {
   chartType: 'single' | 'multi'
@@ -63,55 +64,65 @@ function CommitNumberInput({ value, placeholder, step, min, onCommit }: CommitNu
   )
 }
 
+function reconstructAgeForUnit(unit: StratUnitOption | null): number | null {
+  if (unit === null) return null
+  return unit.age_base_ma ?? unit.age_top_ma ?? null
+}
+
+function truncateAgeForUnit(unit: StratUnitOption | null): number | null {
+  if (unit === null) return null
+  return unit.age_top_ma ?? unit.age_base_ma ?? null
+}
+
 export function SubsidenceChartSettings({ chartType }: SubsidenceChartSettingsProps) {
   const single = chartType === 'single'
 
   const singleCurves = useComputedStore((s) => s.subsidenceCurves)
   const multiResults = useMultiWellStore((s) => s.wellResults)
-  const currentWellId = useWellDataStore((s) => s.well?.well_id ?? null)
-  const formations = useWellDataStore((s) => s.formations)
-  const wellInventories = useWellDataStore((s) => s.wellInventories)
-  const topSets = useWellDataStore((s) => s.topSets)
+  const stratCharts = useWellDataStore((s) => s.stratCharts)
   const depthMin = useViewStore((s) => single ? s.subsidenceSingleDepthMin : s.subsidenceMultiDepthMin)
   const depthMax = useViewStore((s) => single ? s.subsidenceSingleDepthMax : s.subsidenceMultiDepthMax)
   const ageMin = useViewStore((s) => single ? s.subsidenceSingleAgeMin : s.subsidenceMultiAgeMin)
   const ageMax = useViewStore((s) => single ? s.subsidenceSingleAgeMax : s.subsidenceMultiAgeMax)
-  const compareByMarkerByWellId = useViewStore((s) => s.subsidenceCompareByMarkerByWellId)
-  const compareMarkerHorizonIdByWellId = useViewStore((s) => s.subsidenceCompareMarkerHorizonIdByWellId)
+  const reconstructStratUnitId = useViewStore((s) => s.subsidenceReconstructStratUnitId)
+  const truncateBelowStratUnitId = useViewStore((s) => s.subsidenceTruncateBelowStratUnitId)
   const setDepthMin = useViewStore((s) => single ? s.setSubsidenceSingleDepthMin : s.setSubsidenceMultiDepthMin)
   const setDepthMax = useViewStore((s) => single ? s.setSubsidenceSingleDepthMax : s.setSubsidenceMultiDepthMax)
   const setAgeMin = useViewStore((s) => single ? s.setSubsidenceSingleAgeMin : s.setSubsidenceMultiAgeMin)
   const setAgeMax = useViewStore((s) => single ? s.setSubsidenceSingleAgeMax : s.setSubsidenceMultiAgeMax)
 
-  const horizonById = new Map(topSets.flatMap((topSet) => topSet.horizons ?? []).map((horizon) => [horizon.id, horizon]))
-  const inventoryByWellId = new Map(wellInventories.map((well) => [well.well_id, well]))
-  const singleHorizonId = currentWellId ? compareMarkerHorizonIdByWellId[currentWellId] : null
-  const singleHorizon = singleHorizonId !== null && singleHorizonId !== undefined ? horizonById.get(singleHorizonId) : undefined
-  const singlePick = singleHorizonId !== null && singleHorizonId !== undefined
-    ? formations.find((formation) => formation.horizon_id === singleHorizonId)
-    : undefined
+  const [stratUnits, setStratUnits] = useState<StratUnitOption[]>([])
+  const activeStratChartId = stratCharts.find((chart) => chart.is_active)?.id ?? null
+
+  useEffect(() => {
+    if (activeStratChartId === null) {
+      setStratUnits([])
+      return
+    }
+    let cancelled = false
+    const params = new URLSearchParams({ chart_id: String(activeStratChartId), limit: '1000' })
+    void fetch(`/api/strat-units?${params.toString()}`)
+      .then((response) => response.ok ? response.json() as Promise<StratUnitOption[]> : [])
+      .then((rows) => {
+        if (!cancelled) setStratUnits(rows)
+      })
+      .catch(() => {
+        if (!cancelled) setStratUnits([])
+      })
+    return () => { cancelled = true }
+  }, [activeStratChartId])
+
+  const stratUnitById = new Map(stratUnits.map((unit) => [unit.id, unit]))
+  const reconstructAgeMa = reconstructAgeForUnit(
+    reconstructStratUnitId !== null ? stratUnitById.get(reconstructStratUnitId) ?? null : null,
+  )
+  const truncateBelowAgeMa = truncateAgeForUnit(
+    truncateBelowStratUnitId !== null ? stratUnitById.get(truncateBelowStratUnitId) ?? null : null,
+  )
 
   const curves = single
-    ? applyChartCutoff(
-      singleCurves,
-      currentWellId && compareByMarkerByWellId[currentWellId] && singleHorizonId !== null && singleHorizonId !== undefined
-        ? {
-          maxAgeMa: singleHorizon?.age_ma ?? undefined,
-          maxDepthM: singlePick?.depth_md ?? undefined,
-        }
-        : null,
-    )
-    : multiResults.flatMap((result) => {
-      if (!compareByMarkerByWellId[result.wellId]) return result.curves
-      const horizonId = compareMarkerHorizonIdByWellId[result.wellId]
-      if (horizonId === null || horizonId === undefined) return result.curves
-      const horizon = horizonById.get(horizonId)
-      const pick = inventoryByWellId.get(result.wellId)?.formations.find((formation) => formation.horizon_id === horizonId)
-      const maxAgeMa = horizon?.age_ma ?? undefined
-      const maxDepthM = pick?.depth_md ?? undefined
-      if (maxAgeMa === undefined && maxDepthM === undefined) return result.curves
-      return applyChartCutoff(result.curves, { maxAgeMa, maxDepthM })
-    })
+    ? applyGlobalStratCutoffs(singleCurves, { reconstructAgeMa, truncateBelowAgeMa })
+    : multiResults.flatMap((result) => applyGlobalStratCutoffs(result.curves, { reconstructAgeMa, truncateBelowAgeMa }))
   const autoDepth = paddedDepthExtent(curveDepthExtent(curves))
   const autoAge = curveAgeExtent(curves) ?? { min: 0, max: 100 }
   const depthMinPlaceholder = Number.isFinite(autoDepth.min) ? autoDepth.min.toFixed(0) : 'auto'
