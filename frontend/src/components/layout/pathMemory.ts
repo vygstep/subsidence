@@ -1,6 +1,7 @@
 const LAST_PROJECT_PATH_KEY = 'subsidence:last-project-path'
 const LAST_PROJECT_ROOT_KEY = 'subsidence:last-project-root'
 const LAST_IMPORT_ROOT_KEY = 'subsidence:last-import-root'
+const LAST_EXPORT_ROOT_KEY = 'subsidence:last-export-root'
 
 function hasWindow(): boolean {
   return typeof window !== 'undefined' && typeof window.localStorage !== 'undefined'
@@ -70,6 +71,13 @@ export function rememberImportPath(path: string): void {
   }
 }
 
+export function rememberExportRoot(path: string): void {
+  const trimmed = path.trim()
+  if (trimmed) {
+    setItem(LAST_EXPORT_ROOT_KEY, trimmed)
+  }
+}
+
 export function getLastProjectPath(): string {
   return getItem(LAST_PROJECT_PATH_KEY)
 }
@@ -80,6 +88,10 @@ export function getLastProjectRoot(): string {
 
 export function getLastImportRoot(): string {
   return getItem(LAST_IMPORT_ROOT_KEY)
+}
+
+export function getLastExportRoot(): string {
+  return getItem(LAST_EXPORT_ROOT_KEY)
 }
 
 interface PickFileRequest {

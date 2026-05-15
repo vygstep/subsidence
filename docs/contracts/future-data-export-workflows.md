@@ -189,7 +189,7 @@ Before implementing each export stage:
 
 ## Stage 1 - Export Infrastructure
 
-Status: Planned
+Status: Implemented
 
 - Add a backend export router under `/api/export`.
 - Add a small CSV response helper with stable filename handling.
