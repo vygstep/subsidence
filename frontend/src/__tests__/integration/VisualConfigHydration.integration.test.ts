@@ -27,8 +27,8 @@ describe('Project visual config hydration', () => {
           subsidenceSingleAgeMax: 120,
           subsidenceMultiAgeMin: 5,
           subsidenceMultiAgeMax: 160,
-          subsidenceCompareByMarkerByWellId: { well_1: true },
-          subsidenceCompareMarkerHorizonIdByWellId: { well_1: 42 },
+          subsidenceReconstructStratUnitId: 41,
+          subsidenceTruncateBelowStratUnitId: 42,
           depthTrackConfig: { majorInterval: 250 },
           formationsTrackConfig: { nameSource: 'linked-strat-unit' },
         },
@@ -46,8 +46,8 @@ describe('Project visual config hydration', () => {
     expect(useViewStore.getState().subsidenceSingleAgeMax).toBe(120)
     expect(useViewStore.getState().subsidenceMultiAgeMin).toBe(5)
     expect(useViewStore.getState().subsidenceMultiAgeMax).toBe(160)
-    expect(useViewStore.getState().subsidenceCompareByMarkerByWellId.well_1).toBe(true)
-    expect(useViewStore.getState().subsidenceCompareMarkerHorizonIdByWellId.well_1).toBe(42)
+    expect(useViewStore.getState().subsidenceReconstructStratUnitId).toBe(41)
+    expect(useViewStore.getState().subsidenceTruncateBelowStratUnitId).toBe(42)
     expect(useViewStore.getState().depthTrackConfig.majorInterval).toBe(250)
     expect(useViewStore.getState().formationsTrackConfig.nameSource).toBe('linked-strat-unit')
     expect(useWellDataStore.getState().colorOverrides.GR).toBe('#ff0000')

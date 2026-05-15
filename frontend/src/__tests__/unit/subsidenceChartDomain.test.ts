@@ -2,13 +2,16 @@ import { describe, expect, it } from 'vitest'
 
 import type { SubsidenceResult } from '@/types/subsidence'
 import {
-  applyChartCutoff,
+  applyGlobalStratCutoffs,
+  clipBurialPathToAgeRange,
   curveAgeExtent,
   curveDepthExtent,
   clampRangeToBounds,
   paddedDepthExtent,
   panRange,
+  reconstructCurvesToAge,
   resolveRange,
+  truncateCurvesBelowAge,
   zoomRangeAround,
 } from '@/utils/subsidenceChartDomain'
 
@@ -22,36 +25,108 @@ function curve(name: string, ages: number[]): SubsidenceResult {
 }
 
 describe('subsidenceChartDomain', () => {
-  it('applies marker cutoff to whole curves', () => {
-    const filtered = applyChartCutoff([
+  it('clips a burial path to an exact age boundary', () => {
+    expect(clipBurialPathToAgeRange([
+      { age_ma: 0, depth_m: 100 },
+      { age_ma: 10, depth_m: 200 },
+      { age_ma: 20, depth_m: 300 },
+    ], null, 10)).toEqual([
+      { age_ma: 10, depth_m: 200 },
+      { age_ma: 0, depth_m: 100 },
+    ])
+  })
+
+  it('interpolates a burial path when cutoff age falls between points', () => {
+    expect(clipBurialPathToAgeRange([
+      { age_ma: 0, depth_m: 100 },
+      { age_ma: 10, depth_m: 200 },
+    ], null, 5)).toEqual([
+      { age_ma: 5, depth_m: 150 },
+      { age_ma: 0, depth_m: 100 },
+    ])
+  })
+
+  it('returns no path when cutoff range is outside the burial path', () => {
+    expect(clipBurialPathToAgeRange([
+      { age_ma: 0, depth_m: 100 },
+      { age_ma: 10, depth_m: 200 },
+    ], 20, null)).toEqual([])
+  })
+
+  it('handles empty and invalid burial paths', () => {
+    expect(clipBurialPathToAgeRange([], null, 10)).toEqual([])
+    expect(clipBurialPathToAgeRange([
+      { age_ma: Number.NaN, depth_m: 100 },
+      { age_ma: 10, depth_m: Number.NaN },
+    ], null, 10)).toEqual([])
+  })
+
+  it('truncates curves below a stratigraphic age boundary', () => {
+    const transformed = truncateCurvesBelowAge([
       {
-        ...curve('kept-zone', [0, 10]),
+        ...curve('zone-a', []),
+        burial_path: [
+          { age_ma: 0, depth_m: 100 },
+          { age_ma: 4, depth_m: 140 },
+        ],
+      },
+      {
+        ...curve('older-zone', []),
+        burial_path: [
+          { age_ma: 0, depth_m: 300 },
+          { age_ma: 20, depth_m: 350 },
+          { age_ma: 30, depth_m: 400 },
+        ],
+      },
+    ], 5)
+
+    expect(transformed.map((item) => item.formation_name)).toEqual(['zone-a'])
+    expect(transformed[0].burial_path).toEqual([
+      { age_ma: 0, depth_m: 100 },
+      { age_ma: 4, depth_m: 140 },
+    ])
+  })
+
+  it('reconstructs curves to a stratigraphic age boundary', () => {
+    const transformed = reconstructCurvesToAge([
+      {
+        ...curve('zone-a', []),
         burial_path: [
           { age_ma: 0, depth_m: 100 },
           { age_ma: 10, depth_m: 200 },
+          { age_ma: 20, depth_m: 300 },
         ],
       },
       {
-        ...curve('old-zone', [0, 20]),
+        ...curve('young-zone', []),
         burial_path: [
-          { age_ma: 0, depth_m: 200 },
-          { age_ma: 20, depth_m: 250 },
+          { age_ma: 0, depth_m: 50 },
+          { age_ma: 4, depth_m: 90 },
         ],
       },
-      {
-        ...curve('deep-zone', [0, 8]),
-        burial_path: [
-          { age_ma: 0, depth_m: 300 },
-          { age_ma: 8, depth_m: 320 },
-        ],
-      },
-    ], { maxAgeMa: 10, maxDepthM: 250 })
+    ], 5)
 
-    expect(filtered.map((item) => item.formation_name)).toEqual(['kept-zone'])
-    expect(filtered[0].burial_path).toEqual([
-      { age_ma: 0, depth_m: 100 },
+    expect(transformed.map((item) => item.formation_name)).toEqual(['zone-a'])
+    expect(transformed[0].burial_path).toEqual([
+      { age_ma: 20, depth_m: 300 },
       { age_ma: 10, depth_m: 200 },
+      { age_ma: 5, depth_m: 150 },
     ])
+  })
+
+  it('applies reconstruct before truncate for global strat cutoffs', () => {
+    const transformed = applyGlobalStratCutoffs([
+      {
+        ...curve('zone-a', []),
+        burial_path: [
+          { age_ma: 0, depth_m: 100 },
+          { age_ma: 10, depth_m: 200 },
+          { age_ma: 20, depth_m: 300 },
+        ],
+      },
+    ], { reconstructAgeMa: 5, truncateBelowAgeMa: 15 })
+
+    expect(transformed).toEqual([])
   })
 
   it('computes age extent from rendered curves only', () => {

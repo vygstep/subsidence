@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 
 import { logDiagnosticEvent } from '@/utils/diagnostics'
 import { useCanvasRenderer } from '@/hooks/useCanvasRenderer'
@@ -6,7 +6,8 @@ import { useMultiWellStore } from '@/stores/multiWellStore'
 import { useViewStore } from '@/stores/viewStore'
 import { useWellDataStore } from '@/stores/wellDataStore'
 import { useWorkspaceStore } from '@/stores/workspaceStore'
-import { applyChartCutoff, clampRangeToBounds, curveDepthExtent, paddedDepthExtent, panRange, resolveRange, zoomRangeAround } from '@/utils/subsidenceChartDomain'
+import type { StratUnitOption } from '@/types'
+import { applyGlobalStratCutoffs, clampRangeToBounds, curveDepthExtent, paddedDepthExtent, panRange, resolveRange, zoomRangeAround } from '@/utils/subsidenceChartDomain'
 import { GeologicalTimescale } from './GeologicalTimescale'
 
 const PADDING = { top: 12, right: 120, bottom: 40, left: 64 }
@@ -28,19 +29,38 @@ function niceStep(range: number, targetTicks: number): number {
   return 10 * mag
 }
 
+async function fetchStratUnits(chartId: number): Promise<StratUnitOption[]> {
+  const params = new URLSearchParams({ chart_id: String(chartId), limit: '1000' })
+  const response = await fetch(`/api/strat-units?${params.toString()}`)
+  if (!response.ok) {
+    throw new Error(`Failed to load strat units (${response.status})`)
+  }
+  return (await response.json()) as StratUnitOption[]
+}
+
+function reconstructAgeForUnit(unit: StratUnitOption | null): number | null {
+  if (unit === null) return null
+  return unit.age_base_ma ?? unit.age_top_ma ?? null
+}
+
+function truncateAgeForUnit(unit: StratUnitOption | null): number | null {
+  if (unit === null) return null
+  return unit.age_top_ma ?? unit.age_base_ma ?? null
+}
+
 export function MultiWellPanel() {
   const wellResults = useMultiWellStore((s) => s.wellResults)
   const fetchResults = useMultiWellStore((s) => s.fetchResults)
   const activeWellId = useWellDataStore((s) => s.well?.well_id ?? null)
   const wellInventories = useWellDataStore((s) => s.wellInventories)
-  const topSets = useWellDataStore((s) => s.topSets)
+  const stratCharts = useWellDataStore((s) => s.stratCharts)
   const subsidenceDepthMinM = useViewStore((s) => s.subsidenceMultiDepthMin)
   const subsidenceDepthMaxM = useViewStore((s) => s.subsidenceMultiDepthMax)
   const subsidenceAgeMinMa = useViewStore((s) => s.subsidenceMultiAgeMin)
   const subsidenceAgeMaxMa = useViewStore((s) => s.subsidenceMultiAgeMax)
   const subsidenceViewport = useViewStore((s) => s.subsidenceMultiViewport)
-  const compareByMarkerByWellId = useViewStore((s) => s.subsidenceCompareByMarkerByWellId)
-  const compareMarkerHorizonIdByWellId = useViewStore((s) => s.subsidenceCompareMarkerHorizonIdByWellId)
+  const reconstructStratUnitId = useViewStore((s) => s.subsidenceReconstructStratUnitId)
+  const truncateBelowStratUnitId = useViewStore((s) => s.subsidenceTruncateBelowStratUnitId)
   const setSubsidenceViewport = useViewStore((s) => s.setSubsidenceMultiViewport)
   const setSubsidenceDisplayedRange = useViewStore((s) => s.setSubsidenceMultiDisplayedRange)
 
@@ -51,31 +71,43 @@ export function MultiWellPanel() {
   const wellColorById = useMemo(() => (
     new Map(wellInventories.map((well) => [well.well_id, well.color_hex]))
   ), [wellInventories])
-  const inventoryByWellId = useMemo(() => (
-    new Map(wellInventories.map((well) => [well.well_id, well]))
-  ), [wellInventories])
-  const horizonById = useMemo(() => (
-    new Map(topSets.flatMap((topSet) => topSet.horizons ?? []).map((horizon) => [horizon.id, horizon]))
-  ), [topSets])
+  const activeStratChartId = stratCharts.find((chart) => chart.is_active)?.id ?? null
+  const [stratUnits, setStratUnits] = useState<StratUnitOption[]>([])
+
+  useEffect(() => {
+    if (activeStratChartId === null) {
+      setStratUnits([])
+      return
+    }
+
+    let cancelled = false
+    void fetchStratUnits(activeStratChartId)
+      .then((rows) => {
+        if (!cancelled) setStratUnits(rows)
+      })
+      .catch(() => {
+        if (!cancelled) setStratUnits([])
+      })
+
+    return () => { cancelled = true }
+  }, [activeStratChartId])
+
+  const stratUnitById = useMemo(() => new Map(stratUnits.map((unit) => [unit.id, unit])), [stratUnits])
+  const reconstructAgeMa = reconstructAgeForUnit(
+    reconstructStratUnitId !== null ? stratUnitById.get(reconstructStratUnitId) ?? null : null,
+  )
+  const truncateBelowAgeMa = truncateAgeForUnit(
+    truncateBelowStratUnitId !== null ? stratUnitById.get(truncateBelowStratUnitId) ?? null : null,
+  )
 
   const visibleWellResults = useMemo(() => (
     wellResults.map((result) => {
-      if (!compareByMarkerByWellId[result.wellId]) return result
-      const horizonId = compareMarkerHorizonIdByWellId[result.wellId]
-      if (horizonId === null || horizonId === undefined) return result
-
-      const horizon = horizonById.get(horizonId)
-      const pick = inventoryByWellId.get(result.wellId)?.formations.find((formation) => formation.horizon_id === horizonId)
-      const maxAgeMa = horizon?.age_ma ?? undefined
-      const maxDepthM = pick?.depth_md ?? undefined
-      if (maxAgeMa === undefined && maxDepthM === undefined) return result
-
       return {
         ...result,
-        curves: applyChartCutoff(result.curves, { maxAgeMa, maxDepthM }),
+        curves: applyGlobalStratCutoffs(result.curves, { reconstructAgeMa, truncateBelowAgeMa }),
       }
     })
-  ), [compareByMarkerByWellId, compareMarkerHorizonIdByWellId, horizonById, inventoryByWellId, wellResults])
+  ), [reconstructAgeMa, truncateBelowAgeMa, wellResults])
 
   const handleTitleClick = useCallback(() => {
     setSelectedObject(isSelected ? null : { type: 'subsidence-chart', chartType: 'multi' })

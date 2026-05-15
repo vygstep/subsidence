@@ -103,6 +103,8 @@ class StratUnitLookupResponse(BaseModel):
     id: int
     name: str
     rank: str | None
+    age_top_ma: float | None
+    age_base_ma: float | None
     color_hex: str | None
 
 
@@ -193,7 +195,7 @@ def _to_response(row: FormationTopModel, warnings: list[str] | None = None) -> F
 def list_strat_units(request: Request, q: str = '', limit: int = 20, chart_id: int | None = None) -> list[StratUnitLookupResponse]:
     manager = _require_open_project(request)
     with manager.get_session() as session:
-        stmt = select(StratUnit).order_by(StratUnit.name.asc()).limit(max(1, min(limit, 100)))
+        stmt = select(StratUnit).order_by(StratUnit.name.asc()).limit(max(1, min(limit, 1000)))
         query = q.strip()
         if query:
             stmt = stmt.where(StratUnit.name.ilike(f'%{query}%'))
@@ -206,6 +208,8 @@ def list_strat_units(request: Request, q: str = '', limit: int = 20, chart_id: i
                 id=row.id,
                 name=row.name,
                 rank=row.rank,
+                age_top_ma=row.age_top_ma,
+                age_base_ma=row.age_base_ma,
                 color_hex=row.color_hex,
             )
             for row in rows
