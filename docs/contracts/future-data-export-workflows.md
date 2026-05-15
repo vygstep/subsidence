@@ -244,16 +244,32 @@ Status: Implemented
 
 Status: Planned
 
-- Add single-curve CSV export for one well and mnemonic.
-- Add all-curves CSV export for one well.
-- Add LAS export for current well logs.
-- Add LAS export for all wells logs as per-well files, with optional ZIP.
-- Read dense samples from Parquet through existing loader helpers.
-- For CSV all-curves export, decide before implementation whether one file contains all curves in columns or one file per curve. Record the decision before coding.
-- Preserve depth column and curve units in header or metadata-friendly column names.
-- LAS metadata must reflect current project metadata, not original imported LAS headers.
-- Add UI actions from curve and LAS/logs group context menus.
-- Verify continuous and discrete curves.
+- Add current-well logs CSV export.
+- Add all-wells logs CSV export as one file per well only, with optional ZIP.
+- Add current-well logs LAS export.
+- Add all-wells logs LAS export as one file per well only, with optional ZIP.
+- Do not offer `one file for all wells` for logs/curves in this stage. Different wells can have different depth grids and curve sets; per-well files preserve round-trip compatibility.
+- Read dense samples from project Parquet through existing loader helpers.
+- CSV output should contain one file per well with:
+  - `well_name` for automatic target-well creation/matching;
+  - `DEPT [m]` as the depth column;
+  - one project curve per column;
+  - column labels including current project mnemonic and unit, for example `GR [api]`.
+- CSV output must use current project `CurveMetadata.mnemonic` and `CurveMetadata.unit`, not original source headers.
+- LAS output must be rebuilt from current project state:
+  - well metadata from `WellModel`;
+  - curve metadata from `CurveMetadata`;
+  - curve samples from project Parquet;
+  - no copying original LAS payloads from `source_las_path`.
+- LAS well section should include project-edited well name, UWI, KB/EREF, TD, X/Y stored as SLON/SLAT with project coordinate semantics documented, CRS/HZCS, and project null value.
+- LAS curve section should use current project curve mnemonics and units.
+- Add UI actions from WELLS toolbar `Export` menu:
+  - `Export current well logs CSV`;
+  - `Export all wells logs CSV`;
+  - `Export current well logs LAS`;
+  - `Export all wells logs LAS`.
+- Reuse the existing export location/dialog style from well info export.
+- Verify continuous curves first; discrete curves should be exported if present but may need a later contract for label dictionaries.
 
 ## Stage 4 - Tops, TopSets, Picks, And Zones Export
 

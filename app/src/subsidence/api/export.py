@@ -8,13 +8,17 @@ import zipfile
 from pathlib import Path
 from typing import Iterable
 
+import lasio
+import numpy as np
+import pandas as pd
 from fastapi import APIRouter, HTTPException, Request
 from fastapi.responses import Response
 from pydantic import BaseModel
 from sqlalchemy import select
 
 from subsidence.api._deps import require_open_project as _require_open_project
-from subsidence.data.schema import WellModel
+from subsidence.data.loaders import load_curves_from_parquet
+from subsidence.data.schema import CurveMetadata, WellModel
 
 router = APIRouter(tags=['export'])
 
@@ -44,6 +48,13 @@ class WellInfoExportRequest(BaseModel):
     scope: str = 'current'
     well_id: str | None = None
     packaging: str = 'one_file_for_all_wells'
+    export_to_zip: bool = False
+    output_dir: str | None = None
+
+
+class WellLogsExportRequest(BaseModel):
+    scope: str = 'current'
+    well_id: str | None = None
     export_to_zip: bool = False
     output_dir: str | None = None
 
@@ -207,6 +218,142 @@ def _well_info_filename(row: WellModel) -> str:
     return f'{sanitize_filename(row.name, row.id)}_well_info.csv'
 
 
+def _format_curve_column(row: CurveMetadata) -> str:
+    unit = (row.unit or '').strip()
+    return f'{row.mnemonic} [{unit}]' if unit else row.mnemonic
+
+
+def _curve_frame(project_path: Path, curve_rows: list[CurveMetadata]) -> pd.DataFrame:
+    if not curve_rows:
+        raise HTTPException(status_code=404, detail='No curves available for export')
+
+    frame_by_depth = pd.DataFrame(columns=['DEPT']).set_index('DEPT')
+    curve_maps: dict[str, dict[str, tuple[np.ndarray, np.ndarray]]] = {}
+    for row in curve_rows:
+        if row.data_uri not in curve_maps:
+            curve_maps[row.data_uri] = load_curves_from_parquet(project_path, row.data_uri)
+        pair = curve_maps[row.data_uri].get(row.mnemonic)
+        if pair is None:
+            continue
+        depths, values = pair
+        frame_by_depth[row.mnemonic] = pd.Series(
+            values.astype('float64'),
+            index=pd.Index(depths.astype('float64'), name='DEPT'),
+            dtype='float64',
+        )
+
+    if frame_by_depth.empty or not frame_by_depth.columns.tolist():
+        raise HTTPException(status_code=404, detail='No curve samples available for export')
+
+    return frame_by_depth.sort_index().reset_index()
+
+
+def _logs_csv_bytes(project_path: Path, well: WellModel, curve_rows: list[CurveMetadata]) -> bytes:
+    frame = _curve_frame(project_path, curve_rows)
+    frame.insert(0, 'well_name', well.name)
+    columns = {'DEPT': 'DEPT [m]'}
+    columns.update({row.mnemonic: _format_curve_column(row) for row in curve_rows if row.mnemonic in frame.columns})
+    frame = frame.rename(columns=columns)
+
+    buffer = io.StringIO()
+    frame.to_csv(buffer, index=False, lineterminator='\n', na_rep='')
+    return buffer.getvalue().encode('utf-8-sig')
+
+
+def _first_non_empty_extra(row: WellModel, key: str) -> str:
+    value = _well_extra(row).get(key)
+    return str(value).strip() if value not in (None, '') else ''
+
+
+def _logs_las_bytes(project_path: Path, well: WellModel, curve_rows: list[CurveMetadata]) -> bytes:
+    frame = _curve_frame(project_path, curve_rows)
+    null_value = next((row.null_value for row in curve_rows if row.null_value is not None), -999.25)
+
+    las = lasio.LASFile()
+    las.well['NULL'] = float(null_value)
+    las.well['WELL'] = well.name
+    las.well['UWI'] = well.uwi or ''
+    las.well['COMP'] = _first_non_empty_extra(well, 'company')
+    las.well['FLD'] = _first_non_empty_extra(well, 'field')
+    las.well['LOC'] = _first_non_empty_extra(well, 'location')
+    las.well['API'] = _first_non_empty_extra(well, 'api')
+    las.well['CTRY'] = _first_non_empty_extra(well, 'country')
+    las.well.append(lasio.HeaderItem('EREF', 'm', well.kb_elev, 'Project KB elevation'))
+    las.well.append(lasio.HeaderItem('TD', 'm', well.td_md if well.td_md is not None else float(frame['DEPT'].max()), 'Project total depth'))
+    las.well.append(lasio.HeaderItem('SLON', '', well.lon if well.lon is not None else '', 'Project X coordinate'))
+    las.well.append(lasio.HeaderItem('SLAT', '', well.lat if well.lat is not None else '', 'Project Y coordinate'))
+    las.well.append(lasio.HeaderItem('HZCS', '', well.crs or '', 'Project coordinate reference system'))
+    las.well.append(lasio.HeaderItem('COORDSEM', '', 'project_xy', 'SUBSIDENCE coordinate semantics'))
+
+    las.append_curve('DEPT', frame['DEPT'].to_numpy(dtype='float64'), unit='m', descr='Measured depth')
+    for row in curve_rows:
+        if row.mnemonic not in frame.columns:
+            continue
+        values = frame[row.mnemonic].to_numpy(dtype='float64')
+        values = np.where(np.isnan(values), float(null_value), values)
+        description_parts = []
+        if row.canonical_mnemonic:
+            description_parts.append(f'canonical={row.canonical_mnemonic}')
+        if row.family_code:
+            description_parts.append(f'family={row.family_code}')
+        if row.curve_type:
+            description_parts.append(f'type={row.curve_type}')
+        las.append_curve(
+            row.mnemonic,
+            values,
+            unit=row.unit or '',
+            descr='; '.join(description_parts),
+        )
+
+    buffer = io.StringIO()
+    las.write(buffer, version=2.0)
+    return buffer.getvalue().encode('utf-8')
+
+
+def _logs_filename(well: WellModel, extension: str) -> str:
+    return f'{sanitize_filename(well.name, well.id)}_logs.{extension}'
+
+
+def _log_export_files(project_path: Path, wells: list[WellModel], curve_rows_by_well: dict[str, list[CurveMetadata]], export_format: str) -> list[tuple[str, bytes]]:
+    files: list[tuple[str, bytes]] = []
+    for well in wells:
+        curve_rows = curve_rows_by_well.get(well.id, [])
+        if not curve_rows:
+            continue
+        if export_format == 'csv':
+            files.append((_logs_filename(well, 'csv'), _logs_csv_bytes(project_path, well, curve_rows)))
+        elif export_format == 'las':
+            files.append((_logs_filename(well, 'las'), _logs_las_bytes(project_path, well, curve_rows)))
+        else:
+            raise HTTPException(status_code=400, detail="export_format must be 'csv' or 'las'")
+    if not files:
+        raise HTTPException(status_code=404, detail='No well logs available for export')
+    return files
+
+
+def _handle_files_response(
+    files: list[tuple[str, bytes]],
+    *,
+    output_dir: Path | None,
+    export_to_zip: bool,
+    zip_filename: str,
+    media_type: str,
+):
+    if export_to_zip:
+        zip_file = (zip_filename, zip_bytes(files))
+        if output_dir is not None:
+            return write_export_files(output_dir, [zip_file])
+        return download_response(zip_file[1], zip_file[0], 'application/zip')
+
+    if output_dir is not None:
+        return write_export_files(output_dir, files)
+
+    if len(files) > 1:
+        raise HTTPException(status_code=400, detail='Choose an export folder or enable ZIP for multiple browser downloads')
+    filename, content = files[0]
+    return download_response(content, filename, media_type)
+
+
 @router.post('/wells/info')
 def export_well_info(body: WellInfoExportRequest, request: Request):
     manager = _require_open_project(request)
@@ -246,16 +393,54 @@ def export_well_info(body: WellInfoExportRequest, request: Request):
                 for well in wells
             ]
 
-    if body.export_to_zip:
-        zip_file = ('well_info.zip', zip_bytes(files))
-        if output_dir is not None:
-            return write_export_files(output_dir, [zip_file])
-        return download_response(zip_file[1], zip_file[0], 'application/zip')
+    return _handle_files_response(
+        files,
+        output_dir=output_dir,
+        export_to_zip=body.export_to_zip,
+        zip_filename='well_info.zip',
+        media_type='text/csv; charset=utf-8',
+    )
 
-    if output_dir is not None:
-        return write_export_files(output_dir, files)
 
-    if len(files) > 1:
-        raise HTTPException(status_code=400, detail='Choose an export folder or enable ZIP for multiple browser downloads')
-    filename, content = files[0]
-    return download_response(content, filename, 'text/csv; charset=utf-8')
+@router.post('/wells/logs/{export_format}')
+def export_well_logs(export_format: str, body: WellLogsExportRequest, request: Request):
+    manager = _require_open_project(request)
+    output_dir = validate_output_dir(body.output_dir)
+    scope = body.scope.strip().lower()
+    export_format = export_format.strip().lower()
+    if scope not in {'current', 'all'}:
+        raise HTTPException(status_code=400, detail="scope must be 'current' or 'all'")
+    if export_format not in {'csv', 'las'}:
+        raise HTTPException(status_code=400, detail="export_format must be 'csv' or 'las'")
+
+    with manager.get_session() as session:
+        if scope == 'current':
+            if not body.well_id:
+                raise HTTPException(status_code=400, detail='well_id is required for current well export')
+            well = session.get(WellModel, body.well_id)
+            if well is None:
+                raise HTTPException(status_code=404, detail=f'Well not found: {body.well_id}')
+            wells = [well]
+        else:
+            wells = session.scalars(select(WellModel).order_by(WellModel.name.asc(), WellModel.id.asc())).all()
+
+        well_ids = [well.id for well in wells]
+        curve_rows_by_well: dict[str, list[CurveMetadata]] = {well_id: [] for well_id in well_ids}
+        if well_ids:
+            curve_rows = session.scalars(
+                select(CurveMetadata)
+                .where(CurveMetadata.well_id.in_(well_ids))
+                .order_by(CurveMetadata.well_id.asc(), CurveMetadata.id.asc())
+            ).all()
+            for row in curve_rows:
+                curve_rows_by_well.setdefault(row.well_id, []).append(row)
+
+        files = _log_export_files(manager.project_path, wells, curve_rows_by_well, export_format)
+
+    return _handle_files_response(
+        files,
+        output_dir=output_dir,
+        export_to_zip=body.export_to_zip,
+        zip_filename=f'well_logs_{export_format}.zip',
+        media_type='text/csv; charset=utf-8' if export_format == 'csv' else 'application/octet-stream',
+    )

@@ -2,6 +2,7 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 
 import { CreateWellDialog } from './CreateWellDialog'
 import { ExportWellInfoDialog } from './ExportWellInfoDialog'
+import { ExportWellLogsDialog } from './ExportWellLogsDialog'
 import { FileOpenDialog } from './FileOpenDialog'
 import { ImportDeviationDialog } from './ImportDeviationDialog'
 import { ImportLasDialog } from './ImportLasDialog'
@@ -13,7 +14,7 @@ import { NewProjectDialog } from './NewProjectDialog'
 import { useProjectStore, useViewStore, useWellDataStore, useWorkspaceStore } from '@/stores'
 import { buildDiagnosticSnapshot } from '@/utils/diagnostics'
 
-type DialogKind = 'project-open' | 'project-new' | 'create-well' | 'load-wells' | 'load-las' | 'load-tops' | 'load-deviation' | 'load-strat-chart' | 'load-sea-level-curve' | 'export-well-info-current' | 'export-well-info-all' | null
+type DialogKind = 'project-open' | 'project-new' | 'create-well' | 'load-wells' | 'load-las' | 'load-tops' | 'load-deviation' | 'load-strat-chart' | 'load-sea-level-curve' | 'export-well-info-current' | 'export-well-info-all' | 'export-logs-csv-current' | 'export-logs-csv-all' | 'export-logs-las-current' | 'export-logs-las-all' | null
 
 interface UnsavedChangesDialogProps {
   projectName: string | null
@@ -89,6 +90,10 @@ export function ProjectToolbar() {
   const wellOptions = useMemo(
     () => wellInventories.map((item) => ({ well_id: item.well_id, well_name: item.well_name })),
     [wellInventories],
+  )
+  const hasAnyCurves = wellInventories.some((item) => item.curves.length > 0)
+  const activeWellHasCurves = Boolean(
+    well?.well_id && wellInventories.find((item) => item.well_id === well.well_id)?.curves.length,
   )
 
   const topbarTitle = !isProjectOpen
@@ -281,6 +286,46 @@ export function ProjectToolbar() {
             onClose={() => setActiveDialog(null)}
           />
         )
+      case 'export-logs-csv-current':
+        return (
+          <ExportWellLogsDialog
+            initialScope="current"
+            exportFormat="csv"
+            activeWellId={well?.well_id ?? null}
+            wells={wellInventories}
+            onClose={() => setActiveDialog(null)}
+          />
+        )
+      case 'export-logs-csv-all':
+        return (
+          <ExportWellLogsDialog
+            initialScope="all"
+            exportFormat="csv"
+            activeWellId={well?.well_id ?? null}
+            wells={wellInventories}
+            onClose={() => setActiveDialog(null)}
+          />
+        )
+      case 'export-logs-las-current':
+        return (
+          <ExportWellLogsDialog
+            initialScope="current"
+            exportFormat="las"
+            activeWellId={well?.well_id ?? null}
+            wells={wellInventories}
+            onClose={() => setActiveDialog(null)}
+          />
+        )
+      case 'export-logs-las-all':
+        return (
+          <ExportWellLogsDialog
+            initialScope="all"
+            exportFormat="las"
+            activeWellId={well?.well_id ?? null}
+            wells={wellInventories}
+            onClose={() => setActiveDialog(null)}
+          />
+        )
       default:
         return null
     }
@@ -368,6 +413,38 @@ export function ProjectToolbar() {
               onClick={() => { setExportMenuOpen(false); setActiveDialog('export-well-info-all') }}
             >
               Export all wells info
+            </button>
+            <button
+              type="button"
+              className="app-menu__item"
+              disabled={!activeWellHasCurves}
+              onClick={() => { setExportMenuOpen(false); setActiveDialog('export-logs-csv-current') }}
+            >
+              Export current well logs CSV
+            </button>
+            <button
+              type="button"
+              className="app-menu__item"
+              disabled={!hasAnyCurves}
+              onClick={() => { setExportMenuOpen(false); setActiveDialog('export-logs-csv-all') }}
+            >
+              Export all wells logs CSV
+            </button>
+            <button
+              type="button"
+              className="app-menu__item"
+              disabled={!activeWellHasCurves}
+              onClick={() => { setExportMenuOpen(false); setActiveDialog('export-logs-las-current') }}
+            >
+              Export current well logs LAS
+            </button>
+            <button
+              type="button"
+              className="app-menu__item"
+              disabled={!hasAnyCurves}
+              onClick={() => { setExportMenuOpen(false); setActiveDialog('export-logs-las-all') }}
+            >
+              Export all wells logs LAS
             </button>
           </div>
         ) : null}

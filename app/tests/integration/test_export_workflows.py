@@ -83,6 +83,112 @@ def test_export_all_well_info_to_folder_and_zip(tmp_path: Path) -> None:
     if manager.is_open:
         manager.close_project()
 
+
+def test_export_current_well_logs_csv_round_trips_with_logs_import(tmp_path: Path) -> None:
+    manager = app.state.project_manager
+    if manager.is_open:
+        manager.close_project()
+
+    with TestClient(app) as client:
+        _create_project(client, tmp_path, 'logs-csv-export')
+        source_csv = tmp_path / 'source_logs.csv'
+        source_csv.write_text(
+            'well_name,DEPT [m],GR [api],RHOB [g/cm3]\n'
+            'Export Log Well,100,75,2.35\n'
+            'Export Log Well,200,80,2.40\n'
+            'Export Log Well,300,85,2.45\n',
+            encoding='utf-8',
+        )
+        response = client.post('/api/projects/import-logs-csv', json={'csv_path': str(source_csv)})
+        assert response.status_code == 200, response.text
+        well_id = response.json()['well_id']
+
+        response = client.post(f'/api/export/wells/logs/csv', json={
+            'scope': 'current',
+            'well_id': well_id,
+        })
+        assert response.status_code == 200, response.text
+        assert response.headers['content-type'].startswith('text/csv')
+        reader = csv.DictReader(io.StringIO(response.content.decode('utf-8-sig')))
+        assert reader.fieldnames == ['well_name', 'DEPT [m]', 'GR [gAPI]', 'RHOB [g/cc]']
+        export_csv = tmp_path / 'exported_logs.csv'
+        export_csv.write_bytes(response.content)
+
+        response = client.post('/api/projects/close')
+        assert response.status_code == 200, response.text
+        clean_project = _create_project(client, tmp_path, 'logs-csv-roundtrip')
+        response = client.post('/api/projects/import-logs-csv', json={'csv_path': str(export_csv)})
+        assert response.status_code == 200, response.text
+        response = client.get('/api/wells/inventory')
+        assert response.status_code == 200, response.text
+        wells = response.json()
+        assert len(wells) == 1
+        assert wells[0]['well_name'] == 'Export Log Well'
+        assert [curve['mnemonic'] for curve in wells[0]['curves']] == ['GR', 'RHOB']
+        assert [curve['unit'] for curve in wells[0]['curves']] == ['gAPI', 'g/cc']
+        assert clean_project.exists()
+
+    if manager.is_open:
+        manager.close_project()
+
+
+def test_export_current_well_logs_las_round_trips_with_las_import(tmp_path: Path) -> None:
+    manager = app.state.project_manager
+    if manager.is_open:
+        manager.close_project()
+
+    with TestClient(app) as client:
+        _create_project(client, tmp_path, 'logs-las-export')
+        source_csv = tmp_path / 'source_logs_for_las.csv'
+        source_csv.write_text(
+            'well_name,DEPT [m],GR [api],RHOB [g/cm3]\n'
+            'Export LAS Well,100,75,2.35\n'
+            'Export LAS Well,200,80,2.40\n'
+            'Export LAS Well,300,85,2.45\n',
+            encoding='utf-8',
+        )
+        response = client.post('/api/projects/import-logs-csv', json={'csv_path': str(source_csv)})
+        assert response.status_code == 200, response.text
+        well_id = response.json()['well_id']
+        response = client.patch(f'/api/wells/{well_id}', json={
+            'kb_elev': 12.0,
+            'td_md': 350.0,
+            'x': 123.0,
+            'y': 456.0,
+            'crs': 'local',
+        })
+        assert response.status_code == 200, response.text
+
+        response = client.post(f'/api/export/wells/logs/las', json={
+            'scope': 'current',
+            'well_id': well_id,
+        })
+        assert response.status_code == 200, response.text
+        assert response.headers['content-type'] == 'application/octet-stream'
+        export_las = tmp_path / 'exported_logs.las'
+        export_las.write_bytes(response.content)
+
+        response = client.post('/api/projects/close')
+        assert response.status_code == 200, response.text
+        _create_project(client, tmp_path, 'logs-las-roundtrip')
+        response = client.post('/api/projects/import-las', json={'las_path': str(export_las)})
+        assert response.status_code == 200, response.text
+        response = client.get('/api/wells/inventory')
+        assert response.status_code == 200, response.text
+        wells = response.json()
+        assert len(wells) == 1
+        assert wells[0]['well_name'] == 'Export LAS Well'
+        assert wells[0]['kb_elev'] == 12.0
+        assert wells[0]['td_md'] == 350.0
+        assert wells[0]['x'] == 123.0
+        assert wells[0]['y'] == 456.0
+        assert wells[0]['crs'] == 'local'
+        assert [curve['mnemonic'] for curve in wells[0]['curves']] == ['GR', 'RHOB']
+        assert [curve['unit'] for curve in wells[0]['curves']] == ['gAPI', 'g/cc']
+
+    if manager.is_open:
+        manager.close_project()
+
     with TestClient(app) as client:
         _create_project(client, tmp_path, 'well-info-all')
         for name in ('A Well', 'B Well'):
