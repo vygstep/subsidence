@@ -15,10 +15,11 @@ from fastapi import APIRouter, HTTPException, Request
 from fastapi.responses import Response
 from pydantic import BaseModel
 from sqlalchemy import select
+from sqlalchemy.orm import selectinload
 
 from subsidence.api._deps import require_open_project as _require_open_project
 from subsidence.data.loaders import load_curves_from_parquet
-from subsidence.data.schema import CurveMetadata, WellModel
+from subsidence.data.schema import CurveMetadata, FormationTopModel, FormationZone, TopSetHorizon, WellActiveTopSet, WellModel, ZoneWellData
 
 router = APIRouter(tags=['export'])
 
@@ -55,6 +56,14 @@ class WellInfoExportRequest(BaseModel):
 class WellLogsExportRequest(BaseModel):
     scope: str = 'current'
     well_id: str | None = None
+    export_to_zip: bool = False
+    output_dir: str | None = None
+
+
+class WellTopsExportRequest(BaseModel):
+    scope: str = 'current'
+    well_id: str | None = None
+    packaging: str = 'one_file_for_all_wells'
     export_to_zip: bool = False
     output_dir: str | None = None
 
@@ -101,6 +110,37 @@ REQUIRED_WELL_INFO_FIELDNAMES = [
     'coordinate_semantics',
     'depth_unit',
     'color_hex',
+]
+
+TOPS_FIELDNAMES = [
+    'well_name',
+    'topset_name',
+    'top_name',
+    'depth_md',
+    'depth_tvd',
+    'depth_tvdss',
+    'age_ma',
+    'age_base_ma',
+    'boundary_type',
+    'hiatus_duration_ma',
+    'eroded_thickness_m',
+    'water_depth_m',
+    'sea_level_m_override',
+    'lithology',
+    'lithology_fractions',
+    'lithology_source',
+    'color',
+    'note',
+    'lower_top_name',
+    'zone_thickness_md',
+    'zone_thickness_tvd',
+]
+
+REQUIRED_TOPS_FIELDNAMES = [
+    'well_name',
+    'topset_name',
+    'top_name',
+    'depth_md',
 ]
 
 
@@ -331,6 +371,126 @@ def _log_export_files(project_path: Path, wells: list[WellModel], curve_rows_by_
     return files
 
 
+def _tops_filename(well: WellModel) -> str:
+    return f'{sanitize_filename(well.name, well.id)}_tops.csv'
+
+
+def _top_boundary_type(pick: FormationTopModel, horizon: TopSetHorizon | None) -> str:
+    kind = (pick.kind or (horizon.kind if horizon is not None else '') or 'strat').strip().lower()
+    return 'unconformity' if kind == 'unconformity' else 'conformable'
+
+
+def _tops_rows_for_well(session, well: WellModel) -> list[dict[str, object | None]]:
+    active = session.scalar(
+        select(WellActiveTopSet)
+        .where(WellActiveTopSet.well_id == well.id)
+        .options(selectinload(WellActiveTopSet.top_set))
+    )
+    if active is None:
+        return []
+
+    horizons = session.scalars(
+        select(TopSetHorizon)
+        .where(TopSetHorizon.top_set_id == active.top_set_id)
+        .order_by(TopSetHorizon.sort_order.asc(), TopSetHorizon.id.asc())
+    ).all()
+    horizon_by_id = {horizon.id: horizon for horizon in horizons}
+    horizon_ids = list(horizon_by_id.keys())
+    if not horizon_ids:
+        return []
+
+    picks = session.scalars(
+        select(FormationTopModel)
+        .where(
+            FormationTopModel.well_id == well.id,
+            FormationTopModel.horizon_id.in_(horizon_ids),
+            FormationTopModel.depth_md.is_not(None),
+        )
+    ).all()
+    pick_by_horizon_id = {
+        pick.horizon_id: pick
+        for pick in picks
+        if pick.horizon_id is not None
+    }
+
+    zones = session.scalars(
+        select(FormationZone)
+        .where(FormationZone.top_set_id == active.top_set_id)
+        .options(selectinload(FormationZone.lower_horizon))
+    ).all()
+    zone_by_upper_horizon_id = {zone.upper_horizon_id: zone for zone in zones}
+    zone_ids = [zone.id for zone in zones]
+    zwd_by_zone_id: dict[int, ZoneWellData] = {}
+    if zone_ids:
+        zwd_by_zone_id = {
+            row.zone_id: row
+            for row in session.scalars(
+                select(ZoneWellData).where(
+                    ZoneWellData.zone_id.in_(zone_ids),
+                    ZoneWellData.well_id == well.id,
+                )
+            ).all()
+        }
+
+    rows: list[dict[str, object | None]] = []
+    for horizon in horizons:
+        pick = pick_by_horizon_id.get(horizon.id)
+        if pick is None:
+            continue
+        zone = zone_by_upper_horizon_id.get(horizon.id)
+        zwd = zwd_by_zone_id.get(zone.id) if zone is not None else None
+        rows.append({
+            'well_name': well.name,
+            'topset_name': active.top_set.name,
+            'top_name': pick.name or horizon.name,
+            'depth_md': pick.depth_md,
+            'depth_tvd': pick.depth_tvd,
+            'depth_tvdss': pick.depth_tvdss,
+            'age_ma': pick.age_top_ma if pick.age_top_ma is not None else horizon.age_ma,
+            'age_base_ma': pick.age_base_ma,
+            'boundary_type': _top_boundary_type(pick, horizon),
+            'hiatus_duration_ma': pick.hiatus_duration_ma,
+            'eroded_thickness_m': pick.eroded_thickness_m,
+            'water_depth_m': pick.water_depth_m,
+            'sea_level_m_override': pick.sea_level_m_override,
+            'lithology': pick.lithology,
+            'lithology_fractions': zwd.lithology_fractions if zwd is not None else None,
+            'lithology_source': zwd.lithology_source if zwd is not None else None,
+            'color': pick.color or horizon.color,
+            'note': pick.note,
+            'lower_top_name': zone.lower_horizon.name if zone is not None and zone.lower_horizon is not None else None,
+            'zone_thickness_md': zwd.thickness_md if zwd is not None else None,
+            'zone_thickness_tvd': zwd.thickness_tvd if zwd is not None else None,
+        })
+    return rows
+
+
+def _tops_csv(rows: list[dict[str, object | None]]) -> bytes:
+    fieldnames = [
+        field
+        for field in TOPS_FIELDNAMES
+        if field in REQUIRED_TOPS_FIELDNAMES
+        or any(row.get(field) not in (None, '') for row in rows)
+    ]
+    return csv_bytes(fieldnames, rows)
+
+
+def _tops_export_files(session, wells: list[WellModel], packaging: str) -> list[tuple[str, bytes]]:
+    rows_by_well: list[tuple[WellModel, list[dict[str, object | None]]]] = [
+        (well, _tops_rows_for_well(session, well))
+        for well in wells
+    ]
+    rows_by_well = [(well, rows) for well, rows in rows_by_well if rows]
+    if not rows_by_well:
+        raise HTTPException(status_code=404, detail='No active TopSet picks available for export')
+    if packaging == 'one_file_for_all_wells':
+        rows = [row for _well, well_rows in rows_by_well for row in well_rows]
+        return [('tops.csv', _tops_csv(rows))]
+    if packaging == 'one_file_per_well':
+        return [(_tops_filename(well), _tops_csv(rows)) for well, rows in rows_by_well]
+    raise HTTPException(status_code=400, detail="packaging must be 'one_file_for_all_wells' or 'one_file_per_well'")
+
+
 def _handle_files_response(
     files: list[tuple[str, bytes]],
     *,
@@ -443,4 +603,38 @@ def export_well_logs(export_format: str, body: WellLogsExportRequest, request: R
         export_to_zip=body.export_to_zip,
         zip_filename=f'well_logs_{export_format}.zip',
         media_type='text/csv; charset=utf-8' if export_format == 'csv' else 'application/octet-stream',
+    )
+
+
+@router.post('/wells/tops')
+def export_well_tops(body: WellTopsExportRequest, request: Request):
+    manager = _require_open_project(request)
+    output_dir = validate_output_dir(body.output_dir)
+    scope = body.scope.strip().lower()
+    packaging = body.packaging.strip().lower()
+    if scope not in {'current', 'all'}:
+        raise HTTPException(status_code=400, detail="scope must be 'current' or 'all'")
+    if packaging not in {'one_file_for_all_wells', 'one_file_per_well'}:
+        raise HTTPException(status_code=400, detail="packaging must be 'one_file_for_all_wells' or 'one_file_per_well'")
+    if body.export_to_zip and packaging != 'one_file_per_well':
+        raise HTTPException(status_code=400, detail='Export to ZIP is only available for one file per well')
+
+    with manager.get_session() as session:
+        if scope == 'current':
+            if not body.well_id:
+                raise HTTPException(status_code=400, detail='well_id is required for current well export')
+            well = session.get(WellModel, body.well_id)
+            if well is None:
+                raise HTTPException(status_code=404, detail=f'Well not found: {body.well_id}')
+            files = _tops_export_files(session, [well], 'one_file_per_well')
+        else:
+            wells = session.scalars(select(WellModel).order_by(WellModel.name.asc(), WellModel.id.asc())).all()
+            files = _tops_export_files(session, wells, packaging)
+
+    return _handle_files_response(
+        files,
+        output_dir=output_dir,
+        export_to_zip=body.export_to_zip,
+        zip_filename='tops.zip',
+        media_type='text/csv; charset=utf-8',
     )

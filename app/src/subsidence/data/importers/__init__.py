@@ -11,7 +11,7 @@ from .common import (
 from .deviation import import_deviation_csv, import_deviation_csv_multi
 from .las import import_las_file
 from .logs_csv import import_logs_csv, import_logs_csv_multi
-from .tops import import_tops_csv, import_tops_csv_multi
+from .tops import import_tops_csv, import_tops_csv_multi, import_tops_rows, import_tops_rows_multi
 from .wells import import_wells_csv, import_wells_rows
 
 __all__ = [
@@ -30,6 +30,8 @@ __all__ = [
     'import_logs_csv_multi',
     'import_tops_csv',
     'import_tops_csv_multi',
+    'import_tops_rows',
+    'import_tops_rows_multi',
     'import_wells_csv',
     'import_wells_rows',
 ]

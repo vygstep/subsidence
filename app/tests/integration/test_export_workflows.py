@@ -137,6 +137,71 @@ def test_export_current_well_logs_las_round_trips_with_las_import(tmp_path: Path
     if manager.is_open:
         manager.close_project()
 
+
+def test_export_current_well_tops_round_trips_with_tops_import(tmp_path: Path) -> None:
+    manager = app.state.project_manager
+    if manager.is_open:
+        manager.close_project()
+
+    with TestClient(app) as client:
+        _create_project(client, tmp_path, 'tops-export')
+        source_csv = tmp_path / 'source_tops.csv'
+        source_csv.write_text(
+            'well_name,top_name,depth_md,age_ma,boundary_type,water_depth_m,sea_level_m_override,lithology,lithology_fractions,lithology_source,color,note\n'
+            'Export Tops Well,Top A,100,10,conformable,20,5,sandstone,"{""sandstone"": 1.0}",manual,#ff0000,top note\n'
+            'Export Tops Well,Top B,250,20,unconformity,0,,shale,"{""shale"": 1.0}",manual,#00ff00,base note\n',
+            encoding='utf-8',
+        )
+        response = client.post('/api/projects/import-tops', json={
+            'csv_path': str(source_csv),
+            'create_zone_set': True,
+            'zone_set_name': 'RoundTrip TopSet',
+        })
+        assert response.status_code == 200, response.text
+        well_id = response.json()['well_id']
+
+        response = client.post('/api/export/wells/tops', json={
+            'scope': 'current',
+            'well_id': well_id,
+        })
+        assert response.status_code == 200, response.text
+        reader = csv.DictReader(io.StringIO(response.content.decode('utf-8-sig')))
+        assert reader.fieldnames is not None
+        assert 'topset_name' in reader.fieldnames
+        assert 'lithology_fractions' in reader.fieldnames
+        rows = list(reader)
+        assert rows[0]['topset_name'] == 'RoundTrip TopSet'
+        assert rows[0]['top_name'] == 'Top A'
+        assert rows[0]['water_depth_m'] == '20.0'
+        assert rows[0]['sea_level_m_override'] == '5.0'
+        assert rows[0]['lithology_fractions'] == '{"sandstone": 1.0}'
+        export_csv = tmp_path / 'exported_tops.csv'
+        export_csv.write_bytes(response.content)
+
+        response = client.post('/api/projects/close')
+        assert response.status_code == 200, response.text
+        _create_project(client, tmp_path, 'tops-roundtrip')
+        response = client.post('/api/projects/import-tops', json={
+            'csv_path': str(export_csv),
+        })
+        assert response.status_code == 200, response.text
+        imported_well_id = response.json()['well_id']
+
+        response = client.get('/api/wells/inventory')
+        assert response.status_code == 200, response.text
+        wells = response.json()
+        assert len(wells) == 1
+        assert wells[0]['well_id'] == imported_well_id
+        assert wells[0]['well_name'] == 'Export Tops Well'
+        assert wells[0]['active_top_set_name'] == 'RoundTrip TopSet'
+        tops = wells[0]['formations']
+        assert [top['name'] for top in tops] == ['Top A', 'Top B']
+        assert wells[0]['zones'][0]['lithology_fractions'] == '{"sandstone": 1.0}'
+        assert wells[0]['zones'][0]['lithology_source'] == 'manual'
+
+    if manager.is_open:
+        manager.close_project()
+
     with TestClient(app) as client:
         _create_project(client, tmp_path, 'logs-las-export')
         source_csv = tmp_path / 'source_logs_for_las.csv'

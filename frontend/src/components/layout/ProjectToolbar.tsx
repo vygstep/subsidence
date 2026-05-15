@@ -3,6 +3,7 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 import { CreateWellDialog } from './CreateWellDialog'
 import { ExportWellInfoDialog } from './ExportWellInfoDialog'
 import { ExportWellLogsDialog } from './ExportWellLogsDialog'
+import { ExportWellTopsDialog } from './ExportWellTopsDialog'
 import { FileOpenDialog } from './FileOpenDialog'
 import { ImportDeviationDialog } from './ImportDeviationDialog'
 import { ImportLasDialog } from './ImportLasDialog'
@@ -14,7 +15,7 @@ import { NewProjectDialog } from './NewProjectDialog'
 import { useProjectStore, useViewStore, useWellDataStore, useWorkspaceStore } from '@/stores'
 import { buildDiagnosticSnapshot } from '@/utils/diagnostics'
 
-type DialogKind = 'project-open' | 'project-new' | 'create-well' | 'load-wells' | 'load-las' | 'load-tops' | 'load-deviation' | 'load-strat-chart' | 'load-sea-level-curve' | 'export-well-info-current' | 'export-well-info-all' | 'export-logs-csv-current' | 'export-logs-csv-all' | 'export-logs-las-current' | 'export-logs-las-all' | null
+type DialogKind = 'project-open' | 'project-new' | 'create-well' | 'load-wells' | 'load-las' | 'load-tops' | 'load-deviation' | 'load-strat-chart' | 'load-sea-level-curve' | 'export-well-info-current' | 'export-well-info-all' | 'export-logs-csv-current' | 'export-logs-csv-all' | 'export-logs-las-current' | 'export-logs-las-all' | 'export-tops-current' | 'export-tops-all' | null
 
 interface UnsavedChangesDialogProps {
   projectName: string | null
@@ -94,6 +95,10 @@ export function ProjectToolbar() {
   const hasAnyCurves = wellInventories.some((item) => item.curves.length > 0)
   const activeWellHasCurves = Boolean(
     well?.well_id && wellInventories.find((item) => item.well_id === well.well_id)?.curves.length,
+  )
+  const hasAnyActiveTops = wellInventories.some((item) => item.active_top_set_id !== null && item.formations.some((top) => top.depth_md !== null))
+  const activeWellHasActiveTops = Boolean(
+    well?.well_id && wellInventories.find((item) => item.well_id === well.well_id && item.active_top_set_id !== null)?.formations.some((top) => top.depth_md !== null),
   )
 
   const topbarTitle = !isProjectOpen
@@ -326,6 +331,24 @@ export function ProjectToolbar() {
             onClose={() => setActiveDialog(null)}
           />
         )
+      case 'export-tops-current':
+        return (
+          <ExportWellTopsDialog
+            initialScope="current"
+            activeWellId={well?.well_id ?? null}
+            wells={wellInventories}
+            onClose={() => setActiveDialog(null)}
+          />
+        )
+      case 'export-tops-all':
+        return (
+          <ExportWellTopsDialog
+            initialScope="all"
+            activeWellId={well?.well_id ?? null}
+            wells={wellInventories}
+            onClose={() => setActiveDialog(null)}
+          />
+        )
       default:
         return null
     }
@@ -445,6 +468,22 @@ export function ProjectToolbar() {
               onClick={() => { setExportMenuOpen(false); setActiveDialog('export-logs-las-all') }}
             >
               Export all wells logs LAS
+            </button>
+            <button
+              type="button"
+              className="app-menu__item"
+              disabled={!activeWellHasActiveTops}
+              onClick={() => { setExportMenuOpen(false); setActiveDialog('export-tops-current') }}
+            >
+              Export current well tops CSV
+            </button>
+            <button
+              type="button"
+              className="app-menu__item"
+              disabled={!hasAnyActiveTops}
+              onClick={() => { setExportMenuOpen(false); setActiveDialog('export-tops-all') }}
+            >
+              Export all wells tops CSV
             </button>
           </div>
         ) : null}
