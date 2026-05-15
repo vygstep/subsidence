@@ -1,6 +1,6 @@
 # Global Stratigraphic Reconstruction Cutoffs
 
-Status: Active
+Status: Implemented
 Branch: `feature/global-strat-reconstruction-cutoffs`
 
 ## Goal
@@ -150,6 +150,8 @@ Status: Implemented
 - If a linked local pick exists, keep it available for future depth-aware diagnostics.
 
 ## Stage 6 - Verification
+
+Status: Implemented
 
 Manual checks:
 
