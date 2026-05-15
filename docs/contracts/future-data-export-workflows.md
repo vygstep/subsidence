@@ -133,6 +133,29 @@ For tops/markers export:
   - `color`
   - active strat chart link fields where available.
 
+## Round-Trip Compatibility
+
+Every first-pass export must be compatible with automatic import back into SUBSIDENCE.
+
+The user should be able to export data, import it into a clean project, and get the same objects without manually remapping columns or repairing metadata.
+
+Requirements:
+
+- Exported CSV/LAS files must use canonical names that the current import wizards can auto-map.
+- Table column order and names should follow existing importer expectations where possible.
+- Extra project-only fields are allowed only if they do not break existing importers.
+- LAS export must write well and curve metadata so the current LAS importer recreates the intended well and curve set from the exported file.
+- Tops export must preserve enough TopSet/horizon/pick attributes to restore names, ages, depths, paleobathymetry, sea-level override, erosion, and hiatus where the current importer supports those fields.
+- Deviation export must preserve native mode fields so the current deviation importer detects the same mode automatically.
+- Strat chart and sea level exports must use columns that the current loaders can auto-map.
+
+Before implementing each export stage:
+
+- Compare the proposed export schema with `frontend/src/components/layout/importWizard/mapping.ts`.
+- Compare it with the backend importer request and parser for that object type.
+- If the importer cannot automatically restore an exported field that is required for project fidelity, extend the importer first or record the gap explicitly before exporting that field.
+- Do not ship a "pretty export" that cannot be imported back without manual setup.
+
 ## Stage 1 - Export Infrastructure
 
 Status: Planned
