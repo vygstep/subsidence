@@ -16,6 +16,17 @@ from .common import (
 from ..schema import WellModel
 
 
+def _extract_extra(row: dict[str, str]) -> dict[str, object]:
+    extra: dict[str, object] = {}
+    for key, value in row.items():
+        if not key.startswith('extra_'):
+            continue
+        clean_value = (value or '').strip()
+        if clean_value:
+            extra[key.removeprefix('extra_')] = clean_value
+    return extra
+
+
 def import_wells_rows(
     session: Session,
     source_path: Path | str,
@@ -42,8 +53,13 @@ def import_wells_rows(
         x = _coerce_float(_extract_text(row, 'x', 'lon', 'longitude'))
         y = _coerce_float(_extract_text(row, 'y', 'lat', 'latitude'))
         kb = _coerce_float(_extract_text(row, 'kb', 'kb_elev', 'kb_elevation'))
+        gl = _coerce_float(_extract_text(row, 'gl', 'gl_elev', 'gl_elevation'))
         td = _coerce_float(_extract_text(row, 'td', 'td_md', 'total_depth'))
         crs = _extract_text(row, 'crs')
+        depth_unit = _extract_text(row, 'depth_unit')
+        color_hex = _extract_text(row, 'color_hex', 'color')
+        source_las_path = _extract_text(row, 'source_las_path')
+        extra = _extract_extra(row)
 
         well = _find_existing_well_by_identity(session, name=name, uwi=uwi)
         if well is None:
@@ -54,8 +70,13 @@ def import_wells_rows(
                 x=x,
                 y=y,
                 kb=kb if kb is not None else DEFAULT_WELL_KB,
+                gl=gl,
                 td=td,
                 crs=crs,
+                depth_unit=depth_unit,
+                color_hex=color_hex,
+                source_las_path=source_las_path,
+                extra=extra,
             )
         else:
             apply_imported_well_metadata(
@@ -65,8 +86,13 @@ def import_wells_rows(
                 x=x,
                 y=y,
                 kb=kb,
+                gl=gl,
                 td=td,
                 crs=crs,
+                depth_unit=depth_unit,
+                color_hex=color_hex,
+                source_las_path=source_las_path,
+                extra=extra,
             )
 
         if well.id in seen_ids:

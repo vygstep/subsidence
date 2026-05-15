@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 
 import { CreateWellDialog } from './CreateWellDialog'
+import { ExportWellInfoDialog } from './ExportWellInfoDialog'
 import { FileOpenDialog } from './FileOpenDialog'
 import { ImportDeviationDialog } from './ImportDeviationDialog'
 import { ImportLasDialog } from './ImportLasDialog'
@@ -12,7 +13,7 @@ import { NewProjectDialog } from './NewProjectDialog'
 import { useProjectStore, useViewStore, useWellDataStore, useWorkspaceStore } from '@/stores'
 import { buildDiagnosticSnapshot } from '@/utils/diagnostics'
 
-type DialogKind = 'project-open' | 'project-new' | 'create-well' | 'load-wells' | 'load-las' | 'load-tops' | 'load-deviation' | 'load-strat-chart' | 'load-sea-level-curve' | null
+type DialogKind = 'project-open' | 'project-new' | 'create-well' | 'load-wells' | 'load-las' | 'load-tops' | 'load-deviation' | 'load-strat-chart' | 'load-sea-level-curve' | 'export-well-info-current' | 'export-well-info-all' | null
 
 interface UnsavedChangesDialogProps {
   projectName: string | null
@@ -46,8 +47,12 @@ export function ProjectToolbar() {
     useProjectStore.getState().isOpen ? null : 'project-open',
   )
   const [projectMenuOpen, setProjectMenuOpen] = useState(false)
+  const [loadMenuOpen, setLoadMenuOpen] = useState(false)
+  const [exportMenuOpen, setExportMenuOpen] = useState(false)
   const [pendingAction, setPendingAction] = useState<'new-project' | 'open-project' | 'close-project' | null>(null)
   const projectMenuRef = useRef<HTMLDivElement | null>(null)
+  const loadMenuRef = useRef<HTMLDivElement | null>(null)
+  const exportMenuRef = useRef<HTMLDivElement | null>(null)
 
   const well = useWellDataStore((state) => state.well)
   const curves = useWellDataStore((state) => state.curves)
@@ -110,21 +115,30 @@ export function ProjectToolbar() {
   useEffect(() => {
     if (!isProjectOpen) {
       setProjectMenuOpen(false)
+      setLoadMenuOpen(false)
+      setExportMenuOpen(false)
     }
   }, [isProjectOpen])
 
   useEffect(() => {
-    if (!projectMenuOpen) return
+    if (!projectMenuOpen && !loadMenuOpen && !exportMenuOpen) return
 
     const onPointerDown = (event: MouseEvent) => {
-      if (!projectMenuRef.current?.contains(event.target as Node)) {
+      const target = event.target as Node
+      if (!projectMenuRef.current?.contains(target)) {
         setProjectMenuOpen(false)
+      }
+      if (!loadMenuRef.current?.contains(target)) {
+        setLoadMenuOpen(false)
+      }
+      if (!exportMenuRef.current?.contains(target)) {
+        setExportMenuOpen(false)
       }
     }
 
     window.addEventListener('mousedown', onPointerDown)
     return () => window.removeEventListener('mousedown', onPointerDown)
-  }, [projectMenuOpen])
+  }, [exportMenuOpen, loadMenuOpen, projectMenuOpen])
 
   useEffect(() => {
     const onKeyDown = (event: KeyboardEvent) => {
@@ -249,6 +263,24 @@ export function ProjectToolbar() {
             }}
           />
         )
+      case 'export-well-info-current':
+        return (
+          <ExportWellInfoDialog
+            initialScope="current"
+            activeWellId={well?.well_id ?? null}
+            wells={wellInventories}
+            onClose={() => setActiveDialog(null)}
+          />
+        )
+      case 'export-well-info-all':
+        return (
+          <ExportWellInfoDialog
+            initialScope="all"
+            activeWellId={well?.well_id ?? null}
+            wells={wellInventories}
+            onClose={() => setActiveDialog(null)}
+          />
+        )
       default:
         return null
     }
@@ -288,10 +320,58 @@ export function ProjectToolbar() {
   const wellsModeActions = (
     <>
       <button type="button" className="app-action-button" onClick={() => setActiveDialog('create-well')}>Create well</button>
-      <button type="button" className="app-action-button" onClick={() => setActiveDialog('load-wells')}>Load wells</button>
-      <button type="button" className="app-action-button" onClick={() => setActiveDialog('load-las')}>Load logs</button>
-      <button type="button" className="app-action-button" onClick={() => setActiveDialog('load-tops')}>Load tops</button>
-      <button type="button" className="app-action-button" onClick={() => setActiveDialog('load-deviation')}>Load deviation</button>
+      <div className="app-menu" ref={loadMenuRef}>
+        <button
+          type="button"
+          className={`app-action-button ${loadMenuOpen ? 'app-action-button--mode-active' : ''}`}
+          onClick={() => {
+            setLoadMenuOpen((open) => !open)
+            setExportMenuOpen(false)
+          }}
+        >
+          Load
+        </button>
+        {loadMenuOpen ? (
+          <div className="app-menu__dropdown">
+            <button type="button" className="app-menu__item" onClick={() => { setLoadMenuOpen(false); setActiveDialog('load-wells') }}>Load wells</button>
+            <button type="button" className="app-menu__item" onClick={() => { setLoadMenuOpen(false); setActiveDialog('load-las') }}>Load logs</button>
+            <button type="button" className="app-menu__item" onClick={() => { setLoadMenuOpen(false); setActiveDialog('load-tops') }}>Load tops</button>
+            <button type="button" className="app-menu__item" onClick={() => { setLoadMenuOpen(false); setActiveDialog('load-deviation') }}>Load deviation</button>
+          </div>
+        ) : null}
+      </div>
+      <div className="app-menu" ref={exportMenuRef}>
+        <button
+          type="button"
+          className={`app-action-button ${exportMenuOpen ? 'app-action-button--mode-active' : ''}`}
+          onClick={() => {
+            setExportMenuOpen((open) => !open)
+            setLoadMenuOpen(false)
+          }}
+        >
+          Export
+        </button>
+        {exportMenuOpen ? (
+          <div className="app-menu__dropdown">
+            <button
+              type="button"
+              className="app-menu__item"
+              disabled={!well?.well_id}
+              onClick={() => { setExportMenuOpen(false); setActiveDialog('export-well-info-current') }}
+            >
+              Export current well info
+            </button>
+            <button
+              type="button"
+              className="app-menu__item"
+              disabled={wellInventories.length === 0}
+              onClick={() => { setExportMenuOpen(false); setActiveDialog('export-well-info-all') }}
+            >
+              Export all wells info
+            </button>
+          </div>
+        ) : null}
+      </div>
     </>
   )
 

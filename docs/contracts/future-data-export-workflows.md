@@ -207,15 +207,20 @@ Status: Implemented
 - Use existing notification area for success/error where practical.
 - Add focused tests for CSV response formatting if backend test patterns make this cheap.
 
-## Stage 2 - Wells Metadata Export
+## Stage 2 - Well Info Export
 
-Status: Planned
+Status: Implemented
 
-- Add `GET /api/export/wells.csv`.
+- Add export endpoint for well info.
 - Add current-well and all-wells modes.
-- Export one well head row per output file:
-  - `well_id`
+- In WELLS toolbar, group existing import buttons under `Load`.
+- Add adjacent `Export` menu.
+- Initial Export menu entries:
+  - `Export current well info`
+  - `Export all wells info`
+- Export one well info row per per-well output file:
   - `well_name`
+  - `uwi`
   - `td_md`
   - `kb_elev`
   - `gl_elev`
@@ -223,8 +228,16 @@ Status: Planned
   - `y`
   - `coordinate_semantics`
   - `crs`
+  - `depth_unit`
   - `color_hex`
-- Add UI action from the wells/root context or settings area.
+- Include `source_las_path` and selected `well.extra` values where available without breaking round-trip import.
+- Do not export internal project `well_id`.
+- Omit optional columns that are empty for every exported row.
+- Support table packaging:
+  - one file by well;
+  - one file for all wells;
+  - ZIP only for one file by well.
+- Support export folder and browser download.
 - Verify with a project containing multiple wells.
 
 ## Stage 3 - Logs And Curves Export
