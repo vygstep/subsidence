@@ -1,6 +1,6 @@
 # LAS Export Resampling
 
-Status: Active
+Status: Implemented
 Branch: `bug/las-export-resampling`
 
 ## Goal
