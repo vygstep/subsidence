@@ -10,6 +10,7 @@ from sqlalchemy import select as sa_select
 
 from subsidence.api.main import app
 from subsidence.data.importers import DEFAULT_WELL_NAME
+from subsidence.data.importers.log_resampling import VERTICAL_TVD_IMPORT_WARNING
 from subsidence.data.schema import (
     CalculationResult,
     CompactionModel,
@@ -1623,6 +1624,118 @@ def test_logs_import_extends_well_td_with_warning(api_client: TestClient, tmp_pa
     assert response.status_code == 200, response.text
     well = next(w for w in response.json() if w['well_id'] == well_id)
     assert well['td_md'] == pytest.approx(200.0)
+
+
+def test_logs_csv_tvdss_import_without_deviation_uses_vertical_fallback(
+    api_client: TestClient,
+    tmp_path: Path,
+) -> None:
+    project_path = _create_project(api_client, tmp_path, 'logs-tvdss-vertical-fallback')
+    response = api_client.post('/api/projects/wells', json={
+        'name': 'TVDSS Logs Well',
+        'x': 0.0,
+        'y': 0.0,
+        'kb': 10.0,
+        'td': 200.0,
+        'crs': 'local',
+    })
+    assert response.status_code == 200, response.text
+    well_id = response.json()['well_id']
+
+    csv_path = tmp_path / 'logs_tvdss.csv'
+    csv_path.write_text(
+        'TVDSS,GR\n'
+        '90,80\n'
+        '190,90\n',
+        encoding='utf-8',
+    )
+
+    response = api_client.post('/api/projects/import-logs-csv', json={
+        'csv_path': str(csv_path),
+        'well_id': well_id,
+        'depth_column': 'TVDSS',
+        'trusted_depth_reference': 'TVDSS',
+    })
+    assert response.status_code == 200, response.text
+    assert VERTICAL_TVD_IMPORT_WARNING in response.json()['qc_warnings']
+
+    manager = app.state.project_manager
+    with manager.get_session() as session:
+        curve = session.scalar(sa_select(CurveMetadata).where(CurveMetadata.well_id == well_id, CurveMetadata.mnemonic == 'GR'))
+        assert curve is not None
+        assert curve.trusted_depth_reference == 'MD'
+        frame = pd.read_parquet(project_path / curve.data_uri)
+
+    assert frame['DEPT'].iloc[0] == pytest.approx(0.0)
+    assert frame['DEPT'].iloc[-1] == pytest.approx(200.0)
+    assert frame.loc[frame['DEPT'] < 100.0, 'GR'].isna().all()
+    assert frame.loc[frame['DEPT'] == 100.0, 'GR'].iloc[0] == pytest.approx(80.0)
+    assert frame.loc[frame['DEPT'] == 200.0, 'GR'].iloc[0] == pytest.approx(90.0)
+
+
+def test_deviation_import_does_not_rewrite_md_log_storage_but_updates_tvdss_display(
+    api_client: TestClient,
+    tmp_path: Path,
+) -> None:
+    project_path = _create_project(api_client, tmp_path, 'logs-md-storage-derived-tvdss')
+    response = api_client.post('/api/projects/wells', json={
+        'name': 'Derived TVDSS Well',
+        'x': 0.0,
+        'y': 0.0,
+        'kb': 10.0,
+        'td': 200.0,
+        'crs': 'local',
+    })
+    assert response.status_code == 200, response.text
+    well_id = response.json()['well_id']
+
+    csv_path = tmp_path / 'logs_md.csv'
+    csv_path.write_text(
+        'DEPT,GR\n'
+        '100,80\n'
+        '200,90\n',
+        encoding='utf-8',
+    )
+    response = api_client.post('/api/projects/import-logs-csv', json={
+        'csv_path': str(csv_path),
+        'well_id': well_id,
+    })
+    assert response.status_code == 200, response.text
+
+    manager = app.state.project_manager
+    with manager.get_session() as session:
+        curve = session.scalar(sa_select(CurveMetadata).where(CurveMetadata.well_id == well_id, CurveMetadata.mnemonic == 'GR'))
+        assert curve is not None
+        curve_path = project_path / curve.data_uri
+        frame_before = pd.read_parquet(curve_path)
+
+    response = api_client.get(f'/api/wells/{well_id}/curves/full', params={'depth_basis': 'TVDSS'})
+    assert response.status_code == 200, response.text
+    [curve_before_deviation] = response.json()
+    assert curve_before_deviation['depths'][0] == pytest.approx(100.0)
+
+    deviation_csv = tmp_path / 'inclined_deviation.csv'
+    deviation_csv.write_text(
+        'md,incl_deg,azim_deg\n'
+        '0,60,0\n'
+        '200,60,0\n',
+        encoding='utf-8',
+    )
+    response = api_client.post('/api/projects/import-deviation', json={
+        'csv_path': str(deviation_csv),
+        'well_id': well_id,
+    })
+    assert response.status_code == 200, response.text
+
+    frame_after = pd.read_parquet(curve_path)
+    pd.testing.assert_frame_equal(frame_before, frame_after)
+
+    response = api_client.get(f'/api/wells/{well_id}/curves/full', params={'depth_basis': 'TVDSS'})
+    assert response.status_code == 200, response.text
+    [curve_after_deviation] = response.json()
+    assert curve_after_deviation['depths'][0] < 100.0
+    assert curve_after_deviation['depths'][0] == pytest.approx(40.0)
+    assert curve_after_deviation['values'][0] == pytest.approx(80.0)
 
 
 def test_deviation_import_extends_well_td_with_warning(api_client: TestClient, tmp_path: Path) -> None:
