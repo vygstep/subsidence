@@ -1,6 +1,6 @@
 # Logs MD Reference Resampling
 
-Status: Active
+Status: Ready for user verification
 Branch: `feature/logs-md-reference-grid`
 
 ## Goal
@@ -72,28 +72,44 @@ The well's canonical depth axis must be MD. TVD and TVDSS are derived views comp
 
 ## Implementation Stages
 
-1. Add schema support for per-well log grid settings.
+1. Done - Add schema support for per-well log grid settings.
    - `wells.log_md_grid_step_m`, default `0.2`.
    - Lightweight schema migration is enough; no data migration is required because no legacy production projects need automatic conversion.
-2. Add a shared import-time resampling helper.
+2. Done - Add a shared import-time resampling helper.
    - Build `0..TD` MD grids.
    - Preserve null gaps.
    - Cover continuous, discrete, outside-range nulls, TVD/TVDSS conversion, and vertical fallback with unit tests.
-3. Integrate LAS import.
+3. Done - Integrate LAS import.
    - Add import null value override to the dialog/API.
    - Read LAS header `NULL` as the suggested default.
    - Store resampled curves on the canonical MD grid.
-4. Integrate CSV logs import.
+4. Done - Integrate CSV logs import.
    - Add import null value to the dialog/API.
    - Treat empty cells and selected null values as gaps.
    - Store resampled curves on the canonical MD grid.
-5. Verify deviation and display behavior.
+5. Done - Verify deviation and display behavior.
    - Loading deviation after logs must not rewrite log storage.
    - TVD/TVDSS display must still update through existing derived-depth APIs.
    - Picks and zones must retain the current recalculation behavior.
-6. Update exports/tests as needed.
+6. Done - Update exports/tests as needed.
    - Confirm CSV/LAS exports are regular after import.
    - Keep LAS export dialog settings and defensive export resampling.
+
+## Implementation Notes
+
+- Imported LAS and CSV log curves are stored on the well MD grid, not on the source depth basis.
+- LAS `NULL` is detected from file preview and can be overridden in the import dialog.
+- CSV logs use the dialog null value; empty cells and selected null values become gaps.
+- Continuous curves interpolate only across adjacent valid native samples; null gaps are not bridged.
+- Discrete curves use step-down/block behavior.
+- TVD/TVDSS imports convert to MD before storage when deviation exists. Without deviation, the import uses the vertical-well fallback and returns a warning.
+- Deviation imports do not rewrite stored log Parquet. TVD/TVDSS display is still derived on request through `/wells/{well_id}/curves/full`.
+- CSV log exports now read the stored Parquet frame directly so null/gap rows survive export/import.
+
+## Verification
+
+- `cd app && pytest tests/unit/test_log_resampling.py tests/integration/test_export_workflows.py tests/integration/test_project_api_workflows.py tests/integration/test_multi_well_imports.py`
+- `cd frontend && npm run test -- --run`
 
 ## Areas To Analyze
 
