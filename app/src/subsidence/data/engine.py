@@ -73,6 +73,9 @@ def migrate_schema(engine: Engine) -> None:
         if 'depth_unit' not in well_cols:
             conn.execute(text("ALTER TABLE wells ADD COLUMN depth_unit TEXT NOT NULL DEFAULT 'm'"))
             conn.commit()
+        if 'log_md_grid_step_m' not in well_cols:
+            conn.execute(text("ALTER TABLE wells ADD COLUMN log_md_grid_step_m REAL NOT NULL DEFAULT 0.2"))
+            conn.commit()
         rows = conn.execute(text("SELECT id FROM wells WHERE color_hex IS NULL OR color_hex = '' ORDER BY name, id")).fetchall()
         for index, row in enumerate(rows):
             conn.execute(

@@ -88,6 +88,8 @@ class WellModel(Base, AuditMixin):
     extra: Mapped[str | None] = mapped_column(Text, nullable=True)  # JSON blob
     depth_unit: Mapped[str] = mapped_column(String(4), default='m', server_default='m')
     # unit of depth values stored for this well: 'm' | 'ft' | 'km'
+    log_md_grid_step_m: Mapped[float] = mapped_column(Float, default=0.2, server_default='0.2')
+    # canonical MD log grid step in meters
 
     curve_metadata: Mapped[list[CurveMetadata]] = relationship(
         back_populates="well", cascade="all, delete-orphan"
