@@ -87,6 +87,7 @@ export function ImportLasDialog({ wells, activeWellId, onClose, onSuccess }: Imp
   const [mapping, setMapping] = useState<ColumnMapping>({})
   const [trustedDepthRef, setTrustedDepthRef] = useState<'MD' | 'TVD' | 'TVDSS'>('MD')
   const [depthUnit, setDepthUnit] = useState<'m' | 'ft' | 'km'>('m')
+  const [nullValue, setNullValue] = useState('-999.25')
   const [curveTypes, setCurveTypes] = useState<Record<string, 'continuous' | 'discrete'>>({})
   const [currentStepIndex, setCurrentStepIndex] = useState(0)
   const [error, setError] = useState<string | null>(null)
@@ -120,6 +121,12 @@ export function ImportLasDialog({ wells, activeWellId, onClose, onSuccess }: Imp
   useEffect(() => {
     if (sourceType === 'las' && lasPreview?.depth_unit) {
       setDepthUnit(normalizeLasDepthUnit(lasPreview.depth_unit))
+    }
+  }, [lasPreview, sourceType])
+
+  useEffect(() => {
+    if (sourceType === 'las' && lasPreview?.null_value !== null && lasPreview?.null_value !== undefined) {
+      setNullValue(String(lasPreview.null_value))
     }
   }, [lasPreview, sourceType])
 
@@ -213,6 +220,11 @@ export function ImportLasDialog({ wells, activeWellId, onClose, onSuccess }: Imp
     const isCreateNew = wellSelection === IMPORT_WIZARD_CREATE_NEW_WELL
     const resolvedWellId = (!isCreateFromFile && !isCreateNew && wellSelection) ? wellSelection : null
     const createNewWell = isCreateNew
+    const parsedNullValue = Number.parseFloat(nullValue)
+    if (!Number.isFinite(parsedNullValue)) {
+      setError('Null value must be a finite number.')
+      return
+    }
 
     setIsSubmitting(true)
     setError(null)
@@ -230,6 +242,7 @@ export function ImportLasDialog({ wells, activeWellId, onClose, onSuccess }: Imp
                   trusted_depth_reference: trustedDepthRef,
                   depth_unit: depthUnit,
                   curve_types: curveTypes,
+                  null_value: parsedNullValue,
                 }
               : {
                   csv_path: nextPath,
@@ -240,6 +253,7 @@ export function ImportLasDialog({ wells, activeWellId, onClose, onSuccess }: Imp
                   trusted_depth_reference: trustedDepthRef,
                   depth_unit: depthUnit,
                   curve_types: curveTypes,
+                  null_value: parsedNullValue,
                 },
           ),
         })
@@ -356,6 +370,15 @@ export function ImportLasDialog({ wells, activeWellId, onClose, onSuccess }: Imp
                       <option value="km">km</option>
                     </select>
                   </label>
+                  <label className="project-dialog__field project-dialog__field--inline import-wizard__field">
+                    <span>Null value</span>
+                    <input
+                      type="number"
+                      step="any"
+                      value={nullValue}
+                      onChange={(e) => setNullValue(e.target.value)}
+                    />
+                  </label>
                 </div>
               </div>
             )}
@@ -408,6 +431,15 @@ export function ImportLasDialog({ wells, activeWellId, onClose, onSuccess }: Imp
                       <option value="ft">ft</option>
                       <option value="km">km</option>
                     </select>
+                  </label>
+                  <label className="project-dialog__field project-dialog__field--inline import-wizard__field">
+                    <span>Null value</span>
+                    <input
+                      type="number"
+                      step="any"
+                      value={nullValue}
+                      onChange={(e) => setNullValue(e.target.value)}
+                    />
                   </label>
                 </div>
               </div>

@@ -199,15 +199,12 @@ def import_las(payload: ImportLasRequest, request: Request) -> ImportLasResponse
                     well_id=payload.well_id,
                     create_new_well=payload.create_new_well,
                     trusted_depth_reference=payload.trusted_depth_reference,
+                    null_value_override=payload.null_value,
+                    curve_types=payload.curve_types,
                 )
                 well.depth_unit = payload.depth_unit
                 session.flush()
                 well_id = well.id
-                if payload.curve_types:
-                    for curve_row in session.scalars(select(CurveMetadata).where(CurveMetadata.well_id == well_id)):
-                        ct = payload.curve_types.get(curve_row.mnemonic)
-                        if ct in ('continuous', 'discrete'):
-                            curve_row.curve_type = ct
                 deviation_warning = deviation_extrapolation_warning_for_import(manager.project_path, well, imported_max_md)
                 if deviation_warning is not None:
                     qc_warnings.append(deviation_warning)

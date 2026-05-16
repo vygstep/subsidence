@@ -544,10 +544,15 @@ def test_las_import_uses_unit_registry_for_depth_and_curve_units(api_client: Tes
         assert curve is not None
         assert curve.unit == 'g/cc'
         assert curve.original_unit == 'KG/M3'
+        assert curve.sampling_kind == 'CONSTANT'
+        assert curve.nominal_step_m == pytest.approx(0.2)
         frame = pd.read_parquet(project_path / curve.data_uri)
 
-    assert frame['DEPT'].tolist() == pytest.approx([30.48, 60.96, 91.44])
-    assert frame['RHOB'].tolist() == pytest.approx([2.35, 2.4, 2.45])
+    assert frame['DEPT'].iloc[0] == pytest.approx(0.0)
+    assert frame['DEPT'].iloc[-1] == pytest.approx(91.44)
+    assert frame['DEPT'].iloc[1] - frame['DEPT'].iloc[0] == pytest.approx(0.2)
+    assert frame.loc[frame['DEPT'] < 30.48, 'RHOB'].isna().all()
+    assert frame.loc[frame['DEPT'] == 91.44, 'RHOB'].iloc[0] == pytest.approx(2.45)
 
 
 def test_tops_deviation_and_strat_chart_workflows(api_client: TestClient, tmp_path: Path):

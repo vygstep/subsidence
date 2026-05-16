@@ -6,6 +6,7 @@ import lasio
 from sqlalchemy.orm import Session
 
 from ..dict_resolver import load_curve_alias_rules, resolve_curve_alias_with_unit
+from ..deviation_transform import tvd_to_md
 from ..unit_registry import convert_curve_values_to_target, convert_depth_values_to_meters
 from .common import (
     DEFAULT_WELL_CRS,
@@ -26,6 +27,7 @@ from .common import (
     extend_well_td_for_import,
     run_curve_qc,
 )
+from .log_resampling import build_md_grid, convert_source_depths_to_md, resample_curve_to_md_grid
 
 
 def _header_text(las: lasio.LASFile, name: str) -> str | None:
@@ -72,6 +74,8 @@ def import_las_file(
     well_id: str | None = None,
     create_new_well: bool = False,
     trusted_depth_reference: str = 'MD',
+    null_value_override: float | None = None,
+    curve_types: dict[str, str] | None = None,
 ) -> tuple[object, list[str], float | None]:
     bundle_path = Path(project_path)
     source_path = Path(las_path)
@@ -89,7 +93,8 @@ def import_las_file(
     depth_unit = (las.curves[0].unit or 'm').strip()
     depth_values = convert_depth_values_to_meters(session, [float(value) for value in las.index], depth_unit)
     final_depth = max(depth_values) if depth_values else None
-    null_value = _coerce_float(getattr(las.well.get('NULL'), 'value', None))
+    header_null_value = _coerce_float(getattr(las.well.get('NULL'), 'value', None))
+    null_value = null_value_override if null_value_override is not None else header_null_value
     rules = load_curve_alias_rules(session)
     metadata = _well_metadata_from_las(las, original_relative_path, final_depth=final_depth)
     td_before_import: float | None = None
@@ -155,7 +160,17 @@ def import_las_file(
             source_las_path=metadata['source_las_path'],
             extra=metadata['extra'],
         )
-    td_warning = extend_well_td_for_import(well, final_depth, previous_td=td_before_import)
+    converter = (lambda tvd: tvd_to_md(tvd, bundle_path, well)) if well.deviation_survey is not None else None
+    depth_conversion = convert_source_depths_to_md(
+        depth_values,
+        depth_reference=trusted_depth_reference,
+        kb_elev=well.kb_elev,
+        tvd_to_md=converter,
+    )
+    depth_values_md = depth_conversion.depths_md
+    final_depth_md = max(depth_values_md) if depth_values_md else final_depth
+    td_warning = extend_well_td_for_import(well, final_depth_md, previous_td=td_before_import)
+    grid = build_md_grid(float(well.td_md or final_depth_md or 0.0), float(well.log_md_grid_step_m or 0.2))
     curve_payloads: list[dict[str, object]] = []
 
     for curve in las.curves:
@@ -164,38 +179,51 @@ def import_las_file(
             continue
 
         raw_values = [float(value) for value in las[curve.mnemonic]]
-        clean_pairs: dict[float, float] = {}
-        for depth, value in zip(depth_values, raw_values):
-            if _is_valid_sample(depth, value, null_value):
-                clean_pairs[depth] = value
+        native_values: list[float | None] = [
+            value if _is_valid_sample(depth, value, null_value) else None
+            for depth, value in zip(depth_values_md, raw_values, strict=False)
+        ]
 
-        if len(clean_pairs) < 2:
+        if sum(1 for value in native_values if value is not None) < 2:
             continue
-
-        clean_depths = sorted(clean_pairs)
-        clean_values = [clean_pairs[depth] for depth in clean_depths]
         source_unit = (curve.unit or '').strip()
         match = resolve_curve_alias_with_unit(session, mnemonic, source_unit, rules)
         family_code = match.family_code
         standard_mnemonic = match.canonical_mnemonic
         target_unit = match.canonical_unit or source_unit
 
-        values = clean_values
+        values = [value for value in native_values]
         if source_unit and target_unit:
             try:
-                values, target_unit = convert_curve_values_to_target(
+                valid_values_for_conversion = [value for value in values if value is not None]
+                converted_values, target_unit = convert_curve_values_to_target(
                     session,
-                    values,
+                    valid_values_for_conversion,
                     source_unit,
                     target_unit,
                     family_code,
                 )
+                converted_iter = iter(converted_values)
+                values = [next(converted_iter) if value is not None else None for value in values]
             except ValueError:
                 target_unit = source_unit
 
-        sampling_kind, nominal_step_m = compute_sampling_kind(clean_depths)
+        curve_type = (curve_types or {}).get(mnemonic, 'continuous')
+        if curve_type not in ('continuous', 'discrete'):
+            curve_type = 'continuous'
+        resampled = resample_curve_to_md_grid(
+            grid,
+            depth_values_md,
+            values,
+            curve_type=curve_type,
+        )
+        if resampled.valid_sample_count < 2:
+            continue
+        sampling_kind, nominal_step_m = 'CONSTANT', float(well.log_md_grid_step_m or 0.2)
         survey_max_md = None  # no survey context in LAS importer; checked post-import
-        qc = run_curve_qc(clean_depths, values, mnemonic, well.td_md, survey_max_md)
+        valid_depths = [depth for depth, value in zip(resampled.depths, resampled.values, strict=False) if value is not None]
+        valid_values = [value for value in resampled.values if value is not None]
+        qc = run_curve_qc(valid_depths, valid_values, mnemonic, well.td_md, survey_max_md)
 
         curve_payloads.append({
             'mnemonic': mnemonic,
@@ -203,11 +231,12 @@ def import_las_file(
             'family_code': family_code,
             'unit': target_unit,
             'original_unit': source_unit,
-            'depths': clean_depths,
-            'values': values,
+            'depths': resampled.depths,
+            'values': resampled.values,
             'source_hash': source_hash,
             'null_value': null_value if null_value is not None else -999.25,
-            'trusted_depth_reference': trusted_depth_reference,
+            'curve_type': curve_type,
+            'trusted_depth_reference': 'MD',
             'sampling_kind': sampling_kind,
             'nominal_step_m': nominal_step_m,
             'qc_status': qc['qc_status'],
@@ -221,6 +250,8 @@ def import_las_file(
 
     # Collect all unique warning messages from QC summaries
     qc_warnings: list[str] = []
+    if depth_conversion.warning is not None:
+        qc_warnings.append(depth_conversion.warning)
     if td_warning is not None:
         qc_warnings.append(td_warning)
     for p in curve_payloads:
@@ -229,4 +260,4 @@ def import_las_file(
             summary = _json.loads(str(p['qc_summary']))
             qc_warnings.extend(summary.get('messages', []))
 
-    return well, qc_warnings, final_depth
+    return well, qc_warnings, final_depth_md
