@@ -1,0 +1,481 @@
+from pathlib import Path
+import csv
+import io
+
+from fastapi.testclient import TestClient
+
+from subsidence.api.main import app
+
+
+def _create_project(client: TestClient, tmp_path: Path, name: str = 'export-workflow') -> Path:
+    response = client.post('/api/projects', json={'name': name, 'path': str(tmp_path), 'overwrite': True})
+    assert response.status_code == 200, response.text
+    project_path = Path(response.json()['project_path'])
+    response = client.post('/api/projects/open', json={'path': str(project_path)})
+    assert response.status_code == 200, response.text
+    return project_path
+
+
+def test_export_current_well_info_download_round_trips_with_wells_import(tmp_path: Path) -> None:
+    manager = app.state.project_manager
+    if manager.is_open:
+        manager.close_project()
+
+
+def test_export_current_well_deviation_round_trips_with_deviation_import(tmp_path: Path) -> None:
+    manager = app.state.project_manager
+    if manager.is_open:
+        manager.close_project()
+
+
+def test_export_active_strat_chart_round_trips_with_strat_chart_import(tmp_path: Path) -> None:
+    manager = app.state.project_manager
+    if manager.is_open:
+        manager.close_project()
+
+
+def test_export_sea_level_curve_round_trips_with_sea_level_import(tmp_path: Path) -> None:
+    manager = app.state.project_manager
+    if manager.is_open:
+        manager.close_project()
+
+    with TestClient(app) as client:
+        _create_project(client, tmp_path, 'sea-level-export')
+        source_csv = tmp_path / 'Custom Sea Level.csv'
+        source_csv.write_text(
+            'age_ma,sea_level_m\n'
+            '100,-20\n'
+            '50,10\n'
+            '0,0\n',
+            encoding='utf-8',
+        )
+        column_map = {
+            'age_ma': 'age_ma',
+            'sea_level_m': 'sea_level_m',
+        }
+        response = client.post('/api/sea-level-curves/import', json={
+            'csv_path': str(source_csv),
+            'curve_name': 'Custom Sea Level',
+            'column_map': column_map,
+        })
+        assert response.status_code == 200, response.text
+        curve_id = response.json()['curve_id']
+
+        response = client.post('/api/export/sea-level-curves', json={
+            'scope': 'selected',
+            'curve_id': curve_id,
+        })
+        assert response.status_code == 200, response.text
+        assert response.headers['content-type'].startswith('text/csv')
+        reader = csv.DictReader(io.StringIO(response.content.decode('utf-8-sig')))
+        assert reader.fieldnames == ['age_ma', 'sea_level_m']
+        rows = list(reader)
+        assert rows[0] == {'age_ma': '100.0', 'sea_level_m': '-20.0'}
+        assert rows[-1] == {'age_ma': '0.0', 'sea_level_m': '0.0'}
+        export_csv = tmp_path / 'Custom Sea Level.csv'
+        export_csv.write_bytes(response.content)
+
+        response = client.post('/api/projects/close')
+        assert response.status_code == 200, response.text
+        _create_project(client, tmp_path, 'sea-level-roundtrip')
+        response = client.post('/api/sea-level-curves/import', json={
+            'csv_path': str(export_csv),
+            'curve_name': 'Custom Sea Level',
+            'column_map': column_map,
+        })
+        assert response.status_code == 200, response.text
+        imported_curve_id = response.json()['curve_id']
+        assert response.json()['point_count'] == 3
+
+        response = client.get(f'/api/sea-level-curves/{imported_curve_id}/points')
+        assert response.status_code == 200, response.text
+        points = response.json()
+        assert points == [
+            {'age_ma': 100.0, 'sea_level_m': -20.0},
+            {'age_ma': 50.0, 'sea_level_m': 10.0},
+            {'age_ma': 0.0, 'sea_level_m': 0.0},
+        ]
+
+    if manager.is_open:
+        manager.close_project()
+
+    with TestClient(app) as client:
+        _create_project(client, tmp_path, 'strat-chart-export')
+        source_csv = tmp_path / 'Custom StratChart.csv'
+        source_csv.write_text(
+            'unit_id,parent_unit_id,unit_name,rank_name,start_age_ma,end_age_ma,color\n'
+            '1,,System A,system,100,0,#112233\n'
+            '2,1,Stage A1,stage,50,0,#445566\n'
+            '3,1,Stage A2,stage,100,50,#778899\n',
+            encoding='utf-8',
+        )
+        column_map = {
+            'unit_id': 'unit_id',
+            'parent_unit_id': 'parent_unit_id',
+            'unit_name': 'unit_name',
+            'rank_name': 'rank_name',
+            'start_age_ma': 'start_age_ma',
+            'end_age_ma': 'end_age_ma',
+            'color': 'color',
+        }
+        response = client.post('/api/strat-charts/import', json={
+            'csv_path': str(source_csv),
+            'column_map': column_map,
+        })
+        assert response.status_code == 200, response.text
+        response = client.get('/api/strat-charts')
+        assert response.status_code == 200, response.text
+        charts = response.json()
+        custom_chart = next(chart for chart in charts if chart['name'] == 'Custom StratChart')
+        response = client.patch(f"/api/strat-charts/{custom_chart['id']}/activate")
+        assert response.status_code == 200, response.text
+
+        response = client.post('/api/export/strat-charts', json={'scope': 'active'})
+        assert response.status_code == 200, response.text
+        assert response.headers['content-type'].startswith('text/csv')
+        reader = csv.DictReader(io.StringIO(response.content.decode('utf-8-sig')))
+        assert reader.fieldnames == ['unit_id', 'parent_unit_id', 'unit_name', 'rank_name', 'start_age_ma', 'end_age_ma', 'color']
+        rows = list(reader)
+        assert rows[0]['unit_name'] == 'System A'
+        assert rows[1]['parent_unit_id'] == '1'
+        assert rows[1]['color'] == '#445566'
+        export_csv = tmp_path / 'Custom StratChart.csv'
+        export_csv.write_bytes(response.content)
+
+        response = client.post('/api/projects/close')
+        assert response.status_code == 200, response.text
+        _create_project(client, tmp_path, 'strat-chart-roundtrip')
+        response = client.post('/api/strat-charts/import', json={
+            'csv_path': str(export_csv),
+            'column_map': column_map,
+        })
+        assert response.status_code == 200, response.text
+        assert response.json()['units_imported'] == 3
+
+        response = client.get('/api/strat-units', params={'limit': '1000'})
+        assert response.status_code == 200, response.text
+        units = response.json()
+        by_name = {unit['name']: unit for unit in units}
+        assert by_name['System A']['age_top_ma'] == 0.0
+        assert by_name['System A']['age_base_ma'] == 100.0
+        assert by_name['Stage A1']['color_hex'] == '#445566'
+
+    if manager.is_open:
+        manager.close_project()
+
+    with TestClient(app) as client:
+        _create_project(client, tmp_path, 'deviation-export')
+        source_csv = tmp_path / 'source_deviation.csv'
+        source_csv.write_text(
+            'well_name,md,incl_deg,azim_deg\n'
+            'Export Deviation Well,0,0,0\n'
+            'Export Deviation Well,100,1,10\n'
+            'Export Deviation Well,200,2,20\n',
+            encoding='utf-8',
+        )
+        response = client.post('/api/projects/import-deviation', json={'csv_path': str(source_csv)})
+        assert response.status_code == 200, response.text
+        well_id = response.json()['well_id']
+
+        response = client.post('/api/export/wells/deviation', json={
+            'scope': 'current',
+            'well_id': well_id,
+        })
+        assert response.status_code == 200, response.text
+        assert response.headers['content-type'].startswith('text/csv')
+        reader = csv.DictReader(io.StringIO(response.content.decode('utf-8-sig')))
+        assert reader.fieldnames == ['well_name', 'md', 'incl_deg', 'azim_deg']
+        rows = list(reader)
+        assert rows[0] == {'well_name': 'Export Deviation Well', 'md': '0.0', 'incl_deg': '0.0', 'azim_deg': '0.0'}
+        export_csv = tmp_path / 'exported_deviation.csv'
+        export_csv.write_bytes(response.content)
+
+        response = client.post('/api/projects/close')
+        assert response.status_code == 200, response.text
+        _create_project(client, tmp_path, 'deviation-roundtrip')
+        response = client.post('/api/projects/import-deviation', json={'csv_path': str(export_csv)})
+        assert response.status_code == 200, response.text
+        imported = response.json()
+        assert imported['mode'] == 'INCL_AZIM'
+        assert imported['reference'] == 'MD'
+
+        response = client.get('/api/wells/inventory')
+        assert response.status_code == 200, response.text
+        wells = response.json()
+        assert len(wells) == 1
+        assert wells[0]['well_id'] == imported['well_id']
+        assert wells[0]['well_name'] == 'Export Deviation Well'
+        assert wells[0]['deviation']['mode'] == 'INCL_AZIM'
+        assert wells[0]['deviation']['reference'] == 'MD'
+
+    if manager.is_open:
+        manager.close_project()
+
+    with TestClient(app) as client:
+        _create_project(client, tmp_path, 'well-info-current')
+        response = client.post('/api/projects/wells', json={
+            'name': 'Export Well',
+            'x': 123.0,
+            'y': 456.0,
+            'kb': 10.0,
+            'td': 1500.0,
+            'crs': 'local',
+        })
+        assert response.status_code == 200, response.text
+        well_id = response.json()['well_id']
+        response = client.patch(f'/api/wells/{well_id}', json={'gl_elev': 5.0, 'color_hex': '#dc2626'})
+        assert response.status_code == 200, response.text
+
+        response = client.post('/api/export/wells/info', json={
+            'scope': 'current',
+            'well_id': well_id,
+        })
+        assert response.status_code == 200, response.text
+        assert response.headers['content-type'].startswith('text/csv')
+        assert 'Export Well_well_info.csv' in response.headers['content-disposition']
+        reader = csv.DictReader(io.StringIO(response.content.decode('utf-8-sig')))
+        assert reader.fieldnames is not None
+        assert 'well_id' not in reader.fieldnames
+        assert 'uwi' not in reader.fieldnames
+        assert 'source_las_path' not in reader.fieldnames
+        assert 'color_hex' in reader.fieldnames
+        csv_path = tmp_path / 'exported_well.csv'
+        csv_path.write_bytes(response.content)
+
+        response = client.post('/api/projects/close')
+        assert response.status_code == 200, response.text
+        response = client.post('/api/projects', json={'name': 'well-info-roundtrip', 'path': str(tmp_path), 'overwrite': True})
+        assert response.status_code == 200, response.text
+        clean_project = response.json()['project_path']
+        response = client.post('/api/projects/open', json={'path': clean_project})
+        assert response.status_code == 200, response.text
+
+        response = client.post('/api/projects/import-wells', json={'csv_path': str(csv_path)})
+        assert response.status_code == 200, response.text
+        response = client.get('/api/wells/inventory')
+        wells = response.json()
+        assert len(wells) == 1
+        assert wells[0]['well_name'] == 'Export Well'
+        assert wells[0]['x'] == 123.0
+        assert wells[0]['y'] == 456.0
+        assert wells[0]['kb_elev'] == 10.0
+        assert wells[0]['gl_elev'] == 5.0
+        assert wells[0]['td_md'] == 1500.0
+        assert wells[0]['crs'] == 'local'
+        assert wells[0]['color_hex'] == '#dc2626'
+
+    if manager.is_open:
+        manager.close_project()
+
+
+def test_export_all_well_info_to_folder_and_zip(tmp_path: Path) -> None:
+    manager = app.state.project_manager
+    if manager.is_open:
+        manager.close_project()
+
+
+def test_export_current_well_logs_csv_round_trips_with_logs_import(tmp_path: Path) -> None:
+    manager = app.state.project_manager
+    if manager.is_open:
+        manager.close_project()
+
+    with TestClient(app) as client:
+        _create_project(client, tmp_path, 'logs-csv-export')
+        source_csv = tmp_path / 'source_logs.csv'
+        source_csv.write_text(
+            'well_name,DEPT [m],GR [api],RHOB [g/cm3]\n'
+            'Export Log Well,100,75,2.35\n'
+            'Export Log Well,200,80,2.40\n'
+            'Export Log Well,300,85,2.45\n',
+            encoding='utf-8',
+        )
+        response = client.post('/api/projects/import-logs-csv', json={'csv_path': str(source_csv)})
+        assert response.status_code == 200, response.text
+        well_id = response.json()['well_id']
+
+        response = client.post(f'/api/export/wells/logs/csv', json={
+            'scope': 'current',
+            'well_id': well_id,
+        })
+        assert response.status_code == 200, response.text
+        assert response.headers['content-type'].startswith('text/csv')
+        reader = csv.DictReader(io.StringIO(response.content.decode('utf-8-sig')))
+        assert reader.fieldnames == ['well_name', 'DEPT [m]', 'GR [gAPI]', 'RHOB [g/cc]']
+        export_csv = tmp_path / 'exported_logs.csv'
+        export_csv.write_bytes(response.content)
+
+        response = client.post('/api/projects/close')
+        assert response.status_code == 200, response.text
+        clean_project = _create_project(client, tmp_path, 'logs-csv-roundtrip')
+        response = client.post('/api/projects/import-logs-csv', json={'csv_path': str(export_csv)})
+        assert response.status_code == 200, response.text
+        response = client.get('/api/wells/inventory')
+        assert response.status_code == 200, response.text
+        wells = response.json()
+        assert len(wells) == 1
+        assert wells[0]['well_name'] == 'Export Log Well'
+        assert [curve['mnemonic'] for curve in wells[0]['curves']] == ['GR', 'RHOB']
+        assert [curve['unit'] for curve in wells[0]['curves']] == ['gAPI', 'g/cc']
+        assert clean_project.exists()
+
+    if manager.is_open:
+        manager.close_project()
+
+
+def test_export_current_well_logs_las_round_trips_with_las_import(tmp_path: Path) -> None:
+    manager = app.state.project_manager
+    if manager.is_open:
+        manager.close_project()
+
+
+def test_export_current_well_tops_round_trips_with_tops_import(tmp_path: Path) -> None:
+    manager = app.state.project_manager
+    if manager.is_open:
+        manager.close_project()
+
+    with TestClient(app) as client:
+        _create_project(client, tmp_path, 'tops-export')
+        source_csv = tmp_path / 'source_tops.csv'
+        source_csv.write_text(
+            'well_name,top_name,depth_md,age_ma,boundary_type,water_depth_m,sea_level_m_override,lithology,lithology_fractions,lithology_source,color,note\n'
+            'Export Tops Well,Top A,100,10,conformable,20,5,sandstone,"{""sandstone"": 1.0}",manual,#ff0000,top note\n'
+            'Export Tops Well,Top B,250,20,unconformity,0,,shale,"{""shale"": 1.0}",manual,#00ff00,base note\n',
+            encoding='utf-8',
+        )
+        response = client.post('/api/projects/import-tops', json={
+            'csv_path': str(source_csv),
+            'create_zone_set': True,
+            'zone_set_name': 'RoundTrip TopSet',
+        })
+        assert response.status_code == 200, response.text
+        well_id = response.json()['well_id']
+
+        response = client.post('/api/export/wells/tops', json={
+            'scope': 'current',
+            'well_id': well_id,
+        })
+        assert response.status_code == 200, response.text
+        reader = csv.DictReader(io.StringIO(response.content.decode('utf-8-sig')))
+        assert reader.fieldnames is not None
+        assert 'topset_name' in reader.fieldnames
+        assert 'lithology_fractions' in reader.fieldnames
+        rows = list(reader)
+        assert rows[0]['topset_name'] == 'RoundTrip TopSet'
+        assert rows[0]['top_name'] == 'Top A'
+        assert rows[0]['water_depth_m'] == '20.0'
+        assert rows[0]['sea_level_m_override'] == '5.0'
+        assert rows[0]['lithology_fractions'] == '{"sandstone": 1.0}'
+        export_csv = tmp_path / 'exported_tops.csv'
+        export_csv.write_bytes(response.content)
+
+        response = client.post('/api/projects/close')
+        assert response.status_code == 200, response.text
+        _create_project(client, tmp_path, 'tops-roundtrip')
+        response = client.post('/api/projects/import-tops', json={
+            'csv_path': str(export_csv),
+        })
+        assert response.status_code == 200, response.text
+        imported_well_id = response.json()['well_id']
+
+        response = client.get('/api/wells/inventory')
+        assert response.status_code == 200, response.text
+        wells = response.json()
+        assert len(wells) == 1
+        assert wells[0]['well_id'] == imported_well_id
+        assert wells[0]['well_name'] == 'Export Tops Well'
+        assert wells[0]['active_top_set_name'] == 'RoundTrip TopSet'
+        tops = wells[0]['formations']
+        assert [top['name'] for top in tops] == ['Top A', 'Top B']
+        assert wells[0]['zones'][0]['lithology_fractions'] == '{"sandstone": 1.0}'
+        assert wells[0]['zones'][0]['lithology_source'] == 'manual'
+
+    if manager.is_open:
+        manager.close_project()
+
+    with TestClient(app) as client:
+        _create_project(client, tmp_path, 'logs-las-export')
+        source_csv = tmp_path / 'source_logs_for_las.csv'
+        source_csv.write_text(
+            'well_name,DEPT [m],GR [api],RHOB [g/cm3]\n'
+            'Export LAS Well,100,75,2.35\n'
+            'Export LAS Well,200,80,2.40\n'
+            'Export LAS Well,300,85,2.45\n',
+            encoding='utf-8',
+        )
+        response = client.post('/api/projects/import-logs-csv', json={'csv_path': str(source_csv)})
+        assert response.status_code == 200, response.text
+        well_id = response.json()['well_id']
+        response = client.patch(f'/api/wells/{well_id}', json={
+            'kb_elev': 12.0,
+            'td_md': 350.0,
+            'x': 123.0,
+            'y': 456.0,
+            'crs': 'local',
+        })
+        assert response.status_code == 200, response.text
+
+        response = client.post(f'/api/export/wells/logs/las', json={
+            'scope': 'current',
+            'well_id': well_id,
+        })
+        assert response.status_code == 200, response.text
+        assert response.headers['content-type'] == 'application/octet-stream'
+        export_las = tmp_path / 'exported_logs.las'
+        export_las.write_bytes(response.content)
+
+        response = client.post('/api/projects/close')
+        assert response.status_code == 200, response.text
+        _create_project(client, tmp_path, 'logs-las-roundtrip')
+        response = client.post('/api/projects/import-las', json={'las_path': str(export_las)})
+        assert response.status_code == 200, response.text
+        response = client.get('/api/wells/inventory')
+        assert response.status_code == 200, response.text
+        wells = response.json()
+        assert len(wells) == 1
+        assert wells[0]['well_name'] == 'Export LAS Well'
+        assert wells[0]['kb_elev'] == 12.0
+        assert wells[0]['td_md'] == 350.0
+        assert wells[0]['x'] == 123.0
+        assert wells[0]['y'] == 456.0
+        assert wells[0]['crs'] == 'local'
+        assert [curve['mnemonic'] for curve in wells[0]['curves']] == ['GR', 'RHOB']
+        assert [curve['unit'] for curve in wells[0]['curves']] == ['gAPI', 'g/cc']
+
+    if manager.is_open:
+        manager.close_project()
+
+    with TestClient(app) as client:
+        _create_project(client, tmp_path, 'well-info-all')
+        for name in ('A Well', 'B Well'):
+            response = client.post('/api/projects/wells', json={
+                'name': name,
+                'x': 0.0,
+                'y': 0.0,
+                'kb': 0.0,
+                'td': 100.0,
+                'crs': 'local',
+            })
+            assert response.status_code == 200, response.text
+
+        out_dir = tmp_path / 'exports'
+        out_dir.mkdir()
+        response = client.post('/api/export/wells/info', json={
+            'scope': 'all',
+            'packaging': 'one_file_per_well',
+            'output_dir': str(out_dir),
+        })
+        assert response.status_code == 200, response.text
+        payload = response.json()
+        assert payload['file_count'] == 2
+        assert sorted(path.name for path in out_dir.glob('*.csv')) == ['A Well_well_info.csv', 'B Well_well_info.csv']
+
+        response = client.post('/api/export/wells/info', json={
+            'scope': 'all',
+            'packaging': 'one_file_per_well',
+            'export_to_zip': True,
+        })
+        assert response.status_code == 200, response.text
+        assert response.headers['content-type'] == 'application/zip'
+
+    if manager.is_open:
+        manager.close_project()

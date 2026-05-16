@@ -14,7 +14,7 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from ..schema import CurveMetadata, WellModel
-from ..well_colors import select_available_well_color
+from ..well_colors import normalize_hex_color, select_available_well_color
 
 _DEPTH_MNEMONICS = {'DEPT', 'DEPTH', 'MD', 'TVD', 'TVDSS'}
 _DEFAULT_TOP_COLOR = '#4b5563'
@@ -100,9 +100,12 @@ def create_empty_well(
     x: float | None = None,
     y: float | None = None,
     kb: float | None = None,
+    gl: float | None = None,
     td: float | None = None,
     crs: str | None = None,
     uwi: str | None = None,
+    depth_unit: str | None = None,
+    color_hex: str | None = None,
     source_las_path: str | None = None,
     extra: dict[str, object] | None = None,
 ) -> WellModel:
@@ -112,17 +115,25 @@ def create_empty_well(
         for color in session.scalars(select(WellModel.color_hex)).all()
         if color
     }
+    resolved_color = select_available_well_color(used_colors, f'{well_id}:{name or ""}')
+    if color_hex:
+        try:
+            resolved_color = normalize_hex_color(color_hex)
+        except ValueError:
+            resolved_color = select_available_well_color(used_colors, f'{well_id}:{name or ""}')
+
     well = WellModel(
         id=well_id,
         uwi=(uwi or '').strip() or None,
         name=_normalize_well_name(name),
         kb_elev=kb if kb is not None else DEFAULT_WELL_KB,
-        gl_elev=0.0,
+        gl_elev=gl if gl is not None else 0.0,
         td_md=td if td is not None else DEFAULT_WELL_TD_MD,
         lat=y if y is not None else DEFAULT_WELL_Y,
         lon=x if x is not None else DEFAULT_WELL_X,
         crs=_normalized_crs(crs),
-        color_hex=select_available_well_color(used_colors, f'{well_id}:{name or ""}'),
+        color_hex=resolved_color,
+        depth_unit=(depth_unit or 'm').strip()[:4] or 'm',
         source_las_path=source_las_path,
         extra=json.dumps(extra, ensure_ascii=True) if extra else None,
     )
@@ -139,8 +150,11 @@ def apply_imported_well_metadata(
     x: float | None = None,
     y: float | None = None,
     kb: float | None = None,
+    gl: float | None = None,
     td: float | None = None,
     crs: str | None = None,
+    depth_unit: str | None = None,
+    color_hex: str | None = None,
     source_las_path: str | None = None,
     extra: dict[str, object] | None = None,
 ) -> WellModel:
@@ -158,6 +172,8 @@ def apply_imported_well_metadata(
         well.lat = y
     if kb is not None and (well.kb_elev in (0.0, DEFAULT_WELL_KB)):
         well.kb_elev = kb
+    if gl is not None and well.gl_elev == 0.0:
+        well.gl_elev = gl
     if td is not None and (well.td_md is None or td > well.td_md):
         well.td_md = td
 
@@ -167,6 +183,13 @@ def apply_imported_well_metadata(
 
     if source_las_path:
         well.source_las_path = source_las_path
+    if depth_unit:
+        well.depth_unit = depth_unit.strip()[:4] or 'm'
+    if color_hex:
+        try:
+            well.color_hex = normalize_hex_color(color_hex)
+        except ValueError:
+            pass
 
     well.extra = _merge_extra_json(well.extra, extra)
     return well

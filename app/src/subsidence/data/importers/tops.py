@@ -172,6 +172,7 @@ def _import_tops_rows(
         }})
 
     imported: list[FormationTopModel] = []
+    explicit_water_depth_objects: set[int] = set()
     for row_index, row in enumerate(rows):
         _ensure_row_targets_well(row, well, path)
         top_name = _extract_text(row, 'top_name')
@@ -184,6 +185,13 @@ def _import_tops_rows(
         age_ma = _extract_float(row, 'age_ma', 'strat_age_ma', 'age')
         hiatus_ma = _extract_float(row, 'hiatus_duration_ma', 'hiatus_ma', 'hiatus') or 0.0
         eroded_m = _extract_float(row, 'eroded_thickness_m', 'eroded_m', 'eroded') or 0.0
+        water_depth_text = _extract_text(row, 'water_depth_m', 'paleobathymetry_m', 'paleobathymetry')
+        water_depth_m = _extract_float(row, 'water_depth_m', 'paleobathymetry_m', 'paleobathymetry') if water_depth_text is not None else None
+        sea_level_m_override = _extract_float(row, 'sea_level_m_override', 'sea_level_override_m', 'sea_level')
+        age_base_ma = _extract_float(row, 'age_base_ma')
+        lithology = _extract_text(row, 'lithology')
+        lithology_fractions = _extract_text(row, 'lithology_fractions')
+        lithology_source = (_extract_text(row, 'lithology_source') or '').strip().lower()
         explicit_color = _extract_text(row, 'color')
         has_explicit_color = explicit_color is not None
         color = explicit_color or _resolve_ics_color(age_ma, ics_units) or _DEFAULT_TOP_COLOR
@@ -230,8 +238,13 @@ def _import_tops_rows(
         top.depth_md = depth_md
         top.depth_tvd = None
         top.age_top_ma = age_ma
-        top.age_base_ma = None
+        top.age_base_ma = age_base_ma
         top.confidence = None
+        if water_depth_m is not None:
+            top.water_depth_m = water_depth_m
+            explicit_water_depth_objects.add(id(top))
+        top.sea_level_m_override = sea_level_m_override
+        top.lithology = lithology
         if has_explicit_color or top.color_source != 'user':
             top.color = color
             top.color_source = color_source
@@ -240,6 +253,8 @@ def _import_tops_rows(
         top.note = note
         top.qc_status = str(qc['qc_status'])
         top.qc_summary = str(qc['qc_summary']) if qc.get('qc_summary') else None
+        setattr(top, '_import_lithology_fractions', lithology_fractions)
+        setattr(top, '_import_lithology_source', lithology_source if lithology_source in {'manual', 'auto'} else None)
         _log.debug('pick_row', extra={'event': {
             'operation': 'import_tops', 'phase': 'pick_row',
             'name': top_name, 'depth_md': depth_md, 'age_ma': age_ma,
@@ -254,7 +269,7 @@ def _import_tops_rows(
 
     water_depth_set: list[dict] = []
     for top in imported:
-        if top.age_top_ma == 0.0 and top.depth_md is not None:
+        if top.age_top_ma == 0.0 and top.depth_md is not None and id(top) not in explicit_water_depth_objects:
             wd = top.depth_md - (well.kb_elev or 0.0)
             top.water_depth_m = wd
             water_depth_set.append({'name': top.name, 'depth_md': top.depth_md, 'kb_elev': well.kb_elev, 'water_depth_m': wd})
@@ -327,21 +342,46 @@ def import_tops_csv(
     )
 
 
-def import_tops_csv_multi(
+def import_tops_rows(
     session: Session,
-    csv_path: Path | str,
+    well_id: str | None,
+    source_path: Path | str,
+    fieldnames: list[str],
+    rows: list[dict[str, str]],
     depth_ref: str = 'MD',
     *,
-    column_map: dict[str, str] | None = None,
+    strat_units_path: Path | str | None = None,
+    strat_ranks_path: Path | str | None = None,
+    create_new_well: bool = False,
+    top_set_id: int | None = None,
+) -> tuple[list[FormationTopModel], list[str]]:
+    return _import_tops_rows(
+        session,
+        well_id,
+        Path(source_path),
+        fieldnames,
+        rows,
+        depth_ref,
+        strat_units_path=strat_units_path,
+        strat_ranks_path=strat_ranks_path,
+        create_new_well=create_new_well,
+        top_set_id=top_set_id,
+    )
+
+
+def import_tops_rows_multi(
+    session: Session,
+    source_path: Path | str,
+    fieldnames: list[str],
+    rows: list[dict[str, str]],
+    depth_ref: str = 'MD',
+    *,
     strat_units_path: Path | str | None = None,
     strat_ranks_path: Path | str | None = None,
     create_new_well: bool = False,
     top_set_id: int | None = None,
 ) -> tuple[list[FormationTopModel], list[str], list[str], int]:
-    path = Path(csv_path)
-    fieldnames, rows = _read_csv_rows(path)
-    if column_map:
-        fieldnames, rows = _apply_column_map(fieldnames, rows, column_map)
+    path = Path(source_path)
     if not _has_multi_well_rows(rows):
         imported, warnings = _import_tops_rows(
             session,
@@ -377,3 +417,31 @@ def import_tops_csv_multi(
         qc_warnings.extend(warnings)
     well_ids = sorted({top.well_id for top in imported_all})
     return imported_all, qc_warnings, well_ids, len(rows)
+
+
+def import_tops_csv_multi(
+    session: Session,
+    csv_path: Path | str,
+    depth_ref: str = 'MD',
+    *,
+    column_map: dict[str, str] | None = None,
+    strat_units_path: Path | str | None = None,
+    strat_ranks_path: Path | str | None = None,
+    create_new_well: bool = False,
+    top_set_id: int | None = None,
+) -> tuple[list[FormationTopModel], list[str], list[str], int]:
+    path = Path(csv_path)
+    fieldnames, rows = _read_csv_rows(path)
+    if column_map:
+        fieldnames, rows = _apply_column_map(fieldnames, rows, column_map)
+    return import_tops_rows_multi(
+        session,
+        path,
+        fieldnames,
+        rows,
+        depth_ref,
+        strat_units_path=strat_units_path,
+        strat_ranks_path=strat_ranks_path,
+        create_new_well=create_new_well,
+        top_set_id=top_set_id,
+    )

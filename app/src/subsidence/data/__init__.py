@@ -23,6 +23,8 @@ from .importers import (
     import_logs_csv_multi,
     import_tops_csv,
     import_tops_csv_multi,
+    import_tops_rows,
+    import_tops_rows_multi,
     import_wells_csv,
     import_wells_rows,
 )
@@ -104,6 +106,8 @@ __all__ = [
     "import_logs_csv_multi",
     "import_tops_csv",
     "import_tops_csv_multi",
+    "import_tops_rows",
+    "import_tops_rows_multi",
     "import_wells_csv",
     "import_wells_rows",
     "create_engine_for_project",

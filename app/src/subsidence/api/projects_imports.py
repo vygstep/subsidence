@@ -14,11 +14,14 @@ from subsidence.data import (
     import_logs_csv_multi,
     import_tops_csv,
     import_tops_csv_multi,
+    import_tops_rows,
+    import_tops_rows_multi,
     import_wells_rows,
 )
 from subsidence.data.deviation_transform import recalculate_picks_tvd
 from subsidence.data.deviation_transform import deviation_extrapolation_warning_for_import
-from subsidence.data.schema import CurveMetadata, FormationTopModel, FormationZone, TopSet, TopSetHorizon, WellModel
+from subsidence.data.importers.common import _apply_column_map, _read_csv_rows
+from subsidence.data.schema import CurveMetadata, FormationTopModel, FormationZone, TopSet, TopSetHorizon, WellModel, ZoneWellData
 from subsidence.data.zone_service import (
     activate_top_set_for_well,
     linked_well_ids_for_top_set,
@@ -59,6 +62,36 @@ def _ensure_top_set_name_available(session, name: str) -> None:
         )
 
 
+def _get_or_create_top_set_by_name(session, name: str) -> TopSet:
+    normalized = name.strip()
+    if not normalized:
+        raise HTTPException(status_code=400, detail='topset_name cannot be blank')
+    existing = session.scalar(
+        select(TopSet).where(func.lower(TopSet.name) == normalized.lower())
+    )
+    if existing is not None:
+        return existing
+    top_set = TopSet(name=normalized, description='Created during tops import')
+    session.add(top_set)
+    session.flush()
+    return top_set
+
+
+def _row_top_set_name(row: dict[str, str]) -> str | None:
+    for key in ('topset_name', 'top_set_name', 'zone_set_name'):
+        value = (row.get(key) or '').strip()
+        if value:
+            return value
+    return None
+
+
+def _group_rows_by_top_set_name(rows: list[dict[str, str]]) -> dict[str | None, list[dict[str, str]]]:
+    grouped: dict[str | None, list[dict[str, str]]] = {}
+    for row in rows:
+        grouped.setdefault(_row_top_set_name(row), []).append(row)
+    return grouped
+
+
 def _resolve_import_top_set(
     session,
     payload: ImportTopsRequest,
@@ -84,6 +117,44 @@ def _resolve_import_top_set(
     session.add(top_set)
     session.flush()
     return top_set.id
+
+
+def _apply_imported_zone_attributes(session, imported: list[FormationTopModel]) -> list[str]:
+    warnings: list[str] = []
+    for pick in imported:
+        fractions = getattr(pick, '_import_lithology_fractions', None)
+        source = getattr(pick, '_import_lithology_source', None)
+        if not fractions:
+            continue
+        if pick.horizon_id is None:
+            continue
+        zone = session.scalar(
+            select(FormationZone).where(FormationZone.upper_horizon_id == pick.horizon_id)
+        )
+        if zone is None:
+            continue
+        zwd = session.scalar(
+            select(ZoneWellData).where(
+                ZoneWellData.zone_id == zone.id,
+                ZoneWellData.well_id == pick.well_id,
+            )
+        )
+        if zwd is None:
+            zwd = ZoneWellData(zone_id=zone.id, well_id=pick.well_id)
+            session.add(zwd)
+        try:
+            import json as _json
+
+            parsed = _json.loads(fractions)
+            if not isinstance(parsed, dict):
+                raise ValueError('not a JSON object')
+        except (TypeError, ValueError) as exc:
+            warnings.append(f'Ignored invalid lithology_fractions for top "{pick.name}": {exc}')
+            continue
+        zwd.lithology_fractions = fractions
+        zwd.lithology_source = source if source in {'manual', 'auto'} else 'manual'
+    session.flush()
+    return warnings
 
 
 def _zone_set_qc_warnings(
@@ -278,14 +349,68 @@ def import_tops(payload: ImportTopsRequest, request: Request) -> ImportTopsRespo
         try:
             with manager.get_session() as session:
                 target_well_id = payload.well_id
-                zone_set_id = _resolve_import_top_set(session, payload, target_well_id) if target_well_id is not None else None
+                explicit_top_set = payload.create_zone_set or payload.zone_set_id is not None
+                zone_set_id = _resolve_import_top_set(session, payload, target_well_id) if target_well_id is not None and explicit_top_set else None
+                zone_set_ids: set[int] = set()
                 imported_row_count: int | None = None
-                if payload.multi_well:
+                imported: list[FormationTopModel]
+                qc_warnings: list[str]
+                imported_well_ids: list[str]
+
+                source_path = Path(payload.csv_path)
+                fieldnames, prepared_rows = _read_csv_rows(source_path)
+                if payload.column_map:
+                    fieldnames, prepared_rows = _apply_column_map(fieldnames, prepared_rows, payload.column_map)
+                rows_by_top_set = _group_rows_by_top_set_name(prepared_rows)
+                has_file_top_sets = any(name is not None for name in rows_by_top_set)
+
+                if has_file_top_sets and not explicit_top_set:
+                    imported = []
+                    qc_warnings = []
+                    imported_well_ids_set: set[str] = set()
+                    imported_row_count = 0
+                    for top_set_name, group_rows in rows_by_top_set.items():
+                        group_top_set_id = _get_or_create_top_set_by_name(session, top_set_name).id if top_set_name else None
+                        if group_top_set_id is not None:
+                            zone_set_ids.add(group_top_set_id)
+                            if zone_set_id is None:
+                                zone_set_id = group_top_set_id
+                        if payload.multi_well:
+                            group_imported, group_warnings, group_well_ids, group_row_count = import_tops_rows_multi(
+                                session,
+                                source_path,
+                                fieldnames,
+                                group_rows,
+                                payload.depth_ref,
+                                create_new_well=payload.create_new_well,
+                                top_set_id=group_top_set_id,
+                            )
+                        else:
+                            group_imported, group_warnings = import_tops_rows(
+                                session,
+                                payload.well_id,
+                                source_path,
+                                fieldnames,
+                                group_rows,
+                                payload.depth_ref,
+                                create_new_well=payload.create_new_well,
+                                top_set_id=group_top_set_id,
+                            )
+                            group_well_ids = sorted({pick.well_id for pick in group_imported})
+                            group_row_count = len(group_rows)
+                        imported.extend(group_imported)
+                        qc_warnings.extend(group_warnings)
+                        imported_well_ids_set.update(group_well_ids)
+                        imported_row_count += group_row_count
+                    imported_well_ids = sorted(imported_well_ids_set)
+                elif payload.multi_well:
                     if zone_set_id is None:
                         zone_set_id = _resolve_import_top_set(session, payload, None)
+                    if zone_set_id is not None:
+                        zone_set_ids.add(zone_set_id)
                     imported, qc_warnings, imported_well_ids, imported_row_count = import_tops_csv_multi(
                         session,
-                        Path(payload.csv_path),
+                        source_path,
                         payload.depth_ref,
                         column_map=payload.column_map or None,
                         create_new_well=payload.create_new_well,
@@ -295,20 +420,23 @@ def import_tops(payload: ImportTopsRequest, request: Request) -> ImportTopsRespo
                     imported, qc_warnings = import_tops_csv(
                         session,
                         payload.well_id,
-                        Path(payload.csv_path),
+                        source_path,
                         payload.depth_ref,
                         column_map=payload.column_map or None,
                         create_new_well=payload.create_new_well,
                         top_set_id=zone_set_id,
                     )
                     imported_well_ids = sorted({pick.well_id for pick in imported})
+                    if zone_set_id is not None:
+                        zone_set_ids.add(zone_set_id)
                 first_pass_qc_warnings = list(qc_warnings)
                 target_well_id = imported[0].well_id if imported else target_well_id
                 if target_well_id is None:
                     raise HTTPException(status_code=500, detail='Import created no well')
-                if zone_set_id is None and not payload.multi_well:
+                if zone_set_id is None and not payload.multi_well and not has_file_top_sets:
                     zone_set_id = _resolve_import_top_set(session, payload, target_well_id)
                     if zone_set_id is not None:
+                        zone_set_ids.add(zone_set_id)
                         for pick in imported:
                             pick.horizon_id = None
                         session.flush()
@@ -316,7 +444,7 @@ def import_tops(payload: ImportTopsRequest, request: Request) -> ImportTopsRespo
                         imported, qc_warnings = import_tops_csv(
                             session,
                             target_well_id,
-                            Path(payload.csv_path),
+                            source_path,
                             payload.depth_ref,
                             column_map=payload.column_map or None,
                             create_new_well=False,
@@ -335,18 +463,22 @@ def import_tops(payload: ImportTopsRequest, request: Request) -> ImportTopsRespo
                         recalculate_picks_tvd(session, manager.project_path, affected_well)
                 horizon_count = 0
                 zone_count = 0
-                if zone_set_id is not None:
-                    normalize_top_set_horizon_order(session, zone_set_id)
-                    rebuild_zones_for_top_set(session, zone_set_id)
-                    qc_warnings.extend(_zone_set_qc_warnings(session, zone_set_id, imported, None if payload.multi_well else target_well_id))
+                if zone_set_ids:
+                    for current_zone_set_id in sorted(zone_set_ids):
+                        normalize_top_set_horizon_order(session, current_zone_set_id)
+                        rebuild_zones_for_top_set(session, current_zone_set_id)
+                    qc_warnings.extend(_apply_imported_zone_attributes(session, imported))
+                    for current_zone_set_id in sorted(zone_set_ids):
+                        qc_warnings.extend(_zone_set_qc_warnings(session, current_zone_set_id, imported, None if payload.multi_well else target_well_id))
                     include_ids = affected_well_ids or [target_well_id]
-                    linked_ids = set()
-                    for include_well_id in include_ids:
-                        linked_ids.update(linked_well_ids_for_top_set(session, zone_set_id, include_well_id=include_well_id))
-                    for linked_well_id in sorted(linked_ids):
-                        activate_top_set_for_well(session, manager.project_path, linked_well_id, zone_set_id)
-                    horizon_count = len(list(session.scalars(select(TopSetHorizon).where(TopSetHorizon.top_set_id == zone_set_id))))
-                    zone_count = len(list(session.scalars(select(FormationZone).where(FormationZone.top_set_id == zone_set_id))))
+                    for current_zone_set_id in sorted(zone_set_ids):
+                        linked_ids = set()
+                        for include_well_id in include_ids:
+                            linked_ids.update(linked_well_ids_for_top_set(session, current_zone_set_id, include_well_id=include_well_id))
+                        for linked_well_id in sorted(linked_ids):
+                            activate_top_set_for_well(session, manager.project_path, linked_well_id, current_zone_set_id)
+                        horizon_count += len(list(session.scalars(select(TopSetHorizon).where(TopSetHorizon.top_set_id == current_zone_set_id))))
+                        zone_count += len(list(session.scalars(select(FormationZone).where(FormationZone.top_set_id == current_zone_set_id))))
                 formation_count = len(list(session.scalars(select(FormationTopModel).where(FormationTopModel.well_id == target_well_id))))
                 session.commit()
             manager.save_project()

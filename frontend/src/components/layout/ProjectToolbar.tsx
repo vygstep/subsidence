@@ -1,6 +1,12 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 
 import { CreateWellDialog } from './CreateWellDialog'
+import { ExportSeaLevelCurveDialog } from './ExportSeaLevelCurveDialog'
+import { ExportStratChartDialog } from './ExportStratChartDialog'
+import { ExportWellDeviationDialog } from './ExportWellDeviationDialog'
+import { ExportWellInfoDialog } from './ExportWellInfoDialog'
+import { ExportWellLogsDialog } from './ExportWellLogsDialog'
+import { ExportWellTopsDialog } from './ExportWellTopsDialog'
 import { FileOpenDialog } from './FileOpenDialog'
 import { ImportDeviationDialog } from './ImportDeviationDialog'
 import { ImportLasDialog } from './ImportLasDialog'
@@ -12,7 +18,7 @@ import { NewProjectDialog } from './NewProjectDialog'
 import { useProjectStore, useViewStore, useWellDataStore, useWorkspaceStore } from '@/stores'
 import { buildDiagnosticSnapshot } from '@/utils/diagnostics'
 
-type DialogKind = 'project-open' | 'project-new' | 'create-well' | 'load-wells' | 'load-las' | 'load-tops' | 'load-deviation' | 'load-strat-chart' | 'load-sea-level-curve' | null
+type DialogKind = 'project-open' | 'project-new' | 'create-well' | 'load-wells' | 'load-las' | 'load-tops' | 'load-deviation' | 'load-strat-chart' | 'load-sea-level-curve' | 'export-well-info-current' | 'export-well-info-all' | 'export-logs-csv-current' | 'export-logs-csv-all' | 'export-logs-las-current' | 'export-logs-las-all' | 'export-tops-current' | 'export-tops-all' | 'export-deviation-current' | 'export-deviation-all' | 'export-strat-chart-active' | 'export-strat-chart-all' | 'export-sea-level-selected' | 'export-sea-level-all' | null
 
 interface UnsavedChangesDialogProps {
   projectName: string | null
@@ -46,13 +52,18 @@ export function ProjectToolbar() {
     useProjectStore.getState().isOpen ? null : 'project-open',
   )
   const [projectMenuOpen, setProjectMenuOpen] = useState(false)
+  const [loadMenuOpen, setLoadMenuOpen] = useState(false)
+  const [exportMenuOpen, setExportMenuOpen] = useState(false)
   const [pendingAction, setPendingAction] = useState<'new-project' | 'open-project' | 'close-project' | null>(null)
   const projectMenuRef = useRef<HTMLDivElement | null>(null)
+  const loadMenuRef = useRef<HTMLDivElement | null>(null)
+  const exportMenuRef = useRef<HTMLDivElement | null>(null)
 
   const well = useWellDataStore((state) => state.well)
   const curves = useWellDataStore((state) => state.curves)
   const formations = useWellDataStore((state) => state.formations)
   const stratCharts = useWellDataStore((state) => state.stratCharts)
+  const seaLevelCurves = useWellDataStore((state) => state.seaLevelCurves)
   const wellInventories = useWellDataStore((state) => state.wellInventories)
   const isLoading = useWellDataStore((state) => state.isLoading)
   const cancelLoading = useWellDataStore((state) => state.cancelLoading)
@@ -85,6 +96,18 @@ export function ProjectToolbar() {
     () => wellInventories.map((item) => ({ well_id: item.well_id, well_name: item.well_name })),
     [wellInventories],
   )
+  const hasAnyCurves = wellInventories.some((item) => item.curves.length > 0)
+  const activeWellHasCurves = Boolean(
+    well?.well_id && wellInventories.find((item) => item.well_id === well.well_id)?.curves.length,
+  )
+  const hasAnyActiveTops = wellInventories.some((item) => item.active_top_set_id !== null && item.formations.some((top) => top.depth_md !== null))
+  const activeWellHasActiveTops = Boolean(
+    well?.well_id && wellInventories.find((item) => item.well_id === well.well_id && item.active_top_set_id !== null)?.formations.some((top) => top.depth_md !== null),
+  )
+  const hasAnyDeviation = wellInventories.some((item) => item.deviation)
+  const activeWellHasDeviation = Boolean(
+    well?.well_id && wellInventories.find((item) => item.well_id === well.well_id)?.deviation,
+  )
 
   const topbarTitle = !isProjectOpen
     ? 'No project open'
@@ -110,21 +133,30 @@ export function ProjectToolbar() {
   useEffect(() => {
     if (!isProjectOpen) {
       setProjectMenuOpen(false)
+      setLoadMenuOpen(false)
+      setExportMenuOpen(false)
     }
   }, [isProjectOpen])
 
   useEffect(() => {
-    if (!projectMenuOpen) return
+    if (!projectMenuOpen && !loadMenuOpen && !exportMenuOpen) return
 
     const onPointerDown = (event: MouseEvent) => {
-      if (!projectMenuRef.current?.contains(event.target as Node)) {
+      const target = event.target as Node
+      if (!projectMenuRef.current?.contains(target)) {
         setProjectMenuOpen(false)
+      }
+      if (!loadMenuRef.current?.contains(target)) {
+        setLoadMenuOpen(false)
+      }
+      if (!exportMenuRef.current?.contains(target)) {
+        setExportMenuOpen(false)
       }
     }
 
     window.addEventListener('mousedown', onPointerDown)
     return () => window.removeEventListener('mousedown', onPointerDown)
-  }, [projectMenuOpen])
+  }, [exportMenuOpen, loadMenuOpen, projectMenuOpen])
 
   useEffect(() => {
     const onKeyDown = (event: KeyboardEvent) => {
@@ -249,6 +281,132 @@ export function ProjectToolbar() {
             }}
           />
         )
+      case 'export-well-info-current':
+        return (
+          <ExportWellInfoDialog
+            initialScope="current"
+            activeWellId={well?.well_id ?? null}
+            wells={wellInventories}
+            onClose={() => setActiveDialog(null)}
+          />
+        )
+      case 'export-well-info-all':
+        return (
+          <ExportWellInfoDialog
+            initialScope="all"
+            activeWellId={well?.well_id ?? null}
+            wells={wellInventories}
+            onClose={() => setActiveDialog(null)}
+          />
+        )
+      case 'export-logs-csv-current':
+        return (
+          <ExportWellLogsDialog
+            initialScope="current"
+            exportFormat="csv"
+            activeWellId={well?.well_id ?? null}
+            wells={wellInventories}
+            onClose={() => setActiveDialog(null)}
+          />
+        )
+      case 'export-logs-csv-all':
+        return (
+          <ExportWellLogsDialog
+            initialScope="all"
+            exportFormat="csv"
+            activeWellId={well?.well_id ?? null}
+            wells={wellInventories}
+            onClose={() => setActiveDialog(null)}
+          />
+        )
+      case 'export-logs-las-current':
+        return (
+          <ExportWellLogsDialog
+            initialScope="current"
+            exportFormat="las"
+            activeWellId={well?.well_id ?? null}
+            wells={wellInventories}
+            onClose={() => setActiveDialog(null)}
+          />
+        )
+      case 'export-logs-las-all':
+        return (
+          <ExportWellLogsDialog
+            initialScope="all"
+            exportFormat="las"
+            activeWellId={well?.well_id ?? null}
+            wells={wellInventories}
+            onClose={() => setActiveDialog(null)}
+          />
+        )
+      case 'export-tops-current':
+        return (
+          <ExportWellTopsDialog
+            initialScope="current"
+            activeWellId={well?.well_id ?? null}
+            wells={wellInventories}
+            onClose={() => setActiveDialog(null)}
+          />
+        )
+      case 'export-tops-all':
+        return (
+          <ExportWellTopsDialog
+            initialScope="all"
+            activeWellId={well?.well_id ?? null}
+            wells={wellInventories}
+            onClose={() => setActiveDialog(null)}
+          />
+        )
+      case 'export-deviation-current':
+        return (
+          <ExportWellDeviationDialog
+            initialScope="current"
+            activeWellId={well?.well_id ?? null}
+            wells={wellInventories}
+            onClose={() => setActiveDialog(null)}
+          />
+        )
+      case 'export-deviation-all':
+        return (
+          <ExportWellDeviationDialog
+            initialScope="all"
+            activeWellId={well?.well_id ?? null}
+            wells={wellInventories}
+            onClose={() => setActiveDialog(null)}
+          />
+        )
+      case 'export-strat-chart-active':
+        return (
+          <ExportStratChartDialog
+            initialScope="active"
+            charts={stratCharts}
+            onClose={() => setActiveDialog(null)}
+          />
+        )
+      case 'export-strat-chart-all':
+        return (
+          <ExportStratChartDialog
+            initialScope="all"
+            charts={stratCharts}
+            onClose={() => setActiveDialog(null)}
+          />
+        )
+      case 'export-sea-level-selected':
+        return (
+          <ExportSeaLevelCurveDialog
+            initialScope="selected"
+            curves={seaLevelCurves}
+            onClose={() => setActiveDialog(null)}
+          />
+        )
+      case 'export-sea-level-all':
+        return (
+          <ExportSeaLevelCurveDialog
+            initialScope="all"
+            curves={seaLevelCurves}
+            onClose={() => setActiveDialog(null)}
+          />
+        )
       default:
         return null
     }
@@ -277,6 +435,38 @@ export function ProjectToolbar() {
       <button
         type="button"
         className="app-action-button"
+        onClick={() => setActiveDialog('export-strat-chart-active')}
+        disabled={!stratCharts.some((c) => c.is_active)}
+      >
+        Export active StratChart
+      </button>
+      <button
+        type="button"
+        className="app-action-button"
+        onClick={() => setActiveDialog('export-strat-chart-all')}
+        disabled={stratCharts.length === 0}
+      >
+        Export all StratCharts
+      </button>
+      <button
+        type="button"
+        className="app-action-button"
+        onClick={() => setActiveDialog('export-sea-level-selected')}
+        disabled={seaLevelCurves.length === 0}
+      >
+        Export Sea Level Curve
+      </button>
+      <button
+        type="button"
+        className="app-action-button"
+        onClick={() => setActiveDialog('export-sea-level-all')}
+        disabled={seaLevelCurves.length === 0}
+      >
+        Export all Sea Level Curves
+      </button>
+      <button
+        type="button"
+        className="app-action-button"
         onClick={() => void handleDeleteStratChart()}
         disabled={!stratCharts.some((c) => c.is_active && !c.is_builtin)}
       >
@@ -288,10 +478,122 @@ export function ProjectToolbar() {
   const wellsModeActions = (
     <>
       <button type="button" className="app-action-button" onClick={() => setActiveDialog('create-well')}>Create well</button>
-      <button type="button" className="app-action-button" onClick={() => setActiveDialog('load-wells')}>Load wells</button>
-      <button type="button" className="app-action-button" onClick={() => setActiveDialog('load-las')}>Load logs</button>
-      <button type="button" className="app-action-button" onClick={() => setActiveDialog('load-tops')}>Load tops</button>
-      <button type="button" className="app-action-button" onClick={() => setActiveDialog('load-deviation')}>Load deviation</button>
+      <div className="app-menu" ref={loadMenuRef}>
+        <button
+          type="button"
+          className={`app-action-button ${loadMenuOpen ? 'app-action-button--mode-active' : ''}`}
+          onClick={() => {
+            setLoadMenuOpen((open) => !open)
+            setExportMenuOpen(false)
+          }}
+        >
+          Load
+        </button>
+        {loadMenuOpen ? (
+          <div className="app-menu__dropdown">
+            <button type="button" className="app-menu__item" onClick={() => { setLoadMenuOpen(false); setActiveDialog('load-wells') }}>Load wells</button>
+            <button type="button" className="app-menu__item" onClick={() => { setLoadMenuOpen(false); setActiveDialog('load-las') }}>Load logs</button>
+            <button type="button" className="app-menu__item" onClick={() => { setLoadMenuOpen(false); setActiveDialog('load-tops') }}>Load tops</button>
+            <button type="button" className="app-menu__item" onClick={() => { setLoadMenuOpen(false); setActiveDialog('load-deviation') }}>Load deviation</button>
+          </div>
+        ) : null}
+      </div>
+      <div className="app-menu" ref={exportMenuRef}>
+        <button
+          type="button"
+          className={`app-action-button ${exportMenuOpen ? 'app-action-button--mode-active' : ''}`}
+          onClick={() => {
+            setExportMenuOpen((open) => !open)
+            setLoadMenuOpen(false)
+          }}
+        >
+          Export
+        </button>
+        {exportMenuOpen ? (
+          <div className="app-menu__dropdown">
+            <button
+              type="button"
+              className="app-menu__item"
+              disabled={!well?.well_id}
+              onClick={() => { setExportMenuOpen(false); setActiveDialog('export-well-info-current') }}
+            >
+              Export current well info
+            </button>
+            <button
+              type="button"
+              className="app-menu__item"
+              disabled={wellInventories.length === 0}
+              onClick={() => { setExportMenuOpen(false); setActiveDialog('export-well-info-all') }}
+            >
+              Export all wells info
+            </button>
+            <button
+              type="button"
+              className="app-menu__item"
+              disabled={!activeWellHasCurves}
+              onClick={() => { setExportMenuOpen(false); setActiveDialog('export-logs-csv-current') }}
+            >
+              Export current well logs CSV
+            </button>
+            <button
+              type="button"
+              className="app-menu__item"
+              disabled={!hasAnyCurves}
+              onClick={() => { setExportMenuOpen(false); setActiveDialog('export-logs-csv-all') }}
+            >
+              Export all wells logs CSV
+            </button>
+            <button
+              type="button"
+              className="app-menu__item"
+              disabled={!activeWellHasCurves}
+              onClick={() => { setExportMenuOpen(false); setActiveDialog('export-logs-las-current') }}
+            >
+              Export current well logs LAS
+            </button>
+            <button
+              type="button"
+              className="app-menu__item"
+              disabled={!hasAnyCurves}
+              onClick={() => { setExportMenuOpen(false); setActiveDialog('export-logs-las-all') }}
+            >
+              Export all wells logs LAS
+            </button>
+            <button
+              type="button"
+              className="app-menu__item"
+              disabled={!activeWellHasActiveTops}
+              onClick={() => { setExportMenuOpen(false); setActiveDialog('export-tops-current') }}
+            >
+              Export current well tops CSV
+            </button>
+            <button
+              type="button"
+              className="app-menu__item"
+              disabled={!hasAnyActiveTops}
+              onClick={() => { setExportMenuOpen(false); setActiveDialog('export-tops-all') }}
+            >
+              Export all wells tops CSV
+            </button>
+            <button
+              type="button"
+              className="app-menu__item"
+              disabled={!activeWellHasDeviation}
+              onClick={() => { setExportMenuOpen(false); setActiveDialog('export-deviation-current') }}
+            >
+              Export current well deviation CSV
+            </button>
+            <button
+              type="button"
+              className="app-menu__item"
+              disabled={!hasAnyDeviation}
+              onClick={() => { setExportMenuOpen(false); setActiveDialog('export-deviation-all') }}
+            >
+              Export all wells deviation CSV
+            </button>
+          </div>
+        ) : null}
+      </div>
     </>
   )
 
