@@ -19,7 +19,7 @@ from sqlalchemy.orm import selectinload
 
 from subsidence.api._deps import require_open_project as _require_open_project
 from subsidence.data.loaders import load_curves_from_parquet
-from subsidence.data.schema import CurveMetadata, DeviationSurveyModel, FormationTopModel, FormationZone, StratChart, StratUnit, TopSetHorizon, WellActiveTopSet, WellModel, ZoneWellData
+from subsidence.data.schema import CurveMetadata, DeviationSurveyModel, FormationTopModel, FormationZone, SeaLevelCurve, SeaLevelPoint, StratChart, StratUnit, TopSetHorizon, WellActiveTopSet, WellModel, ZoneWellData
 
 router = APIRouter(tags=['export'])
 
@@ -79,6 +79,13 @@ class WellDeviationExportRequest(BaseModel):
 class StratChartExportRequest(BaseModel):
     scope: str = 'active'
     chart_id: int | None = None
+    export_to_zip: bool = False
+    output_dir: str | None = None
+
+
+class SeaLevelCurveExportRequest(BaseModel):
+    scope: str = 'selected'
+    curve_id: int | None = None
     export_to_zip: bool = False
     output_dir: str | None = None
 
@@ -607,6 +614,40 @@ def _strat_chart_export_files(session, charts: list[StratChart]) -> list[tuple[s
     return files
 
 
+SEA_LEVEL_FIELDNAMES = ['age_ma', 'sea_level_m']
+
+
+def _sea_level_filename(curve: SeaLevelCurve) -> str:
+    return f'{sanitize_filename(curve.name, f"sea_level_curve_{curve.id}")}.csv'
+
+
+def _sea_level_csv(curve: SeaLevelCurve, points: list[SeaLevelPoint]) -> bytes:
+    if not points:
+        raise HTTPException(status_code=404, detail=f'Sea level curve "{curve.name}" has no points to export')
+    rows = [
+        {
+            'age_ma': point.age_ma,
+            'sea_level_m': point.sea_level_m,
+        }
+        for point in points
+    ]
+    return csv_bytes(SEA_LEVEL_FIELDNAMES, rows)
+
+
+def _sea_level_export_files(session, curves: list[SeaLevelCurve]) -> list[tuple[str, bytes]]:
+    files: list[tuple[str, bytes]] = []
+    for curve in curves:
+        points = session.scalars(
+            select(SeaLevelPoint)
+            .where(SeaLevelPoint.curve_id == curve.id)
+            .order_by(SeaLevelPoint.age_ma.desc(), SeaLevelPoint.id.asc())
+        ).all()
+        files.append((_sea_level_filename(curve), _sea_level_csv(curve, points)))
+    if not files:
+        raise HTTPException(status_code=404, detail='No sea level curves available for export')
+    return files
+
+
 def _handle_files_response(
     files: list[tuple[str, bytes]],
     *,
@@ -820,5 +861,34 @@ def export_strat_charts(body: StratChartExportRequest, request: Request):
         output_dir=output_dir,
         export_to_zip=body.export_to_zip,
         zip_filename='strat_charts.zip',
+        media_type='text/csv; charset=utf-8',
+    )
+
+
+@router.post('/sea-level-curves')
+def export_sea_level_curves(body: SeaLevelCurveExportRequest, request: Request):
+    manager = _require_open_project(request)
+    output_dir = validate_output_dir(body.output_dir)
+    scope = body.scope.strip().lower()
+    if scope not in {'selected', 'all'}:
+        raise HTTPException(status_code=400, detail="scope must be 'selected' or 'all'")
+
+    with manager.get_session() as session:
+        if scope == 'all':
+            curves = session.scalars(select(SeaLevelCurve).order_by(SeaLevelCurve.name.asc(), SeaLevelCurve.id.asc())).all()
+        else:
+            if body.curve_id is None:
+                raise HTTPException(status_code=400, detail='curve_id is required for selected sea level curve export')
+            curve = session.get(SeaLevelCurve, body.curve_id)
+            if curve is None:
+                raise HTTPException(status_code=404, detail=f'Sea level curve not found: {body.curve_id}')
+            curves = [curve]
+        files = _sea_level_export_files(session, curves)
+
+    return _handle_files_response(
+        files,
+        output_dir=output_dir,
+        export_to_zip=body.export_to_zip,
+        zip_filename='sea_level_curves.zip',
         media_type='text/csv; charset=utf-8',
     )

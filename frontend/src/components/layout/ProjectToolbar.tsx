@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 
 import { CreateWellDialog } from './CreateWellDialog'
+import { ExportSeaLevelCurveDialog } from './ExportSeaLevelCurveDialog'
 import { ExportStratChartDialog } from './ExportStratChartDialog'
 import { ExportWellDeviationDialog } from './ExportWellDeviationDialog'
 import { ExportWellInfoDialog } from './ExportWellInfoDialog'
@@ -17,7 +18,7 @@ import { NewProjectDialog } from './NewProjectDialog'
 import { useProjectStore, useViewStore, useWellDataStore, useWorkspaceStore } from '@/stores'
 import { buildDiagnosticSnapshot } from '@/utils/diagnostics'
 
-type DialogKind = 'project-open' | 'project-new' | 'create-well' | 'load-wells' | 'load-las' | 'load-tops' | 'load-deviation' | 'load-strat-chart' | 'load-sea-level-curve' | 'export-well-info-current' | 'export-well-info-all' | 'export-logs-csv-current' | 'export-logs-csv-all' | 'export-logs-las-current' | 'export-logs-las-all' | 'export-tops-current' | 'export-tops-all' | 'export-deviation-current' | 'export-deviation-all' | 'export-strat-chart-active' | 'export-strat-chart-all' | null
+type DialogKind = 'project-open' | 'project-new' | 'create-well' | 'load-wells' | 'load-las' | 'load-tops' | 'load-deviation' | 'load-strat-chart' | 'load-sea-level-curve' | 'export-well-info-current' | 'export-well-info-all' | 'export-logs-csv-current' | 'export-logs-csv-all' | 'export-logs-las-current' | 'export-logs-las-all' | 'export-tops-current' | 'export-tops-all' | 'export-deviation-current' | 'export-deviation-all' | 'export-strat-chart-active' | 'export-strat-chart-all' | 'export-sea-level-selected' | 'export-sea-level-all' | null
 
 interface UnsavedChangesDialogProps {
   projectName: string | null
@@ -62,6 +63,7 @@ export function ProjectToolbar() {
   const curves = useWellDataStore((state) => state.curves)
   const formations = useWellDataStore((state) => state.formations)
   const stratCharts = useWellDataStore((state) => state.stratCharts)
+  const seaLevelCurves = useWellDataStore((state) => state.seaLevelCurves)
   const wellInventories = useWellDataStore((state) => state.wellInventories)
   const isLoading = useWellDataStore((state) => state.isLoading)
   const cancelLoading = useWellDataStore((state) => state.cancelLoading)
@@ -389,6 +391,22 @@ export function ProjectToolbar() {
             onClose={() => setActiveDialog(null)}
           />
         )
+      case 'export-sea-level-selected':
+        return (
+          <ExportSeaLevelCurveDialog
+            initialScope="selected"
+            curves={seaLevelCurves}
+            onClose={() => setActiveDialog(null)}
+          />
+        )
+      case 'export-sea-level-all':
+        return (
+          <ExportSeaLevelCurveDialog
+            initialScope="all"
+            curves={seaLevelCurves}
+            onClose={() => setActiveDialog(null)}
+          />
+        )
       default:
         return null
     }
@@ -429,6 +447,22 @@ export function ProjectToolbar() {
         disabled={stratCharts.length === 0}
       >
         Export all StratCharts
+      </button>
+      <button
+        type="button"
+        className="app-action-button"
+        onClick={() => setActiveDialog('export-sea-level-selected')}
+        disabled={seaLevelCurves.length === 0}
+      >
+        Export Sea Level Curve
+      </button>
+      <button
+        type="button"
+        className="app-action-button"
+        onClick={() => setActiveDialog('export-sea-level-all')}
+        disabled={seaLevelCurves.length === 0}
+      >
+        Export all Sea Level Curves
       </button>
       <button
         type="button"

@@ -33,6 +33,72 @@ def test_export_active_strat_chart_round_trips_with_strat_chart_import(tmp_path:
     if manager.is_open:
         manager.close_project()
 
+
+def test_export_sea_level_curve_round_trips_with_sea_level_import(tmp_path: Path) -> None:
+    manager = app.state.project_manager
+    if manager.is_open:
+        manager.close_project()
+
+    with TestClient(app) as client:
+        _create_project(client, tmp_path, 'sea-level-export')
+        source_csv = tmp_path / 'Custom Sea Level.csv'
+        source_csv.write_text(
+            'age_ma,sea_level_m\n'
+            '100,-20\n'
+            '50,10\n'
+            '0,0\n',
+            encoding='utf-8',
+        )
+        column_map = {
+            'age_ma': 'age_ma',
+            'sea_level_m': 'sea_level_m',
+        }
+        response = client.post('/api/sea-level-curves/import', json={
+            'csv_path': str(source_csv),
+            'curve_name': 'Custom Sea Level',
+            'column_map': column_map,
+        })
+        assert response.status_code == 200, response.text
+        curve_id = response.json()['curve_id']
+
+        response = client.post('/api/export/sea-level-curves', json={
+            'scope': 'selected',
+            'curve_id': curve_id,
+        })
+        assert response.status_code == 200, response.text
+        assert response.headers['content-type'].startswith('text/csv')
+        reader = csv.DictReader(io.StringIO(response.content.decode('utf-8-sig')))
+        assert reader.fieldnames == ['age_ma', 'sea_level_m']
+        rows = list(reader)
+        assert rows[0] == {'age_ma': '100.0', 'sea_level_m': '-20.0'}
+        assert rows[-1] == {'age_ma': '0.0', 'sea_level_m': '0.0'}
+        export_csv = tmp_path / 'Custom Sea Level.csv'
+        export_csv.write_bytes(response.content)
+
+        response = client.post('/api/projects/close')
+        assert response.status_code == 200, response.text
+        _create_project(client, tmp_path, 'sea-level-roundtrip')
+        response = client.post('/api/sea-level-curves/import', json={
+            'csv_path': str(export_csv),
+            'curve_name': 'Custom Sea Level',
+            'column_map': column_map,
+        })
+        assert response.status_code == 200, response.text
+        imported_curve_id = response.json()['curve_id']
+        assert response.json()['point_count'] == 3
+
+        response = client.get(f'/api/sea-level-curves/{imported_curve_id}/points')
+        assert response.status_code == 200, response.text
+        points = response.json()
+        assert points == [
+            {'age_ma': 100.0, 'sea_level_m': -20.0},
+            {'age_ma': 50.0, 'sea_level_m': 10.0},
+            {'age_ma': 0.0, 'sea_level_m': 0.0},
+        ]
+
+    if manager.is_open:
+        manager.close_project()
+
     with TestClient(app) as client:
         _create_project(client, tmp_path, 'strat-chart-export')
         source_csv = tmp_path / 'Custom StratChart.csv'

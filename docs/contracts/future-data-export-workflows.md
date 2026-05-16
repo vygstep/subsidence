@@ -358,7 +358,15 @@ Status: In Progress
 - Add UI actions from the StratCharts toolbar:
   - `Export active StratChart`
   - `Export all StratCharts`
+- Sea level curve export uses one CSV per curve for round-trip compatibility. Do not combine multiple curves into one CSV because the current importer creates one curve from one file/name.
+- Sea level curve export columns:
+  - `age_ma`
+  - `sea_level_m`
+- Add UI actions from the StratCharts toolbar:
+  - `Export Sea Level Curve`
+  - `Export all Sea Level Curves`
 - `Export all StratCharts` supports one file per chart, optional ZIP, and export folder/browser download.
+- `Export all Sea Level Curves` supports one file per curve, optional ZIP, and export folder/browser download.
 - Verify imported and built-in chart behavior.
 
 ## Stage 7 - Later Export Areas
