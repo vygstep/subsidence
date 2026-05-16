@@ -51,6 +51,8 @@ export function ExportWellLogsDialog({
   const [scope] = useState<ExportScope>(initialScope)
   const [exportToZip, setExportToZip] = useState(false)
   const [exportRoot, setExportRoot] = useState(() => getLastExportRoot())
+  const [lasStepM, setLasStepM] = useState('0.2')
+  const [lasNullValue, setLasNullValue] = useState('-999.25')
   const [lastWrittenPath, setLastWrittenPath] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [isSubmitting, setIsSubmitting] = useState(false)
@@ -69,6 +71,24 @@ export function ExportWellLogsDialog({
     event.preventDefault()
     if (!canSubmit) return
     setError(null)
+    const parsedLasStepM = Number.parseFloat(lasStepM)
+    const parsedLasNullValue = Number.parseFloat(lasNullValue)
+    if (exportFormat === 'las') {
+      if (!Number.isFinite(parsedLasStepM) || parsedLasStepM <= 0) {
+        setError('LAS step must be a positive number.')
+        return
+      }
+      if (!Number.isFinite(parsedLasNullValue)) {
+        setError('LAS null value must be a finite number.')
+        return
+      }
+    }
+    const lasSettings = exportFormat === 'las'
+      ? {
+          las_step_m: parsedLasStepM,
+          las_null_value: parsedLasNullValue,
+        }
+      : {}
     setIsSubmitting(true)
     setLastWrittenPath(null)
     const outputDir = exportRoot.trim() || null
@@ -82,6 +102,7 @@ export function ExportWellLogsDialog({
           scope: 'current',
           well_id: currentWell?.well_id,
           output_dir: outputDir,
+          ...lasSettings,
         })
         if (outputDir) {
           if (!response.ok) throw new Error(await readExportError(response, `Export failed (${response.status})`))
@@ -90,16 +111,18 @@ export function ExportWellLogsDialog({
         } else {
           await downloadResponse(response, `${currentWell?.well_name ?? 'well'}_logs.${exportFormat}`)
         }
+        onClose()
         return
       }
 
       if (!exportToZip && !outputDir) {
         for (const well of exportableWells) {
           // eslint-disable-next-line no-await-in-loop
-          const response = await postLogsExport(exportFormat, { scope: 'current', well_id: well.well_id })
+          const response = await postLogsExport(exportFormat, { scope: 'current', well_id: well.well_id, ...lasSettings })
           // eslint-disable-next-line no-await-in-loop
           await downloadResponse(response, `${well.well_name}_logs.${exportFormat}`)
         }
+        onClose()
         return
       }
 
@@ -107,6 +130,7 @@ export function ExportWellLogsDialog({
         scope: 'all',
         export_to_zip: exportToZip,
         output_dir: outputDir,
+        ...lasSettings,
       })
       if (outputDir) {
         if (!response.ok) throw new Error(await readExportError(response, `Export failed (${response.status})`))
@@ -115,6 +139,7 @@ export function ExportWellLogsDialog({
       } else {
         await downloadResponse(response, `well_logs_${exportFormat}.zip`)
       }
+      onClose()
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : 'Export failed')
     } finally {
@@ -141,6 +166,31 @@ export function ExportWellLogsDialog({
               />
               Export to ZIP
             </label>
+          </div>
+        ) : null}
+
+        {exportFormat === 'las' ? (
+          <div className="project-dialog__section">
+            <div className="project-dialog__field-row">
+              <label className="project-dialog__field">
+                <span>Step (m)</span>
+                <input
+                  type="number"
+                  step="any"
+                  value={lasStepM}
+                  onChange={(event) => setLasStepM(event.target.value)}
+                />
+              </label>
+              <label className="project-dialog__field">
+                <span>Null value</span>
+                <input
+                  type="number"
+                  step="any"
+                  value={lasNullValue}
+                  onChange={(event) => setLasNullValue(event.target.value)}
+                />
+              </label>
+            </div>
           </div>
         ) : null}
 

@@ -58,6 +58,8 @@ class WellLogsExportRequest(BaseModel):
     well_id: str | None = None
     export_to_zip: bool = False
     output_dir: str | None = None
+    las_step_m: float = 0.2
+    las_null_value: float = -999.25
 
 
 class WellTopsExportRequest(BaseModel):
@@ -310,6 +312,98 @@ def _curve_frame(project_path: Path, curve_rows: list[CurveMetadata]) -> pd.Data
     return frame_by_depth.sort_index().reset_index()
 
 
+def _curve_payloads(project_path: Path, curve_rows: list[CurveMetadata]) -> dict[str, tuple[CurveMetadata, np.ndarray, np.ndarray]]:
+    curve_maps: dict[str, dict[str, tuple[np.ndarray, np.ndarray]]] = {}
+    payloads: dict[str, tuple[CurveMetadata, np.ndarray, np.ndarray]] = {}
+    for row in curve_rows:
+        if row.data_uri not in curve_maps:
+            curve_maps[row.data_uri] = load_curves_from_parquet(project_path, row.data_uri)
+        pair = curve_maps[row.data_uri].get(row.mnemonic)
+        if pair is None:
+            continue
+        depths, values = pair
+        order = np.argsort(depths.astype('float64'))
+        clean_depths = depths.astype('float64')[order]
+        clean_values = values.astype('float64')[order]
+        finite_mask = np.isfinite(clean_depths) & np.isfinite(clean_values)
+        if int(finite_mask.sum()) < 2:
+            continue
+        payloads[row.mnemonic] = (row, clean_depths[finite_mask], clean_values[finite_mask])
+    return payloads
+
+
+def _regular_depth_grid(min_depth: float, max_depth: float, step_m: float) -> np.ndarray:
+    if not np.isfinite(min_depth) or not np.isfinite(max_depth):
+        raise HTTPException(status_code=404, detail='No curve samples available for LAS export')
+    if step_m <= 0 or not np.isfinite(step_m):
+        raise HTTPException(status_code=400, detail='LAS export step must be a positive number')
+    if max_depth < min_depth:
+        min_depth, max_depth = max_depth, min_depth
+    decimals = max(0, int(np.ceil(-np.log10(step_m))) + 3) if step_m < 1 else 6
+    count = int(np.floor((max_depth - min_depth) / step_m + 1e-9)) + 1
+    grid = min_depth + np.arange(count + 1, dtype='float64') * step_m
+    grid = grid[grid <= max_depth + step_m * 1e-6]
+    if grid.size == 0 or grid[-1] < max_depth - step_m * 1e-6:
+        grid = np.append(grid, max_depth)
+    return np.round(grid, decimals=decimals)
+
+
+def _native_gap_limit(depths: np.ndarray, row: CurveMetadata) -> float | None:
+    diffs = np.diff(depths)
+    diffs = diffs[np.isfinite(diffs) & (diffs > 0)]
+    if diffs.size == 0:
+        return None
+    reference_step = row.nominal_step_m if row.nominal_step_m is not None and row.nominal_step_m > 0 else float(np.median(diffs))
+    if not np.isfinite(reference_step) or reference_step <= 0:
+        return None
+    return reference_step * 1.5
+
+
+def _mask_large_native_gaps(grid: np.ndarray, depths: np.ndarray, row: CurveMetadata) -> np.ndarray:
+    mask = np.zeros(grid.shape, dtype=bool)
+    gap_limit = _native_gap_limit(depths, row)
+    if gap_limit is None:
+        return mask
+    diffs = np.diff(depths)
+    for idx, gap in enumerate(diffs):
+        if gap > gap_limit:
+            mask |= (grid > depths[idx]) & (grid < depths[idx + 1])
+    return mask
+
+
+def _resample_continuous_curve(grid: np.ndarray, depths: np.ndarray, values: np.ndarray, row: CurveMetadata) -> np.ndarray:
+    result = np.interp(grid, depths, values, left=np.nan, right=np.nan)
+    result[(grid < depths[0]) | (grid > depths[-1])] = np.nan
+    result[_mask_large_native_gaps(grid, depths, row)] = np.nan
+    return result
+
+
+def _resample_discrete_curve(grid: np.ndarray, depths: np.ndarray, values: np.ndarray, row: CurveMetadata) -> np.ndarray:
+    result = np.full(grid.shape, np.nan, dtype='float64')
+    interval_indices = np.searchsorted(depths, grid, side='right') - 1
+    valid = (interval_indices >= 0) & (grid <= depths[-1])
+    if valid.any():
+        result[valid] = values[interval_indices[valid]]
+    result[_mask_large_native_gaps(grid, depths, row)] = np.nan
+    return result
+
+
+def _las_resampled_frame(project_path: Path, curve_rows: list[CurveMetadata], step_m: float) -> pd.DataFrame:
+    payloads = _curve_payloads(project_path, curve_rows)
+    if not payloads:
+        raise HTTPException(status_code=404, detail='No curve samples available for LAS export')
+    min_depth = min(float(depths[0]) for _, depths, _ in payloads.values())
+    max_depth = max(float(depths[-1]) for _, depths, _ in payloads.values())
+    grid = _regular_depth_grid(min_depth, max_depth, step_m)
+    frame = pd.DataFrame({'DEPT': grid})
+    for mnemonic, (row, depths, values) in payloads.items():
+        if row.curve_type == 'discrete':
+            frame[mnemonic] = _resample_discrete_curve(grid, depths, values, row)
+        else:
+            frame[mnemonic] = _resample_continuous_curve(grid, depths, values, row)
+    return frame
+
+
 def _logs_csv_bytes(project_path: Path, well: WellModel, curve_rows: list[CurveMetadata]) -> bytes:
     frame = _curve_frame(project_path, curve_rows)
     frame.insert(0, 'well_name', well.name)
@@ -327,9 +421,12 @@ def _first_non_empty_extra(row: WellModel, key: str) -> str:
     return str(value).strip() if value not in (None, '') else ''
 
 
-def _logs_las_bytes(project_path: Path, well: WellModel, curve_rows: list[CurveMetadata]) -> bytes:
-    frame = _curve_frame(project_path, curve_rows)
-    null_value = next((row.null_value for row in curve_rows if row.null_value is not None), -999.25)
+def _logs_las_bytes(project_path: Path, well: WellModel, curve_rows: list[CurveMetadata], step_m: float, null_value: float) -> bytes:
+    if not np.isfinite(step_m) or step_m <= 0:
+        raise HTTPException(status_code=400, detail='LAS export step must be a positive number')
+    if not np.isfinite(null_value):
+        raise HTTPException(status_code=400, detail='LAS null value must be a finite number')
+    frame = _las_resampled_frame(project_path, curve_rows, step_m)
 
     las = lasio.LASFile()
     las.well['NULL'] = float(null_value)
@@ -376,7 +473,15 @@ def _logs_filename(well: WellModel, extension: str) -> str:
     return f'{sanitize_filename(well.name, well.id)}_logs.{extension}'
 
 
-def _log_export_files(project_path: Path, wells: list[WellModel], curve_rows_by_well: dict[str, list[CurveMetadata]], export_format: str) -> list[tuple[str, bytes]]:
+def _log_export_files(
+    project_path: Path,
+    wells: list[WellModel],
+    curve_rows_by_well: dict[str, list[CurveMetadata]],
+    export_format: str,
+    *,
+    las_step_m: float = 0.2,
+    las_null_value: float = -999.25,
+) -> list[tuple[str, bytes]]:
     files: list[tuple[str, bytes]] = []
     for well in wells:
         curve_rows = curve_rows_by_well.get(well.id, [])
@@ -385,7 +490,7 @@ def _log_export_files(project_path: Path, wells: list[WellModel], curve_rows_by_
         if export_format == 'csv':
             files.append((_logs_filename(well, 'csv'), _logs_csv_bytes(project_path, well, curve_rows)))
         elif export_format == 'las':
-            files.append((_logs_filename(well, 'las'), _logs_las_bytes(project_path, well, curve_rows)))
+            files.append((_logs_filename(well, 'las'), _logs_las_bytes(project_path, well, curve_rows, las_step_m, las_null_value)))
         else:
             raise HTTPException(status_code=400, detail="export_format must be 'csv' or 'las'")
     if not files:
@@ -752,7 +857,14 @@ def export_well_logs(export_format: str, body: WellLogsExportRequest, request: R
             for row in curve_rows:
                 curve_rows_by_well.setdefault(row.well_id, []).append(row)
 
-        files = _log_export_files(manager.project_path, wells, curve_rows_by_well, export_format)
+        files = _log_export_files(
+            manager.project_path,
+            wells,
+            curve_rows_by_well,
+            export_format,
+            las_step_m=body.las_step_m,
+            las_null_value=body.las_null_value,
+        )
 
     return _handle_files_response(
         files,
