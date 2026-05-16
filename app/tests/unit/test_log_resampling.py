@@ -37,6 +37,15 @@ def test_continuous_resampling_interpolates_inside_valid_interval_only() -> None
     assert result.values == [10.0, 15.0, 20.0, 25.0, 30.0]
 
 
+def test_continuous_resampling_keeps_isolated_valid_points_around_null_gap() -> None:
+    grid = build_md_grid(4.0, 1.0)
+
+    result = resample_continuous_to_md_grid(grid, [1.0, 2.0, 3.0], [10.0, None, 30.0])
+
+    assert result.values == [None, 10.0, None, 30.0, None]
+    assert result.valid_sample_count == 2
+
+
 def test_discrete_resampling_steps_down_and_preserves_null_gap() -> None:
     grid = build_md_grid(4.0, 1.0)
 

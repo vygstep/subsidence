@@ -115,6 +115,13 @@ def resample_continuous_to_md_grid(
     if depths.size < 2:
         return _result_from_values(grid, result)
     grid_arr = np.array(grid, dtype='float64')
+    step = float(np.min(np.diff(grid_arr))) if grid_arr.size > 1 else 1e-6
+    tolerance = max(step * 1e-6, 1e-9)
+    for depth, value in zip(depths, values, strict=False):
+        if not np.isfinite(value):
+            continue
+        exact_mask = np.isclose(grid_arr, depth, rtol=0.0, atol=tolerance)
+        result[exact_mask] = value
     for idx in range(len(depths) - 1):
         left_value = values[idx]
         right_value = values[idx + 1]
