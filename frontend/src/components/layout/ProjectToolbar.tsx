@@ -1,6 +1,8 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 
 import { CreateWellDialog } from './CreateWellDialog'
+import { ExportStratChartDialog } from './ExportStratChartDialog'
+import { ExportWellDeviationDialog } from './ExportWellDeviationDialog'
 import { ExportWellInfoDialog } from './ExportWellInfoDialog'
 import { ExportWellLogsDialog } from './ExportWellLogsDialog'
 import { ExportWellTopsDialog } from './ExportWellTopsDialog'
@@ -15,7 +17,7 @@ import { NewProjectDialog } from './NewProjectDialog'
 import { useProjectStore, useViewStore, useWellDataStore, useWorkspaceStore } from '@/stores'
 import { buildDiagnosticSnapshot } from '@/utils/diagnostics'
 
-type DialogKind = 'project-open' | 'project-new' | 'create-well' | 'load-wells' | 'load-las' | 'load-tops' | 'load-deviation' | 'load-strat-chart' | 'load-sea-level-curve' | 'export-well-info-current' | 'export-well-info-all' | 'export-logs-csv-current' | 'export-logs-csv-all' | 'export-logs-las-current' | 'export-logs-las-all' | 'export-tops-current' | 'export-tops-all' | null
+type DialogKind = 'project-open' | 'project-new' | 'create-well' | 'load-wells' | 'load-las' | 'load-tops' | 'load-deviation' | 'load-strat-chart' | 'load-sea-level-curve' | 'export-well-info-current' | 'export-well-info-all' | 'export-logs-csv-current' | 'export-logs-csv-all' | 'export-logs-las-current' | 'export-logs-las-all' | 'export-tops-current' | 'export-tops-all' | 'export-deviation-current' | 'export-deviation-all' | 'export-strat-chart-active' | 'export-strat-chart-all' | null
 
 interface UnsavedChangesDialogProps {
   projectName: string | null
@@ -99,6 +101,10 @@ export function ProjectToolbar() {
   const hasAnyActiveTops = wellInventories.some((item) => item.active_top_set_id !== null && item.formations.some((top) => top.depth_md !== null))
   const activeWellHasActiveTops = Boolean(
     well?.well_id && wellInventories.find((item) => item.well_id === well.well_id && item.active_top_set_id !== null)?.formations.some((top) => top.depth_md !== null),
+  )
+  const hasAnyDeviation = wellInventories.some((item) => item.deviation)
+  const activeWellHasDeviation = Boolean(
+    well?.well_id && wellInventories.find((item) => item.well_id === well.well_id)?.deviation,
   )
 
   const topbarTitle = !isProjectOpen
@@ -349,6 +355,40 @@ export function ProjectToolbar() {
             onClose={() => setActiveDialog(null)}
           />
         )
+      case 'export-deviation-current':
+        return (
+          <ExportWellDeviationDialog
+            initialScope="current"
+            activeWellId={well?.well_id ?? null}
+            wells={wellInventories}
+            onClose={() => setActiveDialog(null)}
+          />
+        )
+      case 'export-deviation-all':
+        return (
+          <ExportWellDeviationDialog
+            initialScope="all"
+            activeWellId={well?.well_id ?? null}
+            wells={wellInventories}
+            onClose={() => setActiveDialog(null)}
+          />
+        )
+      case 'export-strat-chart-active':
+        return (
+          <ExportStratChartDialog
+            initialScope="active"
+            charts={stratCharts}
+            onClose={() => setActiveDialog(null)}
+          />
+        )
+      case 'export-strat-chart-all':
+        return (
+          <ExportStratChartDialog
+            initialScope="all"
+            charts={stratCharts}
+            onClose={() => setActiveDialog(null)}
+          />
+        )
       default:
         return null
     }
@@ -374,6 +414,22 @@ export function ProjectToolbar() {
     <>
       <button type="button" className="app-action-button" onClick={() => setActiveDialog('load-strat-chart')}>Load StratChart</button>
       <button type="button" className="app-action-button" onClick={() => setActiveDialog('load-sea-level-curve')}>Load Sea Level Curve</button>
+      <button
+        type="button"
+        className="app-action-button"
+        onClick={() => setActiveDialog('export-strat-chart-active')}
+        disabled={!stratCharts.some((c) => c.is_active)}
+      >
+        Export active StratChart
+      </button>
+      <button
+        type="button"
+        className="app-action-button"
+        onClick={() => setActiveDialog('export-strat-chart-all')}
+        disabled={stratCharts.length === 0}
+      >
+        Export all StratCharts
+      </button>
       <button
         type="button"
         className="app-action-button"
@@ -484,6 +540,22 @@ export function ProjectToolbar() {
               onClick={() => { setExportMenuOpen(false); setActiveDialog('export-tops-all') }}
             >
               Export all wells tops CSV
+            </button>
+            <button
+              type="button"
+              className="app-menu__item"
+              disabled={!activeWellHasDeviation}
+              onClick={() => { setExportMenuOpen(false); setActiveDialog('export-deviation-current') }}
+            >
+              Export current well deviation CSV
+            </button>
+            <button
+              type="button"
+              className="app-menu__item"
+              disabled={!hasAnyDeviation}
+              onClick={() => { setExportMenuOpen(false); setActiveDialog('export-deviation-all') }}
+            >
+              Export all wells deviation CSV
             </button>
           </div>
         ) : null}

@@ -273,7 +273,7 @@ Status: Implemented
 
 ## Stage 4 - Tops, TopSets, Picks, And Zones Export
 
-Status: Planned
+Status: Implemented
 
 - Add export for per-well picks/tops as the main round-trip format for TopSet data.
 - Do not add a separate zones export in this stage. Zones are derived from TopSet horizons plus per-well picks and are rebuilt after tops import.
@@ -322,22 +322,44 @@ Status: Planned
 
 ## Stage 5 - Deviation Export
 
-Status: Planned
+Status: In Progress
 
-- Add per-well deviation CSV export.
+- Add current-well deviation CSV export.
+- Add all-wells deviation CSV export.
 - Read the stored deviation Parquet payload.
-- Preserve native imported mode and columns where possible.
-- Add UI action from deviation group context menu.
-- Verify INCL/AZIM and non-INCL/AZIM modes if sample data exists.
+- Preserve native imported mode and columns:
+  - depth column remains `md`, `tvd`, or `tvdss`;
+  - mode columns remain `incl_deg`/`azim_deg`, `x`/`y`, or `dx`/`dy`.
+- Add `well_name` to exported CSV so the existing multi-well deviation importer can recreate or match wells automatically.
+- Support table packaging:
+  - one file by well;
+  - one file for all wells;
+  - ZIP only for one file by well.
+- Add UI actions from the WELLS toolbar `Export` menu:
+  - `Export current well deviation CSV`;
+  - `Export all wells deviation CSV`.
+- Verify round-trip with INCL/AZIM. Verify X/Y or DX/DY if sample data exists.
 
 ## Stage 6 - Strat Chart And Sea Level Curve Export
 
-Status: Planned
+Status: In Progress
 
 - Add stratigraphic chart CSV export.
 - Add sea level curve CSV export.
-- Add UI actions from strat chart and sea level curve settings/context where available.
-- Verify imported and built-in chart/curve behavior.
+- StratChart export uses one CSV per chart for round-trip compatibility. Do not combine multiple charts into one CSV because the current importer creates one chart from one file.
+- StratChart export columns:
+  - `unit_id`
+  - `parent_unit_id`
+  - `unit_name`
+  - `rank_name`
+  - `start_age_ma`
+  - `end_age_ma`
+  - `color`
+- Add UI actions from the StratCharts toolbar:
+  - `Export active StratChart`
+  - `Export all StratCharts`
+- `Export all StratCharts` supports one file per chart, optional ZIP, and export folder/browser download.
+- Verify imported and built-in chart behavior.
 
 ## Stage 7 - Later Export Areas
 

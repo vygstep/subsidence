@@ -21,6 +21,130 @@ def test_export_current_well_info_download_round_trips_with_wells_import(tmp_pat
     if manager.is_open:
         manager.close_project()
 
+
+def test_export_current_well_deviation_round_trips_with_deviation_import(tmp_path: Path) -> None:
+    manager = app.state.project_manager
+    if manager.is_open:
+        manager.close_project()
+
+
+def test_export_active_strat_chart_round_trips_with_strat_chart_import(tmp_path: Path) -> None:
+    manager = app.state.project_manager
+    if manager.is_open:
+        manager.close_project()
+
+    with TestClient(app) as client:
+        _create_project(client, tmp_path, 'strat-chart-export')
+        source_csv = tmp_path / 'Custom StratChart.csv'
+        source_csv.write_text(
+            'unit_id,parent_unit_id,unit_name,rank_name,start_age_ma,end_age_ma,color\n'
+            '1,,System A,system,100,0,#112233\n'
+            '2,1,Stage A1,stage,50,0,#445566\n'
+            '3,1,Stage A2,stage,100,50,#778899\n',
+            encoding='utf-8',
+        )
+        column_map = {
+            'unit_id': 'unit_id',
+            'parent_unit_id': 'parent_unit_id',
+            'unit_name': 'unit_name',
+            'rank_name': 'rank_name',
+            'start_age_ma': 'start_age_ma',
+            'end_age_ma': 'end_age_ma',
+            'color': 'color',
+        }
+        response = client.post('/api/strat-charts/import', json={
+            'csv_path': str(source_csv),
+            'column_map': column_map,
+        })
+        assert response.status_code == 200, response.text
+        response = client.get('/api/strat-charts')
+        assert response.status_code == 200, response.text
+        charts = response.json()
+        custom_chart = next(chart for chart in charts if chart['name'] == 'Custom StratChart')
+        response = client.patch(f"/api/strat-charts/{custom_chart['id']}/activate")
+        assert response.status_code == 200, response.text
+
+        response = client.post('/api/export/strat-charts', json={'scope': 'active'})
+        assert response.status_code == 200, response.text
+        assert response.headers['content-type'].startswith('text/csv')
+        reader = csv.DictReader(io.StringIO(response.content.decode('utf-8-sig')))
+        assert reader.fieldnames == ['unit_id', 'parent_unit_id', 'unit_name', 'rank_name', 'start_age_ma', 'end_age_ma', 'color']
+        rows = list(reader)
+        assert rows[0]['unit_name'] == 'System A'
+        assert rows[1]['parent_unit_id'] == '1'
+        assert rows[1]['color'] == '#445566'
+        export_csv = tmp_path / 'Custom StratChart.csv'
+        export_csv.write_bytes(response.content)
+
+        response = client.post('/api/projects/close')
+        assert response.status_code == 200, response.text
+        _create_project(client, tmp_path, 'strat-chart-roundtrip')
+        response = client.post('/api/strat-charts/import', json={
+            'csv_path': str(export_csv),
+            'column_map': column_map,
+        })
+        assert response.status_code == 200, response.text
+        assert response.json()['units_imported'] == 3
+
+        response = client.get('/api/strat-units', params={'limit': '1000'})
+        assert response.status_code == 200, response.text
+        units = response.json()
+        by_name = {unit['name']: unit for unit in units}
+        assert by_name['System A']['age_top_ma'] == 0.0
+        assert by_name['System A']['age_base_ma'] == 100.0
+        assert by_name['Stage A1']['color_hex'] == '#445566'
+
+    if manager.is_open:
+        manager.close_project()
+
+    with TestClient(app) as client:
+        _create_project(client, tmp_path, 'deviation-export')
+        source_csv = tmp_path / 'source_deviation.csv'
+        source_csv.write_text(
+            'well_name,md,incl_deg,azim_deg\n'
+            'Export Deviation Well,0,0,0\n'
+            'Export Deviation Well,100,1,10\n'
+            'Export Deviation Well,200,2,20\n',
+            encoding='utf-8',
+        )
+        response = client.post('/api/projects/import-deviation', json={'csv_path': str(source_csv)})
+        assert response.status_code == 200, response.text
+        well_id = response.json()['well_id']
+
+        response = client.post('/api/export/wells/deviation', json={
+            'scope': 'current',
+            'well_id': well_id,
+        })
+        assert response.status_code == 200, response.text
+        assert response.headers['content-type'].startswith('text/csv')
+        reader = csv.DictReader(io.StringIO(response.content.decode('utf-8-sig')))
+        assert reader.fieldnames == ['well_name', 'md', 'incl_deg', 'azim_deg']
+        rows = list(reader)
+        assert rows[0] == {'well_name': 'Export Deviation Well', 'md': '0.0', 'incl_deg': '0.0', 'azim_deg': '0.0'}
+        export_csv = tmp_path / 'exported_deviation.csv'
+        export_csv.write_bytes(response.content)
+
+        response = client.post('/api/projects/close')
+        assert response.status_code == 200, response.text
+        _create_project(client, tmp_path, 'deviation-roundtrip')
+        response = client.post('/api/projects/import-deviation', json={'csv_path': str(export_csv)})
+        assert response.status_code == 200, response.text
+        imported = response.json()
+        assert imported['mode'] == 'INCL_AZIM'
+        assert imported['reference'] == 'MD'
+
+        response = client.get('/api/wells/inventory')
+        assert response.status_code == 200, response.text
+        wells = response.json()
+        assert len(wells) == 1
+        assert wells[0]['well_id'] == imported['well_id']
+        assert wells[0]['well_name'] == 'Export Deviation Well'
+        assert wells[0]['deviation']['mode'] == 'INCL_AZIM'
+        assert wells[0]['deviation']['reference'] == 'MD'
+
+    if manager.is_open:
+        manager.close_project()
+
     with TestClient(app) as client:
         _create_project(client, tmp_path, 'well-info-current')
         response = client.post('/api/projects/wells', json={

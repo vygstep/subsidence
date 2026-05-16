@@ -19,7 +19,7 @@ from sqlalchemy.orm import selectinload
 
 from subsidence.api._deps import require_open_project as _require_open_project
 from subsidence.data.loaders import load_curves_from_parquet
-from subsidence.data.schema import CurveMetadata, FormationTopModel, FormationZone, TopSetHorizon, WellActiveTopSet, WellModel, ZoneWellData
+from subsidence.data.schema import CurveMetadata, DeviationSurveyModel, FormationTopModel, FormationZone, StratChart, StratUnit, TopSetHorizon, WellActiveTopSet, WellModel, ZoneWellData
 
 router = APIRouter(tags=['export'])
 
@@ -64,6 +64,21 @@ class WellTopsExportRequest(BaseModel):
     scope: str = 'current'
     well_id: str | None = None
     packaging: str = 'one_file_for_all_wells'
+    export_to_zip: bool = False
+    output_dir: str | None = None
+
+
+class WellDeviationExportRequest(BaseModel):
+    scope: str = 'current'
+    well_id: str | None = None
+    packaging: str = 'one_file_for_all_wells'
+    export_to_zip: bool = False
+    output_dir: str | None = None
+
+
+class StratChartExportRequest(BaseModel):
+    scope: str = 'active'
+    chart_id: int | None = None
     export_to_zip: bool = False
     output_dir: str | None = None
 
@@ -491,6 +506,107 @@ def _tops_export_files(session, wells: list[WellModel], packaging: str) -> list[
     raise HTTPException(status_code=400, detail="packaging must be 'one_file_for_all_wells' or 'one_file_per_well'")
 
 
+def _deviation_filename(well: WellModel) -> str:
+    return f'{sanitize_filename(well.name, well.id)}_deviation.csv'
+
+
+def _deviation_frame(project_path: Path, well: WellModel, survey: DeviationSurveyModel) -> pd.DataFrame:
+    parquet_path = project_path / survey.data_uri
+    if not parquet_path.exists():
+        raise HTTPException(status_code=404, detail=f'Deviation payload is missing for well "{well.name}"')
+    frame = pd.read_parquet(parquet_path)
+    if frame.empty:
+        raise HTTPException(status_code=404, detail=f'Deviation survey is empty for well "{well.name}"')
+    frame = frame.copy()
+    frame.insert(0, 'well_name', well.name)
+    return frame
+
+
+def _deviation_csv_bytes(frames: list[pd.DataFrame]) -> bytes:
+    if not frames:
+        raise HTTPException(status_code=404, detail='No deviation surveys available for export')
+    all_columns: list[str] = []
+    for frame in frames:
+        for column in frame.columns:
+            if column not in all_columns:
+                all_columns.append(str(column))
+    normalized = [frame.reindex(columns=all_columns) for frame in frames]
+    output = pd.concat(normalized, ignore_index=True)
+    buffer = io.StringIO()
+    output.to_csv(buffer, index=False, lineterminator='\n', na_rep='')
+    return buffer.getvalue().encode('utf-8-sig')
+
+
+def _deviation_export_files(project_path: Path, session, wells: list[WellModel], packaging: str) -> list[tuple[str, bytes]]:
+    well_ids = [well.id for well in wells]
+    survey_by_well_id: dict[str, DeviationSurveyModel] = {}
+    if well_ids:
+        survey_by_well_id = {
+            row.well_id: row
+            for row in session.scalars(select(DeviationSurveyModel).where(DeviationSurveyModel.well_id.in_(well_ids))).all()
+        }
+    frames_by_well: list[tuple[WellModel, pd.DataFrame]] = []
+    for well in wells:
+        survey = survey_by_well_id.get(well.id)
+        if survey is None:
+            continue
+        frames_by_well.append((well, _deviation_frame(project_path, well, survey)))
+    if not frames_by_well:
+        raise HTTPException(status_code=404, detail='No deviation surveys available for export')
+    if packaging == 'one_file_for_all_wells':
+        return [('deviation.csv', _deviation_csv_bytes([frame for _well, frame in frames_by_well]))]
+    if packaging == 'one_file_per_well':
+        return [(_deviation_filename(well), _deviation_csv_bytes([frame])) for well, frame in frames_by_well]
+    raise HTTPException(status_code=400, detail="packaging must be 'one_file_for_all_wells' or 'one_file_per_well'")
+
+
+STRAT_CHART_FIELDNAMES = [
+    'unit_id',
+    'parent_unit_id',
+    'unit_name',
+    'rank_name',
+    'start_age_ma',
+    'end_age_ma',
+    'color',
+]
+
+
+def _strat_chart_filename(chart: StratChart) -> str:
+    return f'{sanitize_filename(chart.name, f"strat_chart_{chart.id}")}.csv'
+
+
+def _strat_chart_csv(chart: StratChart, units: list[StratUnit]) -> bytes:
+    unit_id_by_db_id = {unit.id: index for index, unit in enumerate(units, start=1)}
+    rows: list[dict[str, object | None]] = []
+    for unit in units:
+        rows.append({
+            'unit_id': unit_id_by_db_id[unit.id],
+            'parent_unit_id': unit_id_by_db_id.get(unit.parent_id) if unit.parent_id is not None else None,
+            'unit_name': unit.name,
+            'rank_name': unit.rank,
+            'start_age_ma': unit.age_base_ma,
+            'end_age_ma': unit.age_top_ma,
+            'color': unit.color_hex,
+        })
+    if not rows:
+        raise HTTPException(status_code=404, detail=f'StratChart "{chart.name}" has no units to export')
+    return csv_bytes(STRAT_CHART_FIELDNAMES, rows)
+
+
+def _strat_chart_export_files(session, charts: list[StratChart]) -> list[tuple[str, bytes]]:
+    files: list[tuple[str, bytes]] = []
+    for chart in charts:
+        units = session.scalars(
+            select(StratUnit)
+            .where(StratUnit.chart_id == chart.id)
+            .order_by(StratUnit.parent_id.asc().nulls_first(), StratUnit.age_top_ma.asc().nulls_last(), StratUnit.age_base_ma.asc().nulls_last(), StratUnit.id.asc())
+        ).all()
+        files.append((_strat_chart_filename(chart), _strat_chart_csv(chart, units)))
+    if not files:
+        raise HTTPException(status_code=404, detail='No stratigraphic charts available for export')
+    return files
+
+
 def _handle_files_response(
     files: list[tuple[str, bytes]],
     *,
@@ -636,5 +752,73 @@ def export_well_tops(body: WellTopsExportRequest, request: Request):
         output_dir=output_dir,
         export_to_zip=body.export_to_zip,
         zip_filename='tops.zip',
+        media_type='text/csv; charset=utf-8',
+    )
+
+
+@router.post('/wells/deviation')
+def export_well_deviation(body: WellDeviationExportRequest, request: Request):
+    manager = _require_open_project(request)
+    output_dir = validate_output_dir(body.output_dir)
+    scope = body.scope.strip().lower()
+    packaging = body.packaging.strip().lower()
+    if scope not in {'current', 'all'}:
+        raise HTTPException(status_code=400, detail="scope must be 'current' or 'all'")
+    if packaging not in {'one_file_for_all_wells', 'one_file_per_well'}:
+        raise HTTPException(status_code=400, detail="packaging must be 'one_file_for_all_wells' or 'one_file_per_well'")
+    if body.export_to_zip and packaging != 'one_file_per_well':
+        raise HTTPException(status_code=400, detail='Export to ZIP is only available for one file per well')
+
+    with manager.get_session() as session:
+        if scope == 'current':
+            if not body.well_id:
+                raise HTTPException(status_code=400, detail='well_id is required for current well export')
+            well = session.get(WellModel, body.well_id)
+            if well is None:
+                raise HTTPException(status_code=404, detail=f'Well not found: {body.well_id}')
+            files = _deviation_export_files(manager.project_path, session, [well], 'one_file_per_well')
+        else:
+            wells = session.scalars(select(WellModel).order_by(WellModel.name.asc(), WellModel.id.asc())).all()
+            files = _deviation_export_files(manager.project_path, session, wells, packaging)
+
+    return _handle_files_response(
+        files,
+        output_dir=output_dir,
+        export_to_zip=body.export_to_zip,
+        zip_filename='deviation.zip',
+        media_type='text/csv; charset=utf-8',
+    )
+
+
+@router.post('/strat-charts')
+def export_strat_charts(body: StratChartExportRequest, request: Request):
+    manager = _require_open_project(request)
+    output_dir = validate_output_dir(body.output_dir)
+    scope = body.scope.strip().lower()
+    if scope not in {'active', 'selected', 'all'}:
+        raise HTTPException(status_code=400, detail="scope must be 'active', 'selected', or 'all'")
+
+    with manager.get_session() as session:
+        if scope == 'all':
+            charts = session.scalars(select(StratChart).order_by(StratChart.name.asc(), StratChart.id.asc())).all()
+        elif scope == 'selected':
+            if body.chart_id is None:
+                raise HTTPException(status_code=400, detail='chart_id is required for selected chart export')
+            chart = session.get(StratChart, body.chart_id)
+            if chart is None:
+                raise HTTPException(status_code=404, detail=f'StratChart not found: {body.chart_id}')
+            charts = [chart]
+        else:
+            chart = session.scalar(select(StratChart).where(StratChart.is_active.is_(True)))
+            if chart is None:
+                raise HTTPException(status_code=404, detail='No active StratChart available for export')
+            charts = [chart]
+        files = _strat_chart_export_files(session, charts)
+
+    return _handle_files_response(
+        files,
+        output_dir=output_dir,
+        export_to_zip=body.export_to_zip,
+        zip_filename='strat_charts.zip',
         media_type='text/csv; charset=utf-8',
     )
