@@ -365,10 +365,17 @@ def test_logs_csv_import_uses_unit_registry_for_depth_and_fraction_units(
         assert curve is not None
         assert curve.unit == 'v/v'
         assert curve.original_unit == '%'
+        assert curve.sampling_kind == 'CONSTANT'
+        assert curve.nominal_step_m == pytest.approx(0.2)
         frame = pd.read_parquet(project_path / curve.data_uri)
 
-    assert frame['DEPT'].tolist() == pytest.approx([30.48, 60.96, 91.44])
-    assert frame['NPHI'].tolist() == pytest.approx([0.35, 0.36, 0.37])
+    assert frame['DEPT'].iloc[0] == pytest.approx(0.0)
+    assert frame['DEPT'].iloc[-1] == pytest.approx(100.0)
+    assert frame['DEPT'].iloc[1] - frame['DEPT'].iloc[0] == pytest.approx(0.2)
+    assert frame.loc[frame['DEPT'] < 30.48, 'NPHI'].isna().all()
+    valid_nphi = frame.dropna(subset=['NPHI'])
+    assert valid_nphi['DEPT'].iloc[-1] <= 91.44
+    assert valid_nphi['NPHI'].iloc[-1] == pytest.approx(0.37, abs=1e-3)
 
 
 def test_curve_import_uses_unit_fallback_only_for_unambiguous_units(
@@ -410,7 +417,12 @@ def test_curve_import_uses_unit_fallback_only_for_unambiguous_units(
         assert resistivity.family_code is None
         assert resistivity.unit == 'ohm.m'
 
-    assert frame['BULK'].tolist() == pytest.approx([2350.0, 2400.0, 2450.0])
+    assert frame['DEPT'].iloc[0] == pytest.approx(0.0)
+    assert frame['DEPT'].iloc[-1] == pytest.approx(300.0)
+    assert frame.loc[frame['DEPT'] < 100.0, 'BULK'].isna().all()
+    assert frame.loc[frame['DEPT'] == 100.0, 'BULK'].iloc[0] == pytest.approx(2350.0)
+    assert frame.loc[frame['DEPT'] == 200.0, 'BULK'].iloc[0] == pytest.approx(2400.0)
+    assert frame.loc[frame['DEPT'] == 300.0, 'BULK'].iloc[0] == pytest.approx(2450.0)
 
 
 def test_las_import_auto_creates_well_and_survives_reopen(api_client: TestClient, tmp_path: Path):

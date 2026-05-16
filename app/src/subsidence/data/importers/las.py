@@ -22,7 +22,6 @@ from .common import (
     _sha256,
     _write_curve_payloads,
     apply_imported_well_metadata,
-    compute_sampling_kind,
     create_empty_well,
     extend_well_td_for_import,
     run_curve_qc,
