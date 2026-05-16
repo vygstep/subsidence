@@ -322,7 +322,7 @@ Status: Implemented
 
 ## Stage 5 - Deviation Export
 
-Status: In Progress
+Status: Implemented
 
 - Add current-well deviation CSV export.
 - Add all-wells deviation CSV export.
@@ -342,7 +342,7 @@ Status: In Progress
 
 ## Stage 6 - Strat Chart And Sea Level Curve Export
 
-Status: In Progress
+Status: Implemented
 
 - Add stratigraphic chart CSV export.
 - Add sea level curve CSV export.
