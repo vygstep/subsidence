@@ -431,25 +431,6 @@ def _validate_strictly_increasing_depth(rows: list[dict[str, str]], depth_column
     return depths
 
 
-def compute_sampling_kind(
-    depths: list[float],
-) -> tuple[str, float | None]:
-    """Return (sampling_kind, nominal_step_m) from a cleaned, sorted depth list."""
-    if len(depths) < 2:
-        return 'SINGLE_POINT', None
-    steps = [depths[i + 1] - depths[i] for i in range(len(depths) - 1)]
-    if not steps:
-        return 'UNKNOWN', None
-    median_step = sorted(steps)[len(steps) // 2]
-    if median_step <= 0:
-        return 'UNKNOWN', None
-    max_step = max(steps)
-    min_step = min(steps)
-    if (max_step - min_step) < 0.10 * median_step:
-        return 'CONSTANT', float(median_step)
-    return 'VARIABLE', None
-
-
 def run_curve_qc(
     depths: list[float],
     values: list[float],
