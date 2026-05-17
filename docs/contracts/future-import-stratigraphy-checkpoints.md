@@ -13,7 +13,7 @@ This contract is intentionally short. Each item needs a proper code review and d
 
 ### 1. Stratigraphy Model Improvements
 
-Moved to `docs/contracts/strat-chart-hierarchy-timescale.md`.
+Moved to `docs/contracts/implemented/strat-chart-hierarchy-timescale.md`.
 
 ### 2. Multi-File Import
 

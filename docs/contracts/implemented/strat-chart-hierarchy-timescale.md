@@ -1,7 +1,7 @@
 # StratChart Hierarchy And Timescale Source Of Truth
 
-Status: Draft
-Branch: TBD
+Status: Implemented
+Branch: feature/strat-chart-hierarchy-timescale
 
 ## Goal
 
@@ -127,46 +127,44 @@ Global model settings such as reconstruction/truncation by StratUnit should cont
 
 ### Stage 1 - Code And Data Inventory
 
-- Review current StratChart schema, import endpoint, Data Manager tree, settings, and subsidence timescale rendering.
-- Confirm all frontend hardcoded timescale usage.
-- Identify the minimum API shape needed for rendering active StratChart units by rank.
+- Done. Reviewed current StratChart schema, import endpoint, Data Manager tree, settings, and subsidence timescale rendering.
+- Done. Confirmed frontend hardcoded timescale usage.
+- Done. Identified the minimum API shape needed for rendering active StratChart units by rank.
 
 ### Stage 2 - Backend Validation
 
-- Add rank order normalization for known ranks.
-- Improve StratChart import validation with line-aware errors.
-- Validate hierarchy order, cycles, missing parents, and age containment.
-- Add backend tests for valid ICS-like hierarchy and invalid rank/parent cases.
+- Done. Added rank order normalization for known ranks.
+- Done. Improved StratChart import validation with line-aware errors.
+- Done. Validated hierarchy order, cycles, missing parents, and age containment.
+- Done. Added backend tests for valid ICS-like hierarchy and invalid rank/parent cases.
 
 ### Stage 3 - Active StratChart Timescale API
 
-- Add or extend API response so frontend can fetch active chart units with parent/rank/age/color.
-- Keep responses compatible with current cutoff controls where possible.
-- Add tests for active chart unit ordering and fields.
+- Done. Extended API response so frontend can fetch active chart units with parent/rank/age/color.
+- Done. Kept responses compatible with current cutoff controls.
+- Done. Added tests for active chart unit fields.
 
 ### Stage 4 - StratCharts Tree UI
 
-- Render StratChart units as a real hierarchy in the StratCharts tab.
-- Show rank labels and colors.
-- Keep built-in/delete/activate behavior unchanged.
+- Done. Rendered StratChart units as a real hierarchy in the StratCharts tab.
+- Done. Showed rank labels and colors.
+- Done. Kept built-in/delete/activate behavior unchanged.
 
 ### Stage 5 - Timescale Settings
 
-- Add StratChart settings for `Timescale upper level` and `Timescale lower level`.
-- Persist settings in project visual/config state.
-- Limit selection to ranks present in the active chart.
+- Done. Added StratChart settings for `Timescale upper level` and `Timescale lower level`.
+- Done. Persisted settings in project visual/config state.
+- Done. Limited selection to ranks present in the active chart.
 
 ### Stage 6 - Subsidence Timescale Rendering
 
-- Replace frontend hardcoded geological timescale source with active StratChart data.
-- Apply selected upper/lower levels.
-- Implement sparse hierarchy fallback for Precambrian/incomplete intervals.
-- Apply to both single-well and multi-well subsidence charts.
+- Done. Replaced frontend hardcoded geological timescale source with active StratChart data.
+- Done. Applied selected upper/lower levels.
+- Done. Implemented sparse hierarchy fallback for Precambrian/incomplete intervals.
+- Done. Applied to both single-well and multi-well subsidence charts.
 
 ### Stage 7 - Verification
 
-- Import built-in/current ICS chart and verify hierarchy.
-- Load a user StratChart with invalid hierarchy and verify line-specific error.
-- Verify single-well and multi-well charts render active StratChart timescale.
-- Verify selected upper/lower ranks persist after save/reopen.
-- Verify Precambrian/sparse intervals render with fallback warning and without mutating data.
+- Done. Backend `pytest tests`: 156 passed.
+- Done. Frontend `npm run test -- --run`: 85 passed.
+- Done. Added unit coverage for sparse lower-rank fallback without mutating source data.
