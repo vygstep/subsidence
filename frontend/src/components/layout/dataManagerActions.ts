@@ -12,6 +12,10 @@ export async function readError(response: Response, fallback: string): Promise<s
   return fallback
 }
 
+function removeKeys<T>(record: Record<string, T>, keys: Set<string>): Record<string, T> {
+  return Object.fromEntries(Object.entries(record).filter(([key]) => !keys.has(key)))
+}
+
 type WellInspectorDraft = {
   well_name: string
   color_hex: string
@@ -202,6 +206,8 @@ export function makeActionHandlers(deps: ActionDeps) {
     updateWellViewState(wellId, (state) => ({
       ...state,
       visibleFormationIds: state.visibleFormationIds.filter((id) => id !== formationId),
+      hiddenTopLabelIds: state.hiddenTopLabelIds.filter((id) => id !== formationId),
+      topLabelPositions: removeKeys(state.topLabelPositions, new Set([formationId])),
     }))
     if (well?.well_id === wellId) {
       await refreshWell(wellId)
@@ -287,7 +293,13 @@ export function makeActionHandlers(deps: ActionDeps) {
       }
     }
 
-    updateWellViewState(wellId, (state) => ({ ...state, visibleFormationIds: [] }))
+    const formationIds = new Set(formations.map((formation) => formation.id))
+    updateWellViewState(wellId, (state) => ({
+      ...state,
+      visibleFormationIds: [],
+      hiddenTopLabelIds: state.hiddenTopLabelIds.filter((id) => !formationIds.has(id)),
+      topLabelPositions: removeKeys(state.topLabelPositions, formationIds),
+    }))
     if (formations.some((formation) => formation.id === selectedFormationId)) {
       setSelectedFormationId(null)
       setSelectedObject(null)
