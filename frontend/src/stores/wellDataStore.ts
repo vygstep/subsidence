@@ -124,6 +124,7 @@ export interface WellDataStore {
   isLoading: boolean
   error: string | null
   reset: () => void
+  clearCurrentWell: (error?: string | null) => void
   setColorOverrides: (overrides: Record<string, string>) => void
   loadWellInventories: () => Promise<boolean>
   loadWell: (wellId: string) => Promise<void>
@@ -324,6 +325,22 @@ export const useWellDataStore = create<WellDataStore>((set, get) => ({
     clearPendingDepthPatches()
     set(emptyState)
   },
+  clearCurrentWell(error = null) {
+    clearPendingDepthPatches()
+    currentLoadController?.abort()
+    currentLoadController = null
+    set({
+      well: null,
+      curves: [],
+      fullCurves: [],
+      formations: [],
+      zones: [],
+      tvdTable: null,
+      depthBasis: 'MD',
+      isLoading: false,
+      error,
+    })
+  },
   setColorOverrides(overrides) {
     set({ colorOverrides: overrides })
   },
@@ -353,7 +370,8 @@ export const useWellDataStore = create<WellDataStore>((set, get) => ({
     currentLoadController?.abort()
     currentLoadController = null
     const inventories = get().wellInventories
-    set({ ...emptyState, wellInventories: inventories })
+    get().clearCurrentWell()
+    set({ wellInventories: inventories })
   },
   async loadWell(wellId: string) {
     currentLoadController?.abort()
@@ -424,11 +442,8 @@ export const useWellDataStore = create<WellDataStore>((set, get) => ({
     } catch (error) {
       if (error instanceof Error && error.name === 'AbortError') return
       const inventories = get().wellInventories
-      set({
-        ...emptyState,
-        wellInventories: inventories,
-        error: error instanceof Error ? error.message : 'Unknown error',
-      })
+      get().clearCurrentWell(error instanceof Error ? error.message : 'Unknown error')
+      set({ wellInventories: inventories })
     }
   },
   async addFormation(formation) {
@@ -609,14 +624,14 @@ export const useWellDataStore = create<WellDataStore>((set, get) => ({
     await get().loadWellInventories()
     const wells = get().wellInventories
     if (wells.length === 0) {
-      get().reset()
+      get().clearCurrentWell()
       return
     }
     const currentWellId = get().well?.well_id
     const hasCurrent = currentWellId ? wells.some((w) => w.well_id === currentWellId) : false
     const nextWellId = preferredWellId ?? (hasCurrent ? currentWellId : wells[0].well_id)
     if (!nextWellId) {
-      get().reset()
+      get().clearCurrentWell()
       return
     }
     if (preferredWellId || nextWellId !== currentWellId) {

@@ -16,6 +16,7 @@ function App() {
   const loadWell = useWellDataStore((state) => state.loadWell)
   const loadWellInventories = useWellDataStore((state) => state.loadWellInventories)
   const resetWell = useWellDataStore((state) => state.reset)
+  const clearCurrentWell = useWellDataStore((state) => state.clearCurrentWell)
   const loadStratCharts = useWellDataStore((state) => state.loadStratCharts)
   const loadTopSets = useWellDataStore((state) => state.loadTopSets)
   const loadCompactionModels = useWellDataStore((state) => state.loadCompactionModels)
@@ -142,19 +143,19 @@ function App() {
     }
     void hydrate()
     return () => { cancelled = true }
-  }, [isProjectOpen, loadScopedVisualConfig, resetVisualConfig, resetWell, resetWorkspace, selectTrack])
+  }, [isProjectOpen, projectPath, loadScopedVisualConfig, resetVisualConfig, resetWell, resetWorkspace, selectTrack])
 
   useEffect(() => {
     if (!isProjectOpen) return
     void loadStratCharts()
     void loadTopSets()
-  }, [isProjectOpen, loadStratCharts, loadTopSets])
+  }, [isProjectOpen, projectPath, loadStratCharts, loadTopSets])
 
   useEffect(() => {
     if (!isProjectOpen) return
     void loadCompactionModels()
     void loadCompactionPresets()
-  }, [isProjectOpen, loadCompactionModels, loadCompactionPresets])
+  }, [isProjectOpen, projectPath, loadCompactionModels, loadCompactionPresets])
 
   useEffect(() => {
     if (!isProjectOpen) return
@@ -164,7 +165,7 @@ function App() {
     void loadLithologySets()
     void loadLithologyPatternPalettes()
     void loadSeaLevelCurves()
-  }, [isProjectOpen, loadMnemonicSets, loadUnitDimensions, loadLithologyDictionary, loadLithologySets, loadLithologyPatternPalettes, loadSeaLevelCurves])
+  }, [isProjectOpen, projectPath, loadMnemonicSets, loadUnitDimensions, loadLithologyDictionary, loadLithologySets, loadLithologyPatternPalettes, loadSeaLevelCurves])
 
   useEffect(() => {
     if (!isProjectOpen) {
@@ -187,7 +188,7 @@ function App() {
           replaceWellViewStates({})
           wellViewsHydratedRef.current = true
           lastSerializedWellViewsRef.current = {}
-          resetWell()
+          clearCurrentWell()
           await loadSeaLevelCurves()
           return
         }
@@ -224,7 +225,7 @@ function App() {
     }
     void loadCurrentProject()
     return () => { cancelled = true }
-  }, [isProjectOpen, projectPath, loadScopedVisualConfig, loadSeaLevelCurves, loadWell, loadWellInventories, replaceWellViewStates, resetWell, selectTrack, setSelectedFormationId])
+  }, [isProjectOpen, projectPath, clearCurrentWell, loadScopedVisualConfig, loadSeaLevelCurves, loadWell, loadWellInventories, replaceWellViewStates, resetWell, selectTrack, setSelectedFormationId])
 
   useEffect(() => {
     if (selectedFormationId && !formations.some((f) => f.id === selectedFormationId)) {

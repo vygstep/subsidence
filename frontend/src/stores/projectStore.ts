@@ -180,6 +180,22 @@ async function openProjectRequest(path: string): Promise<OpenProjectResponse> {
   return (await response.json()) as OpenProjectResponse
 }
 
+async function hydrateProjectReferenceData(): Promise<void> {
+  const store = useWellDataStore.getState()
+  await Promise.all([
+    store.loadStratCharts(),
+    store.loadTopSets(),
+    store.loadSeaLevelCurves(),
+    store.loadCompactionModels(),
+    store.loadCompactionPresets(),
+    store.loadMnemonicSets(),
+    store.loadUnitDimensions(),
+    store.loadLithologyDictionary(),
+    store.loadLithologySets(),
+    store.loadLithologyPatternPalettes(),
+  ])
+}
+
 async function postAction(path: string): Promise<void> {
   const response = await fetch(path, { method: 'POST' })
   if (!response.ok) {
@@ -387,6 +403,7 @@ export const useProjectStore = create<ProjectStore>((set, get) => ({
         visualConfigSaveToken: 0,
       })
       rememberProjectBundlePath(payload.project_path)
+      await hydrateProjectReferenceData()
       try {
         await get().loadRecentProjects()
       } catch {
@@ -519,10 +536,8 @@ export const useProjectStore = create<ProjectStore>((set, get) => ({
         canUndo: payload.can_undo,
         canRedo: payload.can_redo,
       })
+      await hydrateProjectReferenceData()
       await useWellDataStore.getState().loadWellInventories()
-      await useWellDataStore.getState().loadStratCharts()
-      await useWellDataStore.getState().loadSeaLevelCurves()
-      await useWellDataStore.getState().loadTopSets()
       await useWellDataStore.getState().refreshWell()
     }, { projectPath: get().projectPath, details: { checkpointId } })
     if (!checkpoint) throw new Error('Checkpoint was not restored')
