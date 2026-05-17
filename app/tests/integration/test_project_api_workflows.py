@@ -33,6 +33,7 @@ from subsidence.data.schema import (
     StratChart,
     StratUnit,
     UnitDimension,
+    VisualConfig,
     WellModel,
 )
 from subsidence.data.unit_registry import convert_values, convert_values_to_engine, resolve_unit
@@ -1246,6 +1247,7 @@ def test_delete_well_removes_stored_calculation_results(api_client: TestClient, 
             data_uri=result_uri,
             is_stale=False,
         ))
+        session.add(VisualConfig(scope='well', scope_id=well_id, config=json.dumps({'tracks': ['track-1']})))
         session.commit()
 
     response = api_client.delete(f'/api/projects/wells/{well_id}')
@@ -1257,6 +1259,9 @@ def test_delete_well_removes_stored_calculation_results(api_client: TestClient, 
             sa_select(CalculationResult).where(CalculationResult.well_id == well_id)
         ).all()
         assert stored_results == []
+        assert session.scalar(
+            sa_select(VisualConfig).where(VisualConfig.scope == 'well', VisualConfig.scope_id == well_id)
+        ) is None
     assert not result_path.exists()
 
     response = api_client.post('/api/projects/undo')
@@ -1268,6 +1273,11 @@ def test_delete_well_removes_stored_calculation_results(api_client: TestClient, 
         ).all()
         assert len(restored_results) == 1
         assert restored_results[0].data_uri == result_uri
+        restored_visual = session.scalar(
+            sa_select(VisualConfig).where(VisualConfig.scope == 'well', VisualConfig.scope_id == well_id)
+        )
+        assert restored_visual is not None
+        assert json.loads(restored_visual.config)['tracks'] == ['track-1']
     assert result_path.exists()
 
     response = api_client.post('/api/projects/redo')
@@ -1277,7 +1287,62 @@ def test_delete_well_removes_stored_calculation_results(api_client: TestClient, 
         assert session.scalars(
             sa_select(CalculationResult).where(CalculationResult.well_id == well_id)
         ).all() == []
+        assert session.scalar(
+            sa_select(VisualConfig).where(VisualConfig.scope == 'well', VisualConfig.scope_id == well_id)
+        ) is None
     assert not result_path.exists()
+
+
+def test_delete_single_curve_removes_only_that_parquet_column(api_client: TestClient, tmp_path: Path):
+    project_path = _create_project(api_client, tmp_path, 'delete-single-curve-column')
+    response = api_client.post('/api/projects/wells', json={
+        'name': 'Curve Delete Well',
+        'x': 0.0,
+        'y': 0.0,
+        'kb': 10.0,
+        'td': 200.0,
+        'crs': 'local',
+    })
+    assert response.status_code == 200, response.text
+    well_id = response.json()['well_id']
+
+    csv_path = tmp_path / 'logs.csv'
+    csv_path.write_text(
+        'DEPT,GR,RHOB\n'
+        '0,20,2.1\n'
+        '100,40,2.2\n'
+        '200,60,2.3\n',
+        encoding='utf-8',
+    )
+    response = api_client.post('/api/projects/import-logs-csv', json={
+        'csv_path': str(csv_path),
+        'well_id': well_id,
+    })
+    assert response.status_code == 200, response.text
+
+    manager = api_client.app.state.project_manager
+    with manager.get_session() as session:
+        rows = session.scalars(sa_select(CurveMetadata).where(CurveMetadata.well_id == well_id)).all()
+        assert {row.mnemonic for row in rows} == {'GR', 'RHOB'}
+        parquet_path = project_path / rows[0].data_uri
+        assert parquet_path.exists()
+        assert {'DEPT', 'GR', 'RHOB'}.issubset(pd.read_parquet(parquet_path).columns)
+
+    response = api_client.delete(f'/api/wells/{well_id}/curves/GR')
+    assert response.status_code == 204, response.text
+
+    with manager.get_session() as session:
+        rows = session.scalars(sa_select(CurveMetadata).where(CurveMetadata.well_id == well_id)).all()
+        assert [row.mnemonic for row in rows] == ['RHOB']
+        parquet_path = project_path / rows[0].data_uri
+        frame = pd.read_parquet(parquet_path)
+        assert 'DEPT' in frame.columns
+        assert 'RHOB' in frame.columns
+        assert 'GR' not in frame.columns
+
+    response = api_client.delete(f'/api/wells/{well_id}/curves/RHOB')
+    assert response.status_code == 204, response.text
+    assert not parquet_path.exists()
 
 
 def test_checkpoint_create_restore_delete(api_client: TestClient, tmp_path: Path):

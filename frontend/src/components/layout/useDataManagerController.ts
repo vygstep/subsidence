@@ -250,6 +250,10 @@ export function useDataManagerController() {
       : formation.name.toLowerCase() === name.toLowerCase()
   }
 
+  function removeKeys<T>(record: Record<string, T>, keys: Set<string>): Record<string, T> {
+    return Object.fromEntries(Object.entries(record).filter(([key]) => !keys.has(key)))
+  }
+
   function topSetHorizonIds(zoneSetId: number): Set<number> {
     return new Set((topSets.find((topSet) => topSet.id === zoneSetId)?.horizons ?? []).map((horizon) => horizon.id))
   }
@@ -330,9 +334,12 @@ export function useDataManagerController() {
       return
     }
     for (const entry of deletedFormationIdsByWell) {
+      const deletedIds = new Set(entry.ids)
       updateWellViewState(entry.wellId, (state) => ({
         ...state,
         visibleFormationIds: state.visibleFormationIds.filter((id) => !entry.ids.includes(id)),
+        hiddenTopLabelIds: state.hiddenTopLabelIds.filter((id) => !deletedIds.has(id)),
+        topLabelPositions: removeKeys(state.topLabelPositions, deletedIds),
       }))
     }
     if (activePickId !== null && deletedFormationIds.has(activePickId)) {

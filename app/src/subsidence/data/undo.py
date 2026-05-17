@@ -15,7 +15,10 @@ from .schema import (
     FormationStratLink,
     FormationTopModel,
     VisualConfig,
+    WellActiveSeaLevelCurve,
+    WellActiveTopSet,
     WellModel,
+    ZoneWellData,
 )
 from .strat_link import auto_link_all_formations_to_chart
 
@@ -132,6 +135,14 @@ def _capture_well_snapshot(session: Session, project_path: Path | str, well_id: 
     calculation_results = list(session.scalars(
         select(CalculationResult).where(CalculationResult.well_id == well_id)
     ))
+    zone_well_data = list(session.scalars(select(ZoneWellData).where(ZoneWellData.well_id == well_id)))
+    active_top_set = session.scalar(select(WellActiveTopSet).where(WellActiveTopSet.well_id == well_id))
+    active_sea_level_curve = session.scalar(
+        select(WellActiveSeaLevelCurve).where(WellActiveSeaLevelCurve.well_id == well_id)
+    )
+    visual_config = session.scalar(
+        select(VisualConfig).where(VisualConfig.scope == 'well', VisualConfig.scope_id == well_id)
+    )
 
     files: dict[str, bytes] = {}
     relative_paths: set[str] = {row.data_uri for row in curve_rows}
@@ -152,6 +163,10 @@ def _capture_well_snapshot(session: Session, project_path: Path | str, well_id: 
         'formation_tops': [_model_to_dict(row) for row in tops],
         'formation_strat_links': [_model_to_dict(link) for link in links],
         'calculation_results': [_model_to_dict(row) for row in calculation_results],
+        'zone_well_data': [_model_to_dict(row) for row in zone_well_data],
+        'active_top_set': _model_to_dict(active_top_set) if active_top_set is not None else None,
+        'active_sea_level_curve': _model_to_dict(active_sea_level_curve) if active_sea_level_curve is not None else None,
+        'visual_config': _model_to_dict(visual_config) if visual_config is not None else None,
         'files': files,
     }
 
@@ -177,6 +192,14 @@ def _restore_well_snapshot(session: Session, project_path: Path | str, snapshot:
     session.flush()
     for row in snapshot.get('formation_strat_links', []):
         session.add(FormationStratLink(**row))
+    if snapshot.get('active_top_set') is not None:
+        session.add(WellActiveTopSet(**snapshot['active_top_set']))
+    if snapshot.get('active_sea_level_curve') is not None:
+        session.add(WellActiveSeaLevelCurve(**snapshot['active_sea_level_curve']))
+    for row in snapshot.get('zone_well_data', []):
+        session.add(ZoneWellData(**row))
+    if snapshot.get('visual_config') is not None:
+        session.add(VisualConfig(**snapshot['visual_config']))
     for row in snapshot.get('calculation_results', []):
         session.add(CalculationResult(**row))
 
@@ -191,6 +214,22 @@ def _delete_well_snapshot(session: Session, project_path: Path | str, snapshot: 
         result = session.get(CalculationResult, row['id'])
         if result is not None:
             session.delete(result)
+    session.flush()
+
+    visual_config = session.scalar(
+        select(VisualConfig).where(
+            VisualConfig.scope == 'well',
+            VisualConfig.scope_id == snapshot['well']['id'],
+        )
+    )
+    if visual_config is not None:
+        session.delete(visual_config)
+    for row in session.scalars(select(ZoneWellData).where(ZoneWellData.well_id == snapshot['well']['id'])).all():
+        session.delete(row)
+    for row in session.scalars(select(WellActiveSeaLevelCurve).where(WellActiveSeaLevelCurve.well_id == snapshot['well']['id'])).all():
+        session.delete(row)
+    for row in session.scalars(select(WellActiveTopSet).where(WellActiveTopSet.well_id == snapshot['well']['id'])).all():
+        session.delete(row)
     session.flush()
 
     well = session.get(WellModel, snapshot['well']['id'])

@@ -40,6 +40,7 @@ export function FormationTopLine({
   const addQcWarnings = useNotificationStore((state) => state.addQcWarnings)
   const setSelectedFormationId = useWorkspaceStore((state) => state.setSelectedFormationId)
   const setSelectedObject = useWorkspaceStore((state) => state.setSelectedObject)
+  const updateWellViewState = useWorkspaceStore((state) => state.updateWellViewState)
   const depthType = useViewStore((state) => state.depthType)
   const [localY, setLocalY] = useState<number | null>(null)
   const [popover, setPopover] = useState<DepthPopover | null>(null)
@@ -118,6 +119,17 @@ export function FormationTopLine({
       event.preventDefault()
       event.stopPropagation()
       void removeFormation(formation.id).then(() => {
+        if (wellId) {
+          updateWellViewState(wellId, (state) => {
+            const { [formation.id]: _removedPosition, ...topLabelPositions } = state.topLabelPositions
+            return {
+              ...state,
+              visibleFormationIds: state.visibleFormationIds.filter((id) => id !== formation.id),
+              hiddenTopLabelIds: state.hiddenTopLabelIds.filter((id) => id !== formation.id),
+              topLabelPositions,
+            }
+          })
+        }
         onSetActivePick?.(null)
         setSelectedFormationId(null)
         if (wellId) {
@@ -136,6 +148,7 @@ export function FormationTopLine({
     removeFormation,
     setSelectedFormationId,
     setSelectedObject,
+    updateWellViewState,
     wellId,
   ])
 

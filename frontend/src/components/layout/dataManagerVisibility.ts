@@ -54,16 +54,19 @@ export function makeVisibilityHandlers(deps: VisibilityDeps) {
 
     updateWellViewState(activeWellId, (state) => {
       if (!nextValue) {
+        const currentCurveConfig = state.curveSettingsByMnemonic[mnemonic]
+          ?? state.tracks.flatMap((track) => track.curves).find((c) => c.mnemonic === mnemonic)
+        const nextCurveSettings = currentCurveConfig
+          ? { ...state.curveSettingsByMnemonic, [mnemonic]: currentCurveConfig }
+          : state.curveSettingsByMnemonic
         return {
           ...state,
           hiddenCurveMnemonics: Array.from(new Set([...state.hiddenCurveMnemonics, mnemonic])),
-        }
-      }
-
-      if (state.tracks.some((track) => track.curves.some((c) => c.mnemonic === mnemonic))) {
-        return {
-          ...state,
-          hiddenCurveMnemonics: state.hiddenCurveMnemonics.filter((item) => item !== mnemonic),
+          curveSettingsByMnemonic: nextCurveSettings,
+          tracks: state.tracks.map((track) => ({
+            ...track,
+            curves: track.curves.filter((c) => c.mnemonic !== mnemonic),
+          })),
         }
       }
 
@@ -73,37 +76,38 @@ export function makeVisibilityHandlers(deps: VisibilityDeps) {
         ? { curveConfig: savedSettings, scaleType: 'linear' as const }
         : buildCurveDefaults(curve, existingCount)
       const nextCurveSettings = { ...state.curveSettingsByMnemonic, [curve.mnemonic]: curveConfig }
+      const tracksWithoutCurve = state.tracks.map((track) => ({
+        ...track,
+        curves: track.curves.filter((c) => c.mnemonic !== mnemonic),
+      }))
 
       if (selectedTrackId && state.tracks.some((t) => t.id === selectedTrackId)) {
         return {
           ...state,
           hiddenCurveMnemonics: state.hiddenCurveMnemonics.filter((item) => item !== mnemonic),
           curveSettingsByMnemonic: nextCurveSettings,
-          tracks: state.tracks.map((track) =>
+          tracks: tracksWithoutCurve.map((track) =>
             track.id !== selectedTrackId ? track : { ...track, curves: [...track.curves, curveConfig] },
           ),
         }
       }
 
-      const trackNumber = nextTrackNumber(state.tracks)
+      const trackNumber = nextTrackNumber(tracksWithoutCurve)
+      const nextTrack = createEmptyTrack(`track-${trackNumber}`, `Track ${trackNumber}`)
       return {
         ...state,
         hiddenCurveMnemonics: state.hiddenCurveMnemonics.filter((item) => item !== mnemonic),
         curveSettingsByMnemonic: nextCurveSettings,
         tracks: [
-          ...state.tracks,
+          ...tracksWithoutCurve,
           {
-            id: `track-${trackNumber}`,
-            title: `Track ${trackNumber}`,
-            width: 200,
+            ...nextTrack,
             scaleType,
-            gridDivisions: 3,
-            showGrid: true,
             curves: [curveConfig],
           },
         ],
         trackOrder: buildTrackOrder(
-          [...state.tracks.map((track) => track.id), `track-${trackNumber}`],
+          [...tracksWithoutCurve.map((track) => track.id), `track-${trackNumber}`],
           state.trackOrder,
         ),
       }
