@@ -379,6 +379,46 @@ def test_logs_csv_import_uses_unit_registry_for_depth_and_fraction_units(
     assert valid_nphi['NPHI'].iloc[-1] == pytest.approx(0.37, abs=1e-3)
 
 
+def test_logs_csv_reimport_replaces_curve_type_metadata(
+    api_client: TestClient,
+    tmp_path: Path,
+) -> None:
+    _create_project(api_client, tmp_path, 'logs-curve-type-reimport')
+    csv_path = tmp_path / 'logs_curve_type.csv'
+    csv_path.write_text(
+        'DEPT,GR\n'
+        '0,10\n'
+        '10,20\n'
+        '20,30\n',
+        encoding='utf-8',
+    )
+
+    response = api_client.post('/api/projects/import-logs-csv', json={
+        'csv_path': str(csv_path),
+        'depth_column': 'DEPT',
+        'curve_types': {'GR': 'discrete'},
+    })
+    assert response.status_code == 200, response.text
+    well_id = response.json()['well_id']
+
+    manager = app.state.project_manager
+    with manager.get_session() as session:
+        curves = list(session.scalars(sa_select(CurveMetadata).where(CurveMetadata.well_id == well_id, CurveMetadata.mnemonic == 'GR')))
+        assert [(curve.mnemonic, curve.curve_type) for curve in curves] == [('GR', 'discrete')]
+
+    response = api_client.post('/api/projects/import-logs-csv', json={
+        'csv_path': str(csv_path),
+        'well_id': well_id,
+        'depth_column': 'DEPT',
+        'curve_types': {'GR': 'continuous'},
+    })
+    assert response.status_code == 200, response.text
+
+    with manager.get_session() as session:
+        curves = list(session.scalars(sa_select(CurveMetadata).where(CurveMetadata.well_id == well_id, CurveMetadata.mnemonic == 'GR')))
+        assert [(curve.mnemonic, curve.curve_type) for curve in curves] == [('GR', 'continuous')]
+
+
 def test_curve_import_uses_unit_fallback_only_for_unambiguous_units(
     api_client: TestClient,
     tmp_path: Path,

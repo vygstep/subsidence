@@ -89,6 +89,7 @@ export function ImportLasDialog({ wells, activeWellId, onClose, onSuccess }: Imp
   const [depthUnit, setDepthUnit] = useState<'m' | 'ft' | 'km'>('m')
   const [nullValue, setNullValue] = useState('-999.25')
   const [curveTypes, setCurveTypes] = useState<Record<string, 'continuous' | 'discrete'>>({})
+  const [manualCurveTypeColumns, setManualCurveTypeColumns] = useState<Set<string>>(() => new Set())
   const [currentStepIndex, setCurrentStepIndex] = useState(0)
   const [error, setError] = useState<string | null>(null)
   const [isSubmitting, setIsSubmitting] = useState(false)
@@ -153,26 +154,35 @@ export function ImportLasDialog({ wells, activeWellId, onClose, onSuccess }: Imp
   // Auto-detect curve types for LAS (default continuous; no sample values in preview)
   useEffect(() => {
     if (!lasPreview) return
-    const detected: Record<string, 'continuous' | 'discrete'> = {}
-    for (let i = 1; i < lasPreview.curves.length; i++) {
-      detected[lasPreview.curves[i].mnemonic] = 'continuous'
-    }
-    setCurveTypes(detected)
-  }, [lasPreview])
+    setCurveTypes((prev) => {
+      const detected: Record<string, 'continuous' | 'discrete'> = {}
+      for (let i = 1; i < lasPreview.curves.length; i++) {
+        const mnemonic = lasPreview.curves[i].mnemonic
+        detected[mnemonic] = manualCurveTypeColumns.has(mnemonic) && prev[mnemonic]
+          ? prev[mnemonic]
+          : 'continuous'
+      }
+      return detected
+    })
+  }, [lasPreview, manualCurveTypeColumns])
 
   // Auto-detect curve types for CSV columns from preview rows
   useEffect(() => {
     if (!tabularPreview || sourceType !== 'csv') return
     const depthCol = mapping['depth']
     const wellNameCol = mapping['well_name']
-    const detected: Record<string, 'continuous' | 'discrete'> = {}
-    tabularPreview.columns.forEach((col, idx) => {
-      if (col === depthCol) return
-      if (col === wellNameCol) return
-      detected[col] = detectColumnCurveType(idx, tabularPreview.rows)
+    setCurveTypes((prev) => {
+      const detected: Record<string, 'continuous' | 'discrete'> = {}
+      tabularPreview.columns.forEach((col, idx) => {
+        if (col === depthCol) return
+        if (col === wellNameCol) return
+        detected[col] = manualCurveTypeColumns.has(col) && prev[col]
+          ? prev[col]
+          : detectColumnCurveType(idx, tabularPreview.rows)
+      })
+      return detected
     })
-    setCurveTypes(detected)
-  }, [tabularPreview, mapping, sourceType])
+  }, [manualCurveTypeColumns, mapping, sourceType, tabularPreview])
 
   const lasWellName = lasPreview?.well_name ?? null
 
@@ -181,8 +191,18 @@ export function ImportLasDialog({ wells, activeWellId, onClose, onSuccess }: Imp
     setCurrentStepIndex(0)
     setMapping({})
     setCurveTypes({})
+    setManualCurveTypeColumns(new Set())
     setWellSelection(activeWellId ?? '')
   }
+
+  const handleCurveTypeChange = (column: string, type: 'continuous' | 'discrete') => {
+    setManualCurveTypeColumns((prev) => new Set(prev).add(column))
+    setCurveTypes((prev) => ({ ...prev, [column]: type }))
+  }
+
+  useEffect(() => {
+    setManualCurveTypeColumns(new Set())
+  }, [sourcePath, sourceType])
 
   const previewReady = previewLoading
     ? false
@@ -342,7 +362,7 @@ export function ImportLasDialog({ wells, activeWellId, onClose, onSuccess }: Imp
               error={previewError}
               preview={lasPreview}
               curveTypes={curveTypes}
-              onCurveTypeChange={(mnemonic, type) => setCurveTypes((prev) => ({ ...prev, [mnemonic]: type }))}
+              onCurveTypeChange={handleCurveTypeChange}
             />
             {!previewLoading && (lasPreview !== null || previewError !== null) && (
               <div className="import-wizard__options">
@@ -399,7 +419,7 @@ export function ImportLasDialog({ wells, activeWellId, onClose, onSuccess }: Imp
               mapping={mapping}
               onMappingChange={(fieldId, colName) => setMapping((prev) => ({ ...prev, [fieldId]: colName }))}
               curveTypes={curveTypes}
-              onCurveTypeChange={(col, type) => setCurveTypes((prev) => ({ ...prev, [col]: type }))}
+              onCurveTypeChange={handleCurveTypeChange}
               curveTypeExcludedColumns={[mapping['well_name']].filter(Boolean) as string[]}
             />
             {!previewLoading && tabularPreview && (
