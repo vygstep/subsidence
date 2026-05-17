@@ -720,7 +720,44 @@ def test_strat_chart_import_requires_mapping_and_validates_parent_age_interval(a
 
     response = api_client.post('/api/strat-charts/import', json={'csv_path': str(invalid_csv), 'column_map': column_map})
     assert response.status_code == 422, response.text
+    assert 'line 3' in response.json()['detail']
     assert 'outside parent' in response.json()['detail']
+
+
+def test_strat_chart_import_validates_rank_hierarchy(api_client: TestClient, tmp_path: Path) -> None:
+    _create_project(api_client, tmp_path, 'strat-chart-rank-validation')
+
+    column_map = {
+        'unit_id': 'id',
+        'parent_unit_id': 'parent',
+        'unit_name': 'name',
+        'rank_name': 'rank',
+        'start_age_ma': 'base',
+        'end_age_ma': 'top',
+    }
+
+    invalid_rank_order_csv = tmp_path / 'invalid_rank_order.csv'
+    invalid_rank_order_csv.write_text(
+        'id,parent,name,rank,base,top\n'
+        '1,,Stage Parent,stage,50,0\n'
+        '2,1,System Child,system,25,5\n',
+        encoding='utf-8',
+    )
+    response = api_client.post('/api/strat-charts/import', json={'csv_path': str(invalid_rank_order_csv), 'column_map': column_map})
+    assert response.status_code == 422, response.text
+    assert 'line 3' in response.json()['detail']
+    assert 'system cannot be child of stage' in response.json()['detail'].lower()
+
+    unknown_rank_csv = tmp_path / 'unknown_rank.csv'
+    unknown_rank_csv.write_text(
+        'id,parent,name,rank,base,top\n'
+        '1,,Custom Unit,custom_rank,50,0\n',
+        encoding='utf-8',
+    )
+    response = api_client.post('/api/strat-charts/import', json={'csv_path': str(unknown_rank_csv), 'column_map': column_map})
+    assert response.status_code == 422, response.text
+    assert 'line 2' in response.json()['detail']
+    assert 'Unknown rank "custom_rank"' in response.json()['detail']
 
 
 def test_strat_chart_import_accepts_rgb_and_cmyk_color_columns(api_client: TestClient, tmp_path: Path) -> None:
