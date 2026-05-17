@@ -32,7 +32,7 @@ The backend has three practical layers:
 
 The API layer should stay thin over time. Route handlers should validate input, call services, and return response models.
 
-The data layer owns project open/close/save state, SQLite sessions, import parsing, payload writes, undo/redo, checkpoints, dictionaries, stratigraphic linking, and backstrip calculations.
+The data layer owns project open/close/save state, SQLite sessions, import parsing, payload writes, export assembly, undo/redo, checkpoints, dictionaries, stratigraphic linking, deviation transforms, zone rebuilds, and backstrip calculations.
 
 ---
 
@@ -54,6 +54,8 @@ The most important state boundary is store ownership:
 - `computedStore`: subsidence recalculation state and display toggles.
 - `multiWellStore`: multi-well/subsidence workspace state.
 
+Reference data that must survive project open/empty-state transitions, such as built-in StratCharts and dictionary payloads, is hydrated through project open/status flows rather than frontend constants.
+
 ---
 
 ## Core Data Flows
@@ -70,9 +72,17 @@ The most important state boundary is store ownership:
 1. User selects LAS or logs CSV.
 2. Frontend posts an import request with a target well policy.
 3. Backend importer resolves an existing well or creates one.
-4. Curve metadata is stored in SQLite.
-5. Curve arrays are written as Parquet payloads.
-6. Frontend refreshes inventories and the affected well.
+4. Importer applies null-value handling and resamples curves onto the well's MD reference grid.
+5. Curve metadata is stored in SQLite.
+6. Curve arrays are written as Parquet payloads.
+7. Frontend refreshes inventories and the affected well.
+
+### Export Data
+
+1. User opens an export dialog from the Data Manager action bar.
+2. Frontend posts scope, output layout, destination folder, and optional zip settings to `/api/export/...`.
+3. Backend reads project metadata and payload files, then writes project-compatible CSV/LAS files.
+4. Exported tabular files should be importable by the automatic import path without manual remapping when possible.
 
 ### Subsidence Recalculation
 
@@ -80,6 +90,14 @@ The most important state boundary is store ownership:
 2. Frontend sends a WebSocket payload.
 3. Backend computes using the backstrip/subsidence code path.
 4. Frontend receives results and redraws the subsidence panel.
+
+### Stratigraphic Timescale
+
+1. Built-in ICS StratChart is seeded into a project database.
+2. Frontend hydrates active StratChart units during project open and empty-project transitions.
+3. StratChart settings choose upper/lower visible ranks and label mode.
+4. Single-well and multi-well subsidence charts render their geological timescale from the active StratChart, not a frontend hardcoded table.
+5. Global model cutoff controls use active StratChart units, with visible/all list modes.
 
 ---
 

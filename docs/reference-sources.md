@@ -46,7 +46,7 @@ Primary rule:
 
 Directory:
 
-- `docs/contracts/implemented/`
+- Local maintainer implementation notes are not part of the public documentation tree.
 
 Use for:
 

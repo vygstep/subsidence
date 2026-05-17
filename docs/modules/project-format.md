@@ -19,6 +19,8 @@ Expected contents may include:
 
 Generated runtime project folders should not be committed unless they are explicit test fixtures.
 
+Exports are written to user-selected external folders by default, not into the project bundle.
+
 ---
 
 ## SQLite Metadata
@@ -33,6 +35,8 @@ The SQLite database stores:
 - Links between tops and strat units.
 - Visual configuration.
 - Dictionaries.
+- Sea-level curves.
+- Compaction/lithology/unit/mnemonic dictionary state.
 - Undo/redo data where applicable.
 
 ---
@@ -47,11 +51,17 @@ Expected payload examples:
 - Deviation samples under `deviation/`.
 - Computed results under `results/`.
 
+Current log payload rule:
+
+- Imported LAS/CSV log curves are stored on a per-well MD reference grid.
+- Continuous curves are interpolated to that grid.
+- Discrete curves are down-step blocked, with null gaps preserved.
+
 ---
 
 ## Checkpoints
 
-Checkpoints store recoverable project states.
+Checkpoints store recoverable project states, plus a user comment and compact project statistics.
 
 Common bug areas:
 

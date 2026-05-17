@@ -24,6 +24,7 @@ Owns:
 - Project open/closed state.
 - Project path and recent projects.
 - Project create/open/save/close API calls.
+- Reference data hydration after project open, checkpoint restore, and empty-project state transitions.
 - Visual config loading and persistence.
 - Serialization helpers for project-level and per-well visual config.
 
@@ -33,6 +34,7 @@ Common bug areas:
 - Save succeeds but reopen loses data.
 - Recent projects are stale.
 - Track order or curve settings are not restored after reopen.
+- Built-in StratCharts/dictionaries exist in the backend but are missing in the frontend after project open.
 
 ---
 
@@ -43,6 +45,7 @@ Owns:
 - Active well data.
 - Curves and formations for the active well.
 - Well inventories.
+- Zone inventories and active top-set/sea-level assignment context.
 - Formation CRUD and depth drag updates.
 - Well metadata patching.
 - Optimistic/debounced formation depth updates.
@@ -73,6 +76,7 @@ Common bug areas:
 - Wrong track order after save/reopen.
 - Default tracks are created incorrectly.
 - Persisted visual config contains stale or malformed track state.
+- Curve visual settings should persist, but track membership should follow current track visibility/actions.
 
 ---
 
@@ -86,6 +90,8 @@ Owns:
 - Selected track/formation/UI mode.
 - Sidebar/subsidence split dimensions.
 - Depth track and formations track config.
+- StratChart timescale display settings.
+- Global model cutoff settings for reconstruct/truncate controls.
 
 Common bug areas:
 
@@ -93,6 +99,7 @@ Common bug areas:
 - Selection remains after object deletion.
 - Layout scroll state leaks between panes.
 - Resizer bounds or scroll container bugs move the whole app instead of the intended pane.
+- Timescale/cutoff UI resets after project reload.
 
 ---
 
@@ -105,6 +112,7 @@ Owns:
 - Subsidence display toggles.
 - Water depth and related calculation inputs.
 - Compute timeout protection.
+- Stored result loading coordination with active-well recalculation state.
 
 Common bug areas:
 

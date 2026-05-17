@@ -90,10 +90,10 @@ Confirmed issues found during audit. Sorted by severity.
 
 ## Low: stale / wrong documentation
 
-### D1: `projects_export.py` referenced in docs but does not exist
+### D1: export documentation was stale
 - **Docs**: `docs/backend-api.md`, `docs/codebase-map.md`
-- **Reality**: No such file. No export router registered in `main.py`.
-- **Fix**: Remove references, or create the file if export is planned.
+- **Reality at audit time**: export routing was not documented correctly.
+- **Current status**: `app/src/subsidence/api/export.py` is registered in `main.py`; current docs point to that router.
 
 ### D2: `GET /api/wells/{id}/curves/full` not documented
 - **File**: `api/wells.py:565-643`

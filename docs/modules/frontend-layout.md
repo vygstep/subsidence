@@ -32,15 +32,27 @@ Files:
 - `frontend/src/components/layout/CreateWellDialog.tsx`
 - `frontend/src/components/layout/ImportLasDialog.tsx`
 - `frontend/src/components/layout/ImportTopsDialog.tsx`
+- `frontend/src/components/layout/ImportWellsDialog.tsx`
 - `frontend/src/components/layout/ImportDeviationDialog.tsx`
 - `frontend/src/components/layout/LoadStratChartDialog.tsx`
+- `frontend/src/components/layout/LoadSeaLevelCurveDialog.tsx`
+- `frontend/src/components/layout/ExportWellInfoDialog.tsx`
+- `frontend/src/components/layout/ExportWellLogsDialog.tsx`
+- `frontend/src/components/layout/ExportWellTopsDialog.tsx`
+- `frontend/src/components/layout/ExportWellDeviationDialog.tsx`
+- `frontend/src/components/layout/ExportStratChartDialog.tsx`
+- `frontend/src/components/layout/ExportSeaLevelCurveDialog.tsx`
 - `frontend/src/components/layout/FileOpenDialog.tsx`
+- `frontend/src/components/layout/importWizard/*`
+- `frontend/src/components/layout/export/*`
 
 Responsibilities:
 
 - Project actions.
 - File/folder picking.
 - Import target selection.
+- Import preview and column mapping.
+- Export scope, destination folder, per-well/combined layout, and zip selection.
 - Data creation actions.
 
 Common bug areas:
@@ -49,6 +61,8 @@ Common bug areas:
 - Dialog input and action payload diverge.
 - File picker root is not remembered.
 - Path picker writes visible input but submit uses stale internal state.
+- Import wizard UX diverges between LAS, logs CSV, tops, deviation, wells, StratChart, and sea-level workflows.
+- Exported file shape cannot be re-imported automatically.
 
 ---
 
@@ -60,14 +74,17 @@ Files:
 - `frontend/src/components/layout/DataManagerTopPane.tsx`
 - `frontend/src/components/layout/WellDataPanel.tsx`
 - `frontend/src/components/layout/StratChartTab.tsx`
-- `frontend/src/components/layout/CompactionModelsTab.tsx`
 - `frontend/src/components/layout/useDataManagerController.ts`
+- `frontend/src/components/layout/dataManagerSelection.ts`
+- `frontend/src/components/layout/dataManagerVisibility.ts`
+- `frontend/src/components/layout/dataManagerActions.ts`
 
 Responsibilities:
 
 - Tree display for strat charts, wells, and models.
 - Selection and expansion state.
 - Visibility controls.
+- Load/export grouped action menus.
 - Context menus.
 - Object actions such as duplicate, delete, rename, and add/remove from visualization.
 
@@ -102,8 +119,9 @@ Responsibilities:
 - Edit well metadata.
 - Edit curve settings.
 - Edit tops settings.
-- Show strat chart statistics.
+- Edit StratChart display levels and label modes.
 - Edit compaction model settings.
+- Edit subsidence chart domain and interaction settings.
 
 Risk:
 

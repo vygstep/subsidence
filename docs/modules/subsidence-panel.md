@@ -22,11 +22,13 @@ Responsibilities:
 
 - Show burial/subsidence curves.
 - Render axes, labels, formation fills, and curves.
+- Render the geological timescale from the active project StratChart.
 - Trigger recalculation.
 - Expose display toggles and water depth.
 - Export panel PNG.
 - Maintain WebSocket connection and pending recalculation queue.
 - Render stored multi-well results separately from active-well recalculation.
+- Apply global model cutoff controls for reconstruct/truncate modes.
 
 ---
 
@@ -36,12 +38,14 @@ Files:
 
 - `app/src/subsidence/api/subsidence.py`
 - `app/src/subsidence/data/backstrip.py`
+- `app/src/subsidence/api/strat_chart.py`
 
 Responsibilities:
 
 - Receive WebSocket recalculation payloads.
 - Run backstrip/subsidence calculations.
 - Return calculated burial paths and curve data.
+- Provide active StratChart units used by the frontend geological timescale and cutoff controls.
 
 ---
 
@@ -67,7 +71,9 @@ Start here for:
 - Export PNG is empty or clipped.
 - Stored result panel and active recalculation panel show different states.
 - WebSocket reconnect queues stale recalculation payloads.
+- Timescale uses stale hardcoded units instead of the active StratChart.
+- Global cutoff dropdown includes units outside the intended visible/data range.
 
-Historical bug notes:
+Notes:
 
-- See `docs/contracts/implemented/subsidence-panel-bug-report.md`.
+- Historical contract notes are kept locally by maintainers and are not part of the public documentation tree.

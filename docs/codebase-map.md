@@ -2,7 +2,7 @@
 
 **Status:** Current navigation map  
 **Created:** 2026-04-23  
-**Updated:** 2026-05-09
+**Updated:** 2026-05-17
 **Purpose:** Help contributors locate code by workflow before reading the whole repository.
 
 For the full documentation entry point, see [Documentation](documentation-index.md).
@@ -72,7 +72,7 @@ Files:
 - `app/src/subsidence/api/projects.py` — lifecycle, path helpers, shared models
 - `app/src/subsidence/api/projects_imports.py` — import endpoints (LAS, logs CSV, tops, unconformities, deviation)
 - `app/src/subsidence/api/projects_config.py` — undo/redo, checkpoints, dictionaries, visual config
-- No export router is currently registered.
+- `app/src/subsidence/api/export.py` - export endpoints for well info, logs, tops, deviation, StratCharts, and sea-level curves.
 
 The project routers share the `/api/projects` prefix and are registered in `main.py`. Public API paths are unchanged.
 
@@ -325,6 +325,8 @@ Files:
 - `app/src/subsidence/data/importers/logs_csv.py` — logs CSV import
 - `app/src/subsidence/data/importers/tops.py` — tops and unconformities import
 - `app/src/subsidence/data/importers/deviation.py` — deviation import
+- `app/src/subsidence/data/importers/wells.py` — wells CSV import
+- `app/src/subsidence/data/importers/log_resampling.py` — shared log resampling
 - `app/src/subsidence/data/loaders.py` — read curve and deviation payloads from Parquet
 
 Public function signatures are unchanged. All callers import from `data.importers` (the package).
@@ -447,11 +449,13 @@ See `docs/lithology-pattern-palettes.md` for seed source details.
 File:
 
 - `app/src/subsidence/data/importers/preview.py`
+- `app/src/subsidence/data/importers/log_resampling.py`
 
 Responsibilities:
 
 - Parse LAS and tabular files without committing data.
 - Return column list, sample rows, detected delimiter, and warnings for the Import Wizard UI.
+- Resample imported log curves onto the per-well MD reference grid.
 
 ---
 
@@ -590,10 +594,17 @@ Files:
 - `frontend/src/components/layout/CreateWellDialog.tsx`
 - `frontend/src/components/layout/ImportLasDialog.tsx`
 - `frontend/src/components/layout/ImportTopsDialog.tsx`
-- `frontend/src/components/layout/ImportUnconformitiesDialog.tsx`
+- `frontend/src/components/layout/ImportWellsDialog.tsx`
 - `frontend/src/components/layout/ImportDeviationDialog.tsx`
 - `frontend/src/components/layout/LoadStratChartDialog.tsx`
+- `frontend/src/components/layout/LoadSeaLevelCurveDialog.tsx`
 - `frontend/src/components/layout/LinkStratChartDialog.tsx`
+- `frontend/src/components/layout/ExportWellInfoDialog.tsx`
+- `frontend/src/components/layout/ExportWellLogsDialog.tsx`
+- `frontend/src/components/layout/ExportWellTopsDialog.tsx`
+- `frontend/src/components/layout/ExportWellDeviationDialog.tsx`
+- `frontend/src/components/layout/ExportStratChartDialog.tsx`
+- `frontend/src/components/layout/ExportSeaLevelCurveDialog.tsx`
 - `frontend/src/components/layout/FileOpenDialog.tsx`
 
 Responsibilities:
@@ -617,8 +628,8 @@ Files:
 - `frontend/src/components/layout/importWizard/ImportWizardShell.tsx` — multi-step shell, step routing
 - `frontend/src/components/layout/importWizard/LasPreviewPane.tsx` — LAS file preview step
 - `frontend/src/components/layout/importWizard/TabularPreviewPane.tsx` — CSV/TSV preview step
-- `frontend/src/components/layout/importWizard/MappingPane.tsx` — column-to-field mapping step
-- `frontend/src/components/layout/importWizard/ImportWizardTargetWellFields.tsx` — target well selector
+- `frontend/src/components/layout/importWizard/ImportWizardFileField.tsx` — file selection step
+- `frontend/src/components/layout/importWizard/ImportWizardTargetWellSelect.tsx` — shared target well selector
 - `frontend/src/components/layout/importWizard/importWizardPresets.ts` — built-in column mapping presets
 - `frontend/src/components/layout/importWizard/importWizardUtils.ts` — shared parsing helpers
 - `frontend/src/components/layout/importWizard/mapping.ts` — column mapping logic
@@ -631,6 +642,7 @@ Responsibilities:
 - Show a file before committing an import.
 - Let the user map source columns to target fields.
 - Apply presets for known formats (LAS standard, common tops CSV shapes).
+- Current shared controls also include file selection, target well selection, depth unit/reference, null value, and tabular mapping behavior. Check `ImportWizardFileField.tsx` and `ImportWizardTargetWellSelect.tsx` before changing individual import dialogs.
 
 ### Layout infrastructure
 
@@ -698,6 +710,8 @@ Files:
 - `frontend/src/components/subsidence/SubsidenceToolbar.tsx`
 - `frontend/src/components/subsidence/GeologicalTimescale.tsx`
 - `frontend/src/utils/exportPng.ts`
+- `frontend/src/utils/stratTimescale.ts`
+- `frontend/src/utils/subsidenceChartDomain.ts`
 
 Responsibilities:
 
@@ -706,6 +720,8 @@ Responsibilities:
 - Export panel PNG.
 - Render stored multi-well results.
 - Keep WebSocket connection and retry queue.
+- Render geological timescale from the active StratChart.
+- Apply global reconstruct/truncate cutoff settings.
 
 Known historical risk:
 
@@ -815,14 +831,17 @@ Implementation files:
 | Built-in ICS chart wrong | `data/dict_seeder.py`, `api/strat_chart.py`, `sample_data/ics_chart2023.csv` |
 | Undo/redo wrong | `projectStore.ts`, `api/projects.py`, `data/undo.py` |
 | Subsidence panel blank/wrong | `computedStore.ts`, `api/subsidenceSocket.ts`, `MultiWellPanel.tsx`, `SubsidenceCanvas.tsx`, `api/subsidence.py` |
-| Export wrong | `utils/exportPng.ts`, `api/projects.py`, `SubsidenceControls.tsx` |
+| Export wrong | `api/export.py`, export dialogs, `components/layout/export/*`, `utils/exportDownload.ts` |
+| Exported data cannot be imported automatically | `api/export.py`, import dialogs, `data/importers/*` |
 | Layout scroll/resizer bug | `styles/app-layout.css`, `styles/subsidence-panel.css`, `SplitView.tsx`, `DataManagerPane.tsx`, `MultiWellPanel.tsx` |
-| Import Wizard wrong column mapping | `importWizard/MappingPane.tsx`, `importWizard/mapping.ts`, `importWizard/importWizardPresets.ts` |
+| Import Wizard wrong column mapping | `importWizard/mapping.ts`, `importWizard/importWizardPresets.ts`, `TabularPreviewPane.tsx`, `LasPreviewPane.tsx` |
 | Import preview fails or wrong | `api/import_preview.py`, `data/importers/preview.py`, `importWizard/useImportPreview.ts` |
 | Lithology pattern missing/wrong SVG | `api/lithology_patterns.py`, `data/lithology_patterns.py`, `settings/LithologyPatternPaletteSettings.tsx` |
 | Zone lithology aggregation wrong | `data/zone_service.py`, `api/top_sets.py`, `settings/ZoneDetailSettings.tsx` |
 | TVD picks wrong after survey import | `data/deviation_transform.py`, `api/top_sets.py`, `api/projects_imports.py` |
 | Measurement unit lookup wrong | `data/unit_registry.py`, `data/unit_conversion.py`, `settings/MeasurementUnitsRootSettings.tsx` |
+| StratChart timescale wrong | `api/strat_chart.py`, `utils/stratTimescale.ts`, `GeologicalTimescale.tsx`, `StratChartSettings.tsx` |
+| Log resampling/null values wrong | `data/importers/log_resampling.py`, `data/importers/las.py`, `data/importers/logs_csv.py`, `api/export.py` |
 
 ---
 
@@ -842,6 +861,8 @@ These files are allowed to change, but not casually. Add tests/logging first whe
 | `app/src/subsidence/data/deviation_transform.py` | TVD conversion affects all pick depths | deviation import + TVD recalc tests |
 | `app/src/subsidence/data/lithology_patterns.py` | SVG sanitization is a security boundary for user uploads | SVG injection + round-trip tests |
 | `frontend/src/components/layout/importWizard/*` | mapping logic drives what gets imported; preset mismatches cause silent wrong data | preview + mapping + commit integration tests |
+| `app/src/subsidence/api/export.py` | export must round-trip into import workflows and writes user files | export API + import round-trip tests |
+| `frontend/src/utils/stratTimescale.ts` | shared timescale row logic for charts and cutoff dropdowns | unit tests for sparse hierarchy and visible/all modes |
 
 ---
 
@@ -861,7 +882,7 @@ cd app
 pytest tests
 ```
 
-Current baseline from 2026-04-23 (after M6 refactor):
+Recent baseline from 2026-05-17:
 
-- Frontend: 34 passed.
-- Backend: 30 passed.
+- Frontend: 88 passed.
+- Backend: 156 passed.

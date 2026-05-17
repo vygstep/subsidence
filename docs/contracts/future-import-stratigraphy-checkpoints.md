@@ -13,7 +13,7 @@ This contract is intentionally short. Each item needs a proper code review and d
 
 ### 1. Stratigraphy Model Improvements
 
-Moved to `docs/contracts/implemented/strat-chart-hierarchy-timescale.md`.
+Implemented. Maintainer implementation notes are local-only and are not part of the public documentation tree.
 
 ### 2. Multi-File Import
 
@@ -36,7 +36,7 @@ Moved to `docs/contracts/implemented/strat-chart-hierarchy-timescale.md`.
 
 ### 5. Checkpoint Revert And Comments
 
-Moved to `docs/contracts/implemented/checkpoint-comments-revert.md`.
+Implemented. Maintainer implementation notes are local-only and are not part of the public documentation tree.
 
 ## Non-Goals
 

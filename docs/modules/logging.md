@@ -72,7 +72,10 @@ Example:
 
 - `app/src/subsidence/observability.py`: JSON formatter, request ID context, `log_event`, and `operation_log`.
 - `app/src/subsidence/api/main.py`: request ID middleware and HTTP request logs.
-- `app/src/subsidence/api/projects.py`: project lifecycle, imports, undo/redo, checkpoints, visual config, and export logs.
+- `app/src/subsidence/api/projects.py`: project lifecycle and path helper logs.
+- `app/src/subsidence/api/projects_imports.py`: import logs.
+- `app/src/subsidence/api/projects_config.py`: undo/redo, checkpoint, dictionary, and visual config logs.
+- `app/src/subsidence/api/export.py`: export logs.
 - `app/src/subsidence/api/strat_chart.py`: strat chart import/activate/delete logs.
 - `app/src/subsidence/api/subsidence.py`: calculation and websocket recalculation logs.
 
@@ -123,4 +126,4 @@ Required behavior:
 
 ## Status
 
-Backend logging, frontend diagnostics, and critical workflow tests were completed during the post-Phase 5 maintenance cycle. The completed contract is archived at `docs/contracts/implemented/engineering-maintenance-contract.md`.
+Backend logging, frontend diagnostics, and critical workflow tests are implemented. Maintainer implementation notes are local-only and are not part of the public documentation tree.

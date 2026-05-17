@@ -77,11 +77,13 @@ Responsibilities:
 - Draw curves, fills, grids, and clipping windows.
 - Manage canvas render lifecycle.
 - Keep pure rendering logic testable.
+- Draw continuous and discrete curves according to their curve type; discrete curves should render as down-step blocks with null gaps preserved.
 
 Rule:
 
 - Renderer changes should prefer pure unit tests.
-- Do not extract clipping/interpolation from `DataTrack.tsx` without preserving existing depth-clipping unit coverage.
+- Do not extract clipping/render preparation from `DataTrack.tsx` without preserving existing depth-clipping unit coverage.
+- Backend import/export resampling owns project storage semantics; viewer rendering should not redefine how curves are resampled onto MD grids.
 
 ---
 
@@ -108,7 +110,7 @@ Planned split after behavior is stable:
 
 ## Viewer Refactor Risks
 
-- `DataTrack.tsx` combines clipping, interpolation, fill preparation, and canvas drawing orchestration.
+- `DataTrack.tsx` combines clipping, fill preparation, and canvas drawing orchestration.
 - `TrackHeaderRow.tsx` is the track selection/reorder surface.
 - `FormationTopLine.tsx` in `components/interaction` owns editable top interactions.
 - `curvePresets.ts` must stay aligned with backend curve dictionaries when defaults change.
