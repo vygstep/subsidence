@@ -13,10 +13,7 @@ This contract is intentionally short. Each item needs a proper code review and d
 
 ### 1. Stratigraphy Model Improvements
 
-- Review how StratChart hierarchy should work beyond simple `unit_id` / `parent_unit_id`.
-- Decide whether ranks should stay as text or become a normalized model.
-- Decide how loaded StratCharts should drive the geological timescale shown on subsidence charts.
-- Add validation rules for impossible parent-child relationships.
+Moved to `docs/contracts/strat-chart-hierarchy-timescale.md`.
 
 ### 2. Multi-File Import
 
