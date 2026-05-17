@@ -17,4 +17,7 @@ logs/
 AGENTS.md
 CLAUDE.md
 
+# Local completed contract history
+docs/contracts/implemented/
+
 
