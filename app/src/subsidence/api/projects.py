@@ -153,6 +153,7 @@ class CheckpointResponse(BaseModel):
     id: int
     name: str
     description: str
+    statistics: dict | None = None
     timestamp: str
     file_path: str
     byte_size: int

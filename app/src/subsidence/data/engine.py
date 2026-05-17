@@ -152,6 +152,10 @@ def migrate_schema(engine: Engine) -> None:
         if 'base_lithology_code' not in pattern_cols:
             conn.execute(text("ALTER TABLE lithology_patterns ADD COLUMN base_lithology_code VARCHAR(64)"))
             conn.commit()
+        checkpoint_cols = {row[1] for row in conn.execute(text("PRAGMA table_info(checkpoints)"))}
+        if 'statistics_json' not in checkpoint_cols:
+            conn.execute(text("ALTER TABLE checkpoints ADD COLUMN statistics_json TEXT"))
+            conn.commit()
         conn.execute(text(
             "UPDATE curve_metadata SET curve_type = 'continuous' WHERE curve_type = 'lithology_fraction'"
         ))

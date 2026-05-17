@@ -19,13 +19,25 @@ except ImportError:
     def user_cache_dir(app_name: str) -> str:
         return str(Path(tempfile.gettempdir()) / app_name)
 
-from sqlalchemy import select, text
+from sqlalchemy import func, select, text
 from sqlalchemy.orm import Session
 
 from .undo import UndoStack, Command
 
 from .engine import create_all_tables, create_engine_for_project, migrate_schema, validate_project_db
-from .schema import CheckpointModel, ProjectMeta, SCHEMA_VERSION, UserModel
+from .schema import (
+    CheckpointModel,
+    CurveMetadata,
+    DeviationSurveyModel,
+    FormationTopModel,
+    ProjectMeta,
+    SCHEMA_VERSION,
+    SeaLevelCurve,
+    StratChart,
+    TopSet,
+    UserModel,
+    WellModel,
+)
 
 if os.name == 'nt':
     import msvcrt
@@ -252,9 +264,11 @@ class ProjectManager:
         byte_size = checkpoint_path.stat().st_size
 
         with self.get_session() as session:
+            statistics = self._project_statistics(session)
             row = CheckpointModel(
                 name=name,
                 description=description,
+                statistics_json=json.dumps(statistics, sort_keys=True),
                 timestamp=timestamp.replace(tzinfo=None),
                 file_path=relative_path.as_posix(),
                 byte_size=byte_size,
@@ -288,12 +302,28 @@ class ProjectManager:
         self.mark_dirty()
 
         with self.get_session() as session:
+            target_row = session.get(CheckpointModel, target['id'])
+            if target_row is None:
+                target_row = CheckpointModel(
+                    id=target['id'],
+                    name=target['name'],
+                    description=target['description'],
+                    statistics_json=json.dumps(target.get('statistics'), sort_keys=True) if target.get('statistics') is not None else None,
+                    timestamp=datetime.fromisoformat(target['timestamp']).replace(tzinfo=None),
+                    file_path=target['file_path'],
+                    byte_size=target['byte_size'],
+                    sha256=target['sha256'],
+                    app_version=target['app_version'],
+                    schema_version=target['schema_version'],
+                )
+                session.add(target_row)
             row = session.get(CheckpointModel, before_restore['id'])
             if row is None:
                 row = CheckpointModel(
                     id=before_restore['id'],
                     name=before_restore['name'],
                     description=before_restore['description'],
+                    statistics_json=json.dumps(before_restore.get('statistics'), sort_keys=True) if before_restore.get('statistics') is not None else None,
                     timestamp=datetime.fromisoformat(before_restore['timestamp']).replace(tzinfo=None),
                     file_path=before_restore['file_path'],
                     byte_size=before_restore['byte_size'],
@@ -435,10 +465,15 @@ class ProjectManager:
             conn.execute(text(f"VACUUM INTO '{destination.as_posix()}'"))
 
     def _checkpoint_to_dict(self, row: CheckpointModel) -> dict[str, Any]:
+        try:
+            statistics = json.loads(row.statistics_json) if row.statistics_json else None
+        except json.JSONDecodeError:
+            statistics = None
         return {
             'id': row.id,
             'name': row.name,
             'description': row.description,
+            'statistics': statistics,
             'timestamp': row.timestamp.replace(tzinfo=timezone.utc).isoformat(),
             'file_path': row.file_path,
             'byte_size': row.byte_size,
@@ -453,6 +488,23 @@ class ProjectManager:
             if row is None:
                 raise ValueError(f'Checkpoint not found: {checkpoint_id}')
             return self._checkpoint_to_dict(row)
+
+    def _project_statistics(self, session: Session) -> dict[str, Any]:
+        meta = session.get(ProjectMeta, 1)
+        wells = session.scalars(select(WellModel).order_by(WellModel.name.asc(), WellModel.id.asc())).all()
+        well_ids = [well.id for well in wells]
+        return {
+            'project_name': meta.project_name if meta is not None else None,
+            'well_count': len(wells),
+            'well_names': [well.name for well in wells],
+            'log_curve_count': int(session.scalar(select(func.count(CurveMetadata.id))) or 0),
+            'top_pick_count': int(session.scalar(select(func.count(FormationTopModel.id))) or 0),
+            'top_set_count': int(session.scalar(select(func.count(TopSet.id))) or 0),
+            'strat_chart_count': int(session.scalar(select(func.count(StratChart.id))) or 0),
+            'sea_level_curve_count': int(session.scalar(select(func.count(SeaLevelCurve.id))) or 0),
+            'deviation_survey_count': int(session.scalar(select(func.count(DeviationSurveyModel.id))) or 0),
+            'well_ids': well_ids,
+        }
 
     def _slugify(self, value: str) -> str:
         return re.sub(r'[^a-z0-9]+', '-', value.lower()).strip('-')
