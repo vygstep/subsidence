@@ -23,6 +23,8 @@ describe('ProjectToolbar menu', () => {
       curves: [],
       formations: [],
       stratCharts: [],
+      seaLevelCurves: [],
+      topSets: [],
       wellInventories: [],
       isLoading: false,
       error: null,
@@ -40,8 +42,21 @@ describe('ProjectToolbar menu', () => {
     expect(screen.getByText('Open project')).toBeTruthy()
     expect(screen.getByText('Close project')).toBeTruthy()
     expect(screen.getByText('Save project')).toBeTruthy()
-    expect(screen.getByText('Create checkpoint')).toBeTruthy()
+    expect(screen.getAllByText('Create checkpoint').length).toBeGreaterThan(0)
+    expect(screen.getByText('Revert from checkpoint')).toBeTruthy()
     expect(screen.getByText('Copy diagnostics')).toBeTruthy()
+  })
+
+  it('opens the checkpoint creation dialog from the project menu', () => {
+    render(<ProjectToolbar />)
+
+    fireEvent.click(screen.getByText('Project'))
+    fireEvent.click(screen.getByText('Create checkpoint'))
+
+    expect(screen.getAllByText('Create checkpoint').length).toBeGreaterThan(0)
+    expect(screen.getByText('Date')).toBeTruthy()
+    expect(screen.getByText('User comment')).toBeTruthy()
+    expect(screen.getByText('Project statistics')).toBeTruthy()
   })
 
   it('calls undo and redo actions from the top bar', () => {

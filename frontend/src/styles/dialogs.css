@@ -100,7 +100,8 @@
   cursor: not-allowed;
 }
 
-.project-dialog__field input {
+.project-dialog__field input,
+.project-dialog__field textarea {
   width: 100%;
   min-height: 22px;
   padding: 2px 7px;
@@ -109,6 +110,13 @@
   background: #ffffff;
   color: #17212b;
   font-size: 0.78rem;
+}
+
+.project-dialog__field textarea {
+  min-height: 66px;
+  resize: vertical;
+  font-family: inherit;
+  line-height: 1.35;
 }
 
 .project-dialog__field select {
@@ -123,6 +131,7 @@
 }
 
 .project-dialog__field input:focus,
+.project-dialog__field textarea:focus,
 .project-dialog__field select:focus {
   outline: 2px solid rgba(37, 99, 235, 0.22);
   border-color: #2563eb;
@@ -249,6 +258,11 @@
   background: #f1f7fc;
 }
 
+.project-dialog__recent-item--active {
+  border-color: #2563eb;
+  background: #eff6ff;
+}
+
 .project-dialog__recent-name {
   font-size: 0.84rem;
   font-weight: 700;
@@ -315,6 +329,65 @@
 .project-dialog__button:disabled {
   opacity: 0.4;
   cursor: not-allowed;
+}
+
+.checkpoint-summary {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  padding: 10px 12px;
+  border: 1px solid #d8e2ec;
+  border-radius: 10px;
+  background: #f8fbff;
+}
+
+.checkpoint-summary__row {
+  display: flex;
+  justify-content: space-between;
+  gap: 16px;
+  font-size: 0.76rem;
+}
+
+.checkpoint-summary__label {
+  flex: 0 0 auto;
+  color: #64748b;
+  font-weight: 600;
+}
+
+.checkpoint-summary__value {
+  min-width: 0;
+  color: #17212b;
+  text-align: right;
+  word-break: break-word;
+}
+
+.checkpoint-restore-layout {
+  display: grid;
+  grid-template-columns: minmax(0, 0.9fr) minmax(0, 1.1fr);
+  gap: 12px;
+}
+
+.checkpoint-restore-layout__list {
+  max-height: 340px;
+}
+
+.checkpoint-preview {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  min-width: 0;
+}
+
+.checkpoint-preview__comment {
+  min-height: 42px;
+  margin: 0;
+  padding: 9px 11px;
+  border: 1px solid #d8e2ec;
+  border-radius: 10px;
+  background: #ffffff;
+  font-size: 0.78rem;
+  color: #314155;
+  white-space: pre-wrap;
 }
 
 .project-dialog__field--inline {
