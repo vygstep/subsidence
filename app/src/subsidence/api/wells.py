@@ -885,6 +885,7 @@ def get_deviation(well_id: str, request: Request) -> DeviationSurveyResponse:
 def delete_curve(well_id: str, mnemonic: str, request: Request) -> None:
     manager = _require_open_project(request)
     parquet_to_delete: str | None = None
+    parquet_to_rewrite: tuple[str, list[str]] | None = None
     with manager.get_session() as session:
         if session.get(WellModel, well_id) is None:
             raise HTTPException(status_code=404, detail=f'Well not found: {well_id}')
@@ -896,13 +897,23 @@ def delete_curve(well_id: str, mnemonic: str, request: Request) -> None:
         data_uri = row.data_uri
         session.delete(row)
         session.flush()
-        if not session.scalar(select(CurveMetadata).where(CurveMetadata.data_uri == data_uri).limit(1)):
+        remaining_rows = list(session.scalars(select(CurveMetadata).where(CurveMetadata.data_uri == data_uri)))
+        if not remaining_rows:
             parquet_to_delete = data_uri
+        else:
+            parquet_to_rewrite = (data_uri, [remaining.mnemonic for remaining in remaining_rows])
         session.commit()
     if parquet_to_delete:
         path = manager.project_path / parquet_to_delete
         if path.exists():
             path.unlink()
+    elif parquet_to_rewrite:
+        data_uri, remaining_mnemonics = parquet_to_rewrite
+        path = manager.project_path / data_uri
+        if path.exists():
+            frame = pd.read_parquet(path)
+            keep_columns = ['DEPT', *[name for name in remaining_mnemonics if name in frame.columns]]
+            frame.loc[:, keep_columns].to_parquet(path, index=False)
     manager.save_project()
 
 

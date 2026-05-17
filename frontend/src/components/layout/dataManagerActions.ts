@@ -226,6 +226,9 @@ export function makeActionHandlers(deps: ActionDeps) {
         curves: track.curves.filter((c) => c.mnemonic !== mnemonic),
       })),
       hiddenCurveMnemonics: state.hiddenCurveMnemonics.filter((m) => m !== mnemonic),
+      curveSettingsByMnemonic: Object.fromEntries(
+        Object.entries(state.curveSettingsByMnemonic).filter(([key]) => key !== mnemonic),
+      ),
     }))
     if (selectedObject?.type === 'curve' && (selectedObject as { wellId?: string }).wellId === wellId
         && (selectedObject as { mnemonic?: string }).mnemonic === mnemonic) {
@@ -246,6 +249,7 @@ export function makeActionHandlers(deps: ActionDeps) {
       ...state,
       tracks: state.tracks.map((track) => ({ ...track, curves: [] })),
       hiddenCurveMnemonics: [],
+      curveSettingsByMnemonic: {},
     }))
     if (selectedObject?.type === 'curve' && (selectedObject as { wellId?: string }).wellId === wellId) {
       setSelectedObject(null)
