@@ -37,16 +37,9 @@ This contract is intentionally short. Each item needs a proper code review and d
 - Store them in the database first; decide later where and how they should be displayed or used.
 - Apply this consistently across relevant importers after reviewing the schema.
 
-### 5. Checkpoint Revert
+### 5. Checkpoint Revert And Comments
 
-- Add a user-facing way to revert/open from an existing checkpoint.
-- Define whether revert replaces the current project state or creates a new checkpoint first.
-- Make sure undo/redo and dirty-state behavior are clear.
-
-### 6. Checkpoint Comments
-
-- When creating a checkpoint, allow the user to save a short comment/description.
-- Show that comment in the checkpoint list/history.
+Moved to `docs/contracts/checkpoint-comments-revert.md`.
 
 ## Non-Goals
 
