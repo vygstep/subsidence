@@ -193,6 +193,14 @@ def _parse_color_hex(value: str | None) -> str | None:
     return None
 
 
+def _unit_code(row: dict[str, Any]) -> str | None:
+    for key in ('unit_code', 'strat_index', 'unit_abbrev', 'code'):
+        value = (row.get(key) or '').strip()
+        if value:
+            return value
+    return None
+
+
 def _import_ics_csv(session, csv_path: Path, column_map: dict[str, str]) -> tuple[StratChart, int]:
     required = {'unit_id', 'unit_name', 'start_age_ma', 'end_age_ma'}
     missing_mapping = sorted(required.difference(column_map))
@@ -271,6 +279,7 @@ def _import_ics_csv(session, csv_path: Path, column_map: dict[str, str]) -> tupl
                     )
             unit = StratUnit(
                 name=(row.get('unit_name') or '').strip(),
+                unit_code=_unit_code(row),
                 rank=row.get('rank_name'),
                 parent_id=parent_db_id,
                 age_top_ma=age_top_ma,

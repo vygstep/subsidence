@@ -104,6 +104,7 @@ export interface StratChartInfo {
 export interface StratUnitOption {
   id: number
   name: string
+  unit_code?: string | null
   rank?: string | null
   parent_id?: number | null
   chart_id?: number | null

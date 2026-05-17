@@ -224,7 +224,9 @@ export function StratChartTab({
             <span className="tree-toggle tree-toggle--spacer">&gt;</span>
           )}
           <span className="dm-object-color-bar" style={{ ['--dm-object-color' as string]: node.unit.color_hex ?? '#9ca3af' }} />
-          <span className="tree-node__label-button strat-unit-tree-label">{node.unit.name}</span>
+          <span className="tree-node__label-button strat-unit-tree-label">
+            {node.unit.name}{node.unit.unit_code ? ` (${node.unit.unit_code})` : ''}
+          </span>
           {node.unit.rank ? <span className="tree-node__badge">{node.unit.rank}</span> : null}
         </div>
         {hasChildren && isExpanded(unitKey) ? (

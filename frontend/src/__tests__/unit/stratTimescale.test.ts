@@ -5,7 +5,7 @@ import { buildStratTimescaleRows } from '@/utils/stratTimescale'
 
 const units: StratUnitOption[] = [
   { id: 1, name: 'Paleozoic', rank: 'era', age_top_ma: 251.9, age_base_ma: 538.8, color_hex: '#aabbcc' },
-  { id: 2, name: 'Devonian', rank: 'period', age_top_ma: 358.9, age_base_ma: 419.2, color_hex: '#ddaa00' },
+  { id: 2, name: 'Devonian', unit_code: 'D', rank: 'period', age_top_ma: 358.9, age_base_ma: 419.2, color_hex: '#ddaa00' },
   { id: 3, name: 'Carboniferous', rank: 'period', age_top_ma: 298.9, age_base_ma: 358.9, color_hex: '#00aadd' },
   { id: 4, name: 'Frasnian', rank: 'age', age_top_ma: 372.2, age_base_ma: 382.7, color_hex: '#cc00aa' },
 ]
@@ -32,6 +32,7 @@ describe('buildStratTimescaleRows', () => {
     expect(rows[0].rank).toBe('period')
     expect(rows[1].rank).toBe('age')
     expect(rows[1].isFallback).toBe(false)
+    expect(rows[0].units.find((unit) => unit.name === 'Devonian')?.label).toBe('D')
   })
 
   it('falls back to the nearest coarser available rank for missing sparse ranks', () => {

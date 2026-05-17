@@ -102,6 +102,7 @@ class FormationTopResponse(BaseModel):
 class StratUnitLookupResponse(BaseModel):
     id: int
     name: str
+    unit_code: str | None
     rank: str | None
     parent_id: int | None
     chart_id: int | None
@@ -209,6 +210,7 @@ def list_strat_units(request: Request, q: str = '', limit: int = 20, chart_id: i
             StratUnitLookupResponse(
                 id=row.id,
                 name=row.name,
+                unit_code=row.unit_code,
                 rank=row.rank,
                 parent_id=row.parent_id,
                 chart_id=row.chart_id,

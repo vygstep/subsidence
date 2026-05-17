@@ -134,6 +134,11 @@ function unitLabel(name: string): string {
     .toUpperCase() || trimmed.slice(0, 6)
 }
 
+function unitDisplayCode(unit: StratUnitOption): string {
+  const code = unit.unit_code?.trim()
+  return code || unitLabel(unit.name)
+}
+
 function unitsForRank(
   units: StratUnitOption[],
   rank: string | null,
@@ -149,7 +154,7 @@ function unitsForRank(
       return [{
         id: String(unit.id),
         name: unit.name,
-        label: unitLabel(unit.name),
+        label: unitDisplayCode(unit),
         start_ma: base,
         end_ma: top,
         color: unit.color_hex ?? DEFAULT_COLOR,
@@ -248,7 +253,7 @@ function fillSparseLowerIntervals({
         return [{
           id: `fallback-${unit.id}`,
           name: unit.name,
-          label: unitLabel(unit.name),
+          label: unitDisplayCode(unit),
           start_ma: base,
           end_ma: top,
           color: unit.color_hex ?? DEFAULT_COLOR,

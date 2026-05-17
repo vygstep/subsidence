@@ -92,6 +92,9 @@ def migrate_schema(engine: Engine) -> None:
         if 'chart_id' not in strat_unit_cols:
             conn.execute(text("ALTER TABLE strat_units ADD COLUMN chart_id INTEGER REFERENCES strat_charts(id)"))
             conn.commit()
+        if 'unit_code' not in strat_unit_cols:
+            conn.execute(text("ALTER TABLE strat_units ADD COLUMN unit_code VARCHAR(64)"))
+            conn.commit()
         formation_cols = {row[1] for row in conn.execute(text("PRAGMA table_info(formation_tops)"))}
         if 'water_depth_m' not in formation_cols:
             conn.execute(text("ALTER TABLE formation_tops ADD COLUMN water_depth_m REAL NOT NULL DEFAULT 0.0"))

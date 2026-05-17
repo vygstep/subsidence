@@ -150,7 +150,9 @@ def test_new_project_seeds_builtin_reference_data(api_client: TestClient, tmp_pa
     with manager.get_session() as session:
         builtin_chart = session.scalar(sa_select(StratChart).where(StratChart.name == 'ICS 2023'))
         assert builtin_chart is not None
-        assert len(session.scalars(sa_select(StratUnit).where(StratUnit.chart_id == builtin_chart.id)).all()) > 0
+        builtin_units = session.scalars(sa_select(StratUnit).where(StratUnit.chart_id == builtin_chart.id)).all()
+        assert len(builtin_units) > 0
+        assert any(unit.unit_code for unit in builtin_units)
 
         sea_level_curves = session.scalars(
             sa_select(SeaLevelCurve).where(SeaLevelCurve.is_builtin.is_(True))
@@ -691,15 +693,16 @@ def test_strat_chart_import_requires_mapping_and_validates_parent_age_interval(a
 
     chart_csv = tmp_path / 'mapped_chart.csv'
     chart_csv.write_text(
-        'id,parent,name,rank,base,top,color\n'
-        '1,,System A,system,50,0,#123456\n'
-        '2,1,Stage A,stage,25,5,#abcdef\n',
+        'id,parent,name,code,rank,base,top,color\n'
+        '1,,System A,SA,system,50,0,#123456\n'
+        '2,1,Stage A,Sta,stage,25,5,#abcdef\n',
         encoding='utf-8',
     )
     column_map = {
         'unit_id': 'id',
         'parent_unit_id': 'parent',
         'unit_name': 'name',
+        'unit_code': 'code',
         'rank_name': 'rank',
         'start_age_ma': 'base',
         'end_age_ma': 'top',
@@ -718,8 +721,10 @@ def test_strat_chart_import_requires_mapping_and_validates_parent_age_interval(a
     units = {unit['name']: unit for unit in response.json()}
     assert units['System A']['parent_id'] is None
     assert units['System A']['chart_id'] == chart['id']
+    assert units['System A']['unit_code'] == 'SA'
     assert units['Stage A']['parent_id'] == units['System A']['id']
     assert units['Stage A']['chart_id'] == chart['id']
+    assert units['Stage A']['unit_code'] == 'Sta'
 
     invalid_csv = tmp_path / 'invalid_chart.csv'
     invalid_csv.write_text(
