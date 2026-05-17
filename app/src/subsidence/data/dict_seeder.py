@@ -251,6 +251,7 @@ def _seed_strat_units(session: Session, csv_path: Path, chart: StratChart) -> No
                 StratUnit(
                     id=unit_id,
                     name=(row.get('unit_name') or '').strip(),
+                    unit_code=(row.get('strat_index') or row.get('unit_code') or row.get('unit_abbrev') or '').strip() or None,
                     rank=(row.get('rank_name') or '').strip() or None,
                     parent_id=parent_id,
                     age_top_ma=float(row['end_age_ma']) if (row.get('end_age_ma') or '').strip() else None,

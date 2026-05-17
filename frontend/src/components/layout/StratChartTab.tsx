@@ -1,7 +1,7 @@
-import { useEffect, useLayoutEffect, useRef } from 'react'
+import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
 
 import { defaultSeaLevelOverlayStyle, useViewStore, useWellDataStore, useWorkspaceStore } from '@/stores'
-import type { StratChartInfo } from '@/types'
+import type { StratChartInfo, StratUnitOption } from '@/types'
 import { useDataManager } from './dataManager/DataManagerContext'
 
 interface StratChartTabProps {
@@ -66,6 +66,50 @@ function OverlayAllCheckbox({ curveIds, selectedCurveIds, onChange }: OverlayAll
   )
 }
 
+interface StratUnitTreeNode {
+  unit: StratUnitOption
+  children: StratUnitTreeNode[]
+}
+
+async function fetchChartUnits(chartId: number): Promise<StratUnitOption[]> {
+  const params = new URLSearchParams({ chart_id: String(chartId), limit: '1000' })
+  const response = await fetch(`/api/strat-units?${params.toString()}`)
+  if (!response.ok) {
+    throw new Error(`Failed to load strat units (${response.status})`)
+  }
+  return (await response.json()) as StratUnitOption[]
+}
+
+function unitSortKey(unit: StratUnitOption): number {
+  return unit.age_top_ma ?? unit.age_base_ma ?? Number.POSITIVE_INFINITY
+}
+
+function buildUnitTree(units: StratUnitOption[]): StratUnitTreeNode[] {
+  const nodes = new Map<number, StratUnitTreeNode>()
+  for (const unit of units) {
+    nodes.set(unit.id, { unit, children: [] })
+  }
+
+  const roots: StratUnitTreeNode[] = []
+  for (const node of nodes.values()) {
+    const parentId = node.unit.parent_id
+    const parent = parentId !== null && parentId !== undefined ? nodes.get(parentId) : null
+    if (parent) parent.children.push(node)
+    else roots.push(node)
+  }
+
+  const sortNodes = (items: StratUnitTreeNode[]) => {
+    items.sort((a, b) => {
+      const ageDelta = unitSortKey(a.unit) - unitSortKey(b.unit)
+      if (ageDelta !== 0) return ageDelta
+      return a.unit.name.localeCompare(b.unit.name)
+    })
+    for (const item of items) sortNodes(item.children)
+  }
+  sortNodes(roots)
+  return roots
+}
+
 export function StratChartTab({
   charts,
   onActivate,
@@ -91,6 +135,8 @@ export function StratChartTab({
   const selectedCurveId = selectedObject?.type === 'sea-level-curve' ? selectedObject.curveId : null
   const isSeaLevelRootSelected = selectedObject?.type === 'sea-level-curves-root'
   const didInitializeExpanded = useRef(false)
+  const [unitsByChartId, setUnitsByChartId] = useState<Record<number, StratUnitOption[]>>({})
+  const [unitLoadErrors, setUnitLoadErrors] = useState<Record<number, string>>({})
   const activeWellCurveId = wellInventories.find((well) => well.well_id === activeWellId)?.active_sea_level_curve_id ?? null
   const effectiveOverlayCurveIds = overlayCurveIds.length > 0
     ? overlayCurveIds
@@ -105,6 +151,40 @@ export function StratChartTab({
     setExpanded('strat-charts-root', true)
     setExpanded('sea-level-curves-root', true)
   }, [setExpanded])
+
+  useEffect(() => {
+    if (charts.length === 0) {
+      setUnitsByChartId({})
+      setUnitLoadErrors({})
+      return
+    }
+
+    let cancelled = false
+    void Promise.all(
+      charts.map((chart) =>
+        fetchChartUnits(chart.id)
+          .then((units) => ({ chartId: chart.id, units, error: null }))
+          .catch((cause: unknown) => ({
+            chartId: chart.id,
+            units: [] as StratUnitOption[],
+            error: cause instanceof Error ? cause.message : 'Failed to load strat units',
+          })),
+      ),
+    ).then((results) => {
+      if (cancelled) return
+      setUnitsByChartId(Object.fromEntries(results.map((result) => [result.chartId, result.units])))
+      setUnitLoadErrors(Object.fromEntries(results.flatMap((result) => result.error ? [[result.chartId, result.error]] : [])))
+      const activeChart = charts.find((chart) => chart.is_active)
+      if (activeChart) setExpanded(`strat-chart-${activeChart.id}`, true)
+    })
+
+    return () => { cancelled = true }
+  }, [charts, setExpanded])
+
+  const unitTreesByChartId = useMemo(
+    () => Object.fromEntries(Object.entries(unitsByChartId).map(([chartId, units]) => [Number(chartId), buildUnitTree(units)])),
+    [unitsByChartId],
+  )
 
   const isCurveInUse = (curveId: number) =>
     wellInventories.some((w) => w.active_sea_level_curve_id === curveId)
@@ -129,6 +209,51 @@ export function StratChartTab({
     return (seaLevelOverlayStyles[curveId] ?? defaultSeaLevelOverlayStyle(curveId)).colorHex
   }
 
+  function renderStratUnitNode(node: StratUnitTreeNode) {
+    const unitKey = `strat-unit-${node.unit.id}`
+    const hasChildren = node.children.length > 0
+    return (
+      <div key={node.unit.id} className="tree-node">
+        <div className="tree-node__row">
+          {hasChildren ? (
+            <TreeToggleButton
+              isOpen={isExpanded(unitKey)}
+              onToggle={() => toggleExpanded(unitKey)}
+            />
+          ) : (
+            <span className="tree-toggle tree-toggle--spacer">&gt;</span>
+          )}
+          <span className="dm-object-color-bar" style={{ ['--dm-object-color' as string]: node.unit.color_hex ?? '#9ca3af' }} />
+          <span className="tree-node__label-button strat-unit-tree-label">
+            {node.unit.name}{node.unit.unit_code ? ` (${node.unit.unit_code})` : ''}
+          </span>
+          {node.unit.rank ? <span className="tree-node__badge">{node.unit.rank}</span> : null}
+        </div>
+        {hasChildren && isExpanded(unitKey) ? (
+          <div className="tree-node__children">
+            {node.children.map((child) => renderStratUnitNode(child))}
+          </div>
+        ) : null}
+      </div>
+    )
+  }
+
+  function renderChartUnits(chart: StratChartInfo) {
+    const units = unitTreesByChartId[chart.id] ?? []
+    const loadError = unitLoadErrors[chart.id]
+    return (
+      <div key={`strat-chart-units-${chart.id}`} className="tree-node__children strat-chart-unit-tree">
+        {loadError ? (
+          <p className="sidebar-panel__empty">{loadError}</p>
+        ) : units.length === 0 ? (
+          <p className="sidebar-panel__empty">No units loaded.</p>
+        ) : (
+          units.map((unit) => renderStratUnitNode(unit))
+        )}
+      </div>
+    )
+  }
+
   return (
     <div className="sidebar-panel__body">
       <div className="tree-list">
@@ -150,15 +275,19 @@ export function StratChartTab({
               {charts.length === 0 ? (
                 <p className="sidebar-panel__empty">No stratigraphic charts loaded. Use StratChart &gt; Load StratChart.</p>
               ) : charts.map((chart) => (
-                <div
-                  key={chart.id}
-                  className={`tree-node__row ${chart.is_active ? 'tree-node__row--active' : ''} ${selectedChartId === chart.id ? 'tree-node__row--selected' : ''}`}
-                  onClick={() => onSelect(chart.id)}
-                  onContextMenu={(event) => {
-                    onSelect(chart.id)
-                    onContextMenu(event, chart)
-                  }}
-                >
+                <div key={chart.id} className="tree-node">
+                  <div
+                    className={`tree-node__row ${chart.is_active ? 'tree-node__row--active' : ''} ${selectedChartId === chart.id ? 'tree-node__row--selected' : ''}`}
+                    onClick={() => onSelect(chart.id)}
+                    onContextMenu={(event) => {
+                      onSelect(chart.id)
+                      onContextMenu(event, chart)
+                    }}
+                  >
+                  <TreeToggleButton
+                    isOpen={isExpanded(`strat-chart-${chart.id}`)}
+                    onToggle={() => toggleExpanded(`strat-chart-${chart.id}`)}
+                  />
                   <input
                     type="radio"
                     name="active-strat-chart"
@@ -194,6 +323,8 @@ export function StratChartTab({
                   >
                     ✕
                   </button>
+                  </div>
+                  {isExpanded(`strat-chart-${chart.id}`) ? renderChartUnits(chart) : null}
                 </div>
               ))}
             </div>

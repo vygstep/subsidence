@@ -150,7 +150,9 @@ def test_new_project_seeds_builtin_reference_data(api_client: TestClient, tmp_pa
     with manager.get_session() as session:
         builtin_chart = session.scalar(sa_select(StratChart).where(StratChart.name == 'ICS 2023'))
         assert builtin_chart is not None
-        assert len(session.scalars(sa_select(StratUnit).where(StratUnit.chart_id == builtin_chart.id)).all()) > 0
+        builtin_units = session.scalars(sa_select(StratUnit).where(StratUnit.chart_id == builtin_chart.id)).all()
+        assert len(builtin_units) > 0
+        assert any(unit.unit_code for unit in builtin_units)
 
         sea_level_curves = session.scalars(
             sa_select(SeaLevelCurve).where(SeaLevelCurve.is_builtin.is_(True))
@@ -691,15 +693,16 @@ def test_strat_chart_import_requires_mapping_and_validates_parent_age_interval(a
 
     chart_csv = tmp_path / 'mapped_chart.csv'
     chart_csv.write_text(
-        'id,parent,name,rank,base,top,color\n'
-        '1,,System A,system,50,0,#123456\n'
-        '2,1,Stage A,stage,25,5,#abcdef\n',
+        'id,parent,name,code,rank,base,top,color\n'
+        '1,,System A,SA,system,50,0,#123456\n'
+        '2,1,Stage A,Sta,stage,25,5,#abcdef\n',
         encoding='utf-8',
     )
     column_map = {
         'unit_id': 'id',
         'parent_unit_id': 'parent',
         'unit_name': 'name',
+        'unit_code': 'code',
         'rank_name': 'rank',
         'start_age_ma': 'base',
         'end_age_ma': 'top',
@@ -709,6 +712,19 @@ def test_strat_chart_import_requires_mapping_and_validates_parent_age_interval(a
     response = api_client.post('/api/strat-charts/import', json={'csv_path': str(chart_csv), 'column_map': column_map})
     assert response.status_code == 200, response.text
     assert response.json()['units_imported'] == 2
+
+    response = api_client.get('/api/strat-charts')
+    assert response.status_code == 200, response.text
+    chart = next(chart for chart in response.json() if chart['name'] == 'mapped_chart')
+    response = api_client.get('/api/strat-units', params={'chart_id': chart['id'], 'limit': '1000'})
+    assert response.status_code == 200, response.text
+    units = {unit['name']: unit for unit in response.json()}
+    assert units['System A']['parent_id'] is None
+    assert units['System A']['chart_id'] == chart['id']
+    assert units['System A']['unit_code'] == 'SA'
+    assert units['Stage A']['parent_id'] == units['System A']['id']
+    assert units['Stage A']['chart_id'] == chart['id']
+    assert units['Stage A']['unit_code'] == 'Sta'
 
     invalid_csv = tmp_path / 'invalid_chart.csv'
     invalid_csv.write_text(
@@ -720,7 +736,44 @@ def test_strat_chart_import_requires_mapping_and_validates_parent_age_interval(a
 
     response = api_client.post('/api/strat-charts/import', json={'csv_path': str(invalid_csv), 'column_map': column_map})
     assert response.status_code == 422, response.text
+    assert 'line 3' in response.json()['detail']
     assert 'outside parent' in response.json()['detail']
+
+
+def test_strat_chart_import_validates_rank_hierarchy(api_client: TestClient, tmp_path: Path) -> None:
+    _create_project(api_client, tmp_path, 'strat-chart-rank-validation')
+
+    column_map = {
+        'unit_id': 'id',
+        'parent_unit_id': 'parent',
+        'unit_name': 'name',
+        'rank_name': 'rank',
+        'start_age_ma': 'base',
+        'end_age_ma': 'top',
+    }
+
+    invalid_rank_order_csv = tmp_path / 'invalid_rank_order.csv'
+    invalid_rank_order_csv.write_text(
+        'id,parent,name,rank,base,top\n'
+        '1,,Stage Parent,stage,50,0\n'
+        '2,1,System Child,system,25,5\n',
+        encoding='utf-8',
+    )
+    response = api_client.post('/api/strat-charts/import', json={'csv_path': str(invalid_rank_order_csv), 'column_map': column_map})
+    assert response.status_code == 422, response.text
+    assert 'line 3' in response.json()['detail']
+    assert 'system cannot be child of stage' in response.json()['detail'].lower()
+
+    unknown_rank_csv = tmp_path / 'unknown_rank.csv'
+    unknown_rank_csv.write_text(
+        'id,parent,name,rank,base,top\n'
+        '1,,Custom Unit,custom_rank,50,0\n',
+        encoding='utf-8',
+    )
+    response = api_client.post('/api/strat-charts/import', json={'csv_path': str(unknown_rank_csv), 'column_map': column_map})
+    assert response.status_code == 422, response.text
+    assert 'line 2' in response.json()['detail']
+    assert 'Unknown rank "custom_rank"' in response.json()['detail']
 
 
 def test_strat_chart_import_accepts_rgb_and_cmyk_color_columns(api_client: TestClient, tmp_path: Path) -> None:

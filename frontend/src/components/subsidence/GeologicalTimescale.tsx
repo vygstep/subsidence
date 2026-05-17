@@ -1,5 +1,5 @@
-import { GEOLOGIC_ERAS, GEOLOGIC_PERIODS } from '@/utils/geologicalTimescale'
-import type { GeologicUnit } from '@/utils/geologicalTimescale'
+import type { StratUnitOption } from '@/types'
+import { buildStratTimescaleRows, type StratTimescaleUnitLabelMode, type TimescaleBlockUnit } from '@/utils/stratTimescale'
 
 interface TimeRange {
   min_ma: number
@@ -11,6 +11,10 @@ interface GeologicalTimescaleProps {
   height?: number
   paddingLeft?: number
   paddingRight?: number
+  stratUnits?: StratUnitOption[]
+  upperRank?: string | null
+  lowerRank?: string | null
+  labelMode?: StratTimescaleUnitLabelMode
 }
 
 function TimescaleRow({
@@ -20,7 +24,7 @@ function TimescaleRow({
   rowHeight,
   minWidthPctForLabel,
 }: {
-  units: GeologicUnit[]
+  units: TimescaleBlockUnit[]
   minMa: number
   maxMa: number
   rowHeight: number
@@ -40,7 +44,7 @@ function TimescaleRow({
     <div style={{ position: 'relative', height: rowHeight, overflow: 'hidden', flexShrink: 0 }}>
       {blocks.map(({ unit, leftPct, widthPct }) => (
         <div
-          key={unit.name}
+          key={unit.id}
           style={{
             position: 'absolute',
             left: `${leftPct}%`,
@@ -54,7 +58,7 @@ function TimescaleRow({
             alignItems: 'center',
             justifyContent: 'center',
           }}
-          title={`${unit.name} (${unit.start_ma}–${unit.end_ma} Ma)`}
+          title={`${unit.name} (${unit.start_ma}-${unit.end_ma} Ma)`}
         >
           <span
             style={{
@@ -68,7 +72,7 @@ function TimescaleRow({
               textAlign: 'center',
             }}
           >
-            {widthPct > minWidthPctForLabel ? unit.abbreviation : ''}
+            {widthPct > minWidthPctForLabel ? unit.label : ''}
           </span>
         </div>
       ))}
@@ -81,42 +85,54 @@ export function GeologicalTimescale({
   height = 52,
   paddingLeft = 0,
   paddingRight = 0,
+  stratUnits = [],
+  upperRank = null,
+  lowerRank = null,
+  labelMode = 'auto',
 }: GeologicalTimescaleProps) {
   const { min_ma, max_ma } = timeRange
-  const eraRowH = Math.round(height / 2)
-  const periodRowH = height - eraRowH
+  const upperRowH = Math.round(height / 2)
+  const lowerRowH = height - upperRowH
+  const rows = buildStratTimescaleRows({
+    units: stratUnits,
+    minMa: min_ma,
+    maxMa: max_ma,
+    upperRank,
+    lowerRank,
+    labelMode,
+  })
 
   return (
     <div
       className="geological-timescale"
       style={{ height, display: 'flex', flexDirection: 'column', flexShrink: 0 }}
     >
-      {([
-        { units: GEOLOGIC_ERAS, rowHeight: eraRowH, minPct: 3 },
-        { units: GEOLOGIC_PERIODS, rowHeight: periodRowH, minPct: 4 },
-      ] as const).map(({ units, rowHeight, minPct }, i) => (
-        <div key={i} style={{ display: 'flex', alignItems: 'stretch', height: rowHeight, flexShrink: 0 }}>
-          {paddingLeft > 0 && <div style={{ width: paddingLeft, flexShrink: 0 }} />}
-          <div style={{
-            flex: 1,
-            position: 'relative',
-            overflow: 'hidden',
-            marginRight: paddingRight,
-            borderLeft: '1px solid #000',
-            borderRight: '1px solid #000',
-            borderTop: i === 0 ? '1px solid #000' : undefined,
-            borderBottom: '1px solid #000',
-          }}>
-            <TimescaleRow
-              units={units}
-              minMa={min_ma}
-              maxMa={max_ma}
-              rowHeight={rowHeight}
-              minWidthPctForLabel={minPct}
-            />
+      {rows.map(({ units }, i) => {
+        const rowHeight = i === 0 ? upperRowH : lowerRowH
+        return (
+          <div key={i} style={{ display: 'flex', alignItems: 'stretch', height: rowHeight, flexShrink: 0 }}>
+            {paddingLeft > 0 && <div style={{ width: paddingLeft, flexShrink: 0 }} />}
+            <div style={{
+              flex: 1,
+              position: 'relative',
+              overflow: 'hidden',
+              marginRight: paddingRight,
+              borderLeft: '1px solid #000',
+              borderRight: '1px solid #000',
+              borderTop: i === 0 ? '1px solid #000' : undefined,
+              borderBottom: '1px solid #000',
+            }}>
+              <TimescaleRow
+                units={units}
+                minMa={min_ma}
+                maxMa={max_ma}
+                rowHeight={rowHeight}
+                minWidthPctForLabel={i === 0 ? 3 : 4}
+              />
+            </div>
           </div>
-        </div>
-      ))}
+        )
+      })}
     </div>
   )
 }

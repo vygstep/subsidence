@@ -61,6 +61,9 @@ export function MultiWellPanel() {
   const subsidenceViewport = useViewStore((s) => s.subsidenceMultiViewport)
   const reconstructStratUnitId = useViewStore((s) => s.subsidenceReconstructStratUnitId)
   const truncateBelowStratUnitId = useViewStore((s) => s.subsidenceTruncateBelowStratUnitId)
+  const stratTimescaleUpperRank = useViewStore((s) => s.stratTimescaleUpperRank)
+  const stratTimescaleLowerRank = useViewStore((s) => s.stratTimescaleLowerRank)
+  const stratTimescaleLabelMode = useViewStore((s) => s.stratTimescaleLabelMode)
   const setSubsidenceViewport = useViewStore((s) => s.setSubsidenceMultiViewport)
   const setSubsidenceDisplayedRange = useViewStore((s) => s.setSubsidenceMultiDisplayedRange)
 
@@ -566,6 +569,10 @@ export function MultiWellPanel() {
         height={TIMESCALE_HEIGHT}
         paddingLeft={PADDING.left}
         paddingRight={PADDING.right}
+        stratUnits={stratUnits}
+        upperRank={stratTimescaleUpperRank}
+        lowerRank={stratTimescaleLowerRank}
+        labelMode={stratTimescaleLabelMode}
       />
       <div
         className="multi-well-canvas-wrapper"

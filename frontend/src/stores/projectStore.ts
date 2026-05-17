@@ -3,7 +3,7 @@ import { create } from 'zustand'
 import { rememberProjectBundlePath } from '@/components/layout/pathMemory'
 import { recordOperation } from '@/utils/diagnostics'
 
-import { useViewStore, type DepthTrackConfig, type FormationsTrackConfig, type SeaLevelOverlayStyle, type SubsidenceModelType, type SubsidenceModelConfig } from './viewStore'
+import { useViewStore, type DepthTrackConfig, type FormationsTrackConfig, type SeaLevelOverlayStyle, type SubsidenceModelType, type SubsidenceModelConfig, type StratTimescaleLabelMode } from './viewStore'
 import { useWellDataStore } from './wellDataStore'
 import { useWorkspaceStore } from './workspaceStore'
 
@@ -98,6 +98,9 @@ interface VisualConfigPayload {
   seaLevelOverlayStyles?: Record<string, Partial<SeaLevelOverlayStyle>>
   subsidenceReconstructStratUnitId?: number | null
   subsidenceTruncateBelowStratUnitId?: number | null
+  stratTimescaleUpperRank?: string | null
+  stratTimescaleLowerRank?: string | null
+  stratTimescaleLabelMode?: StratTimescaleLabelMode
 }
 
 interface ProjectStatusResponse {
@@ -178,6 +181,22 @@ async function openProjectRequest(path: string): Promise<OpenProjectResponse> {
   return (await response.json()) as OpenProjectResponse
 }
 
+async function hydrateProjectReferenceData(): Promise<void> {
+  const store = useWellDataStore.getState()
+  await Promise.all([
+    store.loadStratCharts(),
+    store.loadTopSets(),
+    store.loadSeaLevelCurves(),
+    store.loadCompactionModels(),
+    store.loadCompactionPresets(),
+    store.loadMnemonicSets(),
+    store.loadUnitDimensions(),
+    store.loadLithologyDictionary(),
+    store.loadLithologySets(),
+    store.loadLithologyPatternPalettes(),
+  ])
+}
+
 async function postAction(path: string): Promise<void> {
   const response = await fetch(path, { method: 'POST' })
   if (!response.ok) {
@@ -252,6 +271,9 @@ function applyVisualConfigPayload(config: Record<string, unknown>): void {
     seaLevelOverlayStyles: payload.seaLevelOverlayStyles,
     subsidenceReconstructStratUnitId: payload.subsidenceReconstructStratUnitId,
     subsidenceTruncateBelowStratUnitId: payload.subsidenceTruncateBelowStratUnitId,
+    stratTimescaleUpperRank: payload.stratTimescaleUpperRank,
+    stratTimescaleLowerRank: payload.stratTimescaleLowerRank,
+    stratTimescaleLabelMode: payload.stratTimescaleLabelMode,
   })
   useWellDataStore.getState().setColorOverrides(payload.curveColors ?? {})
 }
@@ -295,6 +317,9 @@ export function collectProjectVisualConfig(): VisualConfigPayload {
     seaLevelOverlayStyles: vs.seaLevelOverlayStyles,
     subsidenceReconstructStratUnitId: vs.subsidenceReconstructStratUnitId,
     subsidenceTruncateBelowStratUnitId: vs.subsidenceTruncateBelowStratUnitId,
+    stratTimescaleUpperRank: vs.stratTimescaleUpperRank,
+    stratTimescaleLowerRank: vs.stratTimescaleLowerRank,
+    stratTimescaleLabelMode: vs.stratTimescaleLabelMode,
   }
 }
 
@@ -381,6 +406,7 @@ export const useProjectStore = create<ProjectStore>((set, get) => ({
         visualConfigSaveToken: 0,
       })
       rememberProjectBundlePath(payload.project_path)
+      await hydrateProjectReferenceData()
       try {
         await get().loadRecentProjects()
       } catch {
@@ -513,10 +539,8 @@ export const useProjectStore = create<ProjectStore>((set, get) => ({
         canUndo: payload.can_undo,
         canRedo: payload.can_redo,
       })
+      await hydrateProjectReferenceData()
       await useWellDataStore.getState().loadWellInventories()
-      await useWellDataStore.getState().loadStratCharts()
-      await useWellDataStore.getState().loadSeaLevelCurves()
-      await useWellDataStore.getState().loadTopSets()
       await useWellDataStore.getState().refreshWell()
     }, { projectPath: get().projectPath, details: { checkpointId } })
     if (!checkpoint) throw new Error('Checkpoint was not restored')

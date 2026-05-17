@@ -1,7 +1,8 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 
 import { useViewStore, useWellDataStore } from '@/stores'
 import type { StratUnitOption, TopSetSummary } from '@/types'
+import { buildStratTimescaleRows } from '@/utils/stratTimescale'
 
 async function fetchStratUnits(chartId: number): Promise<StratUnitOption[]> {
   const params = new URLSearchParams({ chart_id: String(chartId), limit: '1000' })
@@ -25,18 +26,21 @@ function formatUnitAge(unit: StratUnitOption): string {
 
 export function ModelsRootSettings() {
   const wellInventories = useWellDataStore((s) => s.wellInventories)
+  const formations = useWellDataStore((s) => s.formations)
   const seaLevelCurves = useWellDataStore((s) => s.seaLevelCurves)
   const stratCharts = useWellDataStore((s) => s.stratCharts)
   const setWellActiveTopSet = useWellDataStore((s) => s.setWellActiveTopSet)
   const setWellActiveSeaLevelCurve = useWellDataStore((s) => s.setWellActiveSeaLevelCurve)
   const reconstructStratUnitId = useViewStore((s) => s.subsidenceReconstructStratUnitId)
   const truncateBelowStratUnitId = useViewStore((s) => s.subsidenceTruncateBelowStratUnitId)
+  const lowerRank = useViewStore((s) => s.stratTimescaleLowerRank)
   const setReconstructStratUnitId = useViewStore((s) => s.setSubsidenceReconstructStratUnitId)
   const setTruncateBelowStratUnitId = useViewStore((s) => s.setSubsidenceTruncateBelowStratUnitId)
 
   const [selectedWellId, setSelectedWellId] = useState<string>('')
   const [topSets, setTopSets] = useState<TopSetSummary[]>([])
   const [stratUnits, setStratUnits] = useState<StratUnitOption[]>([])
+  const [showAllCutoffUnits, setShowAllCutoffUnits] = useState(false)
   const [isSaving, setIsSaving] = useState(false)
   const [stratUnitError, setStratUnitError] = useState<string | null>(null)
 
@@ -85,7 +89,56 @@ export function ModelsRootSettings() {
   }, [activeChart])
 
   const selectedInventory = wellInventories.find((w) => w.well_id === selectedWellId) ?? null
-  const stratUnitControlsDisabled = activeChart === null || stratUnits.length === 0
+  const modelAgeRange = useMemo(() => {
+    const ages = [
+      ...wellInventories.flatMap((well) => well.zones.flatMap((zone) => [
+        zone.upper_horizon.age_ma,
+        zone.lower_horizon.age_ma,
+      ])),
+      ...formations.flatMap((formation) => [formation.age_ma, formation.age_base_ma]),
+    ].filter((age): age is number => Number.isFinite(age))
+    if (ages.length === 0) return null
+    return { minMa: Math.min(...ages), maxMa: Math.max(...ages) }
+  }, [formations, wellInventories])
+  const modelStratUnits = useMemo(() => {
+    if (modelAgeRange === null) return stratUnits
+    return stratUnits.filter((unit) => {
+      const top = unit.age_top_ma
+      const base = unit.age_base_ma
+      if (!Number.isFinite(top) || !Number.isFinite(base)) return false
+      return Math.max(top ?? 0, modelAgeRange.minMa) < Math.min(base ?? 0, modelAgeRange.maxMa)
+    })
+  }, [modelAgeRange, stratUnits])
+  const visibleCutoffStratUnits = useMemo(() => {
+    const ages = modelStratUnits.flatMap((unit) => [unit.age_top_ma, unit.age_base_ma])
+      .filter((age): age is number => Number.isFinite(age))
+    if (ages.length === 0) return []
+    const rows = buildStratTimescaleRows({
+      units: modelStratUnits,
+      minMa: Math.min(...ages),
+      maxMa: Math.max(...ages),
+      upperRank: null,
+      lowerRank,
+    })
+    const secondRowIds = new Set(
+      (rows[1]?.units ?? [])
+        .map((unit) => Number(String(unit.id).replace(/^fallback-/, '')))
+        .filter((id) => Number.isFinite(id)),
+    )
+    return modelStratUnits.filter((unit) => secondRowIds.has(unit.id))
+  }, [lowerRank, modelStratUnits])
+  const cutoffStratUnits = showAllCutoffUnits ? stratUnits : visibleCutoffStratUnits
+  const stratUnitControlsDisabled = activeChart === null || cutoffStratUnits.length === 0
+
+  useEffect(() => {
+    const visibleIds = new Set(cutoffStratUnits.map((unit) => unit.id))
+    if (reconstructStratUnitId !== null && !visibleIds.has(reconstructStratUnitId)) {
+      setReconstructStratUnitId(null)
+    }
+    if (truncateBelowStratUnitId !== null && !visibleIds.has(truncateBelowStratUnitId)) {
+      setTruncateBelowStratUnitId(null)
+    }
+  }, [cutoffStratUnits, reconstructStratUnitId, setReconstructStratUnitId, setTruncateBelowStratUnitId, truncateBelowStratUnitId])
 
   async function handleTopSetChange(value: string) {
     if (!selectedWellId || !value) return
@@ -127,14 +180,27 @@ export function ModelsRootSettings() {
         <select
           value={reconstructStratUnitId ?? ''}
           disabled={stratUnitControlsDisabled}
-          onChange={(event) => setReconstructStratUnitId(event.target.value === '' ? null : Number(event.target.value))}
+          onChange={(event) => {
+            if (event.target.value === '__show_all__') {
+              setShowAllCutoffUnits(true)
+              return
+            }
+            if (event.target.value === '__show_visible__') {
+              setShowAllCutoffUnits(false)
+              return
+            }
+            setReconstructStratUnitId(event.target.value === '' ? null : Number(event.target.value))
+          }}
         >
           <option value="">None</option>
-          {stratUnits.map((unit) => (
+          {cutoffStratUnits.map((unit) => (
             <option key={unit.id} value={unit.id}>
               {unit.name} ({formatUnitAge(unit)})
             </option>
           ))}
+          {showAllCutoffUnits
+            ? <option value="__show_visible__">Show visible</option>
+            : <option value="__show_all__">Show all</option>}
         </select>
       </div>
 
@@ -150,14 +216,27 @@ export function ModelsRootSettings() {
         <select
           value={truncateBelowStratUnitId ?? ''}
           disabled={stratUnitControlsDisabled}
-          onChange={(event) => setTruncateBelowStratUnitId(event.target.value === '' ? null : Number(event.target.value))}
+          onChange={(event) => {
+            if (event.target.value === '__show_all__') {
+              setShowAllCutoffUnits(true)
+              return
+            }
+            if (event.target.value === '__show_visible__') {
+              setShowAllCutoffUnits(false)
+              return
+            }
+            setTruncateBelowStratUnitId(event.target.value === '' ? null : Number(event.target.value))
+          }}
         >
           <option value="">None</option>
-          {stratUnits.map((unit) => (
+          {cutoffStratUnits.map((unit) => (
             <option key={unit.id} value={unit.id}>
               {unit.name} ({formatUnitAge(unit)})
             </option>
           ))}
+          {showAllCutoffUnits
+            ? <option value="__show_visible__">Show visible</option>
+            : <option value="__show_all__">Show all</option>}
         </select>
       </div>
 

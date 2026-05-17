@@ -16,6 +16,7 @@ export interface SubsidenceChartViewport {
 
 export type SubsidenceModelType = 'total' | 'decompaction' | 'airy' | 'stepwise' | 'thermal'
 export type SeaLevelOverlayLineStyle = 'solid' | 'dashed' | 'dotted'
+export type StratTimescaleLabelMode = 'auto' | 'unit-name' | 'unit-code'
 
 export interface SeaLevelOverlayStyle {
   colorHex: string
@@ -53,6 +54,9 @@ interface VisualConfigPayload {
   seaLevelOverlayStyles?: Record<string, Partial<SeaLevelOverlayStyle>>
   subsidenceReconstructStratUnitId?: number | null
   subsidenceTruncateBelowStratUnitId?: number | null
+  stratTimescaleUpperRank?: string | null
+  stratTimescaleLowerRank?: string | null
+  stratTimescaleLabelMode?: StratTimescaleLabelMode
 }
 
 export type SelectedElementType = 'curve' | 'track' | 'formation'
@@ -115,6 +119,9 @@ export interface ViewStore {
   seaLevelOverlayStyles: Record<number, SeaLevelOverlayStyle>
   subsidenceReconstructStratUnitId: number | null
   subsidenceTruncateBelowStratUnitId: number | null
+  stratTimescaleUpperRank: string | null
+  stratTimescaleLowerRank: string | null
+  stratTimescaleLabelMode: StratTimescaleLabelMode
   setScroll: (depth: number) => void
   setScale: (dpp: number) => void
   setCursorDepth: (depth: number | null) => void
@@ -152,6 +159,9 @@ export interface ViewStore {
   updateSeaLevelOverlayStyle: (id: number, patch: Partial<SeaLevelOverlayStyle>) => void
   setSubsidenceReconstructStratUnitId: (stratUnitId: number | null) => void
   setSubsidenceTruncateBelowStratUnitId: (stratUnitId: number | null) => void
+  setStratTimescaleUpperRank: (rank: string | null) => void
+  setStratTimescaleLowerRank: (rank: string | null) => void
+  setStratTimescaleLabelMode: (mode: StratTimescaleLabelMode) => void
   lodEnabled: boolean
   setLodEnabled: (v: boolean) => void
   applyActiveWellTrackWidths: (trackWidths: Record<string, number>) => void
@@ -195,6 +205,10 @@ const initialFormationsTrackConfig: FormationsTrackConfig = {
   markerLabelPosition: 'left',
   zoneLabelPosition: 'center',
 }
+
+const initialStratTimescaleUpperRank = 'erathem'
+const initialStratTimescaleLowerRank = 'system'
+const initialStratTimescaleLabelMode: StratTimescaleLabelMode = 'auto'
 
 const SEA_LEVEL_OVERLAY_PALETTE = ['#0891b2', '#7c3aed', '#ea580c', '#16a34a', '#dc2626', '#2563eb']
 
@@ -277,6 +291,9 @@ export const useViewStore = create<ViewStore>((set) => ({
   seaLevelOverlayStyles: {},
   subsidenceReconstructStratUnitId: null,
   subsidenceTruncateBelowStratUnitId: null,
+  stratTimescaleUpperRank: initialStratTimescaleUpperRank,
+  stratTimescaleLowerRank: initialStratTimescaleLowerRank,
+  stratTimescaleLabelMode: initialStratTimescaleLabelMode,
   lodEnabled: false,
   setScroll(depth) {
     set((state) => ({
@@ -419,6 +436,27 @@ export const useViewStore = create<ViewStore>((set) => ({
       subsidenceMultiViewport: null,
     })
   },
+  setStratTimescaleUpperRank(rank) {
+    set({
+      stratTimescaleUpperRank: rank,
+      subsidenceSingleViewport: null,
+      subsidenceMultiViewport: null,
+    })
+  },
+  setStratTimescaleLowerRank(rank) {
+    set({
+      stratTimescaleLowerRank: rank,
+      subsidenceSingleViewport: null,
+      subsidenceMultiViewport: null,
+    })
+  },
+  setStratTimescaleLabelMode(mode) {
+    set({
+      stratTimescaleLabelMode: mode,
+      subsidenceSingleViewport: null,
+      subsidenceMultiViewport: null,
+    })
+  },
   updateSubsidenceModelConfig(modelType, patch) {
     set((state) => ({
       subsidenceModelConfigs: {
@@ -488,6 +526,9 @@ export const useViewStore = create<ViewStore>((set) => ({
           : state.seaLevelOverlayStyles,
         subsidenceReconstructStratUnitId: 'subsidenceReconstructStratUnitId' in config ? config.subsidenceReconstructStratUnitId ?? null : state.subsidenceReconstructStratUnitId,
         subsidenceTruncateBelowStratUnitId: 'subsidenceTruncateBelowStratUnitId' in config ? config.subsidenceTruncateBelowStratUnitId ?? null : state.subsidenceTruncateBelowStratUnitId,
+        stratTimescaleUpperRank: 'stratTimescaleUpperRank' in config ? config.stratTimescaleUpperRank ?? initialStratTimescaleUpperRank : state.stratTimescaleUpperRank,
+        stratTimescaleLowerRank: 'stratTimescaleLowerRank' in config ? config.stratTimescaleLowerRank ?? initialStratTimescaleLowerRank : state.stratTimescaleLowerRank,
+        stratTimescaleLabelMode: config.stratTimescaleLabelMode ?? state.stratTimescaleLabelMode,
         visibleDepthRange: deriveVisibleDepthRange(state.scrollDepth, nextDepthPerPixel, state.viewportHeight),
       }
     })
@@ -519,6 +560,9 @@ export const useViewStore = create<ViewStore>((set) => ({
       seaLevelOverlayStyles: {},
       subsidenceReconstructStratUnitId: null,
       subsidenceTruncateBelowStratUnitId: null,
+      stratTimescaleUpperRank: initialStratTimescaleUpperRank,
+      stratTimescaleLowerRank: initialStratTimescaleLowerRank,
+      stratTimescaleLabelMode: initialStratTimescaleLabelMode,
       visibleDepthRange: deriveVisibleDepthRange(state.scrollDepth, initialDepthPerPixel, state.viewportHeight),
     }))
   },

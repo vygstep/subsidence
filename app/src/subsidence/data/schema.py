@@ -197,6 +197,7 @@ class StratUnit(Base):
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
     name: Mapped[str] = mapped_column(String(256))
+    unit_code: Mapped[str | None] = mapped_column(String(64), nullable=True)
     rank: Mapped[str | None] = mapped_column(String(64), nullable=True)
     parent_id: Mapped[int | None] = mapped_column(
         Integer, ForeignKey("strat_units.id"), nullable=True
