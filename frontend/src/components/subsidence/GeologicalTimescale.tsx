@@ -104,7 +104,7 @@ export function GeologicalTimescale({
       className="geological-timescale"
       style={{ height, display: 'flex', flexDirection: 'column', flexShrink: 0 }}
     >
-      {rows.map(({ units, rank, isFallback }, i) => {
+      {rows.map(({ units }, i) => {
         const rowHeight = i === 0 ? upperRowH : lowerRowH
         return (
           <div key={i} style={{ display: 'flex', alignItems: 'stretch', height: rowHeight, flexShrink: 0 }}>
@@ -126,20 +126,6 @@ export function GeologicalTimescale({
                 rowHeight={rowHeight}
                 minWidthPctForLabel={i === 0 ? 3 : 4}
               />
-              {units.length === 0 || isFallback ? (
-                <div
-                  style={{
-                    position: 'absolute',
-                    right: 4,
-                    top: 2,
-                    fontSize: 9,
-                    color: '#64748b',
-                    pointerEvents: 'none',
-                  }}
-                >
-                  {units.length === 0 ? 'No StratChart units' : `Using ${rank}`}
-                </div>
-              ) : null}
             </div>
           </div>
         )
