@@ -2,7 +2,7 @@
 
 This is the main navigation document for development and maintenance.
 
-Phase contracts are historical execution records. For current architecture and debugging, start here and follow the module links below.
+For current architecture and debugging, start here and follow the module links below.
 
 ---
 
@@ -19,11 +19,14 @@ The current implementation is built around:
 - SQLite + Parquet project bundles on disk
 - WebSocket recalculation path for subsidence results
 - Import Wizard with tabular/LAS preview and column mapping
+- Export workflows for well info, logs, tops, deviation, StratCharts, and sea-level curves
 - Lithology pattern palettes (built-in Equinor SVG set + user uploads)
 - Stratigraphic zone system with lithology aggregation from curves
+- Active StratChart-driven geological timescale and global model cutoff controls
+- Resampled log import/export path with per-well MD reference grids
 - Measurement unit registry and normalization engine
 
-Current active work is tracked in `todo.md`; completed and superseded contracts are archived under `docs/contracts/implemented/`.
+Current active work is tracked in `todo.md`. Completed implementation contracts are local maintainer notes and are intentionally not part of the public documentation tree.
 
 ---
 
@@ -77,26 +80,6 @@ See [Execution Backlog](../todo.md) for active contracts and checkpoint status.
 
 ---
 
-## Implemented Contracts
-
-Implemented or superseded contracts are archived in `contracts/implemented/`. They are useful for understanding why features exist, but they are not the primary current architecture map:
-
-- [Bugs and Features (Phases A-F)](contracts/implemented/bugs_and_features.md)
-- [Bugs and Features 2](contracts/implemented/bugs_and_features_2.md)
-- [1D Well Model Architecture](contracts/implemented/well_1d_model_architecture.md)
-- [1D Well Model Summary](contracts/implemented/well_1d_model_summary.md)
-- [Engineering Maintenance Contract](contracts/implemented/engineering-maintenance-contract.md)
-- [Phase 5 Contract](contracts/implemented/phase5-contract.md)
-- [Phase 4 Contract](contracts/implemented/phase4-contract.md)
-- [Phase 3 Cleanup 2 Contract](contracts/implemented/phase3-cleanup2-contract.md)
-- [Phase 3 Cleanup Contract](contracts/implemented/phase3-cleanup-contract.md)
-- [Phase 3 Contract](contracts/implemented/phase3-contract.md)
-- [Phase 2.5 Data Contract](contracts/implemented/phase2.5-data_contract.md)
-- [Phase 2 Contract](contracts/implemented/phase2-contract.md)
-- [Phase 1 Contract](contracts/implemented/phase1-contract.md)
-
----
-
 ## Current Test Commands
 
 Frontend:
@@ -113,7 +96,7 @@ cd app
 pytest tests
 ```
 
-Recent baseline from 2026-05-09:
+Recent baseline from 2026-05-17:
 
-- Frontend: 57 passed.
-- Backend: run before backend refactors.
+- Frontend: 88 passed.
+- Backend: 156 passed.

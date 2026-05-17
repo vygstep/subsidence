@@ -1,6 +1,6 @@
 # Backend Data Layer Module
 
-This module covers project persistence, importers, schema, undo/redo, and dictionaries.
+This module covers project persistence, importers, schema, undo/redo, dictionaries, and calculation services.
 
 ---
 
@@ -37,20 +37,18 @@ Files:
 
 - `app/src/subsidence/data/schema.py`
 - `app/src/subsidence/data/models.py`
+- `app/src/subsidence/data/engine.py`
 
 Responsibilities:
 
 - SQLAlchemy table definitions.
 - Domain/Pydantic-style data models.
 - Persisted object identity and metadata.
+- SQLite table creation, pragmas, validation, and lightweight migrations.
 
 Rule:
 
-- Any schema change must include compatibility notes or a migration plan.
-
-Migration owner:
-
-- `app/src/subsidence/data/engine.py` handles lightweight project DB migrations and validation.
+- Any schema change must include compatibility notes or a migration plan unless the project format is intentionally reset during development.
 
 ---
 
@@ -58,31 +56,56 @@ Migration owner:
 
 Files:
 
-- `app/src/subsidence/data/importers/__init__.py` — re-exports all public symbols
-- `app/src/subsidence/data/importers/common.py` — shared helpers and well resolution
-- `app/src/subsidence/data/importers/las.py` — LAS import
-- `app/src/subsidence/data/importers/logs_csv.py` — logs CSV import
-- `app/src/subsidence/data/importers/tops.py` — tops and unconformities import
-- `app/src/subsidence/data/importers/deviation.py` — deviation survey import
-- `app/src/subsidence/data/loaders.py` — read curve/deviation payloads from Parquet
-
-All callers import from `data.importers` (package); public function signatures are unchanged.
+- `app/src/subsidence/data/importers/__init__.py` - public importer re-exports.
+- `app/src/subsidence/data/importers/common.py` - shared helpers and well resolution.
+- `app/src/subsidence/data/importers/las.py` - LAS import.
+- `app/src/subsidence/data/importers/logs_csv.py` - logs CSV import.
+- `app/src/subsidence/data/importers/tops.py` - tops and unconformities import.
+- `app/src/subsidence/data/importers/deviation.py` - deviation survey import.
+- `app/src/subsidence/data/importers/wells.py` - wells CSV import.
+- `app/src/subsidence/data/importers/log_resampling.py` - shared log curve resampling helpers.
+- `app/src/subsidence/data/importers/preview.py` - LAS/tabular preview.
+- `app/src/subsidence/data/loaders.py` - read curve/deviation payloads from Parquet.
 
 `common.py` owns:
 
-- CSV reading helpers, numeric parsing, well identity resolution.
+- CSV reading helpers, numeric parsing, and well identity resolution.
 - `create_empty_well`, `apply_imported_well_metadata`.
 - Curve payload writing.
-- ICS utility functions.
-
-`loaders.py` owns reading curve and deviation payload files back from disk. Import tests must verify not only SQLite rows but also payload reopen.
+- Null-value parsing and target-well fallback defaults.
 
 Important import behaviors:
 
-- If target well is explicitly selected, source data without well identity should import into that active target well.
-- If source data has a matching existing well name/identity, import should reuse that well unless user intentionally creates a new one.
-- Tops, logs, and deviation imports must be independent.
-- Imported logs deeper than current TD may update well TD.
+- If target well is explicitly selected, source data without well identity imports into that target well.
+- If source data has a matching existing well name/identity, import should reuse that well unless the user intentionally creates a new one.
+- Tops, logs, deviation, and wells imports must be independent.
+- Imported logs deeper than current TD may update well TD and warn the user.
+- LAS and logs CSV imports resample curves onto a per-well MD reference grid.
+- Continuous curves use linear interpolation.
+- Discrete curves use down-step blocking with null gaps preserved.
+- LAS export uses the same resampling semantics so exported files are project-compatible.
+
+---
+
+## Export Assembly
+
+File:
+
+- `app/src/subsidence/api/export.py`
+
+Although this is an API module, most export assembly currently lives inside the router file.
+
+Export responsibilities:
+
+- Read SQLite metadata and Parquet payloads.
+- Export well info, logs, tops, deviation, StratCharts, and sea-level curves.
+- Write files to a user-selected folder.
+- Optionally package per-well outputs into zip files.
+- Preserve project metadata rather than original source-file metadata.
+
+Refactor direction:
+
+- If export logic grows further, extract pure file builders into `app/src/subsidence/data/exporters/`.
 
 ---
 
@@ -97,6 +120,12 @@ Responsibilities:
 - Record reversible operations.
 - Apply undo/redo.
 - Support project checkpoint operations through API.
+
+Checkpoint behavior:
+
+- Checkpoints store recoverable project state.
+- The create-checkpoint UI collects a user comment and shows compact project statistics.
+- Restore warns that current project state can be replaced.
 
 Common bug areas:
 
@@ -114,22 +143,23 @@ Files:
 - `app/src/subsidence/data/dict_resolver.py`
 - `app/src/subsidence/data/strat_link.py`
 - `app/src/subsidence/data/unit_conversion.py`
-
-Responsibilities:
-
-- Seed built-in curve, lithology, and stratigraphy dictionaries.
-- Resolve curve mnemonic defaults.
-- Link tops to strat chart units.
-- Normalize units.
+- `app/src/subsidence/data/unit_registry.py`
 
 Dictionary payload files:
 
 - `app/src/subsidence/data/dictionaries/curve_families.csv`
-- `app/src/subsidence/data/dictionaries/lithology_defaults.csv`
+- `app/src/subsidence/data/dictionaries/lithology/lithology_core.csv`
+- `app/src/subsidence/data/dictionaries/lithology_sets/default_lithologies.csv`
+- `app/src/subsidence/data/dictionaries/strat_charts/ics_2023.csv`
+- `app/src/subsidence/data/dictionaries/sea_level/sea_level_binned_models.csv`
+- `app/src/subsidence/data/dictionaries/compaction/compaction_presets.csv`
 
-Related frontend defaults:
+Responsibilities:
 
-- `frontend/src/utils/curvePresets.ts`
+- Seed built-in curve, lithology, StratChart, sea-level, unit, and compaction defaults.
+- Resolve curve mnemonic defaults.
+- Link tops to active StratChart units.
+- Normalize units and unit aliases.
 
 Common bug areas:
 
@@ -137,22 +167,28 @@ Common bug areas:
 - Incorrect unit normalization.
 - Tops not linked to the active chart.
 - Backend mnemonic dictionary and frontend visual presets diverge.
+- Built-in dictionaries missing from a new project after project open.
 
 ---
 
-## LOD and Calculations
+## Calculations and Derived Data
 
 Files:
 
 - `app/src/subsidence/data/lttb.py`
 - `app/src/subsidence/data/backstrip.py`
+- `app/src/subsidence/data/deviation_transform.py`
+- `app/src/subsidence/data/zone_service.py`
 
 Responsibilities:
 
 - `lttb.py`: curve downsampling for visible-window endpoints.
 - `backstrip.py`: Athy decompaction and Airy backstripping.
+- `deviation_transform.py`: MD/TVD/TVDSS conversion from deviation surveys.
+- `zone_service.py`: rebuild zones and lithology fractions from top sets and log curves.
 
 Rule:
 
-- Treat `backstrip.py` as scientific logic. Changes need unit tests.
+- Treat `backstrip.py` and `deviation_transform.py` as scientific logic. Changes need focused tests.
+- Treat `zone_service.py` as shared derived-data logic. Changes need cross-well/topset checks.
 - Treat `lttb.py` as performance/display logic. Changes need endpoint and viewer checks.

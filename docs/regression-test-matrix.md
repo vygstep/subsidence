@@ -2,7 +2,7 @@
 
 **Status:** Active test planning document  
 **Created:** 2026-04-23  
-**Scope:** Post-Phase 5 regression coverage for maintenance, logging, and safe refactoring.
+**Scope:** Regression coverage for maintenance, import/export, visualization, and safe refactoring.
 
 This matrix turns critical user workflows into executable test work items. It is not a test implementation report; it is the source list for what must be automated before risky refactors.
 
@@ -10,10 +10,10 @@ This matrix turns critical user workflows into executable test work items. It is
 
 ## 1. Current Baseline
 
-Current automated tests:
+Recent automated baseline from 2026-05-17:
 
-- Backend: `30 passed` via `cd app && pytest tests`
-- Frontend: `34 passed` via `cd frontend && npm run test -- --run`
+- Backend: `156 passed` via `cd app && pytest tests`
+- Frontend: `88 passed` via `cd frontend && npm run test -- --run`
 
 Existing backend tests:
 
@@ -21,6 +21,7 @@ Existing backend tests:
 - `app/tests/integration/test_formation_crud.py`
 - `app/tests/integration/test_formation_depth_persistence.py`
 - `app/tests/integration/test_project_api_workflows.py`
+- Additional backend API/data tests now cover StratChart workflows, export workflows, log resampling, well cleanup, and checkpoints.
 
 Existing frontend tests:
 
@@ -29,8 +30,13 @@ Existing frontend tests:
 - `frontend/src/__tests__/integration/FormationDepthDrag.integration.test.ts`
 - `frontend/src/__tests__/integration/ImportDialogTargetWell.integration.test.tsx`
 - `frontend/src/__tests__/integration/ProjectToolbarMenu.integration.test.tsx`
+- `frontend/src/__tests__/integration/ProjectReferenceHydration.integration.test.ts`
 - `frontend/src/__tests__/integration/VisualConfigHydration.integration.test.ts`
 - `frontend/src/__tests__/integration/WellSwitching.integration.test.ts`
+- `frontend/src/__tests__/unit/depthGrid.test.ts`
+- `frontend/src/__tests__/unit/depthTransform.test.ts`
+- `frontend/src/__tests__/unit/stratTimescale.test.ts`
+- `frontend/src/__tests__/unit/subsidenceChartDomain.test.ts`
 
 ---
 

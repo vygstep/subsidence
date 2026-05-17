@@ -22,10 +22,10 @@ cd app
 pytest tests
 ```
 
-Baseline from 2026-04-23:
+Recent baseline from 2026-05-17:
 
-- Frontend: 34 passed.
-- Backend: 30 passed.
+- Frontend: 88 passed.
+- Backend: 156 passed.
 
 ---
 
@@ -40,6 +40,10 @@ Frontend:
 - Project visual config hydration into view and curve stores.
 - Well switching.
 - Depth clipping.
+- StratChart reference hydration.
+- StratChart-driven timescale row construction.
+- Subsidence chart domain and depth grid behavior.
+- Export/import dialog target well behavior.
 
 Backend:
 
@@ -53,6 +57,8 @@ Backend:
 - Undo/redo, delete well, and checkpoint create/restore/delete through API.
 - Formation CRUD at data layer.
 - Formation depth persistence.
+- Export workflows for well info/logs/tops/deviation/StratCharts/sea-level curves.
+- Log resampling and LAS export behavior.
 - Backstrip unit behavior.
 
 ---
@@ -65,7 +71,7 @@ Missing high-priority workflows:
 - Full Data Manager settings inspector routing for every object type.
 - Context menus.
 - Track reorder/config persistence.
-- PNG/export behavior.
+- Browser-level smoke tests for import/export dialogs and viewer rendering.
 
 See `docs/regression-test-matrix.md` for planned test IDs, files, layers, and execution order.
 
