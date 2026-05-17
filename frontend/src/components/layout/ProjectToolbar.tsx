@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 
+import { CheckpointDialog } from './CheckpointDialog'
 import { CreateWellDialog } from './CreateWellDialog'
 import { ExportSeaLevelCurveDialog } from './ExportSeaLevelCurveDialog'
 import { ExportStratChartDialog } from './ExportStratChartDialog'
@@ -16,9 +17,10 @@ import { LoadSeaLevelCurveDialog } from './LoadSeaLevelCurveDialog'
 import { LoadStratChartDialog } from './LoadStratChartDialog'
 import { NewProjectDialog } from './NewProjectDialog'
 import { useProjectStore, useViewStore, useWellDataStore, useWorkspaceStore } from '@/stores'
+import type { CheckpointStatistics } from '@/stores/projectStore'
 import { buildDiagnosticSnapshot } from '@/utils/diagnostics'
 
-type DialogKind = 'project-open' | 'project-new' | 'create-well' | 'load-wells' | 'load-las' | 'load-tops' | 'load-deviation' | 'load-strat-chart' | 'load-sea-level-curve' | 'export-well-info-current' | 'export-well-info-all' | 'export-logs-csv-current' | 'export-logs-csv-all' | 'export-logs-las-current' | 'export-logs-las-all' | 'export-tops-current' | 'export-tops-all' | 'export-deviation-current' | 'export-deviation-all' | 'export-strat-chart-active' | 'export-strat-chart-all' | 'export-sea-level-selected' | 'export-sea-level-all' | null
+type DialogKind = 'project-open' | 'project-new' | 'checkpoint-create' | 'checkpoint-restore' | 'create-well' | 'load-wells' | 'load-las' | 'load-tops' | 'load-deviation' | 'load-strat-chart' | 'load-sea-level-curve' | 'export-well-info-current' | 'export-well-info-all' | 'export-logs-csv-current' | 'export-logs-csv-all' | 'export-logs-las-current' | 'export-logs-las-all' | 'export-tops-current' | 'export-tops-all' | 'export-deviation-current' | 'export-deviation-all' | 'export-strat-chart-active' | 'export-strat-chart-all' | 'export-sea-level-selected' | 'export-sea-level-all' | null
 
 interface UnsavedChangesDialogProps {
   projectName: string | null
@@ -64,6 +66,7 @@ export function ProjectToolbar() {
   const formations = useWellDataStore((state) => state.formations)
   const stratCharts = useWellDataStore((state) => state.stratCharts)
   const seaLevelCurves = useWellDataStore((state) => state.seaLevelCurves)
+  const topSets = useWellDataStore((state) => state.topSets)
   const wellInventories = useWellDataStore((state) => state.wellInventories)
   const isLoading = useWellDataStore((state) => state.isLoading)
   const cancelLoading = useWellDataStore((state) => state.cancelLoading)
@@ -83,6 +86,8 @@ export function ProjectToolbar() {
   const canRedo = useProjectStore((state) => state.canRedo)
   const saveProject = useProjectStore((state) => state.saveProject)
   const createCheckpoint = useProjectStore((state) => state.createCheckpoint)
+  const listCheckpoints = useProjectStore((state) => state.listCheckpoints)
+  const restoreCheckpoint = useProjectStore((state) => state.restoreCheckpoint)
   const closeProject = useProjectStore((state) => state.closeProject)
   const undoProject = useProjectStore((state) => state.undo)
   const redoProject = useProjectStore((state) => state.redo)
@@ -108,6 +113,18 @@ export function ProjectToolbar() {
   const activeWellHasDeviation = Boolean(
     well?.well_id && wellInventories.find((item) => item.well_id === well.well_id)?.deviation,
   )
+  const checkpointStatistics: CheckpointStatistics = useMemo(() => ({
+    project_name: projectName,
+    well_count: wellInventories.length,
+    well_names: wellInventories.map((item) => item.well_name),
+    log_curve_count: wellInventories.reduce((sum, item) => sum + item.curves.length, 0),
+    top_pick_count: wellInventories.reduce((sum, item) => sum + item.formations.length, 0),
+    top_set_count: topSets.length,
+    strat_chart_count: stratCharts.length,
+    sea_level_curve_count: seaLevelCurves.length,
+    deviation_survey_count: wellInventories.filter((item) => item.deviation).length,
+    well_ids: wellInventories.map((item) => item.well_id),
+  }), [projectName, seaLevelCurves.length, stratCharts.length, topSets.length, wellInventories])
 
   const topbarTitle = !isProjectOpen
     ? 'No project open'
@@ -250,6 +267,28 @@ export function ProjectToolbar() {
         return <FileOpenDialog onSwitchToNew={() => setActiveDialog('project-new')} onClose={isProjectOpen ? () => setActiveDialog(null) : undefined} />
       case 'project-new':
         return <NewProjectDialog onSwitchToOpen={() => setActiveDialog('project-open')} onClose={isProjectOpen ? () => setActiveDialog(null) : undefined} />
+      case 'checkpoint-create':
+        return (
+          <CheckpointDialog
+            mode="create"
+            currentStatistics={checkpointStatistics}
+            createCheckpoint={createCheckpoint}
+            listCheckpoints={listCheckpoints}
+            restoreCheckpoint={restoreCheckpoint}
+            onClose={() => setActiveDialog(null)}
+          />
+        )
+      case 'checkpoint-restore':
+        return (
+          <CheckpointDialog
+            mode="restore"
+            currentStatistics={checkpointStatistics}
+            createCheckpoint={createCheckpoint}
+            listCheckpoints={listCheckpoints}
+            restoreCheckpoint={restoreCheckpoint}
+            onClose={() => setActiveDialog(null)}
+          />
+        )
       case 'create-well':
         return <CreateWellDialog onClose={() => setActiveDialog(null)} onSuccess={handleWellMutation} />
       case 'load-wells':
@@ -418,7 +457,8 @@ export function ProjectToolbar() {
       <button type="button" className="app-menu__item" onClick={() => requestAction('open-project')}>Open project</button>
       <button type="button" className="app-menu__item" onClick={() => requestAction('close-project')}>Close project</button>
       <button type="button" className="app-menu__item" onClick={() => { setProjectMenuOpen(false); void saveProject() }}>Save project</button>
-      <button type="button" className="app-menu__item" onClick={() => { setProjectMenuOpen(false); void createCheckpoint() }}>Create checkpoint</button>
+      <button type="button" className="app-menu__item" onClick={() => { setProjectMenuOpen(false); setActiveDialog('checkpoint-create') }}>Create checkpoint</button>
+      <button type="button" className="app-menu__item" onClick={() => { setProjectMenuOpen(false); setActiveDialog('checkpoint-restore') }}>Revert from checkpoint</button>
       <button type="button" className="app-menu__item" onClick={() => { setProjectMenuOpen(false); void handleCopyDiagnostics() }}>Copy diagnostics</button>
       <hr className="app-menu__separator" />
       <button type="button" className="app-menu__item app-menu__item--check" onClick={() => setLodEnabled(!lodEnabled)}>

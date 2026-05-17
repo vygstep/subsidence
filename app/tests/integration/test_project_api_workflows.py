@@ -1358,9 +1358,17 @@ def test_checkpoint_create_restore_delete(api_client: TestClient, tmp_path: Path
     assert response.status_code == 200, response.text
     first_well_id = response.json()['well_id']
 
-    response = api_client.post('/api/projects/checkpoints', json={'name': 'before-second-well', 'description': ''})
+    response = api_client.post('/api/projects/checkpoints', json={
+        'name': 'before-second-well',
+        'description': 'Checkpoint before adding the second well',
+    })
     assert response.status_code == 200, response.text
-    checkpoint_id = response.json()['id']
+    checkpoint_payload = response.json()
+    checkpoint_id = checkpoint_payload['id']
+    assert checkpoint_payload['description'] == 'Checkpoint before adding the second well'
+    assert checkpoint_payload['statistics']['project_name'] == 'checkpoints'
+    assert checkpoint_payload['statistics']['well_count'] == 1
+    assert checkpoint_payload['statistics']['well_names'] == ['Checkpoint A']
 
     response = api_client.post('/api/projects/wells', json={
         'name': 'Checkpoint B',
@@ -1389,7 +1397,11 @@ def test_checkpoint_create_restore_delete(api_client: TestClient, tmp_path: Path
     assert response.status_code == 200, response.text
     response = api_client.get('/api/projects/checkpoints')
     assert response.status_code == 200, response.text
-    assert all(item['id'] != before_restore_checkpoint_id for item in response.json())
+    checkpoints = response.json()
+    assert all(item['id'] != before_restore_checkpoint_id for item in checkpoints)
+    original = next(item for item in checkpoints if item['id'] == checkpoint_id)
+    assert original['description'] == 'Checkpoint before adding the second well'
+    assert original['statistics']['well_count'] == 1
 
 
 def test_measurement_units_seeded_on_project_create(api_client: TestClient, tmp_path: Path) -> None:

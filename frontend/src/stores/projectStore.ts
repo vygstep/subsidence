@@ -13,6 +13,32 @@ export interface RecentProject {
   lastOpened: string
 }
 
+export interface CheckpointStatistics {
+  project_name?: string | null
+  well_count: number
+  well_names: string[]
+  log_curve_count: number
+  top_pick_count: number
+  top_set_count: number
+  strat_chart_count: number
+  sea_level_curve_count: number
+  deviation_survey_count: number
+  well_ids?: string[]
+}
+
+export interface Checkpoint {
+  id: number
+  name: string
+  description: string
+  statistics: CheckpointStatistics | null
+  timestamp: string
+  file_path: string
+  byte_size: number
+  sha256: string
+  app_version: string
+  schema_version: number
+}
+
 export interface ProjectStore {
   isOpen: boolean
   projectName: string | null
@@ -35,7 +61,9 @@ export interface ProjectStore {
   loadScopedVisualConfig: (scope: 'project' | 'well', scopeId?: string) => Promise<Record<string, unknown>>
   saveScopedVisualConfig: (scope: 'project' | 'well', patch: Record<string, unknown>, scopeId?: string) => Promise<Record<string, unknown>>
   saveProject: () => Promise<void>
-  createCheckpoint: (name?: string, description?: string) => Promise<void>
+  createCheckpoint: (name?: string, description?: string) => Promise<Checkpoint>
+  listCheckpoints: () => Promise<Checkpoint[]>
+  restoreCheckpoint: (checkpointId: number) => Promise<Checkpoint>
   undo: () => Promise<void>
   redo: () => Promise<void>
   markVisualConfigDirty: () => void
@@ -96,6 +124,8 @@ interface OpenProjectResponse {
   project_path: string
 }
 
+type CheckpointResponse = Checkpoint
+
 async function readError(response: Response, fallback: string): Promise<string> {
   try {
     const payload = (await response.json()) as { detail?: string }
@@ -155,7 +185,7 @@ async function postAction(path: string): Promise<void> {
   }
 }
 
-async function postJsonAction(path: string, payload: Record<string, unknown>): Promise<void> {
+async function postJsonAction<T = unknown>(path: string, payload: Record<string, unknown>): Promise<T> {
   const response = await fetch(path, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
@@ -164,6 +194,15 @@ async function postJsonAction(path: string, payload: Record<string, unknown>): P
   if (!response.ok) {
     throw new Error(await readError(response, `Request failed for ${path} (${response.status})`))
   }
+  return (await response.json()) as T
+}
+
+async function fetchCheckpoints(): Promise<Checkpoint[]> {
+  const response = await fetch('/api/projects/checkpoints')
+  if (!response.ok) {
+    throw new Error(await readError(response, `Failed to read checkpoints (${response.status})`))
+  }
+  return (await response.json()) as CheckpointResponse[]
 }
 
 async function fetchVisualConfig(scope: 'project' | 'well' = 'project', scopeId?: string): Promise<VisualConfigResponse> {
@@ -436,9 +475,10 @@ export const useProjectStore = create<ProjectStore>((set, get) => ({
     }, { projectPath: get().projectPath })
   },
   async createCheckpoint(name, description = '') {
+    let checkpoint: Checkpoint | null = null
     await recordOperation('checkpoint.create', async () => {
       const stamp = new Date().toISOString().replace(/[:.]/g, '-')
-      await postJsonAction('/api/projects/checkpoints', {
+      checkpoint = await postJsonAction<Checkpoint>('/api/projects/checkpoints', {
         name: name?.trim() || `checkpoint-${stamp}`,
         description,
       })
@@ -453,6 +493,34 @@ export const useProjectStore = create<ProjectStore>((set, get) => ({
         canRedo: payload.can_redo,
       })
     }, { projectPath: get().projectPath, details: { name } })
+    if (!checkpoint) throw new Error('Checkpoint was not created')
+    return checkpoint
+  },
+  async listCheckpoints() {
+    return fetchCheckpoints()
+  },
+  async restoreCheckpoint(checkpointId) {
+    let checkpoint: Checkpoint | null = null
+    await recordOperation('checkpoint.restore', async () => {
+      checkpoint = await postJsonAction<Checkpoint>(`/api/projects/checkpoints/${checkpointId}/restore`, {})
+      const payload = await fetchStatus()
+      set({
+        isOpen: payload.is_open,
+        projectName: payload.project_name,
+        projectPath: payload.project_path,
+        backendDirty: payload.is_dirty,
+        isDirty: payload.is_dirty || get().pendingVisualConfigDirty,
+        canUndo: payload.can_undo,
+        canRedo: payload.can_redo,
+      })
+      await useWellDataStore.getState().loadWellInventories()
+      await useWellDataStore.getState().loadStratCharts()
+      await useWellDataStore.getState().loadSeaLevelCurves()
+      await useWellDataStore.getState().loadTopSets()
+      await useWellDataStore.getState().refreshWell()
+    }, { projectPath: get().projectPath, details: { checkpointId } })
+    if (!checkpoint) throw new Error('Checkpoint was not restored')
+    return checkpoint
   },
   async undo() {
     await recordOperation('undo.run', async () => {

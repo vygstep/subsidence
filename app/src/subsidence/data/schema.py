@@ -648,6 +648,7 @@ class CheckpointModel(Base):
     id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
     name: Mapped[str] = mapped_column(String(256))
     description: Mapped[str] = mapped_column(Text, default="")
+    statistics_json: Mapped[str | None] = mapped_column(Text, nullable=True)
     timestamp: Mapped[datetime] = mapped_column(default=_now)
     file_path: Mapped[str] = mapped_column(Text)   # relative to project bundle root
     byte_size: Mapped[int] = mapped_column(Integer)
