@@ -39,7 +39,7 @@ This contract is intentionally short. Each item needs a proper code review and d
 
 ### 5. Checkpoint Revert And Comments
 
-Moved to `docs/contracts/checkpoint-comments-revert.md`.
+Moved to `docs/contracts/implemented/checkpoint-comments-revert.md`.
 
 ## Non-Goals
 

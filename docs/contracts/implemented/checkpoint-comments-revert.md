@@ -1,6 +1,6 @@
 # Checkpoint Comments And Revert Workflow
 
-Status: Draft
+Status: Implemented
 Branch: feature/checkpoint-comments-revert
 
 ## Goal
