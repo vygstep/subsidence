@@ -88,10 +88,18 @@ Settings for the active StratChart should allow choosing up to two ranks for sub
 
 - `Timescale upper level`
 - `Timescale lower level`
+- `Labels`: `Auto`, `Unit name`, or `Unit code`
 
 Maximum visible levels for this implementation: `2`.
 
 These settings belong to the StratChart settings context, not per well.
+
+Default display levels:
+
+- upper level: `erathem`;
+- lower level: `system`.
+
+`Auto` labels use the StratChart unit code when available and fall back to the unit name/abbreviated label when a code is not available.
 
 ### 6. Sparse Hierarchy And Precambrian Display
 
@@ -115,6 +123,13 @@ Both single-well and multi-well subsidence chart timescales must use the active 
 The visible time range should clip StratChart blocks to the chart age domain.
 
 Global model settings such as reconstruction/truncation by StratUnit should continue to use the active StratChart.
+
+Model cutoff dropdown behavior:
+
+- `None` means no reconstruction/truncation cutoff is active.
+- `Show visible` lists only StratChart units visible in the selected lower timescale row and within the current model/well data age range.
+- `Show all` lists every unit from the active StratChart.
+- Precambrian/sparse-hierarchy fallback units can appear in `Show visible` when they are the rendered lower-row units.
 
 ## Non-Goals
 
@@ -153,6 +168,8 @@ Global model settings such as reconstruction/truncation by StratUnit should cont
 ### Stage 5 - Timescale Settings
 
 - Done. Added StratChart settings for `Timescale upper level` and `Timescale lower level`.
+- Done. Added reset buttons for default `erathem` / `system` display levels.
+- Done. Added label mode setting: `Auto`, `Unit name`, `Unit code`.
 - Done. Persisted settings in project visual/config state.
 - Done. Limited selection to ranks present in the active chart.
 
@@ -162,9 +179,12 @@ Global model settings such as reconstruction/truncation by StratUnit should cont
 - Done. Applied selected upper/lower levels.
 - Done. Implemented sparse hierarchy fallback for Precambrian/incomplete intervals.
 - Done. Applied to both single-well and multi-well subsidence charts.
+- Done. Removed the debug/status label from the subsidence chart.
+- Done. Updated global model cutoff dropdowns to use active StratChart units with `None`, `Show visible`, and `Show all` modes.
 
 ### Stage 7 - Verification
 
 - Done. Backend `pytest tests`: 156 passed.
-- Done. Frontend `npm run test -- --run`: 85 passed.
+- Done. Frontend `npm run test -- --run`: 88 passed.
 - Done. Added unit coverage for sparse lower-rank fallback without mutating source data.
+- Done. Added frontend coverage for StratChart reference hydration and label modes.

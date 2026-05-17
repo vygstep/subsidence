@@ -35,6 +35,19 @@ describe('buildStratTimescaleRows', () => {
     expect(rows[0].units.find((unit) => unit.name === 'Devonian')?.label).toBe('D')
   })
 
+  it('supports explicit unit name labels', () => {
+    const rows = buildStratTimescaleRows({
+      units,
+      minMa: 250,
+      maxMa: 430,
+      upperRank: 'period',
+      lowerRank: 'age',
+      labelMode: 'unit-name',
+    })
+
+    expect(rows[0].units.find((unit) => unit.name === 'Devonian')?.label).toBe('Devonian')
+  })
+
   it('falls back to the nearest coarser available rank for missing sparse ranks', () => {
     const rows = buildStratTimescaleRows({
       units: units.filter((unit) => unit.rank !== 'age'),

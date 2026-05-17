@@ -3,7 +3,7 @@ import { create } from 'zustand'
 import { rememberProjectBundlePath } from '@/components/layout/pathMemory'
 import { recordOperation } from '@/utils/diagnostics'
 
-import { useViewStore, type DepthTrackConfig, type FormationsTrackConfig, type SeaLevelOverlayStyle, type SubsidenceModelType, type SubsidenceModelConfig } from './viewStore'
+import { useViewStore, type DepthTrackConfig, type FormationsTrackConfig, type SeaLevelOverlayStyle, type SubsidenceModelType, type SubsidenceModelConfig, type StratTimescaleLabelMode } from './viewStore'
 import { useWellDataStore } from './wellDataStore'
 import { useWorkspaceStore } from './workspaceStore'
 
@@ -100,6 +100,7 @@ interface VisualConfigPayload {
   subsidenceTruncateBelowStratUnitId?: number | null
   stratTimescaleUpperRank?: string | null
   stratTimescaleLowerRank?: string | null
+  stratTimescaleLabelMode?: StratTimescaleLabelMode
 }
 
 interface ProjectStatusResponse {
@@ -272,6 +273,7 @@ function applyVisualConfigPayload(config: Record<string, unknown>): void {
     subsidenceTruncateBelowStratUnitId: payload.subsidenceTruncateBelowStratUnitId,
     stratTimescaleUpperRank: payload.stratTimescaleUpperRank,
     stratTimescaleLowerRank: payload.stratTimescaleLowerRank,
+    stratTimescaleLabelMode: payload.stratTimescaleLabelMode,
   })
   useWellDataStore.getState().setColorOverrides(payload.curveColors ?? {})
 }
@@ -317,6 +319,7 @@ export function collectProjectVisualConfig(): VisualConfigPayload {
     subsidenceTruncateBelowStratUnitId: vs.subsidenceTruncateBelowStratUnitId,
     stratTimescaleUpperRank: vs.stratTimescaleUpperRank,
     stratTimescaleLowerRank: vs.stratTimescaleLowerRank,
+    stratTimescaleLabelMode: vs.stratTimescaleLabelMode,
   }
 }
 

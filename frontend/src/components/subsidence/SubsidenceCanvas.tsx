@@ -228,6 +228,7 @@ export function SubsidenceCanvas() {
   const truncateBelowStratUnitId = useViewStore((s) => s.subsidenceTruncateBelowStratUnitId)
   const stratTimescaleUpperRank = useViewStore((s) => s.stratTimescaleUpperRank)
   const stratTimescaleLowerRank = useViewStore((s) => s.stratTimescaleLowerRank)
+  const stratTimescaleLabelMode = useViewStore((s) => s.stratTimescaleLabelMode)
   const setSubsidenceViewport = useViewStore((s) => s.setSubsidenceSingleViewport)
   const setSubsidenceDisplayedRange = useViewStore((s) => s.setSubsidenceSingleDisplayedRange)
   const showSeaLevel = useViewStore((s) => s.subsidenceSingleShowSeaLevel)
@@ -664,6 +665,7 @@ export function SubsidenceCanvas() {
         stratUnits={stratUnits}
         upperRank={stratTimescaleUpperRank}
         lowerRank={stratTimescaleLowerRank}
+        labelMode={stratTimescaleLabelMode}
       />
       <div
         className="subsidence-canvas-wrapper"

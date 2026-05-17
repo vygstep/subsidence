@@ -1,5 +1,5 @@
 import type { StratUnitOption } from '@/types'
-import { buildStratTimescaleRows, type TimescaleBlockUnit } from '@/utils/stratTimescale'
+import { buildStratTimescaleRows, type StratTimescaleUnitLabelMode, type TimescaleBlockUnit } from '@/utils/stratTimescale'
 
 interface TimeRange {
   min_ma: number
@@ -14,6 +14,7 @@ interface GeologicalTimescaleProps {
   stratUnits?: StratUnitOption[]
   upperRank?: string | null
   lowerRank?: string | null
+  labelMode?: StratTimescaleUnitLabelMode
 }
 
 function TimescaleRow({
@@ -87,6 +88,7 @@ export function GeologicalTimescale({
   stratUnits = [],
   upperRank = null,
   lowerRank = null,
+  labelMode = 'auto',
 }: GeologicalTimescaleProps) {
   const { min_ma, max_ma } = timeRange
   const upperRowH = Math.round(height / 2)
@@ -97,6 +99,7 @@ export function GeologicalTimescale({
     maxMa: max_ma,
     upperRank,
     lowerRank,
+    labelMode,
   })
 
   return (

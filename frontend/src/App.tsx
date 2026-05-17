@@ -62,6 +62,7 @@ function App() {
   const subsidenceTruncateBelowStratUnitId = useViewStore((state) => state.subsidenceTruncateBelowStratUnitId)
   const stratTimescaleUpperRank = useViewStore((state) => state.stratTimescaleUpperRank)
   const stratTimescaleLowerRank = useViewStore((state) => state.stratTimescaleLowerRank)
+  const stratTimescaleLabelMode = useViewStore((state) => state.stratTimescaleLabelMode)
   const seaLevelOverlayStyles = useViewStore((state) => state.seaLevelOverlayStyles)
   const applyActiveWellTrackWidths = useViewStore((state) => state.applyActiveWellTrackWidths)
   const resetVisualConfig = useViewStore((state) => state.resetVisualConfig)
@@ -308,6 +309,7 @@ function App() {
     subsidenceSingleShowSeaLevel,
     subsidenceReconstructStratUnitId,
     subsidenceTruncateBelowStratUnitId,
+    stratTimescaleLabelMode,
     stratTimescaleUpperRank,
     stratTimescaleLowerRank,
     subsidenceWidth,

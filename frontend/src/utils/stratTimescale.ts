@@ -15,6 +15,8 @@ export interface TimescaleRowData {
   isFallback: boolean
 }
 
+export type StratTimescaleUnitLabelMode = 'auto' | 'unit-name' | 'unit-code'
+
 const DEFAULT_COLOR = '#e2e8f0'
 
 const RANK_ORDER = [
@@ -134,14 +136,17 @@ function unitLabel(name: string): string {
     .toUpperCase() || trimmed.slice(0, 6)
 }
 
-function unitDisplayCode(unit: StratUnitOption): string {
+function unitDisplayLabel(unit: StratUnitOption, labelMode: StratTimescaleUnitLabelMode): string {
   const code = unit.unit_code?.trim()
+  if (labelMode === 'unit-name') return unitLabel(unit.name)
+  if (labelMode === 'unit-code') return code || unitLabel(unit.name)
   return code || unitLabel(unit.name)
 }
 
 function unitsForRank(
   units: StratUnitOption[],
   rank: string | null,
+  labelMode: StratTimescaleUnitLabelMode,
 ): TimescaleBlockUnit[] {
   if (rank === null) return []
   const key = normalizeRank(rank)
@@ -154,7 +159,7 @@ function unitsForRank(
       return [{
         id: String(unit.id),
         name: unit.name,
-        label: unitDisplayCode(unit),
+        label: unitDisplayLabel(unit, labelMode),
         start_ma: base,
         end_ma: top,
         color: unit.color_hex ?? DEFAULT_COLOR,
@@ -215,12 +220,14 @@ function fillSparseLowerIntervals({
   lowerUnits,
   upperRank,
   requestedLowerRank,
+  labelMode,
 }: {
   units: StratUnitOption[]
   upperUnits: TimescaleBlockUnit[]
   lowerUnits: TimescaleBlockUnit[]
   upperRank: string | null
   requestedLowerRank: string | null | undefined
+  labelMode: StratTimescaleUnitLabelMode
 }): { units: TimescaleBlockUnit[]; isFallback: boolean } {
   if (!requestedLowerRank || upperUnits.length === 0) {
     return { units: lowerUnits, isFallback: false }
@@ -253,7 +260,7 @@ function fillSparseLowerIntervals({
         return [{
           id: `fallback-${unit.id}`,
           name: unit.name,
-          label: unitDisplayCode(unit),
+          label: unitDisplayLabel(unit, labelMode),
           start_ma: base,
           end_ma: top,
           color: unit.color_hex ?? DEFAULT_COLOR,
@@ -277,24 +284,27 @@ export function buildStratTimescaleRows({
   maxMa,
   upperRank,
   lowerRank,
+  labelMode = 'auto',
 }: {
   units: StratUnitOption[]
   minMa: number
   maxMa: number
   upperRank?: string | null
   lowerRank?: string | null
+  labelMode?: StratTimescaleUnitLabelMode
 }): TimescaleRowData[] {
   const ranks = availableRanks(units, minMa, maxMa)
   const upper = resolveRank(upperRank, ranks, 0)
   const lowerFallbackStart = upper.index >= 0 ? upper.index + 1 : 1
   const lower = resolveRank(lowerRank, ranks, lowerFallbackStart)
-  const upperUnits = unitsForRank(units, upper.rank)
+  const upperUnits = unitsForRank(units, upper.rank, labelMode)
   const lowerResult = fillSparseLowerIntervals({
     units,
     upperUnits,
-    lowerUnits: unitsForRank(units, lower.rank),
+    lowerUnits: unitsForRank(units, lower.rank, labelMode),
     upperRank: upper.rank,
     requestedLowerRank: lowerRank,
+    labelMode,
   })
   const rows = [
     {
