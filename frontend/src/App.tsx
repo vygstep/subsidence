@@ -59,6 +59,8 @@ function App() {
   const subsidenceSingleSeaLevelOverlayCurveIds = useViewStore((state) => state.subsidenceSingleSeaLevelOverlayCurveIds)
   const subsidenceReconstructStratUnitId = useViewStore((state) => state.subsidenceReconstructStratUnitId)
   const subsidenceTruncateBelowStratUnitId = useViewStore((state) => state.subsidenceTruncateBelowStratUnitId)
+  const stratTimescaleUpperRank = useViewStore((state) => state.stratTimescaleUpperRank)
+  const stratTimescaleLowerRank = useViewStore((state) => state.stratTimescaleLowerRank)
   const seaLevelOverlayStyles = useViewStore((state) => state.seaLevelOverlayStyles)
   const applyActiveWellTrackWidths = useViewStore((state) => state.applyActiveWellTrackWidths)
   const resetVisualConfig = useViewStore((state) => state.resetVisualConfig)
@@ -305,6 +307,8 @@ function App() {
     subsidenceSingleShowSeaLevel,
     subsidenceReconstructStratUnitId,
     subsidenceTruncateBelowStratUnitId,
+    stratTimescaleUpperRank,
+    stratTimescaleLowerRank,
     subsidenceWidth,
     trackWidths,
     wellViewStates,

@@ -98,6 +98,8 @@ interface VisualConfigPayload {
   seaLevelOverlayStyles?: Record<string, Partial<SeaLevelOverlayStyle>>
   subsidenceReconstructStratUnitId?: number | null
   subsidenceTruncateBelowStratUnitId?: number | null
+  stratTimescaleUpperRank?: string | null
+  stratTimescaleLowerRank?: string | null
 }
 
 interface ProjectStatusResponse {
@@ -252,6 +254,8 @@ function applyVisualConfigPayload(config: Record<string, unknown>): void {
     seaLevelOverlayStyles: payload.seaLevelOverlayStyles,
     subsidenceReconstructStratUnitId: payload.subsidenceReconstructStratUnitId,
     subsidenceTruncateBelowStratUnitId: payload.subsidenceTruncateBelowStratUnitId,
+    stratTimescaleUpperRank: payload.stratTimescaleUpperRank,
+    stratTimescaleLowerRank: payload.stratTimescaleLowerRank,
   })
   useWellDataStore.getState().setColorOverrides(payload.curveColors ?? {})
 }
@@ -295,6 +299,8 @@ export function collectProjectVisualConfig(): VisualConfigPayload {
     seaLevelOverlayStyles: vs.seaLevelOverlayStyles,
     subsidenceReconstructStratUnitId: vs.subsidenceReconstructStratUnitId,
     subsidenceTruncateBelowStratUnitId: vs.subsidenceTruncateBelowStratUnitId,
+    stratTimescaleUpperRank: vs.stratTimescaleUpperRank,
+    stratTimescaleLowerRank: vs.stratTimescaleLowerRank,
   }
 }
 

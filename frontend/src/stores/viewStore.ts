@@ -53,6 +53,8 @@ interface VisualConfigPayload {
   seaLevelOverlayStyles?: Record<string, Partial<SeaLevelOverlayStyle>>
   subsidenceReconstructStratUnitId?: number | null
   subsidenceTruncateBelowStratUnitId?: number | null
+  stratTimescaleUpperRank?: string | null
+  stratTimescaleLowerRank?: string | null
 }
 
 export type SelectedElementType = 'curve' | 'track' | 'formation'
@@ -115,6 +117,8 @@ export interface ViewStore {
   seaLevelOverlayStyles: Record<number, SeaLevelOverlayStyle>
   subsidenceReconstructStratUnitId: number | null
   subsidenceTruncateBelowStratUnitId: number | null
+  stratTimescaleUpperRank: string | null
+  stratTimescaleLowerRank: string | null
   setScroll: (depth: number) => void
   setScale: (dpp: number) => void
   setCursorDepth: (depth: number | null) => void
@@ -152,6 +156,8 @@ export interface ViewStore {
   updateSeaLevelOverlayStyle: (id: number, patch: Partial<SeaLevelOverlayStyle>) => void
   setSubsidenceReconstructStratUnitId: (stratUnitId: number | null) => void
   setSubsidenceTruncateBelowStratUnitId: (stratUnitId: number | null) => void
+  setStratTimescaleUpperRank: (rank: string | null) => void
+  setStratTimescaleLowerRank: (rank: string | null) => void
   lodEnabled: boolean
   setLodEnabled: (v: boolean) => void
   applyActiveWellTrackWidths: (trackWidths: Record<string, number>) => void
@@ -277,6 +283,8 @@ export const useViewStore = create<ViewStore>((set) => ({
   seaLevelOverlayStyles: {},
   subsidenceReconstructStratUnitId: null,
   subsidenceTruncateBelowStratUnitId: null,
+  stratTimescaleUpperRank: null,
+  stratTimescaleLowerRank: null,
   lodEnabled: false,
   setScroll(depth) {
     set((state) => ({
@@ -419,6 +427,20 @@ export const useViewStore = create<ViewStore>((set) => ({
       subsidenceMultiViewport: null,
     })
   },
+  setStratTimescaleUpperRank(rank) {
+    set({
+      stratTimescaleUpperRank: rank,
+      subsidenceSingleViewport: null,
+      subsidenceMultiViewport: null,
+    })
+  },
+  setStratTimescaleLowerRank(rank) {
+    set({
+      stratTimescaleLowerRank: rank,
+      subsidenceSingleViewport: null,
+      subsidenceMultiViewport: null,
+    })
+  },
   updateSubsidenceModelConfig(modelType, patch) {
     set((state) => ({
       subsidenceModelConfigs: {
@@ -488,6 +510,8 @@ export const useViewStore = create<ViewStore>((set) => ({
           : state.seaLevelOverlayStyles,
         subsidenceReconstructStratUnitId: 'subsidenceReconstructStratUnitId' in config ? config.subsidenceReconstructStratUnitId ?? null : state.subsidenceReconstructStratUnitId,
         subsidenceTruncateBelowStratUnitId: 'subsidenceTruncateBelowStratUnitId' in config ? config.subsidenceTruncateBelowStratUnitId ?? null : state.subsidenceTruncateBelowStratUnitId,
+        stratTimescaleUpperRank: 'stratTimescaleUpperRank' in config ? config.stratTimescaleUpperRank ?? null : state.stratTimescaleUpperRank,
+        stratTimescaleLowerRank: 'stratTimescaleLowerRank' in config ? config.stratTimescaleLowerRank ?? null : state.stratTimescaleLowerRank,
         visibleDepthRange: deriveVisibleDepthRange(state.scrollDepth, nextDepthPerPixel, state.viewportHeight),
       }
     })
@@ -519,6 +543,8 @@ export const useViewStore = create<ViewStore>((set) => ({
       seaLevelOverlayStyles: {},
       subsidenceReconstructStratUnitId: null,
       subsidenceTruncateBelowStratUnitId: null,
+      stratTimescaleUpperRank: null,
+      stratTimescaleLowerRank: null,
       visibleDepthRange: deriveVisibleDepthRange(state.scrollDepth, initialDepthPerPixel, state.viewportHeight),
     }))
   },
