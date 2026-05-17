@@ -158,6 +158,114 @@ function unitsForRank(
     .sort((a, b) => a.end_ma - b.end_ma)
 }
 
+function blockOverlapsRange(unit: TimescaleBlockUnit, minMa: number, maxMa: number): boolean {
+  return Math.max(unit.end_ma, minMa) < Math.min(unit.start_ma, maxMa)
+}
+
+function stratUnitOverlapsRange(unit: StratUnitOption, minMa: number, maxMa: number): boolean {
+  const top = ageTop(unit)
+  const base = ageBase(unit)
+  if (top === null || base === null) return false
+  return Math.max(top, minMa) < Math.min(base, maxMa)
+}
+
+function fallbackRankForInterval({
+  units,
+  intervalMinMa,
+  intervalMaxMa,
+  upperRank,
+  requestedLowerRank,
+}: {
+  units: StratUnitOption[]
+  intervalMinMa: number
+  intervalMaxMa: number
+  upperRank: string | null
+  requestedLowerRank: string
+}): string | null {
+  const upperOrder = rankOrder(upperRank)
+  const requestedOrder = rankOrder(requestedLowerRank)
+  const intervalRanks = availableRanks(units, intervalMinMa, intervalMaxMa)
+    .filter((rank) => {
+      const order = rankOrder(rank)
+      return order > upperOrder && order !== requestedOrder
+    })
+
+  let bestRank: string | null = null
+  let bestScore = Number.POSITIVE_INFINITY
+  for (const rank of intervalRanks) {
+    const order = rankOrder(rank)
+    const isCoarserThanRequested = order < requestedOrder ? 0 : 1
+    const score = isCoarserThanRequested * 1000 + Math.abs(order - requestedOrder)
+    if (score < bestScore) {
+      bestScore = score
+      bestRank = rank
+    }
+  }
+  return bestRank
+}
+
+function fillSparseLowerIntervals({
+  units,
+  upperUnits,
+  lowerUnits,
+  upperRank,
+  requestedLowerRank,
+}: {
+  units: StratUnitOption[]
+  upperUnits: TimescaleBlockUnit[]
+  lowerUnits: TimescaleBlockUnit[]
+  upperRank: string | null
+  requestedLowerRank: string | null | undefined
+}): { units: TimescaleBlockUnit[]; isFallback: boolean } {
+  if (!requestedLowerRank || upperUnits.length === 0) {
+    return { units: lowerUnits, isFallback: false }
+  }
+
+  const mixed = [...lowerUnits]
+  let usedFallback = false
+  for (const upperUnit of upperUnits) {
+    const intervalMinMa = upperUnit.end_ma
+    const intervalMaxMa = upperUnit.start_ma
+    const hasSelectedLower = lowerUnits.some((unit) => blockOverlapsRange(unit, intervalMinMa, intervalMaxMa))
+    if (hasSelectedLower) continue
+
+    const fallbackRank = fallbackRankForInterval({
+      units,
+      intervalMinMa,
+      intervalMaxMa,
+      upperRank,
+      requestedLowerRank,
+    })
+    if (fallbackRank === null) continue
+
+    const fallbackUnits = units
+      .filter((unit) => normalizeRank(unit.rank) === normalizeRank(fallbackRank))
+      .filter((unit) => stratUnitOverlapsRange(unit, intervalMinMa, intervalMaxMa))
+      .flatMap((unit) => {
+        const top = ageTop(unit)
+        const base = ageBase(unit)
+        if (top === null || base === null || top >= base) return []
+        return [{
+          id: `fallback-${unit.id}`,
+          name: unit.name,
+          label: unitLabel(unit.name),
+          start_ma: base,
+          end_ma: top,
+          color: unit.color_hex ?? DEFAULT_COLOR,
+        }]
+      })
+    if (fallbackUnits.length > 0) {
+      mixed.push(...fallbackUnits)
+      usedFallback = true
+    }
+  }
+
+  return {
+    units: mixed.sort((a, b) => a.end_ma - b.end_ma),
+    isFallback: usedFallback,
+  }
+}
+
 export function buildStratTimescaleRows({
   units,
   minMa,
@@ -175,10 +283,18 @@ export function buildStratTimescaleRows({
   const upper = resolveRank(upperRank, ranks, 0)
   const lowerFallbackStart = upper.index >= 0 ? upper.index + 1 : 1
   const lower = resolveRank(lowerRank, ranks, lowerFallbackStart)
+  const upperUnits = unitsForRank(units, upper.rank)
+  const lowerResult = fillSparseLowerIntervals({
+    units,
+    upperUnits,
+    lowerUnits: unitsForRank(units, lower.rank),
+    upperRank: upper.rank,
+    requestedLowerRank: lowerRank,
+  })
   const rows = [
     {
       rank: upper.rank,
-      units: unitsForRank(units, upper.rank),
+      units: upperUnits,
       isFallback: upper.isFallback,
     },
   ]
@@ -186,8 +302,8 @@ export function buildStratTimescaleRows({
   if (lower.rank !== null && normalizeRank(lower.rank) !== normalizeRank(upper.rank)) {
     rows.push({
       rank: lower.rank,
-      units: unitsForRank(units, lower.rank),
-      isFallback: lower.isFallback,
+      units: lowerResult.units,
+      isFallback: lower.isFallback || lowerResult.isFallback,
     })
   } else {
     rows.push({ rank: null, units: [], isFallback: false })

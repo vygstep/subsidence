@@ -46,4 +46,25 @@ describe('buildStratTimescaleRows', () => {
     expect(rows[0].rank).toBe('period')
     expect(rows[1].rank).toBeNull()
   })
+
+  it('fills lower-rank gaps inside upper intervals with the nearest available child rank', () => {
+    const sparseUnits: StratUnitOption[] = [
+      { id: 10, name: 'Precambrian', rank: 'eon', age_top_ma: 538.8, age_base_ma: 4600, color_hex: '#999999' },
+      { id: 11, name: 'Phanerozoic', rank: 'eon', age_top_ma: 0, age_base_ma: 538.8, color_hex: '#aaaaaa' },
+      { id: 12, name: 'Neoproterozoic', rank: 'era', age_top_ma: 538.8, age_base_ma: 1000, color_hex: '#bbbbbb' },
+      { id: 13, name: 'Cambrian', rank: 'period', age_top_ma: 485.4, age_base_ma: 538.8, color_hex: '#cccccc' },
+    ]
+
+    const rows = buildStratTimescaleRows({
+      units: sparseUnits,
+      minMa: 0,
+      maxMa: 1000,
+      upperRank: 'eon',
+      lowerRank: 'period',
+    })
+
+    expect(rows[1].rank).toBe('period')
+    expect(rows[1].isFallback).toBe(true)
+    expect(rows[1].units.map((unit) => unit.name)).toEqual(['Cambrian', 'Neoproterozoic'])
+  })
 })
