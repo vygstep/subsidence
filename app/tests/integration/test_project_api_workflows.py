@@ -710,6 +710,17 @@ def test_strat_chart_import_requires_mapping_and_validates_parent_age_interval(a
     assert response.status_code == 200, response.text
     assert response.json()['units_imported'] == 2
 
+    response = api_client.get('/api/strat-charts')
+    assert response.status_code == 200, response.text
+    chart = next(chart for chart in response.json() if chart['name'] == 'mapped_chart')
+    response = api_client.get('/api/strat-units', params={'chart_id': chart['id'], 'limit': '1000'})
+    assert response.status_code == 200, response.text
+    units = {unit['name']: unit for unit in response.json()}
+    assert units['System A']['parent_id'] is None
+    assert units['System A']['chart_id'] == chart['id']
+    assert units['Stage A']['parent_id'] == units['System A']['id']
+    assert units['Stage A']['chart_id'] == chart['id']
+
     invalid_csv = tmp_path / 'invalid_chart.csv'
     invalid_csv.write_text(
         'id,parent,name,rank,base,top,color\n'
