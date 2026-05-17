@@ -105,6 +105,34 @@ def _result_from_values(grid: list[float], values: np.ndarray) -> ResampledCurve
     )
 
 
+def _grid_exact_indices(grid_arr: np.ndarray, depths: np.ndarray) -> tuple[np.ndarray, np.ndarray]:
+    if grid_arr.size == 0 or depths.size == 0:
+        return np.array([], dtype='int64'), np.array([], dtype=bool)
+    step = float(np.min(np.diff(grid_arr))) if grid_arr.size > 1 else 1e-6
+    tolerance = max(step * 1e-6, 1e-9)
+    indices = np.searchsorted(grid_arr, depths)
+    valid = indices < grid_arr.size
+    if valid.any():
+        valid_indices = indices[valid]
+        valid[valid] = np.isclose(grid_arr[valid_indices], depths[valid], rtol=0.0, atol=tolerance)
+    return indices, valid
+
+
+def _invalid_interval_mask(grid_arr: np.ndarray, depths: np.ndarray, valid_values: np.ndarray) -> np.ndarray:
+    if depths.size < 2 or grid_arr.size == 0:
+        return np.zeros(grid_arr.shape, dtype=bool)
+    interval_indices = np.searchsorted(depths, grid_arr, side='right') - 1
+    in_range = (interval_indices >= 0) & (interval_indices < depths.size - 1)
+    mask = np.zeros(grid_arr.shape, dtype=bool)
+    if not in_range.any():
+        return mask
+    idx = interval_indices[in_range]
+    invalid_interval = (~valid_values[:-1] | ~valid_values[1:])[idx]
+    open_interval = (grid_arr[in_range] > depths[idx]) & (grid_arr[in_range] < depths[idx + 1])
+    mask[in_range] = invalid_interval & open_interval
+    return mask
+
+
 def resample_continuous_to_md_grid(
     grid: list[float],
     native_depths_md: list[float],
@@ -112,28 +140,23 @@ def resample_continuous_to_md_grid(
 ) -> ResampledCurve:
     depths, values = _prepare_native_samples(native_depths_md, native_values)
     result = np.full(len(grid), np.nan, dtype='float64')
-    if depths.size < 2:
+    if depths.size == 0:
         return _result_from_values(grid, result)
     grid_arr = np.array(grid, dtype='float64')
-    step = float(np.min(np.diff(grid_arr))) if grid_arr.size > 1 else 1e-6
-    tolerance = max(step * 1e-6, 1e-9)
-    for depth, value in zip(depths, values, strict=False):
-        if not np.isfinite(value):
-            continue
-        exact_mask = np.isclose(grid_arr, depth, rtol=0.0, atol=tolerance)
-        result[exact_mask] = value
-    for idx in range(len(depths) - 1):
-        left_value = values[idx]
-        right_value = values[idx + 1]
-        if not np.isfinite(left_value) or not np.isfinite(right_value):
-            continue
-        left_depth = depths[idx]
-        right_depth = depths[idx + 1]
-        if right_depth <= left_depth:
-            continue
-        mask = (grid_arr >= left_depth) & (grid_arr <= right_depth)
-        if mask.any():
-            result[mask] = np.interp(grid_arr[mask], [left_depth, right_depth], [left_value, right_value])
+    finite_values = np.isfinite(values)
+    if int(finite_values.sum()) >= 2:
+        finite_depths = depths[finite_values]
+        finite_curve_values = values[finite_values]
+        result = np.interp(grid_arr, finite_depths, finite_curve_values, left=np.nan, right=np.nan)
+        result[_invalid_interval_mask(grid_arr, depths, finite_values)] = np.nan
+
+    exact_indices, exact_valid = _grid_exact_indices(grid_arr, depths)
+    if exact_valid.any():
+        matched_indices = exact_indices[exact_valid]
+        matched_values = values[exact_valid]
+        finite_matched = np.isfinite(matched_values)
+        result[matched_indices[finite_matched]] = matched_values[finite_matched]
+        result[matched_indices[~finite_matched]] = np.nan
     return _result_from_values(grid, result)
 
 
@@ -147,18 +170,16 @@ def resample_discrete_to_md_grid(
     if depths.size == 0:
         return _result_from_values(grid, result)
     grid_arr = np.array(grid, dtype='float64')
-    for idx, depth in enumerate(depths):
-        value = values[idx]
-        if not np.isfinite(value):
-            continue
-        next_depth = depths[idx + 1] if idx + 1 < len(depths) else depth
-        if next_depth < depth:
-            continue
-        if idx + 1 < len(depths):
-            mask = (grid_arr >= depth) & (grid_arr < next_depth)
-        else:
-            mask = grid_arr == depth
-        result[mask] = value
+    interval_indices = np.searchsorted(depths, grid_arr, side='right') - 1
+    valid = (interval_indices >= 0) & (grid_arr <= depths[-1])
+    if valid.any():
+        candidate_values = values[interval_indices[valid]]
+        result[valid] = np.where(np.isfinite(candidate_values), candidate_values, np.nan)
+    exact_indices, exact_valid = _grid_exact_indices(grid_arr, depths)
+    if exact_valid.any():
+        matched_indices = exact_indices[exact_valid]
+        matched_values = values[exact_valid]
+        result[matched_indices] = np.where(np.isfinite(matched_values), matched_values, np.nan)
     return _result_from_values(grid, result)
 
 
