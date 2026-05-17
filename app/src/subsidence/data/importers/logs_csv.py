@@ -7,6 +7,7 @@ from pathlib import Path
 from sqlalchemy.orm import Session
 
 from ..dict_resolver import load_curve_alias_rules, resolve_curve_alias_with_unit
+from ..deviation_transform import tvd_to_md
 from ..unit_registry import convert_curve_values_to_target, convert_depth_values_to_meters
 from .common import (
     DEFAULT_WELL_KB,
@@ -23,10 +24,10 @@ from .common import (
     _validate_strictly_increasing_depth,
     _write_curve_payloads,
     apply_imported_well_metadata,
-    compute_sampling_kind,
     extend_well_td_for_import,
     run_curve_qc,
 )
+from .log_resampling import build_md_grid, convert_source_depths_to_md, resample_curve_to_md_grid
 
 
 def _header_curve_parts(column_name: str) -> tuple[str, str]:
@@ -78,6 +79,8 @@ def _import_logs_rows(
     depth_column: str | None = None,
     create_new_well: bool = False,
     trusted_depth_reference: str = 'MD',
+    null_value: float = -999.25,
+    curve_types: dict[str, str] | None = None,
 ) -> tuple[object, list[str], float | None]:
     bundle_path = Path(project_path)
     if not rows:
@@ -87,11 +90,20 @@ def _import_logs_rows(
     raw_depths = _validate_strictly_increasing_depth(rows, resolved_depth_column, source_path)
     _depth_mnemonic, depth_unit = _header_curve_parts(resolved_depth_column)
     depths = convert_depth_values_to_meters(session, raw_depths, depth_unit or 'm')
-    final_depth = depths[-1] if depths else None
     well = _resolve_or_create_well_from_rows(session, rows, well_id=well_id, create_new_well=create_new_well)
     td_before_import = well.td_md
-    apply_imported_well_metadata(well, td=final_depth)
-    td_warning = extend_well_td_for_import(well, final_depth, previous_td=td_before_import)
+    converter = (lambda tvd: tvd_to_md(tvd, bundle_path, well)) if well.deviation_survey is not None else None
+    depth_conversion = convert_source_depths_to_md(
+        depths,
+        depth_reference=trusted_depth_reference,
+        kb_elev=well.kb_elev,
+        tvd_to_md=converter,
+    )
+    depths_md = depth_conversion.depths_md
+    final_depth_md = max(depths_md) if depths_md else None
+    apply_imported_well_metadata(well, td=final_depth_md)
+    td_warning = extend_well_td_for_import(well, final_depth_md, previous_td=td_before_import)
+    grid = build_md_grid(float(well.td_md or final_depth_md or 0.0), float(well.log_md_grid_step_m or 0.2))
 
     rules = load_curve_alias_rules(session)
     curve_columns = [
@@ -105,42 +117,59 @@ def _import_logs_rows(
         if not mnemonic or mnemonic.upper() in _DEPTH_MNEMONICS:
             continue
 
-        clean_pairs: dict[float, float] = {}
+        native_values: list[float | None] = []
         for row_index, (depth, row) in enumerate(zip(depths, rows, strict=False), start=2):
             raw_value = row.get(column)
             if raw_value in (None, ''):
+                native_values.append(None)
                 continue
             value = _coerce_float(raw_value)
             if value is None:
                 raise ValueError(f'{source_path}: invalid curve value in column {column!r} at row {row_index}: {raw_value!r}')
-            if math.isfinite(value):
-                clean_pairs[depth] = value
+            if math.isfinite(value) and value != null_value:
+                native_values.append(value)
+            else:
+                native_values.append(None)
 
-        if len(clean_pairs) < 2:
+        if sum(1 for value in native_values if value is not None) < 2:
             continue
 
-        clean_depths = sorted(clean_pairs)
-        clean_values = [clean_pairs[depth] for depth in clean_depths]
         match = resolve_curve_alias_with_unit(session, mnemonic, source_unit, rules)
         family_code = match.family_code
         standard_mnemonic = match.canonical_mnemonic
         target_unit = match.canonical_unit or source_unit
 
-        values = clean_values
+        values = [value for value in native_values]
         if source_unit and target_unit:
             try:
-                values, target_unit = convert_curve_values_to_target(
+                valid_values_for_conversion = [value for value in values if value is not None]
+                converted_values, target_unit = convert_curve_values_to_target(
                     session,
-                    values,
+                    valid_values_for_conversion,
                     source_unit,
                     target_unit,
                     family_code,
                 )
+                converted_iter = iter(converted_values)
+                values = [next(converted_iter) if value is not None else None for value in values]
             except ValueError:
                 target_unit = source_unit
 
-        sampling_kind, nominal_step_m = compute_sampling_kind(clean_depths)
-        qc = run_curve_qc(clean_depths, values, mnemonic, well.td_md, None)
+        curve_type = (curve_types or {}).get(column) or (curve_types or {}).get(mnemonic, 'continuous')
+        if curve_type not in ('continuous', 'discrete'):
+            curve_type = 'continuous'
+        resampled = resample_curve_to_md_grid(
+            grid,
+            depths_md,
+            values,
+            curve_type=curve_type,
+        )
+        if resampled.valid_sample_count < 2:
+            continue
+        sampling_kind, nominal_step_m = 'CONSTANT', float(well.log_md_grid_step_m or 0.2)
+        valid_depths = [depth for depth, value in zip(resampled.depths, resampled.values, strict=False) if value is not None]
+        valid_values = [value for value in resampled.values if value is not None]
+        qc = run_curve_qc(valid_depths, valid_values, mnemonic, well.td_md, None)
 
         curve_payloads.append({
             'mnemonic': mnemonic,
@@ -148,11 +177,12 @@ def _import_logs_rows(
             'family_code': family_code,
             'unit': target_unit,
             'original_unit': source_unit,
-            'depths': clean_depths,
-            'values': values,
+            'depths': resampled.depths,
+            'values': resampled.values,
             'source_hash': source_hash,
-            'null_value': -999.25,
-            'trusted_depth_reference': trusted_depth_reference,
+            'null_value': null_value,
+            'curve_type': curve_type,
+            'trusted_depth_reference': 'MD',
             'sampling_kind': sampling_kind,
             'nominal_step_m': nominal_step_m,
             'qc_status': qc['qc_status'],
@@ -166,6 +196,8 @@ def _import_logs_rows(
 
     import json as _json
     qc_warnings: list[str] = []
+    if depth_conversion.warning is not None:
+        qc_warnings.append(depth_conversion.warning)
     if td_warning is not None:
         qc_warnings.append(td_warning)
     for p in curve_payloads:
@@ -173,7 +205,7 @@ def _import_logs_rows(
             summary = _json.loads(str(p['qc_summary']))
             qc_warnings.extend(summary.get('messages', []))
 
-    return well, qc_warnings, final_depth
+    return well, qc_warnings, final_depth_md
 
 
 def import_logs_csv(
@@ -185,6 +217,8 @@ def import_logs_csv(
     depth_column: str | None = None,
     create_new_well: bool = False,
     trusted_depth_reference: str = 'MD',
+    null_value: float = -999.25,
+    curve_types: dict[str, str] | None = None,
 ) -> tuple[object, list[str], float | None]:
     source_path = Path(csv_path)
     source_hash = _sha256(source_path)
@@ -200,6 +234,8 @@ def import_logs_csv(
         depth_column=depth_column,
         create_new_well=create_new_well,
         trusted_depth_reference=trusted_depth_reference,
+        null_value=null_value,
+        curve_types=curve_types,
     )
 
 
@@ -211,6 +247,8 @@ def import_logs_csv_multi(
     depth_column: str | None = None,
     create_new_well: bool = False,
     trusted_depth_reference: str = 'MD',
+    null_value: float = -999.25,
+    curve_types: dict[str, str] | None = None,
 ) -> tuple[list[object], list[str], dict[str, float | None], int]:
     source_path = Path(csv_path)
     source_hash = _sha256(source_path)
@@ -227,6 +265,8 @@ def import_logs_csv_multi(
             depth_column=depth_column,
             create_new_well=create_new_well,
             trusted_depth_reference=trusted_depth_reference,
+            null_value=null_value,
+            curve_types=curve_types,
         )
         return [well], warnings, {well.id: final_depth}, len(rows)
 
@@ -245,6 +285,8 @@ def import_logs_csv_multi(
             depth_column=depth_column,
             create_new_well=create_new_well,
             trusted_depth_reference=trusted_depth_reference,
+            null_value=null_value,
+            curve_types=curve_types,
         )
         imported_wells.append(well)
         qc_warnings.extend(warnings)

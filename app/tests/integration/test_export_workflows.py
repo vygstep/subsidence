@@ -322,6 +322,61 @@ def test_export_current_well_logs_csv_round_trips_with_logs_import(tmp_path: Pat
         manager.close_project()
 
 
+def test_export_current_well_logs_csv_preserves_null_gap_rows(tmp_path: Path) -> None:
+    manager = app.state.project_manager
+    if manager.is_open:
+        manager.close_project()
+
+    with TestClient(app) as client:
+        _create_project(client, tmp_path, 'logs-csv-gap-export')
+        source_csv = tmp_path / 'source_logs_with_gap.csv'
+        source_csv.write_text(
+            'well_name,DEPT [m],GR [api]\n'
+            'Gap Export Well,100,75\n'
+            'Gap Export Well,200,-999.25\n'
+            'Gap Export Well,300,85\n',
+            encoding='utf-8',
+        )
+        response = client.post('/api/projects/import-logs-csv', json={'csv_path': str(source_csv)})
+        assert response.status_code == 200, response.text
+        well_id = response.json()['well_id']
+
+        response = client.post('/api/export/wells/logs/csv', json={
+            'scope': 'current',
+            'well_id': well_id,
+        })
+        assert response.status_code == 200, response.text
+        reader = csv.DictReader(io.StringIO(response.content.decode('utf-8-sig')))
+        rows = list(reader)
+        by_depth = {row['DEPT [m]']: row for row in rows}
+        assert by_depth['100.0']['GR [gAPI]'] == '75.0'
+        assert by_depth['200.0']['GR [gAPI]'] == ''
+        assert by_depth['300.0']['GR [gAPI]'] == '85.0'
+
+        export_csv = tmp_path / 'exported_logs_with_gap.csv'
+        export_csv.write_bytes(response.content)
+
+        response = client.post('/api/projects/close')
+        assert response.status_code == 200, response.text
+        _create_project(client, tmp_path, 'logs-csv-gap-roundtrip')
+        response = client.post('/api/projects/import-logs-csv', json={'csv_path': str(export_csv)})
+        assert response.status_code == 200, response.text
+        well_id = response.json()['well_id']
+
+        response = client.post('/api/export/wells/logs/csv', json={
+            'scope': 'current',
+            'well_id': well_id,
+        })
+        assert response.status_code == 200, response.text
+        reader = csv.DictReader(io.StringIO(response.content.decode('utf-8-sig')))
+        roundtrip_rows = list(reader)
+        roundtrip_by_depth = {row['DEPT [m]']: row for row in roundtrip_rows}
+        assert roundtrip_by_depth['200.0']['GR [gAPI]'] == ''
+
+    if manager.is_open:
+        manager.close_project()
+
+
 def test_export_current_well_logs_las_round_trips_with_las_import(tmp_path: Path) -> None:
     manager = app.state.project_manager
     if manager.is_open:

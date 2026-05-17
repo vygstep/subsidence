@@ -291,22 +291,27 @@ def _curve_frame(project_path: Path, curve_rows: list[CurveMetadata]) -> pd.Data
     if not curve_rows:
         raise HTTPException(status_code=404, detail='No curves available for export')
 
-    frame_by_depth = pd.DataFrame(columns=['DEPT']).set_index('DEPT')
-    curve_maps: dict[str, dict[str, tuple[np.ndarray, np.ndarray]]] = {}
+    frame_by_depth: pd.DataFrame | None = None
+    frame_cache: dict[str, pd.DataFrame] = {}
     for row in curve_rows:
-        if row.data_uri not in curve_maps:
-            curve_maps[row.data_uri] = load_curves_from_parquet(project_path, row.data_uri)
-        pair = curve_maps[row.data_uri].get(row.mnemonic)
-        if pair is None:
+        if row.data_uri not in frame_cache:
+            parquet_path = project_path / row.data_uri
+            frame_cache[row.data_uri] = pd.read_parquet(parquet_path)
+        source_frame = frame_cache[row.data_uri]
+        if 'DEPT' not in source_frame.columns or row.mnemonic not in source_frame.columns:
             continue
-        depths, values = pair
-        frame_by_depth[row.mnemonic] = pd.Series(
-            values.astype('float64'),
-            index=pd.Index(depths.astype('float64'), name='DEPT'),
+        depths = pd.to_numeric(source_frame['DEPT'], errors='coerce')
+        values = pd.to_numeric(source_frame[row.mnemonic], errors='coerce')
+        series = pd.Series(
+            values.to_numpy(dtype='float64'),
+            index=pd.Index(depths.to_numpy(dtype='float64'), name='DEPT'),
             dtype='float64',
         )
+        series = series[series.index.notna()]
+        next_frame = series.to_frame(row.mnemonic)
+        frame_by_depth = next_frame if frame_by_depth is None else frame_by_depth.join(next_frame, how='outer')
 
-    if frame_by_depth.empty or not frame_by_depth.columns.tolist():
+    if frame_by_depth is None or frame_by_depth.empty or not frame_by_depth.columns.tolist():
         raise HTTPException(status_code=404, detail='No curve samples available for export')
 
     return frame_by_depth.sort_index().reset_index()

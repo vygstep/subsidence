@@ -64,6 +64,7 @@ class ImportLasRequest(BaseModel):
     trusted_depth_reference: str = 'MD'
     depth_unit: str = 'm'
     curve_types: dict[str, str] = {}
+    null_value: float | None = None
 
 
 class ImportLogsCsvRequest(BaseModel):
@@ -75,6 +76,7 @@ class ImportLogsCsvRequest(BaseModel):
     trusted_depth_reference: str = 'MD'
     depth_unit: str = 'm'
     curve_types: dict[str, str] = {}
+    null_value: float = -999.25
 
 
 class ImportTopsRequest(BaseModel):
