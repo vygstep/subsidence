@@ -1,7 +1,7 @@
 # Well Object Delete Cleanup
 
-Status: Draft
-Branch: TBD
+Status: Implemented
+Branch: bug/well-object-delete-cleanup
 
 ## Goal
 
