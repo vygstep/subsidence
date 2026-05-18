@@ -25,7 +25,7 @@ pytest tests
 Recent baseline from 2026-05-17:
 
 - Frontend: 88 passed.
-- Backend: 156 passed.
+- Backend: 158 passed.
 
 ---
 
@@ -59,6 +59,7 @@ Backend:
 - Formation depth persistence.
 - Export workflows for well info/logs/tops/deviation/StratCharts/sea-level curves.
 - Log resampling and LAS export behavior.
+- Subprocess-isolated native path picker endpoints.
 - Backstrip unit behavior.
 
 ---
