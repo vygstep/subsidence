@@ -30,7 +30,7 @@ Implemented. Maintainer implementation notes are local-only and are not part of 
 
 ### 4. User Attributes From Extra Columns
 
-Moved to `docs/contracts/import-user-attributes.md`.
+Implemented. Maintainer implementation notes are local-only and are not part of the public documentation tree.
 
 ### 5. Checkpoint Revert And Comments
 
