@@ -60,6 +60,10 @@ export function ProjectToolbar() {
   const projectMenuRef = useRef<HTMLDivElement | null>(null)
   const loadMenuRef = useRef<HTMLDivElement | null>(null)
   const exportMenuRef = useRef<HTMLDivElement | null>(null)
+  const chartLoadMenuRef = useRef<HTMLDivElement | null>(null)
+  const chartExportMenuRef = useRef<HTMLDivElement | null>(null)
+  const [chartLoadMenuOpen, setChartLoadMenuOpen] = useState(false)
+  const [chartExportMenuOpen, setChartExportMenuOpen] = useState(false)
 
   const well = useWellDataStore((state) => state.well)
   const curves = useWellDataStore((state) => state.curves)
@@ -74,7 +78,6 @@ export function ProjectToolbar() {
   const loadWell = useWellDataStore((state) => state.loadWell)
   const loadStratCharts = useWellDataStore((state) => state.loadStratCharts)
   const loadSeaLevelCurves = useWellDataStore((state) => state.loadSeaLevelCurves)
-  const deleteChart = useWellDataStore((state) => state.deleteChart)
   const refreshWell = useWellDataStore((state) => state.refreshWell)
 
   const isProjectOpen = useProjectStore((state) => state.isOpen)
@@ -152,11 +155,13 @@ export function ProjectToolbar() {
       setProjectMenuOpen(false)
       setLoadMenuOpen(false)
       setExportMenuOpen(false)
+      setChartLoadMenuOpen(false)
+      setChartExportMenuOpen(false)
     }
   }, [isProjectOpen])
 
   useEffect(() => {
-    if (!projectMenuOpen && !loadMenuOpen && !exportMenuOpen) return
+    if (!projectMenuOpen && !loadMenuOpen && !exportMenuOpen && !chartLoadMenuOpen && !chartExportMenuOpen) return
 
     const onPointerDown = (event: MouseEvent) => {
       const target = event.target as Node
@@ -169,11 +174,17 @@ export function ProjectToolbar() {
       if (!exportMenuRef.current?.contains(target)) {
         setExportMenuOpen(false)
       }
+      if (!chartLoadMenuRef.current?.contains(target)) {
+        setChartLoadMenuOpen(false)
+      }
+      if (!chartExportMenuRef.current?.contains(target)) {
+        setChartExportMenuOpen(false)
+      }
     }
 
     window.addEventListener('mousedown', onPointerDown)
     return () => window.removeEventListener('mousedown', onPointerDown)
-  }, [exportMenuOpen, loadMenuOpen, projectMenuOpen])
+  }, [chartExportMenuOpen, chartLoadMenuOpen, exportMenuOpen, loadMenuOpen, projectMenuOpen])
 
   useEffect(() => {
     const onKeyDown = (event: KeyboardEvent) => {
@@ -237,23 +248,6 @@ export function ProjectToolbar() {
       window.alert('Diagnostics copied to clipboard.')
     } catch {
       window.prompt('Copy diagnostics JSON', body)
-    }
-  }
-
-  async function handleDeleteStratChart(): Promise<void> {
-    const activeChart = stratCharts.find((c) => c.is_active) ?? null
-    if (!activeChart) return
-    if (activeChart.is_builtin) {
-      window.alert('Built-in ICS chart cannot be deleted.')
-      return
-    }
-    if (!window.confirm(`Delete stratigraphic chart "${activeChart.name}"? Formation links to this chart will be cleared.`)) return
-
-    try {
-      await deleteChart(activeChart.id)
-      if (well?.well_id) await loadWell(well.well_id)
-    } catch {
-      window.alert('Failed to delete the active stratigraphic chart')
     }
   }
 
@@ -470,48 +464,72 @@ export function ProjectToolbar() {
 
   const stratChartModeActions = (
     <>
-      <button type="button" className="app-action-button" onClick={() => setActiveDialog('load-strat-chart')}>Load StratChart</button>
-      <button type="button" className="app-action-button" onClick={() => setActiveDialog('load-sea-level-curve')}>Load Sea Level Curve</button>
-      <button
-        type="button"
-        className="app-action-button"
-        onClick={() => setActiveDialog('export-strat-chart-active')}
-        disabled={!stratCharts.some((c) => c.is_active)}
-      >
-        Export active StratChart
-      </button>
-      <button
-        type="button"
-        className="app-action-button"
-        onClick={() => setActiveDialog('export-strat-chart-all')}
-        disabled={stratCharts.length === 0}
-      >
-        Export all StratCharts
-      </button>
-      <button
-        type="button"
-        className="app-action-button"
-        onClick={() => setActiveDialog('export-sea-level-selected')}
-        disabled={seaLevelCurves.length === 0}
-      >
-        Export Sea Level Curve
-      </button>
-      <button
-        type="button"
-        className="app-action-button"
-        onClick={() => setActiveDialog('export-sea-level-all')}
-        disabled={seaLevelCurves.length === 0}
-      >
-        Export all Sea Level Curves
-      </button>
-      <button
-        type="button"
-        className="app-action-button"
-        onClick={() => void handleDeleteStratChart()}
-        disabled={!stratCharts.some((c) => c.is_active && !c.is_builtin)}
-      >
-        Delete StratChart
-      </button>
+      <div className="app-menu" ref={chartLoadMenuRef}>
+        <button
+          type="button"
+          className={`app-action-button ${chartLoadMenuOpen ? 'app-action-button--mode-active' : ''}`}
+          onClick={() => {
+            setChartLoadMenuOpen((open) => !open)
+            setChartExportMenuOpen(false)
+          }}
+        >
+          Load
+        </button>
+        {chartLoadMenuOpen ? (
+          <div className="app-menu__dropdown">
+            <button type="button" className="app-menu__item" onClick={() => { setChartLoadMenuOpen(false); setActiveDialog('load-strat-chart') }}>Load StratChart</button>
+            <button type="button" className="app-menu__item" onClick={() => { setChartLoadMenuOpen(false); setActiveDialog('load-sea-level-curve') }}>Load Sea Level Curve</button>
+          </div>
+        ) : null}
+      </div>
+      <div className="app-menu" ref={chartExportMenuRef}>
+        <button
+          type="button"
+          className={`app-action-button ${chartExportMenuOpen ? 'app-action-button--mode-active' : ''}`}
+          onClick={() => {
+            setChartExportMenuOpen((open) => !open)
+            setChartLoadMenuOpen(false)
+          }}
+        >
+          Export
+        </button>
+        {chartExportMenuOpen ? (
+          <div className="app-menu__dropdown">
+            <button
+              type="button"
+              className="app-menu__item"
+              onClick={() => { setChartExportMenuOpen(false); setActiveDialog('export-strat-chart-active') }}
+              disabled={!stratCharts.some((c) => c.is_active)}
+            >
+              Export active StratChart
+            </button>
+            <button
+              type="button"
+              className="app-menu__item"
+              onClick={() => { setChartExportMenuOpen(false); setActiveDialog('export-strat-chart-all') }}
+              disabled={stratCharts.length === 0}
+            >
+              Export all StratCharts
+            </button>
+            <button
+              type="button"
+              className="app-menu__item"
+              onClick={() => { setChartExportMenuOpen(false); setActiveDialog('export-sea-level-selected') }}
+              disabled={seaLevelCurves.length === 0}
+            >
+              Export Sea Level Curve
+            </button>
+            <button
+              type="button"
+              className="app-menu__item"
+              onClick={() => { setChartExportMenuOpen(false); setActiveDialog('export-sea-level-all') }}
+              disabled={seaLevelCurves.length === 0}
+            >
+              Export all Sea Level Curves
+            </button>
+          </div>
+        ) : null}
+      </div>
     </>
   )
 
