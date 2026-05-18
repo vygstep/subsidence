@@ -7,7 +7,7 @@ from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column, relationship
 from sqlalchemy import MetaData
 
 SUBSIDENCE_APP_ID = 0x53554253  # "SUBS" as 4-byte int
-SCHEMA_VERSION = 14
+SCHEMA_VERSION = 15
 
 _NAMING: dict[str, str] = {
     "ix": "ix_%(table_name)s_%(column_0_name)s",
@@ -206,6 +206,8 @@ class StratUnit(Base):
     age_base_ma: Mapped[float | None] = mapped_column(Float, nullable=True)
     lithology: Mapped[str | None] = mapped_column(String(32), nullable=True)
     color_hex: Mapped[str | None] = mapped_column(String(9), nullable=True)
+    extra: Mapped[str | None] = mapped_column(Text, nullable=True)
+    # JSON blob for imported user-defined attributes
     chart_id: Mapped[int | None] = mapped_column(
         Integer, ForeignKey("strat_charts.id"), nullable=True
     )
@@ -315,6 +317,8 @@ class FormationTopModel(Base, AuditMixin):
     # JSON blob: {flags, messages}
     color_source: Mapped[str] = mapped_column(String(4), nullable=False, server_default='auto')
     # 'auto' = follows linked horizon color; 'user' = manually overridden
+    extra: Mapped[str | None] = mapped_column(Text, nullable=True)
+    # JSON blob for imported user-defined attributes
 
     well: Mapped[WellModel] = relationship(back_populates="formation_tops")
     strat_links: Mapped[list["FormationStratLink"]] = relationship(
@@ -753,6 +757,8 @@ class SeaLevelPoint(Base):
     )
     age_ma: Mapped[float] = mapped_column(Float, nullable=False)
     sea_level_m: Mapped[float] = mapped_column(Float, nullable=False)
+    extra: Mapped[str | None] = mapped_column(Text, nullable=True)
+    # JSON blob for imported user-defined attributes
 
     curve: Mapped["SeaLevelCurve"] = relationship(back_populates="points")
 

@@ -25,6 +25,7 @@ DEFAULT_WELL_KB = 10.0
 DEFAULT_WELL_TD_MD = 100.0
 DEFAULT_WELL_CRS = 'unset'
 _CSV_EXCLUDED_COLUMNS = {'well_name'}
+_EMPTY_ATTRIBUTE_VALUES = {None, ''}
 
 
 def _sha256(path: Path) -> str:
@@ -91,6 +92,53 @@ def _merge_extra_json(existing_json: str | None, patch: dict[str, object] | None
             existing = {}
     existing.update({key: value for key, value in patch.items() if value not in (None, '')})
     return json.dumps(existing, ensure_ascii=True) if existing else None
+
+
+def _clean_attribute_key(key: str) -> str:
+    stripped = key.strip()
+    return stripped[6:] if stripped.casefold().startswith('extra_') else stripped
+
+
+def _extract_user_attributes(
+    row: dict[str, str],
+    known_fields: set[str],
+    *,
+    excluded_fields: set[str] | None = None,
+) -> dict[str, object]:
+    excluded = excluded_fields or set()
+    attributes: dict[str, object] = {}
+    known = {field.strip().casefold() for field in known_fields}
+    excluded_normalized = {field.strip().casefold() for field in excluded}
+    for key, value in row.items():
+        raw_key = (key or '').strip()
+        if not raw_key:
+            continue
+        normalized_key = raw_key.casefold()
+        is_prefixed_extra = normalized_key.startswith('extra_')
+        if normalized_key in known and not is_prefixed_extra:
+            continue
+        if normalized_key in excluded_normalized:
+            continue
+        clean_key = _clean_attribute_key(raw_key)
+        if not clean_key:
+            continue
+        if value in _EMPTY_ATTRIBUTE_VALUES:
+            continue
+        clean_value = str(value).strip()
+        if not clean_value:
+            continue
+        attributes[clean_key] = clean_value
+    return attributes
+
+
+def _json_or_none(data: dict[str, object] | None) -> str | None:
+    if not data:
+        return None
+    return json.dumps(data, ensure_ascii=True)
+
+
+def _merge_extra_attribute_json(existing_json: str | None, patch: dict[str, object] | None) -> str | None:
+    return _merge_extra_json(existing_json, patch)
 
 
 def create_empty_well(

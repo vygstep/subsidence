@@ -28,6 +28,30 @@ from .common import (
 )
 from .log_resampling import build_md_grid, convert_source_depths_to_md, resample_curve_to_md_grid
 
+_LAS_CORE_WELL_HEADERS = {
+    'WELL',
+    'UWI',
+    'EREF',
+    'KB',
+    'TD',
+    'SLAT',
+    'LATI',
+    'SLON',
+    'LONG',
+    'HZCS',
+    'NULL',
+}
+
+_LAS_EXTRA_ALIASES = {
+    'COMP': 'company',
+    'FLD': 'field',
+    'LOC': 'location',
+    'API': 'api',
+    'COUNTRY': 'country',
+    'CTRY': 'country',
+    'ORIGINALWELLNAME': 'original_well_name',
+}
+
 
 def _header_text(las: lasio.LASFile, name: str) -> str | None:
     item = las.well.get(name)
@@ -44,24 +68,45 @@ def _header_float(las: lasio.LASFile, name: str, default: float | None = None) -
     return _coerce_float(getattr(item, 'value', None), default)
 
 
+def _las_well_header_extra(las: lasio.LASFile) -> dict[str, object]:
+    extra: dict[str, object] = {}
+    for item in las.well:
+        mnemonic = str(getattr(item, 'mnemonic', '') or '').strip()
+        if not mnemonic:
+            continue
+        value = str(getattr(item, 'value', '') or '').strip()
+        if not value:
+            continue
+        normalized = mnemonic.upper()
+        if normalized in _LAS_CORE_WELL_HEADERS:
+            continue
+        key = _LAS_EXTRA_ALIASES.get(normalized, mnemonic.strip().lower())
+        extra[key] = value
+    return extra
+
+
 def _well_metadata_from_las(las: lasio.LASFile, original_relative_path: str, *, final_depth: float | None) -> dict[str, object]:
+    extra = _las_well_header_extra(las)
+    extra = {
+        **extra,
+        'company': _header_text(las, 'COMP') or extra.get('company'),
+        'field': _header_text(las, 'FLD') or extra.get('field'),
+        'location': _header_text(las, 'LOC') or extra.get('location'),
+        'api': _header_text(las, 'API') or extra.get('api'),
+        'country': _header_text(las, 'COUNTRY') or _header_text(las, 'CTRY') or extra.get('country'),
+        'original_well_name': _header_text(las, 'ORIGINALWELLNAME') or extra.get('original_well_name'),
+    }
+    extra = {key: value for key, value in extra.items() if value not in (None, '')}
     return {
         'uwi': _header_text(las, 'UWI'),
         'name': _header_text(las, 'WELL') or _header_text(las, 'ORIGINALWELLNAME') or DEFAULT_WELL_NAME,
-        'kb': _header_float(las, 'EREF', DEFAULT_WELL_KB) or DEFAULT_WELL_KB,
+        'kb': _header_float(las, 'EREF') or _header_float(las, 'KB') or DEFAULT_WELL_KB,
         'td': _header_float(las, 'TD', final_depth) or final_depth,
         'y': _header_float(las, 'SLAT') or _header_float(las, 'LATI'),
         'x': _header_float(las, 'SLON') or _header_float(las, 'LONG'),
         'crs': _header_text(las, 'HZCS') or DEFAULT_WELL_CRS,
         'source_las_path': original_relative_path,
-        'extra': {
-            'company': _header_text(las, 'COMP'),
-            'field': _header_text(las, 'FLD'),
-            'location': _header_text(las, 'LOC'),
-            'api': _header_text(las, 'API'),
-            'country': _header_text(las, 'COUNTRY') or _header_text(las, 'CTRY'),
-            'original_well_name': _header_text(las, 'ORIGINALWELLNAME'),
-        },
+        'extra': extra,
     }
 
 

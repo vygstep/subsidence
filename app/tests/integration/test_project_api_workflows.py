@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import csv
+import io
 import json
 from pathlib import Path
 
@@ -1793,6 +1795,185 @@ def test_tops_import_with_column_map(api_client: TestClient, tmp_path: Path) -> 
     assert 'Cretaceous Base' in top_names
 
 
+def _csv_response_rows(response) -> list[dict[str, str]]:
+    text = response.content.decode('utf-8-sig')
+    return list(csv.DictReader(io.StringIO(text)))
+
+
+def test_wells_import_preserves_unknown_columns_as_extra_attributes(api_client: TestClient, tmp_path: Path) -> None:
+    _create_project(api_client, tmp_path, 'well-user-attributes')
+    csv_path = tmp_path / 'wells_extra.csv'
+    csv_path.write_text(
+        'well_name,kb,td,operator,extra_country\n'
+        'Extra Well,11,250,Acme,Norway\n',
+        encoding='utf-8',
+    )
+
+    response = api_client.post('/api/projects/import-wells', json={'csv_path': str(csv_path)})
+    assert response.status_code == 200, response.text
+    well_id = response.json()['well_ids'][0]
+
+    manager = app.state.project_manager
+    with manager.get_session() as session:
+        well = session.get(WellModel, well_id)
+        assert well is not None
+        extra = json.loads(well.extra or '{}')
+        assert extra['operator'] == 'Acme'
+        assert extra['country'] == 'Norway'
+
+    response = api_client.post('/api/export/wells/info', json={'scope': 'current', 'well_id': well_id})
+    assert response.status_code == 200, response.text
+    rows = _csv_response_rows(response)
+    assert rows[0]['extra_operator'] == 'Acme'
+    assert rows[0]['extra_country'] == 'Norway'
+
+
+def test_las_import_preserves_well_header_extra_metadata(api_client: TestClient, tmp_path: Path) -> None:
+    _create_project(api_client, tmp_path, 'las-header-user-attributes')
+    las_path = tmp_path / 'extra_header.las'
+    las_path.write_text(
+        '~Version Information\n'
+        ' VERS. 2.0 : CWLS LOG ASCII STANDARD\n'
+        ' WRAP. NO  : One line per depth step\n'
+        '~Well Information\n'
+        ' STRT.M 0.0 : Start depth\n'
+        ' STOP.M 1.0 : Stop depth\n'
+        ' STEP.M 0.5 : Step\n'
+        ' NULL. -999.25 : Null value\n'
+        ' WELL. Header Well : Well name\n'
+        ' COMP. Test Company : Company\n'
+        ' BASIN. North Sea : Basin\n'
+        '~Curve Information\n'
+        ' DEPT.M : Depth\n'
+        ' GR.API : Gamma ray\n'
+        '~ASCII\n'
+        '0.0 80.0\n'
+        '0.5 85.0\n'
+        '1.0 90.0\n',
+        encoding='utf-8',
+    )
+
+    response = api_client.post('/api/projects/import-las', json={'las_path': str(las_path)})
+    assert response.status_code == 200, response.text
+    well_id = response.json()['well_id']
+
+    manager = app.state.project_manager
+    with manager.get_session() as session:
+        well = session.get(WellModel, well_id)
+        assert well is not None
+        extra = json.loads(well.extra or '{}')
+        assert extra['company'] == 'Test Company'
+        assert extra['basin'] == 'North Sea'
+
+
+def test_tops_import_export_preserves_unknown_columns_as_extra_attributes(api_client: TestClient, tmp_path: Path) -> None:
+    _create_project(api_client, tmp_path, 'tops-user-attributes')
+    response = api_client.post('/api/projects/wells', json={'name': 'Top Extra Well', 'td': 500.0})
+    assert response.status_code == 200, response.text
+    well_id = response.json()['well_id']
+
+    csv_path = tmp_path / 'tops_extra.csv'
+    csv_path.write_text(
+        'well_name,top_name,depth_md,age_ma,source_quality,extra_interpreter\n'
+        'Top Extra Well,Top A,100,10,checked,SV\n'
+        'Top Extra Well,Top B,200,20,reviewed,SV\n',
+        encoding='utf-8',
+    )
+
+    response = api_client.post('/api/projects/import-tops', json={
+        'csv_path': str(csv_path),
+        'well_id': well_id,
+        'create_zone_set': True,
+        'zone_set_name': 'Extra TopSet',
+    })
+    assert response.status_code == 200, response.text
+
+    manager = app.state.project_manager
+    with manager.get_session() as session:
+        top = session.scalar(sa_select(FormationTopModel).where(FormationTopModel.name == 'Top A'))
+        assert top is not None
+        extra = json.loads(top.extra or '{}')
+        assert extra['source_quality'] == 'checked'
+        assert extra['interpreter'] == 'SV'
+
+    response = api_client.post('/api/export/wells/tops', json={'scope': 'current', 'well_id': well_id})
+    assert response.status_code == 200, response.text
+    rows = _csv_response_rows(response)
+    assert rows[0]['extra_source_quality'] == 'checked'
+    assert rows[0]['extra_interpreter'] == 'SV'
+
+
+def test_strat_chart_import_export_preserves_unknown_columns_as_extra_attributes(api_client: TestClient, tmp_path: Path) -> None:
+    _create_project(api_client, tmp_path, 'strat-user-attributes')
+    chart_csv = tmp_path / 'custom_strat_extra.csv'
+    chart_csv.write_text(
+        'id,parent,name,rank,top,base,hex,authority\n'
+        '1,,System A,system,0,20,#abcdef,Local\n'
+        '2,1,Stage A,stage,0,10,#fedcba,Local child\n',
+        encoding='utf-8',
+    )
+
+    response = api_client.post('/api/strat-charts/import', json={
+        'csv_path': str(chart_csv),
+        'column_map': {
+            'unit_id': 'id',
+            'parent_unit_id': 'parent',
+            'unit_name': 'name',
+            'rank_name': 'rank',
+            'end_age_ma': 'top',
+            'start_age_ma': 'base',
+            'color': 'hex',
+        },
+    })
+    assert response.status_code == 200, response.text
+
+    manager = app.state.project_manager
+    with manager.get_session() as session:
+        chart = session.scalar(sa_select(StratChart).where(StratChart.name == 'custom_strat_extra'))
+        assert chart is not None
+        unit = session.scalar(sa_select(StratUnit).where(StratUnit.chart_id == chart.id, StratUnit.name == 'Stage A'))
+        assert unit is not None
+        assert json.loads(unit.extra or '{}')['authority'] == 'Local child'
+        chart_id = chart.id
+
+    response = api_client.post('/api/export/strat-charts', json={'scope': 'selected', 'chart_id': chart_id})
+    assert response.status_code == 200, response.text
+    rows = _csv_response_rows(response)
+    stage = next(row for row in rows if row['unit_name'] == 'Stage A')
+    assert stage['extra_authority'] == 'Local child'
+
+
+def test_sea_level_import_export_preserves_unknown_columns_as_extra_attributes(api_client: TestClient, tmp_path: Path) -> None:
+    _create_project(api_client, tmp_path, 'sea-level-user-attributes')
+    curve_csv = tmp_path / 'sea_level_extra.csv'
+    curve_csv.write_text(
+        'age,level,source_model\n'
+        '10,5,Haq\n'
+        '0,0,Present\n',
+        encoding='utf-8',
+    )
+
+    response = api_client.post('/api/sea-level-curves/import', json={
+        'csv_path': str(curve_csv),
+        'curve_name': 'Extra Sea Level',
+        'column_map': {'age_ma': 'age', 'sea_level_m': 'level'},
+    })
+    assert response.status_code == 200, response.text
+    curve_id = response.json()['curve_id']
+
+    manager = app.state.project_manager
+    with manager.get_session() as session:
+        point = session.scalar(sa_select(SeaLevelPoint).where(SeaLevelPoint.curve_id == curve_id, SeaLevelPoint.age_ma == 10.0))
+        assert point is not None
+        assert json.loads(point.extra or '{}')['source_model'] == 'Haq'
+
+    response = api_client.post('/api/export/sea-level-curves', json={'scope': 'selected', 'curve_id': curve_id})
+    assert response.status_code == 200, response.text
+    rows = _csv_response_rows(response)
+    oldest = next(row for row in rows if row['age_ma'] == '10.0')
+    assert oldest['extra_source_model'] == 'Haq'
+
+
 def test_logs_import_extends_well_td_with_warning(api_client: TestClient, tmp_path: Path) -> None:
     _create_project(api_client, tmp_path, 'logs-extends-td')
     response = api_client.post('/api/projects/wells', json={
@@ -2625,6 +2806,30 @@ def test_deviation_import_with_column_map(api_client: TestClient, tmp_path: Path
     })
     assert response.status_code == 200, response.text
     assert response.json()['mode'] == 'INCL_AZIM'
+
+
+def test_deviation_import_export_preserves_numeric_extra_columns(api_client: TestClient, tmp_path: Path) -> None:
+    _create_project(api_client, tmp_path, 'deviation-extra-numeric')
+    response = api_client.post('/api/projects/wells', json={'name': 'Deviation Extra Well', 'td': 500.0})
+    assert response.status_code == 200, response.text
+    well_id = response.json()['well_id']
+
+    csv_path = tmp_path / 'deviation_extra.csv'
+    csv_path.write_text(
+        'well_name,md,incl_deg,azim_deg,dogleg_severity\n'
+        'Deviation Extra Well,0,0,0,0\n'
+        'Deviation Extra Well,100,2,45,1.5\n'
+        'Deviation Extra Well,300,5,50,2.5\n',
+        encoding='utf-8',
+    )
+
+    response = api_client.post('/api/projects/import-deviation', json={'csv_path': str(csv_path), 'well_id': well_id})
+    assert response.status_code == 200, response.text
+
+    response = api_client.post('/api/export/wells/deviation', json={'scope': 'current', 'well_id': well_id})
+    assert response.status_code == 200, response.text
+    rows = _csv_response_rows(response)
+    assert rows[1]['dogleg_severity'] == '1.5'
 
 
 def test_tops_import_with_incomplete_column_map_returns_400(api_client: TestClient, tmp_path: Path) -> None:
