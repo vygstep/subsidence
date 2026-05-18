@@ -30,9 +30,7 @@ Implemented. Maintainer implementation notes are local-only and are not part of 
 
 ### 4. User Attributes From Extra Columns
 
-- Preserve imported columns that are not part of the core schema as user-defined attributes.
-- Store them in the database first; decide later where and how they should be displayed or used.
-- Apply this consistently across relevant importers after reviewing the schema.
+Moved to `docs/contracts/import-user-attributes.md`.
 
 ### 5. Checkpoint Revert And Comments
 

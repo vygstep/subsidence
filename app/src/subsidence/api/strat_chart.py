@@ -10,6 +10,7 @@ from pydantic import BaseModel
 from sqlalchemy import delete, func, select
 
 from subsidence.data import ActivateStratChart, ProjectManager
+from subsidence.data.importers.common import _extract_user_attributes, _json_or_none
 from subsidence.data.schema import FormationStratLink, StratChart, StratUnit
 from subsidence.data.strat_link import auto_link_all_formations_to_chart
 from subsidence.observability import operation_log
@@ -86,10 +87,51 @@ def _is_builtin_chart(chart: StratChart) -> bool:
 
 
 def _apply_column_map(row: dict[str, str], column_map: dict[str, str]) -> dict[str, str]:
-    return {
+    mapped_sources = set(column_map.values())
+    mapped = {
+        key: value
+        for key, value in row.items()
+        if key not in mapped_sources
+    }
+    mapped.update({
         canonical: row.get(source, '')
         for canonical, source in column_map.items()
-    }
+    })
+    return mapped
+
+
+_STRAT_CHART_KNOWN_FIELDS = {
+    'unit_id',
+    'id',
+    'parent_unit_id',
+    'parent_id',
+    'unit_name',
+    'name',
+    'strat_unit',
+    'unit',
+    'rank_name',
+    'rank',
+    'start_age_ma',
+    'start_age',
+    'age_base_ma',
+    'base_age_ma',
+    'end_age_ma',
+    'end_age',
+    'age_top_ma',
+    'top_age_ma',
+    'color',
+    'color_hex',
+    'hex',
+    'html_rgb_hash',
+    'rgb',
+    'cmyk',
+    'unit_code',
+    'strat_index',
+    'unit_abbrev',
+    'code',
+    'source_line',
+    'parent_csv_id',
+}
 
 
 def _line_error(line_number: int, message: str) -> StratChartImportError:
@@ -286,6 +328,7 @@ def _import_ics_csv(session, csv_path: Path, column_map: dict[str, str]) -> tupl
                 age_base_ma=age_base_ma,
                 lithology=None,
                 color_hex=_parse_color_hex(row.get('color')),
+                extra=_json_or_none(_extract_user_attributes(row, _STRAT_CHART_KNOWN_FIELDS)),
                 chart_id=chart.id,
             )
             session.add(unit)

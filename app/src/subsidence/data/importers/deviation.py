@@ -28,6 +28,46 @@ _DEVIATION_MODE_COLUMNS = {
     'X_Y': ('x', 'y'),
     'DX_DY': ('dx', 'dy'),
 }
+_DEVIATION_KNOWN_COLUMNS = {
+    'well_name',
+    'well',
+    'wellname',
+    'well_id',
+    'uwi',
+    'md',
+    'tvd',
+    'tvdss',
+    'incl_deg',
+    'incl',
+    'inclination',
+    'dip',
+    'inc',
+    'angle',
+    'azim_deg',
+    'azim',
+    'azimuth',
+    'az',
+    'azi',
+    'bearing',
+    'x',
+    'x_offset',
+    'easting',
+    'east',
+    'ns',
+    'y',
+    'y_offset',
+    'northing',
+    'north',
+    'ew',
+    'dx',
+    'delta_x',
+    'delta_easting',
+    'deast',
+    'dy',
+    'delta_y',
+    'delta_northing',
+    'dnorth',
+}
 
 
 def _detect_deviation_reference(fieldnames: list[str]) -> tuple[str, str]:
@@ -92,6 +132,24 @@ def _import_deviation_rows(
                 raise ValueError(f'{path}: invalid {column} value at row {row_index}: {raw_value!r}')
             values.append(value)
         frame_data[column] = values
+
+    for column in fieldnames:
+        if column in frame_data or column.strip().casefold() in _DEVIATION_KNOWN_COLUMNS:
+            continue
+        values = []
+        has_value = False
+        for row_index, row in enumerate(rows, start=2):
+            raw_value = row.get(column)
+            if raw_value in (None, ''):
+                values.append(float('nan'))
+                continue
+            value = _coerce_float(raw_value)
+            if value is None:
+                raise ValueError(f'{path}: invalid numeric extra deviation column {column!r} at row {row_index}: {raw_value!r}')
+            values.append(value)
+            has_value = True
+        if has_value:
+            frame_data[column] = values
 
     frame = pd.DataFrame(frame_data)
     for column in frame.columns:

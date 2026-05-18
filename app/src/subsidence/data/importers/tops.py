@@ -16,9 +16,11 @@ from .common import (
     _ensure_row_targets_well,
     _extract_float,
     _extract_text,
+    _extract_user_attributes,
     _group_rows_by_well_name,
     _has_multi_well_rows,
     _load_ics_units,
+    _merge_extra_attribute_json,
     _read_csv_rows,
     _resolve_or_create_well_from_rows,
     _resolve_ics_color,
@@ -26,6 +28,65 @@ from .common import (
     extend_well_td_for_import,
     run_top_qc,
 )
+
+_TOPS_KNOWN_FIELDS = {
+    'well_name',
+    'well',
+    'wellname',
+    'well_id',
+    'uwi',
+    'topset_name',
+    'top_set_name',
+    'zone_set_name',
+    'top_name',
+    'name',
+    'formation',
+    'top',
+    'horizon',
+    'pick',
+    'stratigraphic_unit',
+    'unit',
+    'marker',
+    'depth_md',
+    'depth',
+    'md',
+    'dept',
+    'depth_m',
+    'md_m',
+    'measured_depth',
+    'boundary_type',
+    'kind',
+    'type',
+    'age_ma',
+    'strat_age_ma',
+    'age',
+    'age_base_ma',
+    'hiatus_duration_ma',
+    'hiatus_ma',
+    'hiatus',
+    'eroded_thickness_m',
+    'eroded_m',
+    'eroded',
+    'water_depth_m',
+    'paleobathymetry_m',
+    'paleobathymetry',
+    'sea_level_m_override',
+    'sea_level_override_m',
+    'sea_level',
+    'lithology',
+    'lithology_fractions',
+    'lithology_source',
+    'color',
+    'note',
+}
+
+_TOPS_COMPUTED_EXPORT_FIELDS = {
+    'depth_tvd',
+    'depth_tvdss',
+    'lower_top_name',
+    'zone_thickness_md',
+    'zone_thickness_tvd',
+}
 
 
 def _top_name_key(name: str | None) -> str:
@@ -197,6 +258,11 @@ def _import_tops_rows(
         color = explicit_color or _resolve_ics_color(age_ma, ics_units) or _DEFAULT_TOP_COLOR
         color_source = 'user' if has_explicit_color else 'auto'
         note = _extract_text(row, 'note')
+        extra = _extract_user_attributes(
+            row,
+            _TOPS_KNOWN_FIELDS,
+            excluded_fields=_TOPS_COMPUTED_EXPORT_FIELDS,
+        )
 
         qc = run_top_qc(top_name, depth_md, well.td_md)
         kind = 'unconformity' if is_unconformity else 'strat'
@@ -253,6 +319,7 @@ def _import_tops_rows(
         top.note = note
         top.qc_status = str(qc['qc_status'])
         top.qc_summary = str(qc['qc_summary']) if qc.get('qc_summary') else None
+        top.extra = _merge_extra_attribute_json(top.extra, extra)
         setattr(top, '_import_lithology_fractions', lithology_fractions)
         setattr(top, '_import_lithology_source', lithology_source if lithology_source in {'manual', 'auto'} else None)
         _log.debug('pick_row', extra={'event': {

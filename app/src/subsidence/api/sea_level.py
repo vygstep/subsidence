@@ -10,11 +10,23 @@ from sqlalchemy import func, select
 
 from subsidence.api._deps import manager_project_path as _manager_project_path
 from subsidence.api._deps import require_open_project as _require_open_project
-from subsidence.data.importers.common import _apply_column_map
+from subsidence.data.importers.common import _apply_column_map, _extract_user_attributes, _json_or_none
 from subsidence.data.schema import SeaLevelCurve, SeaLevelPoint, WellActiveSeaLevelCurve, WellModel
 from subsidence.observability import operation_log
 
 router = APIRouter(tags=['sea-level'])
+
+_SEA_LEVEL_KNOWN_FIELDS = {
+    'age_ma',
+    'age',
+    'age_ma_bp',
+    'time_ma',
+    'sea_level_m',
+    'sea_level',
+    'level_m',
+    'sl_m',
+    'eustatic_m',
+}
 
 
 class SeaLevelCurveCreate(BaseModel):
@@ -123,7 +135,13 @@ def _import_sea_level_curve_csv(
     for row_number, row in enumerate(rows, start=header_row + 2):
         age_ma = _float_required(row.get('age_ma'), 'age_ma', row_number)
         sea_level_m = _float_required(row.get('sea_level_m'), 'sea_level_m', row_number)
-        points.append(SeaLevelPoint(age_ma=age_ma, sea_level_m=sea_level_m))
+        points.append(
+            SeaLevelPoint(
+                age_ma=age_ma,
+                sea_level_m=sea_level_m,
+                extra=_json_or_none(_extract_user_attributes(row, _SEA_LEVEL_KNOWN_FIELDS)),
+            )
+        )
 
     points.sort(key=lambda point: point.age_ma, reverse=True)
 

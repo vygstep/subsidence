@@ -185,6 +185,27 @@ def csv_bytes(fieldnames: list[str], rows: Iterable[dict[str, object | None]]) -
     return buffer.getvalue().encode('utf-8-sig')
 
 
+def _json_extra(value: str | None) -> dict[str, object]:
+    if not value:
+        return {}
+    try:
+        parsed = json.loads(value)
+    except json.JSONDecodeError:
+        return {}
+    return parsed if isinstance(parsed, dict) else {}
+
+
+def _extra_csv_fields(rows: list[dict[str, object | None]], reserved: set[str]) -> list[str]:
+    fields: set[str] = set()
+    for row in rows:
+        for key, value in row.items():
+            if key in reserved or value in (None, ''):
+                continue
+            if key.startswith('extra_'):
+                fields.add(key)
+    return sorted(fields)
+
+
 def download_response(content: bytes, filename: str, media_type: str) -> Response:
     safe_name = sanitize_filename(filename)
     return Response(
@@ -235,18 +256,12 @@ def write_export_files(output_dir: Path, files: Iterable[tuple[str, bytes]]) -> 
 
 
 def _well_extra(row: WellModel) -> dict[str, object]:
-    if not row.extra:
-        return {}
-    try:
-        parsed = json.loads(row.extra)
-    except json.JSONDecodeError:
-        return {}
-    return parsed if isinstance(parsed, dict) else {}
+    return _json_extra(row.extra)
 
 
 def _well_info_row(row: WellModel) -> dict[str, object | None]:
     extra = _well_extra(row)
-    return {
+    result = {
         'well_name': row.name,
         'uwi': row.uwi,
         'kb_elev': row.kb_elev,
@@ -266,6 +281,11 @@ def _well_info_row(row: WellModel) -> dict[str, object | None]:
         'extra_country': extra.get('country'),
         'extra_original_well_name': extra.get('original_well_name'),
     }
+    for key, value in extra.items():
+        field = f'extra_{key}'
+        if field not in result:
+            result[field] = value
+    return result
 
 
 def _well_info_csv(rows: list[dict[str, object | None]]) -> bytes:
@@ -275,6 +295,7 @@ def _well_info_csv(rows: list[dict[str, object | None]]) -> bytes:
         if field in REQUIRED_WELL_INFO_FIELDNAMES
         or any(row.get(field) not in (None, '') for row in rows)
     ]
+    fieldnames.extend(field for field in _extra_csv_fields(rows, set(fieldnames)) if field not in fieldnames)
     return csv_bytes(fieldnames, rows)
 
 
@@ -593,6 +614,7 @@ def _tops_rows_for_well(session, well: WellModel) -> list[dict[str, object | Non
             'lower_top_name': zone.lower_horizon.name if zone is not None and zone.lower_horizon is not None else None,
             'zone_thickness_md': zwd.thickness_md if zwd is not None else None,
             'zone_thickness_tvd': zwd.thickness_tvd if zwd is not None else None,
+            **{f'extra_{key}': value for key, value in _json_extra(pick.extra).items()},
         })
     return rows
 
@@ -604,6 +626,7 @@ def _tops_csv(rows: list[dict[str, object | None]]) -> bytes:
         if field in REQUIRED_TOPS_FIELDNAMES
         or any(row.get(field) not in (None, '') for row in rows)
     ]
+    fieldnames.extend(field for field in _extra_csv_fields(rows, set(fieldnames)) if field not in fieldnames)
     return csv_bytes(fieldnames, rows)
 
 
@@ -704,10 +727,13 @@ def _strat_chart_csv(chart: StratChart, units: list[StratUnit]) -> bytes:
             'start_age_ma': unit.age_base_ma,
             'end_age_ma': unit.age_top_ma,
             'color': unit.color_hex,
+            **{f'extra_{key}': value for key, value in _json_extra(unit.extra).items()},
         })
     if not rows:
         raise HTTPException(status_code=404, detail=f'StratChart "{chart.name}" has no units to export')
-    return csv_bytes(STRAT_CHART_FIELDNAMES, rows)
+    fieldnames = list(STRAT_CHART_FIELDNAMES)
+    fieldnames.extend(field for field in _extra_csv_fields(rows, set(fieldnames)) if field not in fieldnames)
+    return csv_bytes(fieldnames, rows)
 
 
 def _strat_chart_export_files(session, charts: list[StratChart]) -> list[tuple[str, bytes]]:
@@ -738,10 +764,13 @@ def _sea_level_csv(curve: SeaLevelCurve, points: list[SeaLevelPoint]) -> bytes:
         {
             'age_ma': point.age_ma,
             'sea_level_m': point.sea_level_m,
+            **{f'extra_{key}': value for key, value in _json_extra(point.extra).items()},
         }
         for point in points
     ]
-    return csv_bytes(SEA_LEVEL_FIELDNAMES, rows)
+    fieldnames = list(SEA_LEVEL_FIELDNAMES)
+    fieldnames.extend(field for field in _extra_csv_fields(rows, set(fieldnames)) if field not in fieldnames)
+    return csv_bytes(fieldnames, rows)
 
 
 def _sea_level_export_files(session, curves: list[SeaLevelCurve]) -> list[tuple[str, bytes]]:
