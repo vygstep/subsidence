@@ -68,7 +68,6 @@ Open **[http://127.0.0.1:5173](http://127.0.0.1:5173)** in a browser.
 ## Known issues and development status
 
 Active bugs and open work items are tracked in [`docs/contracts/`](docs/contracts/).  
-Completed work is archived in [`docs/contracts/implemented/`](docs/contracts/implemented/).
 
 ---
 
@@ -87,3 +86,5 @@ Free to use for scientific and commercial purposes — see [LICENSE](LICENSE).
 - [Architecture overview](docs/architecture.md)
 - [Codebase map](docs/codebase-map.md)
 - [Documentation index](docs/documentation-index.md)
+- Backend source: `app/src/subsidence`
+- Frontend source: `frontend/src`
