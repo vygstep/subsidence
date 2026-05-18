@@ -139,11 +139,7 @@ export function TabularPreviewPane({
                         >
                           <option value="">—</option>
                           {fields.map((f) => (
-                            <option
-                              key={f.id}
-                              value={f.id}
-                              disabled={!!mapping[f.id] && mapping[f.id] !== col}
-                            >
+                            <option key={f.id} value={f.id}>
                               {f.label}{f.required ? ' *' : ''}
                             </option>
                           ))}

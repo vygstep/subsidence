@@ -13,6 +13,8 @@ Make import column mapping faster and less error-prone across the tabular import
 
 The mapping row prevents assigning a field to a new CSV column if that field is already assigned elsewhere. The user has to manually set the old column to `-` first, then assign the field to the new column.
 
+Status: Implemented.
+
 ### 2. CSV Log Mapping Labels
 
 For CSV log import, the mapping row only exposes `Well name` and `Depth column`. All real log columns remain visually shown as `-`, even though they are imported as curves. This makes it unclear which curve mnemonics will be created.
@@ -85,8 +87,8 @@ The active StratChart node should not auto-expand in Data Manager. The user cont
 
 ## Implementation Plan
 
-1. Finish the small StratChart tree expansion fix and test.
-2. Update the shared tabular preview/mapping component so mapped fields can be reassigned in one action.
+1. Finish the small StratChart tree expansion fix and test. Done.
+2. Update the shared tabular preview/mapping component so mapped fields can be reassigned in one action. Done.
 3. Extend CSV log mapping display so imported curve columns show the curve mnemonic instead of `-`.
 4. Adjust CSV log curve type detection to default numeric curves to continuous unless a reliable discrete signal exists.
 5. Trace same-mnemonic curve reimport from backend metadata replacement through frontend view state and fix stale curve type behavior.
