@@ -399,14 +399,6 @@ export function ImportLasDialog({ wells, activeWellId, onClose, onSuccess }: Imp
                     extraOptions={lasWellName ? [{ value: CREATE_FROM_FILE, label: `Create new well "${lasWellName}"` }] : []}
                   />
                   <label className="project-dialog__field project-dialog__field--inline import-wizard__field">
-                    <span>Depth reference</span>
-                    <select value={trustedDepthRef} onChange={(e) => setTrustedDepthRef(e.target.value as 'MD' | 'TVD' | 'TVDSS')}>
-                      <option value="MD">MD</option>
-                      <option value="TVD">TVD</option>
-                      <option value="TVDSS">TVDSS</option>
-                    </select>
-                  </label>
-                  <label className="project-dialog__field project-dialog__field--inline import-wizard__field">
                     <span>Depth unit</span>
                     <select value={depthUnit} onChange={(e) => setDepthUnit(e.target.value as 'm' | 'ft' | 'km')}>
                       <option value="m">m</option>
@@ -461,14 +453,6 @@ export function ImportLasDialog({ wells, activeWellId, onClose, onSuccess }: Imp
                       emptyLabel="Use file well_name / create from defaults"
                     />
                   ) : null}
-                  <label className="project-dialog__field project-dialog__field--inline import-wizard__field">
-                    <span>Depth reference</span>
-                    <select value={trustedDepthRef} onChange={(e) => setTrustedDepthRef(e.target.value as 'MD' | 'TVD' | 'TVDSS')}>
-                      <option value="MD">MD</option>
-                      <option value="TVD">TVD</option>
-                      <option value="TVDSS">TVDSS</option>
-                    </select>
-                  </label>
                   <label className="project-dialog__field project-dialog__field--inline import-wizard__field">
                     <span>Depth unit</span>
                     <select value={depthUnit} onChange={(e) => setDepthUnit(e.target.value as 'm' | 'ft' | 'km')}>
