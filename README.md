@@ -6,10 +6,22 @@ Created by Stepan Vygovskiy
 
 SUBSIDENCE is a local application for 1D burial history analysis and tectonic subsidence / backstripping. It runs entirely on your machine — no cloud, no account required. Import well logs and formation tops, build a stratigraphic framework, assign lithology parameters, and reconstruct how sedimentary layers were buried and compacted through geological time.
 
+Current functionality includes:
+
+- stratigraphic picking directly inside the application
+- handling of formation thicknesses, erosional intervals, and hiatuses
+- sea-level curve support
+- single-well and multi-well subsidence chart comparison
+- reconstruction and truncation at selected geological times
+- built-in stratigraphic charts
+- built-in lithology properties and compaction presets
+- support for user-defined sea-level curves, StratCharts, lithologies, and compaction presets
+
+The software is still under active development, but the foundation for future decompaction, tectonic subsidence, and backstripping workflows is already included.
+
 ---
 
-<!-- screenshot: add an image here once the UI is stable -->
-<!-- ![SUBSIDENCE screenshot](docs/screenshot.png) -->
+![SUBSIDENCE screenshot](docs/assets/subsidence-1.png)
 
 ---
 

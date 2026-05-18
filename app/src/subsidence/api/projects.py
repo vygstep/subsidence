@@ -1,10 +1,10 @@
 from __future__ import annotations
 
+import json
 import math
 import platform
 import subprocess
-import tkinter as tk
-from tkinter import filedialog
+import sys
 from pathlib import Path
 
 from fastapi import APIRouter, HTTPException, Request
@@ -32,6 +32,43 @@ from subsidence.api._deps import (
 )
 
 router = APIRouter(tags=['projects'])
+
+
+_NATIVE_PICKER_SCRIPT = r"""
+from __future__ import annotations
+
+import json
+import sys
+
+try:
+    import tkinter as tk
+    from tkinter import filedialog
+
+    kind = sys.argv[1]
+    initial_dir = json.loads(sys.argv[2])
+    file_types = json.loads(sys.argv[3])
+
+    root = tk.Tk()
+    root.withdraw()
+    root.attributes('-topmost', True)
+    root.update()
+    try:
+        if kind == 'folder':
+            selected = filedialog.askdirectory(initialdir=initial_dir or None, mustexist=True)
+        elif kind == 'file':
+            selected = filedialog.askopenfilename(
+                initialdir=initial_dir or None,
+                filetypes=[tuple(item) for item in file_types] or [('All files', '*.*')],
+            )
+        else:
+            raise ValueError(f'Unknown picker kind: {kind}')
+        print(json.dumps({'path': selected or None}))
+    finally:
+        root.destroy()
+except Exception as exc:
+    print(json.dumps({'error': f'{type(exc).__name__}: {exc}'}))
+    raise SystemExit(2)
+"""
 
 
 class CreateProjectRequest(BaseModel):
@@ -348,15 +385,37 @@ def _normalize_initial_dir(path: str | None) -> str | None:
     return None
 
 
-def _pick_path(callback):
-    root = tk.Tk()
-    root.withdraw()
-    root.attributes('-topmost', True)
-    root.update()
+def _pick_path(kind: str, initial_dir: str | None, file_types: list[tuple[str, str]] | None = None) -> str | None:
+    """Run native Tk picker outside the API process.
+
+    Tcl/Tk can crash a threaded FastAPI worker on Windows if a Tk root created
+    for a file dialog is finalized from another thread. Keeping it in a short
+    subprocess isolates that GUI lifecycle from the backend server process.
+    """
+    result = subprocess.run(
+        [
+            sys.executable,
+            '-c',
+            _NATIVE_PICKER_SCRIPT,
+            kind,
+            json.dumps(initial_dir),
+            json.dumps(file_types or []),
+        ],
+        check=False,
+        capture_output=True,
+        text=True,
+    )
+    stdout = result.stdout.strip()
+    if not stdout:
+        stderr = result.stderr.strip()
+        raise RuntimeError(stderr or f'Native picker exited with code {result.returncode}')
     try:
-        return callback()
-    finally:
-        root.destroy()
+        payload = json.loads(stdout.splitlines()[-1])
+    except json.JSONDecodeError as exc:
+        raise RuntimeError(f'Native picker returned invalid output: {stdout}') from exc
+    if payload.get('error'):
+        raise RuntimeError(str(payload['error']))
+    return payload.get('path')
 
 
 @router.post('', response_model=CreateProjectResponse)
@@ -473,8 +532,8 @@ def pick_folder(payload: PickFolderRequest, request: Request) -> PickPathRespons
     initial_dir = _normalize_initial_dir(payload.initial_path)
 
     try:
-        selected = _pick_path(lambda: filedialog.askdirectory(initialdir=initial_dir or None, mustexist=True))
-    except tk.TclError as error:
+        selected = _pick_path('folder', initial_dir)
+    except RuntimeError as error:
         raise HTTPException(status_code=500, detail=f'Failed to open folder picker: {error}') from error
 
     return PickPathResponse(path=selected or None)
@@ -487,13 +546,8 @@ def pick_file(payload: PickFileRequest, request: Request) -> PickPathResponse:
     file_types = payload.file_types or [('All files', '*.*')]
 
     try:
-        selected = _pick_path(
-            lambda: filedialog.askopenfilename(
-                initialdir=initial_dir or None,
-                filetypes=file_types,
-            )
-        )
-    except tk.TclError as error:
+        selected = _pick_path('file', initial_dir, file_types)
+    except RuntimeError as error:
         raise HTTPException(status_code=500, detail=f'Failed to open file picker: {error}') from error
 
     return PickPathResponse(path=selected or None)

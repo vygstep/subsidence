@@ -66,14 +66,6 @@ Reference:
 
 ---
 
-## Audit Snapshots
-
-Audit snapshots are point-in-time analysis notes. They are useful context, but they are not canonical architecture documentation.
-
-- [2026-05 Refactor Map](audits/2026-05-refactor-map/07-reorganization-plan.md): trigger/data/schema/API/settings/risk maps used to prepare `REFACTOR-001`.
-
----
-
 ## Active Contracts
 
 See [Execution Backlog](../todo.md) for active contracts and checkpoint status.
@@ -99,4 +91,4 @@ pytest tests
 Recent baseline from 2026-05-17:
 
 - Frontend: 88 passed.
-- Backend: 156 passed.
+- Backend: 158 passed.

@@ -66,7 +66,8 @@ All project routers are registered in `main.py` under the same `/api/projects` p
 
 Note:
 
-- Native path picking endpoints remain in `projects.py`; they are platform-blocking and must not be made async.
+- Native path picking endpoints remain in `projects.py`, but `tkinter` runs in a short subprocess so Tcl/Tk cannot crash the FastAPI server process.
+- Keep picker endpoints synchronous from the API caller's perspective; do not import `tkinter` at module scope or create Tk roots in the backend worker process.
 - Shared Pydantic models and helpers live in `projects.py` and are imported by the split files.
 
 ---

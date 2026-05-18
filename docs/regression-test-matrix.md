@@ -12,7 +12,7 @@ This matrix turns critical user workflows into executable test work items. It is
 
 Recent automated baseline from 2026-05-17:
 
-- Backend: `156 passed` via `cd app && pytest tests`
+- Backend: `158 passed` via `cd app && pytest tests`
 - Frontend: `88 passed` via `cd frontend && npm run test -- --run`
 
 Existing backend tests:
@@ -21,7 +21,7 @@ Existing backend tests:
 - `app/tests/integration/test_formation_crud.py`
 - `app/tests/integration/test_formation_depth_persistence.py`
 - `app/tests/integration/test_project_api_workflows.py`
-- Additional backend API/data tests now cover StratChart workflows, export workflows, log resampling, well cleanup, and checkpoints.
+- Additional backend API/data tests now cover StratChart workflows, export workflows, log resampling, native path picker isolation, well cleanup, and checkpoints.
 
 Existing frontend tests:
 

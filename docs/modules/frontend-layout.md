@@ -61,6 +61,7 @@ Common bug areas:
 - Dialog input and action payload diverge.
 - File picker root is not remembered.
 - Path picker writes visible input but submit uses stale internal state.
+- Backend native picker crashes should be fixed in `api/projects.py`; frontend dialogs only call `/api/projects/pick-file` or `/api/projects/pick-folder`.
 - Import wizard UX diverges between LAS, logs CSV, tops, deviation, wells, StratChart, and sea-level workflows.
 - Exported file shape cannot be re-imported automatically.
 

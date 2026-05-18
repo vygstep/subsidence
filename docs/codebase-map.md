@@ -80,7 +80,7 @@ The project routers share the `/api/projects` prefix and are registered in `main
 
 Risk:
 
-- Native path picking endpoints in `projects.py` use platform-blocking dialogs. Do not make them async.
+- Native path picking endpoints in `projects.py` run `tkinter` in a short subprocess. Do not reintroduce module-scope `tkinter` imports or create Tk roots in the FastAPI worker process.
 - Shared models are imported by the split files; renaming models in `projects.py` requires updating those imports.
 
 ### Well API
@@ -803,7 +803,7 @@ Implementation files:
 
 1. Dialog uses `pathMemory.ts` to suggest last root.
 2. Frontend calls `/api/projects/pick-folder` or `/api/projects/pick-file`.
-3. `projects.py` invokes native picker and returns selected path.
+3. `projects.py` invokes an isolated native-picker subprocess and returns selected path.
 4. Dialog updates local input and remembers the root.
 
 ---
@@ -815,6 +815,7 @@ Implementation files:
 | Project cannot open/save/reopen | `projectStore.ts`, `api/projects.py`, `data/project_manager.py` |
 | Recent projects wrong | `projectStore.ts`, `data/project_manager.py`, `api/projects.py` |
 | Native file/folder picker wrong | `FileOpenDialog.tsx`, import dialogs, `pathMemory.ts`, `api/projects.py` |
+| Backend crashes after file picking | `api/projects.py` native picker subprocess path; avoid in-process `tkinter` |
 | LAS/log CSV imports into wrong well | import dialog, `projectStore.ts`, `importers/common.py`, `api/projects_imports.py` |
 | Logs CSV delimiter problem | `importers/logs_csv.py`, `ImportLasDialog.tsx`, `api/projects_imports.py` |
 | Tops colors/links wrong | `importers/tops.py`, `data/strat_link.py`, `api/formations.py`, `StratChartTab.tsx` |
@@ -852,7 +853,7 @@ These files are allowed to change, but not casually. Add tests/logging first whe
 | File | Why risky | Safety net needed |
 |---|---|---|
 | `app/src/subsidence/data/importers/` | all import paths and well auto-resolution | API import/save/reopen tests |
-| `app/src/subsidence/api/projects*.py` | project lifecycle, native dialogs; shared models imported by split files | project lifecycle + import API tests |
+| `app/src/subsidence/api/projects*.py` | project lifecycle, subprocess-isolated native dialogs; shared models imported by split files | project lifecycle + import API tests |
 | `frontend/src/components/layout/useDataManagerController.ts` | many object actions and selection behavior | Data Manager component/store tests |
 | `frontend/src/stores/projectStore.ts` | project lifecycle and visual config serialization | save/reopen/hydration tests |
 | `frontend/src/stores/wellDataStore.ts` | active well data, optimistic top updates | well switching + formation CRUD tests |
@@ -885,4 +886,4 @@ pytest tests
 Recent baseline from 2026-05-17:
 
 - Frontend: 88 passed.
-- Backend: 156 passed.
+- Backend: 158 passed.
