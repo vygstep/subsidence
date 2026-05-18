@@ -1,8 +1,9 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import type { FormEvent } from 'react'
 
 import { useNotificationStore, useProjectStore } from '@/stores'
 import { recordOperation } from '@/utils/diagnostics'
+import { detectCsvLogCurveType } from '@/utils/curveTypeDetection'
 
 import {
   ImportWizardShell,
@@ -70,11 +71,12 @@ function detectCsvDepthRef(columnName: string): 'MD' | 'TVD' | 'TVDSS' {
   return 'MD'
 }
 
-function detectColumnCurveType(colIndex: number, rows: string[][]): 'continuous' | 'discrete' {
-  const vals = rows.map((r) => r[colIndex]).filter((v) => v !== '' && v !== null && v !== undefined)
-  if (vals.length === 0) return 'continuous'
-  if (vals.every((v) => /^-?\d+$/.test(v.trim()))) return 'discrete'
-  return 'continuous'
+function displayCurveMnemonic(columnName: string): string {
+  const bracketMatch = columnName.match(/^(.+?)\s*\[[^\]]+\]\s*$/)
+  if (bracketMatch) return bracketMatch[1].trim() || columnName
+  const parenMatch = columnName.match(/^(.+?)\s*\([^)]+\)\s*$/)
+  if (parenMatch) return parenMatch[1].trim() || columnName
+  return columnName.trim() || columnName
 }
 
 export function ImportLasDialog({ wells, activeWellId, onClose, onSuccess }: ImportLasDialogProps) {
@@ -97,6 +99,12 @@ export function ImportLasDialog({ wells, activeWellId, onClose, onSuccess }: Imp
   const preset = sourceType === 'las' ? importWizardPresets.logsLas : importWizardPresets.logsCsv
   const sourceIsValid = sourcePath.trim().length > 0
   const isOnPreviewStep = currentStepIndex === 1
+  const logsCsvFields = useMemo(
+    () => LOGS_CSV_FIELDS.map((field) => (
+      field.id === 'depth' ? { ...field, label: trustedDepthRef } : field
+    )),
+    [trustedDepthRef],
+  )
 
   const { isLoading: previewLoading, error: previewError, tabularPreview, lasPreview, parserSettings, updateParserSettings } = useImportPreview(
     preset.previewMode,
@@ -178,7 +186,7 @@ export function ImportLasDialog({ wells, activeWellId, onClose, onSuccess }: Imp
         if (col === wellNameCol) return
         detected[col] = manualCurveTypeColumns.has(col) && prev[col]
           ? prev[col]
-          : detectColumnCurveType(idx, tabularPreview.rows)
+          : detectCsvLogCurveType(col, idx, tabularPreview.rows)
       })
       return detected
     })
@@ -221,6 +229,16 @@ export function ImportLasDialog({ wells, activeWellId, onClose, onSuccess }: Imp
     : sourceIsValid && tabularPreview !== null && validateLogsCsvMapping(mapping).length === 0 && hasImportableLogCurves
   const csvWellNames = sourceType === 'csv' ? distinctMappedValues(tabularPreview, mapping, 'well_name') : []
   const isCsvMultiWell = csvWellNames.length > 1
+  const csvCurveColumnLabels = useMemo(() => {
+    if (!tabularPreview || sourceType !== 'csv') return {}
+    const depthCol = mapping['depth']
+    const wellNameCol = mapping['well_name']
+    return Object.fromEntries(
+      tabularPreview.columns
+        .filter((col) => col !== depthCol && col !== wellNameCol)
+        .map((col) => [col, displayCurveMnemonic(col)]),
+    )
+  }, [mapping, sourceType, tabularPreview])
 
   useEffect(() => {
     if (sourceType !== 'csv') return
@@ -375,14 +393,6 @@ export function ImportLasDialog({ wells, activeWellId, onClose, onSuccess }: Imp
                     extraOptions={lasWellName ? [{ value: CREATE_FROM_FILE, label: `Create new well "${lasWellName}"` }] : []}
                   />
                   <label className="project-dialog__field project-dialog__field--inline import-wizard__field">
-                    <span>Depth reference</span>
-                    <select value={trustedDepthRef} onChange={(e) => setTrustedDepthRef(e.target.value as 'MD' | 'TVD' | 'TVDSS')}>
-                      <option value="MD">MD</option>
-                      <option value="TVD">TVD</option>
-                      <option value="TVDSS">TVDSS</option>
-                    </select>
-                  </label>
-                  <label className="project-dialog__field project-dialog__field--inline import-wizard__field">
                     <span>Depth unit</span>
                     <select value={depthUnit} onChange={(e) => setDepthUnit(e.target.value as 'm' | 'ft' | 'km')}>
                       <option value="m">m</option>
@@ -415,9 +425,10 @@ export function ImportLasDialog({ wells, activeWellId, onClose, onSuccess }: Imp
               settings={parserSettings}
               onSettingsChange={updateParserSettings}
               depthColumn={mapping['depth'] ?? null}
-              fields={LOGS_CSV_FIELDS}
+              fields={logsCsvFields}
               mapping={mapping}
               onMappingChange={(fieldId, colName) => setMapping((prev) => ({ ...prev, [fieldId]: colName }))}
+              unmappedColumnLabels={csvCurveColumnLabels}
               curveTypes={curveTypes}
               onCurveTypeChange={handleCurveTypeChange}
               curveTypeExcludedColumns={[mapping['well_name']].filter(Boolean) as string[]}
@@ -436,14 +447,6 @@ export function ImportLasDialog({ wells, activeWellId, onClose, onSuccess }: Imp
                       emptyLabel="Use file well_name / create from defaults"
                     />
                   ) : null}
-                  <label className="project-dialog__field project-dialog__field--inline import-wizard__field">
-                    <span>Depth reference</span>
-                    <select value={trustedDepthRef} onChange={(e) => setTrustedDepthRef(e.target.value as 'MD' | 'TVD' | 'TVDSS')}>
-                      <option value="MD">MD</option>
-                      <option value="TVD">TVD</option>
-                      <option value="TVDSS">TVDSS</option>
-                    </select>
-                  </label>
                   <label className="project-dialog__field project-dialog__field--inline import-wizard__field">
                     <span>Depth unit</span>
                     <select value={depthUnit} onChange={(e) => setDepthUnit(e.target.value as 'm' | 'ft' | 'km')}>

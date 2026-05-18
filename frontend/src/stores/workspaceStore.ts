@@ -1,6 +1,6 @@
 import { create } from 'zustand'
 
-import type { CurveConfig, TrackConfig } from '@/types'
+import type { CurveConfig, CurveData, TrackConfig } from '@/types'
 
 export const DEPTH_TRACK_ID = 'depth'
 export const FORMATION_TRACK_ID = 'formations'
@@ -93,6 +93,30 @@ export function createDefaultWellView(): WellViewState {
     deviationVisible: false,
     hiddenTrackIds: [],
     curveSettingsByMnemonic: {},
+  }
+}
+
+export function syncWellViewCurveMetadata(state: WellViewState, curves: CurveData[]): WellViewState {
+  const curveByMnemonic = new Map(curves.map((curve) => [curve.mnemonic, curve]))
+  const syncCurve = (curveConfig: CurveConfig): CurveConfig => {
+    const source = curveByMnemonic.get(curveConfig.mnemonic)
+    if (!source) return curveConfig
+    return {
+      ...curveConfig,
+      unit: source.unit,
+      curve_type: source.curve_type ?? 'continuous',
+    }
+  }
+
+  return {
+    ...state,
+    tracks: state.tracks.map((track) => ({
+      ...track,
+      curves: track.curves.map(syncCurve),
+    })),
+    curveSettingsByMnemonic: Object.fromEntries(
+      Object.entries(state.curveSettingsByMnemonic).map(([mnemonic, config]) => [mnemonic, syncCurve(config)]),
+    ),
   }
 }
 

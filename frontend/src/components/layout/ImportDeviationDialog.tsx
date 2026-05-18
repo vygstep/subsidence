@@ -20,6 +20,7 @@ import {
   DEVIATION_FIELDS,
   autoMap,
   isMappingValid,
+  preservedUnmappedColumnLabels,
   validateDeviationMapping,
 } from './importWizard/mapping'
 import type { ColumnMapping } from './importWizard/mapping'
@@ -186,6 +187,7 @@ export function ImportDeviationDialog({ wells, activeWellId, onClose, onSuccess 
             onSettingsChange={updateParserSettings}
             fields={DEVIATION_FIELDS}
             mapping={mapping}
+            unmappedColumnLabels={preservedUnmappedColumnLabels(tabularPreview, mapping, { numericOnly: true })}
             onMappingChange={(fieldId, col) => setMapping((prev) => ({ ...prev, [fieldId]: col }))}
           />
 

@@ -25,6 +25,7 @@ interface TabularPreviewPaneProps {
   curveTypes?: Record<string, CurveType>
   onCurveTypeChange?: (col: string, type: CurveType) => void
   curveTypeExcludedColumns?: string[]
+  unmappedColumnLabels?: Record<string, string>
 }
 
 export function TabularPreviewPane({
@@ -40,6 +41,7 @@ export function TabularPreviewPane({
   curveTypes,
   onCurveTypeChange,
   curveTypeExcludedColumns = [],
+  unmappedColumnLabels = {},
 }: TabularPreviewPaneProps) {
   const [headerRowDraft, setHeaderRowDraft] = useState(String(settings.headerRow))
   const depthColIndex = depthColumn != null && preview ? preview.columns.indexOf(depthColumn) : -1
@@ -137,13 +139,9 @@ export function TabularPreviewPane({
                             if (nextFieldId) onMappingChange(nextFieldId, col)
                           }}
                         >
-                          <option value="">—</option>
+                          <option value="">{unmappedColumnLabels[col] ?? '—'}</option>
                           {fields.map((f) => (
-                            <option
-                              key={f.id}
-                              value={f.id}
-                              disabled={!!mapping[f.id] && mapping[f.id] !== col}
-                            >
+                            <option key={f.id} value={f.id}>
                               {f.label}{f.required ? ' *' : ''}
                             </option>
                           ))}

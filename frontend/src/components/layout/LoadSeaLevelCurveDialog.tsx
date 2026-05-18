@@ -17,6 +17,7 @@ import {
   SEA_LEVEL_CURVE_FIELDS,
   autoMap,
   isMappingValid,
+  preservedUnmappedColumnLabels,
   validateSeaLevelCurveMapping,
 } from './importWizard/mapping'
 import type { ColumnMapping } from './importWizard/mapping'
@@ -183,6 +184,7 @@ export function LoadSeaLevelCurveDialog({ onClose, onSuccess }: LoadSeaLevelCurv
             onSettingsChange={updateParserSettings}
             fields={SEA_LEVEL_CURVE_FIELDS}
             mapping={mapping}
+            unmappedColumnLabels={preservedUnmappedColumnLabels(tabularPreview, mapping)}
             onMappingChange={(fieldId, col) => setMapping((prev) => ({ ...prev, [fieldId]: col }))}
           />
         </>
