@@ -7,6 +7,15 @@ export interface FieldDefinition {
 
 export type ColumnMapping = Record<string, string | null>
 
+interface PreviewLike {
+  columns: string[]
+  rows: string[][]
+}
+
+interface PreservedColumnLabelOptions {
+  numericOnly?: boolean
+}
+
 export const TOPS_FIELDS: FieldDefinition[] = [
   {
     id: 'top_name',
@@ -97,6 +106,7 @@ export const STRAT_CHART_FIELDS: FieldDefinition[] = [
   { id: 'rank_name', label: 'Rank name', required: false, aliases: ['rank_name', 'rank'] },
   { id: 'start_age_ma', label: 'Start age (Ma)', required: true, aliases: ['start_age_ma', 'start_age', 'age_base_ma', 'base_age_ma'] },
   { id: 'end_age_ma', label: 'End age (Ma)', required: true, aliases: ['end_age_ma', 'end_age', 'age_top_ma', 'top_age_ma'] },
+  { id: 'unit_code', label: 'Unit code', required: false, aliases: ['unit_code', 'strat_index', 'unit_abbrev', 'code'] },
   { id: 'color', label: 'Color', required: false, aliases: ['html_rgb_hash', 'rgb', 'cmyk', 'color', 'color_hex', 'hex'] },
 ]
 
@@ -126,6 +136,39 @@ export function autoMap(columns: string[], fields: FieldDefinition[]): ColumnMap
     }
   }
   return mapping
+}
+
+function isBlank(value: string | null | undefined): boolean {
+  return value == null || value.trim().length === 0
+}
+
+function isNumericPreviewColumn(preview: PreviewLike, colIdx: number): boolean {
+  const values = preview.rows
+    .map((row) => row[colIdx])
+    .filter((value) => !isBlank(value))
+
+  return values.length > 0 && values.every((value) => Number.isFinite(Number(value)))
+}
+
+export function preservedUnmappedColumnLabels(
+  preview: PreviewLike | null,
+  mapping: ColumnMapping,
+  options: PreservedColumnLabelOptions = {},
+): Record<string, string> {
+  if (!preview) return {}
+
+  const mappedColumns = new Set(
+    Object.values(mapping).filter((value): value is string => value != null && value.length > 0),
+  )
+  const labels: Record<string, string> = {}
+
+  preview.columns.forEach((column, colIdx) => {
+    if (mappedColumns.has(column)) return
+    if (options.numericOnly && !isNumericPreviewColumn(preview, colIdx)) return
+    labels[column] = column
+  })
+
+  return labels
 }
 
 export function validateTopsMapping(mapping: ColumnMapping): string[] {

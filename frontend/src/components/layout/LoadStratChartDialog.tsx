@@ -17,6 +17,7 @@ import {
   STRAT_CHART_FIELDS,
   autoMap,
   isMappingValid,
+  preservedUnmappedColumnLabels,
   validateStratChartMapping,
 } from './importWizard/mapping'
 import type { ColumnMapping } from './importWizard/mapping'
@@ -145,6 +146,7 @@ export function LoadStratChartDialog({ onClose, onSuccess }: LoadStratChartDialo
           onSettingsChange={updateParserSettings}
           fields={STRAT_CHART_FIELDS}
           mapping={mapping}
+          unmappedColumnLabels={preservedUnmappedColumnLabels(tabularPreview, mapping)}
           onMappingChange={(fieldId, col) => setMapping((prev) => ({ ...prev, [fieldId]: col }))}
         />
       ) : null}

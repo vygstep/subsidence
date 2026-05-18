@@ -21,6 +21,7 @@ import {
   TOPS_FIELDS,
   autoMap,
   isMappingValid,
+  preservedUnmappedColumnLabels,
   validateTopsMapping,
 } from './importWizard/mapping'
 import type { ColumnMapping } from './importWizard/mapping'
@@ -238,6 +239,7 @@ export function ImportTopsDialog({ wells, activeWellId, onClose, onSuccess }: Im
             onSettingsChange={updateParserSettings}
             fields={TOPS_FIELDS}
             mapping={mapping}
+            unmappedColumnLabels={preservedUnmappedColumnLabels(tabularPreview, mapping)}
             onMappingChange={(fieldId, col) => setMapping((prev) => ({ ...prev, [fieldId]: col }))}
           />
 

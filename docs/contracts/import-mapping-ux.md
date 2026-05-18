@@ -49,9 +49,33 @@ StratChart import currently uses `unit_code` in the application, and the backend
 
 All optional attributes that the application actually uses should be available in the import mapping UX. Extra/unrecognized columns still remain user attributes.
 
+Status: Implemented.
+
 ### 6. Active StratChart Tree Expansion
 
 The active StratChart node should not auto-expand in Data Manager. The user controls expansion manually.
+
+### 7. Preserved Unmapped Column Labels
+
+For tabular loaders, the mapping row should not show `-` for columns that will still be imported or preserved.
+
+Required display rule:
+
+- Mapped canonical field: show the canonical field label, for example `Unit name`, `Age (Ma)`, `Well name`, `MD`.
+- CSV log curve column: show the curve mnemonic from the source column, for example `GR`, `RHOB`.
+- Preserved user/extra attribute column: show the original source column name.
+- Ignored column: show `-`.
+
+This should apply consistently to all tabular importers:
+
+- Wells CSV: extra columns preserved as well metadata attributes should show their source column names.
+- Tops CSV: extra columns preserved as top attributes should show their source column names.
+- Deviation CSV: extra numeric data columns preserved in deviation payload should show their source column names.
+- StratChart CSV: extra columns preserved as unit attributes should show their source column names.
+- Sea level CSV: extra columns preserved as point attributes should show their source column names.
+- Logs CSV: imported curve columns already show curve mnemonics.
+
+Status: Implemented.
 
 ## Required Behavior
 
@@ -98,9 +122,10 @@ The active StratChart node should not auto-expand in Data Manager. The user cont
 3. Extend CSV log mapping display so imported curve columns show the curve mnemonic instead of `-`. Done.
 4. Adjust CSV log curve type detection to default numeric curves to continuous unless a reliable discrete signal exists. Done.
 5. Trace same-mnemonic curve reimport from backend metadata replacement through frontend view state and fix stale curve type behavior. Done.
-6. Add `unit_code` to StratChart frontend mapping and tests.
-7. Run focused frontend tests for import mapping and Data Manager tree.
-8. Run backend import tests if backend payload/import behavior changes.
+6. Add `unit_code` to StratChart frontend mapping and tests. Done.
+7. Show source column names for preserved unmapped columns across all tabular loaders. Done.
+8. Run focused frontend tests for import mapping and Data Manager tree.
+9. Run backend import tests if backend payload/import behavior changes.
 
 ## Open UX Review
 
