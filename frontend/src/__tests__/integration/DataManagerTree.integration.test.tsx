@@ -2,9 +2,11 @@ import { fireEvent, render, screen } from '@testing-library/react'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 
 import { DataManagerProvider } from '@/components/layout/dataManager/DataManagerContext'
+import { StratChartTab } from '@/components/layout/StratChartTab'
 import { TopSetSettings } from '@/components/layout/settings/TopSetSettings'
 import { TemplatesTab } from '@/components/layout/TemplatesTab'
 import { WellDataPanel } from '@/components/layout/WellDataPanel'
+import { useWellDataStore } from '@/stores'
 import { useWorkspaceStore } from '@/stores/workspaceStore'
 import type {
   CompactionPresetSummary,
@@ -105,6 +107,11 @@ function renderPanel(overrides: Partial<React.ComponentProps<typeof WellDataPane
 
 beforeEach(() => {
   useWorkspaceStore.getState().resetWorkspace()
+  useWellDataStore.setState({
+    seaLevelCurves: [],
+    wellInventories: [],
+    well: null,
+  })
 })
 
 const builtinPreset: CompactionPresetSummary = {
@@ -315,6 +322,57 @@ describe('Data Manager templates tree', () => {
     )
 
     expect(screen.getByText('Custom').closest('.tree-node__item-selected')).toBeTruthy()
+  })
+})
+
+describe('Data Manager StratChart tree', () => {
+  it('does not auto-expand the active chart after unit loading', async () => {
+    const fetchMock = vi.spyOn(globalThis, 'fetch').mockResolvedValue({
+      ok: true,
+      json: async () => [
+        {
+          id: 10,
+          chart_id: 1,
+          parent_id: null,
+          name: 'Phanerozoic',
+          rank: 'eonothem',
+          age_top_ma: 0,
+          age_base_ma: 538.8,
+          color_hex: '#f2f2f2',
+          unit_code: 'PH',
+        },
+      ],
+    } as Response)
+
+    render(
+      <DataManagerProvider>
+        <StratChartTab
+          charts={[{
+            id: 1,
+            name: 'ICS 2023',
+            description: null,
+            source: null,
+            is_builtin: true,
+            is_active: true,
+            unit_count: 1,
+          }]}
+          onActivate={vi.fn()}
+          onDeleteById={vi.fn()}
+          onContextMenu={vi.fn()}
+          selectedChartId={null}
+          onSelect={vi.fn()}
+        />
+      </DataManagerProvider>,
+    )
+
+    expect(await screen.findByText('ICS 2023')).toBeTruthy()
+    expect(screen.queryByText(/Phanerozoic/)).toBeNull()
+
+    const chartRow = screen.getByText('ICS 2023').closest('.tree-node__row')!
+    fireEvent.click(chartRow.querySelector('button[aria-label="Expand"]') as HTMLButtonElement)
+    expect(await screen.findByText(/Phanerozoic/)).toBeTruthy()
+
+    fetchMock.mockRestore()
   })
 })
 

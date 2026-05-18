@@ -24,9 +24,7 @@ Implemented. Maintainer implementation notes are local-only and are not part of 
 
 ### 3. Import Mapping UX
 
-- Improve column mapping behavior.
-- If a user assigns a field to a new source column, automatically clear the previous source column for that field.
-- The user should not need to manually set the old column back to `-` before choosing a new one.
+Moved to `docs/contracts/import-mapping-ux.md`.
 
 ### 4. User Attributes From Extra Columns
 

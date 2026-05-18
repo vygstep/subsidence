@@ -174,12 +174,10 @@ export function StratChartTab({
       if (cancelled) return
       setUnitsByChartId(Object.fromEntries(results.map((result) => [result.chartId, result.units])))
       setUnitLoadErrors(Object.fromEntries(results.flatMap((result) => result.error ? [[result.chartId, result.error]] : [])))
-      const activeChart = charts.find((chart) => chart.is_active)
-      if (activeChart) setExpanded(`strat-chart-${activeChart.id}`, true)
     })
 
     return () => { cancelled = true }
-  }, [charts, setExpanded])
+  }, [charts])
 
   const unitTreesByChartId = useMemo(
     () => Object.fromEntries(Object.entries(unitsByChartId).map(([chartId, units]) => [Number(chartId), buildUnitTree(units)])),
