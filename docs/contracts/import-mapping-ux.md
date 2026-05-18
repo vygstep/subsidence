@@ -33,6 +33,8 @@ Discrete should be a stricter classification:
 - Discrete is appropriate for flag/code curves, lithology/code curves, or columns with explicit keyword/code semantics.
 - Continuous should be the safe default for ordinary numeric log curves.
 
+Status: Implemented.
+
 ### 4. Reimport Does Not Refresh Curve Type In View State
 
 When a curve is first imported as `discrete`, then reimported with the same mnemonic as `continuous`, the project data should replace the curve metadata and visual behavior. The backend appears to replace same-mnemonic curve metadata, but the UI can still behave as if the old discrete style is retained until the curve is deleted first.
@@ -92,7 +94,7 @@ The active StratChart node should not auto-expand in Data Manager. The user cont
 1. Finish the small StratChart tree expansion fix and test. Done.
 2. Update the shared tabular preview/mapping component so mapped fields can be reassigned in one action. Done.
 3. Extend CSV log mapping display so imported curve columns show the curve mnemonic instead of `-`. Done.
-4. Adjust CSV log curve type detection to default numeric curves to continuous unless a reliable discrete signal exists.
+4. Adjust CSV log curve type detection to default numeric curves to continuous unless a reliable discrete signal exists. Done.
 5. Trace same-mnemonic curve reimport from backend metadata replacement through frontend view state and fix stale curve type behavior.
 6. Add `unit_code` to StratChart frontend mapping and tests.
 7. Run focused frontend tests for import mapping and Data Manager tree.

@@ -3,6 +3,7 @@ import type { FormEvent } from 'react'
 
 import { useNotificationStore, useProjectStore } from '@/stores'
 import { recordOperation } from '@/utils/diagnostics'
+import { detectCsvLogCurveType } from '@/utils/curveTypeDetection'
 
 import {
   ImportWizardShell,
@@ -68,13 +69,6 @@ function detectCsvDepthRef(columnName: string): 'MD' | 'TVD' | 'TVDSS' {
   if (c.includes('tvdss')) return 'TVDSS'
   if (c.includes('tvd')) return 'TVD'
   return 'MD'
-}
-
-function detectColumnCurveType(colIndex: number, rows: string[][]): 'continuous' | 'discrete' {
-  const vals = rows.map((r) => r[colIndex]).filter((v) => v !== '' && v !== null && v !== undefined)
-  if (vals.length === 0) return 'continuous'
-  if (vals.every((v) => /^-?\d+$/.test(v.trim()))) return 'discrete'
-  return 'continuous'
 }
 
 function displayCurveMnemonic(columnName: string): string {
@@ -192,7 +186,7 @@ export function ImportLasDialog({ wells, activeWellId, onClose, onSuccess }: Imp
         if (col === wellNameCol) return
         detected[col] = manualCurveTypeColumns.has(col) && prev[col]
           ? prev[col]
-          : detectColumnCurveType(idx, tabularPreview.rows)
+          : detectCsvLogCurveType(col, idx, tabularPreview.rows)
       })
       return detected
     })
