@@ -41,6 +41,8 @@ When a curve is first imported as `discrete`, then reimported with the same mnem
 
 This needs a code review of track curve settings and per-well view state. Curve visual style may persist, but `curve_type` must follow the current project curve metadata after reimport.
 
+Status: Implemented.
+
 ### 5. StratChart Optional Fields
 
 StratChart import currently uses `unit_code` in the application, and the backend accepts aliases including `unit_code`, `strat_index`, `unit_abbrev`, and `code`. The frontend mapping list does not expose `unit_code` explicitly, so users cannot clearly map it during import.
@@ -95,7 +97,7 @@ The active StratChart node should not auto-expand in Data Manager. The user cont
 2. Update the shared tabular preview/mapping component so mapped fields can be reassigned in one action. Done.
 3. Extend CSV log mapping display so imported curve columns show the curve mnemonic instead of `-`. Done.
 4. Adjust CSV log curve type detection to default numeric curves to continuous unless a reliable discrete signal exists. Done.
-5. Trace same-mnemonic curve reimport from backend metadata replacement through frontend view state and fix stale curve type behavior.
+5. Trace same-mnemonic curve reimport from backend metadata replacement through frontend view state and fix stale curve type behavior. Done.
 6. Add `unit_code` to StratChart frontend mapping and tests.
 7. Run focused frontend tests for import mapping and Data Manager tree.
 8. Run backend import tests if backend payload/import behavior changes.

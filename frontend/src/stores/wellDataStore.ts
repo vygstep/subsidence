@@ -30,6 +30,7 @@ import type {
 } from '@/types'
 import { minCurvatureToTVD, type TVDTable } from '@/utils/depthTransform'
 import { recordOperation } from '@/utils/diagnostics'
+import { syncWellViewCurveMetadata, useWorkspaceStore } from './workspaceStore'
 
 interface CurveResponse {
   mnemonic: string
@@ -413,6 +414,7 @@ export const useWellDataStore = create<WellDataStore>((set, get) => ({
         isLoading: false,
         error: null,
       })
+      useWorkspaceStore.getState().updateWellViewState(wellId, (state) => syncWellViewCurveMetadata(state, mappedCurves))
 
       // Load TVD table if INCL_AZIM deviation survey exists
       if (well.deviation?.mode === 'INCL_AZIM') {
