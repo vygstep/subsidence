@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import type { FormEvent } from 'react'
 
 import { useNotificationStore, useProjectStore } from '@/stores'
@@ -77,6 +77,14 @@ function detectColumnCurveType(colIndex: number, rows: string[][]): 'continuous'
   return 'continuous'
 }
 
+function displayCurveMnemonic(columnName: string): string {
+  const bracketMatch = columnName.match(/^(.+?)\s*\[[^\]]+\]\s*$/)
+  if (bracketMatch) return bracketMatch[1].trim() || columnName
+  const parenMatch = columnName.match(/^(.+?)\s*\([^)]+\)\s*$/)
+  if (parenMatch) return parenMatch[1].trim() || columnName
+  return columnName.trim() || columnName
+}
+
 export function ImportLasDialog({ wells, activeWellId, onClose, onSuccess }: ImportLasDialogProps) {
   const projectPath = useProjectStore((state) => state.projectPath)
   const addQcWarnings = useNotificationStore((state) => state.addQcWarnings)
@@ -97,6 +105,12 @@ export function ImportLasDialog({ wells, activeWellId, onClose, onSuccess }: Imp
   const preset = sourceType === 'las' ? importWizardPresets.logsLas : importWizardPresets.logsCsv
   const sourceIsValid = sourcePath.trim().length > 0
   const isOnPreviewStep = currentStepIndex === 1
+  const logsCsvFields = useMemo(
+    () => LOGS_CSV_FIELDS.map((field) => (
+      field.id === 'depth' ? { ...field, label: trustedDepthRef } : field
+    )),
+    [trustedDepthRef],
+  )
 
   const { isLoading: previewLoading, error: previewError, tabularPreview, lasPreview, parserSettings, updateParserSettings } = useImportPreview(
     preset.previewMode,
@@ -221,6 +235,16 @@ export function ImportLasDialog({ wells, activeWellId, onClose, onSuccess }: Imp
     : sourceIsValid && tabularPreview !== null && validateLogsCsvMapping(mapping).length === 0 && hasImportableLogCurves
   const csvWellNames = sourceType === 'csv' ? distinctMappedValues(tabularPreview, mapping, 'well_name') : []
   const isCsvMultiWell = csvWellNames.length > 1
+  const csvCurveColumnLabels = useMemo(() => {
+    if (!tabularPreview || sourceType !== 'csv') return {}
+    const depthCol = mapping['depth']
+    const wellNameCol = mapping['well_name']
+    return Object.fromEntries(
+      tabularPreview.columns
+        .filter((col) => col !== depthCol && col !== wellNameCol)
+        .map((col) => [col, displayCurveMnemonic(col)]),
+    )
+  }, [mapping, sourceType, tabularPreview])
 
   useEffect(() => {
     if (sourceType !== 'csv') return
@@ -415,9 +439,10 @@ export function ImportLasDialog({ wells, activeWellId, onClose, onSuccess }: Imp
               settings={parserSettings}
               onSettingsChange={updateParserSettings}
               depthColumn={mapping['depth'] ?? null}
-              fields={LOGS_CSV_FIELDS}
+              fields={logsCsvFields}
               mapping={mapping}
               onMappingChange={(fieldId, colName) => setMapping((prev) => ({ ...prev, [fieldId]: colName }))}
+              unmappedColumnLabels={csvCurveColumnLabels}
               curveTypes={curveTypes}
               onCurveTypeChange={handleCurveTypeChange}
               curveTypeExcludedColumns={[mapping['well_name']].filter(Boolean) as string[]}

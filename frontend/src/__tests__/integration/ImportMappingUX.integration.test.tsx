@@ -49,4 +49,33 @@ describe('Import mapping UX', () => {
     expect((mappingSelects[0] as HTMLSelectElement).value).toBe('')
     expect((mappingSelects[1] as HTMLSelectElement).value).toBe('depth')
   })
+
+  it('shows log curve mnemonics for unmapped curve columns', () => {
+    render(
+      <TabularPreviewPane
+        isLoading={false}
+        error={null}
+        preview={{
+          columns: ['MD', 'GR', 'RHOB [g/cc]'],
+          rows: [['100', '80', '2.4']],
+          detected_delimiter: ',',
+          header_row: 0,
+          total_rows: 1,
+          warnings: [],
+        }}
+        settings={{ delimiter: ',', headerRow: 0 }}
+        onSettingsChange={vi.fn()}
+        fields={fields}
+        mapping={{ depth: 'MD', well_name: null }}
+        onMappingChange={vi.fn()}
+        unmappedColumnLabels={{ GR: 'GR', 'RHOB [g/cc]': 'RHOB' }}
+      />,
+    )
+
+    const mappingSelects = within(screen.getAllByRole('row')[0]).getAllByRole('combobox') as HTMLSelectElement[]
+
+    expect(mappingSelects[0].selectedOptions[0].textContent).toBe('MD *')
+    expect(mappingSelects[1].selectedOptions[0].textContent).toBe('GR')
+    expect(mappingSelects[2].selectedOptions[0].textContent).toBe('RHOB')
+  })
 })

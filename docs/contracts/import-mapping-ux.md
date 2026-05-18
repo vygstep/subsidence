@@ -21,6 +21,8 @@ For CSV log import, the mapping row only exposes `Well name` and `Depth column`.
 
 The depth mapping should read as the real depth mnemonic, normally `MD`, instead of the generic `Depth column`. The second row that controls log curve type can still show the depth role/reference.
 
+Status: Implemented.
+
 ### 3. CSV Curve Type Detection
 
 CSV log curve type detection currently treats any column whose preview values are all integer strings as `discrete`. This can classify normal continuous curves like gamma ray as discrete when values are stored as integers.
@@ -89,7 +91,7 @@ The active StratChart node should not auto-expand in Data Manager. The user cont
 
 1. Finish the small StratChart tree expansion fix and test. Done.
 2. Update the shared tabular preview/mapping component so mapped fields can be reassigned in one action. Done.
-3. Extend CSV log mapping display so imported curve columns show the curve mnemonic instead of `-`.
+3. Extend CSV log mapping display so imported curve columns show the curve mnemonic instead of `-`. Done.
 4. Adjust CSV log curve type detection to default numeric curves to continuous unless a reliable discrete signal exists.
 5. Trace same-mnemonic curve reimport from backend metadata replacement through frontend view state and fix stale curve type behavior.
 6. Add `unit_code` to StratChart frontend mapping and tests.
