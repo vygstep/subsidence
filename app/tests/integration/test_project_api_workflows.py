@@ -8,6 +8,7 @@ import pandas as pd
 from fastapi.testclient import TestClient
 from sqlalchemy import select as sa_select
 
+from subsidence.api import projects as projects_api
 from subsidence.api.main import app
 from subsidence.data.importers import DEFAULT_WELL_NAME
 from subsidence.data.importers.log_resampling import VERTICAL_TVD_IMPORT_WARNING
@@ -107,6 +108,38 @@ def _write_minimal_las_without_well_name(path: Path) -> Path:
         encoding='utf-8',
     )
     return path
+
+
+def test_pick_file_uses_isolated_native_picker(api_client: TestClient, tmp_path: Path, monkeypatch: pytest.MonkeyPatch):
+    selected_path = tmp_path / 'logs.csv'
+    calls = []
+
+    def fake_pick_path(kind: str, initial_dir: str | None, file_types: list[tuple[str, str]] | None = None) -> str:
+        calls.append((kind, initial_dir, file_types))
+        return str(selected_path)
+
+    monkeypatch.setattr(projects_api, '_pick_path', fake_pick_path)
+
+    response = api_client.post('/api/projects/pick-file', json={
+        'initial_path': str(tmp_path),
+        'file_types': [['CSV files', '*.csv']],
+    })
+
+    assert response.status_code == 200, response.text
+    assert response.json() == {'path': str(selected_path)}
+    assert calls == [('file', str(tmp_path), [('CSV files', '*.csv')])]
+
+
+def test_pick_file_reports_native_picker_failures(api_client: TestClient, monkeypatch: pytest.MonkeyPatch):
+    def fake_pick_path(kind: str, initial_dir: str | None, file_types: list[tuple[str, str]] | None = None) -> None:
+        raise RuntimeError('TclError: failed')
+
+    monkeypatch.setattr(projects_api, '_pick_path', fake_pick_path)
+
+    response = api_client.post('/api/projects/pick-file', json={})
+
+    assert response.status_code == 500
+    assert 'Failed to open file picker' in response.json()['detail']
 
 
 def test_project_lifecycle_save_close_reopen_preserves_wells(api_client: TestClient, tmp_path: Path):
