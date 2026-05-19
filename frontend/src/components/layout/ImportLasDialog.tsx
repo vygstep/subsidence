@@ -13,20 +13,25 @@ import {
   LasPreviewPane,
   TabularPreviewPane,
   buildImportWizardSteps,
+  createMultiFileQueue,
   distinctMappedValues,
   importWizardPresets,
+  nextPendingFileIndex,
   readImportError,
+  summarizeMultiFileQueue,
   useImportPreview,
 } from './importWizard'
+import type { MultiFileImportItem, MultiFileImportStatus } from './importWizard'
 import {
   LOGS_CSV_FIELDS,
   autoMap,
   validateLogsCsvMapping,
 } from './importWizard/mapping'
 import type { ColumnMapping } from './importWizard/mapping'
-import { getLastImportRoot, pickFile, rememberImportPath } from './pathMemory'
+import { getLastImportRoot, pickFiles, rememberImportPath } from './pathMemory'
 
 const STEP_LABELS = ['File', 'Preview']
+const SUMMARY_STEP_LABELS = ['File', 'Preview', 'Summary']
 
 // Sentinel values for the target well dropdown
 const CREATE_FROM_FILE = '__create_from_file__'
@@ -111,6 +116,8 @@ export function ImportLasDialog({ wells, activeWellId, onClose, onSuccess }: Imp
   const [nullValue, setNullValue] = useState('-999.25')
   const [curveTypes, setCurveTypes] = useState<Record<string, 'continuous' | 'discrete'>>({})
   const [manualCurveTypeColumns, setManualCurveTypeColumns] = useState<Set<string>>(() => new Set())
+  const [fileQueue, setFileQueue] = useState<MultiFileImportItem[]>([])
+  const [currentFileIndex, setCurrentFileIndex] = useState(0)
   const [currentStepIndex, setCurrentStepIndex] = useState(0)
   const [error, setError] = useState<string | null>(null)
   const [isSubmitting, setIsSubmitting] = useState(false)
@@ -122,6 +129,10 @@ export function ImportLasDialog({ wells, activeWellId, onClose, onSuccess }: Imp
     ? 'Unsupported log file type. Select a LAS, CSV, TSV, or TXT file.'
     : null
   const isOnPreviewStep = currentStepIndex === 1
+  const isSummaryStep = currentStepIndex === 2
+  const isMultiFileRun = fileQueue.length > 1
+  const currentFile = isMultiFileRun ? fileQueue[currentFileIndex] : null
+  const queueSummary = summarizeMultiFileQueue(fileQueue)
   const logsCsvFields = useMemo(
     () => LOGS_CSV_FIELDS.map((field) => (
       field.id === 'depth' ? { ...field, label: trustedDepthRef } : field
@@ -217,16 +228,27 @@ export function ImportLasDialog({ wells, activeWellId, onClose, onSuccess }: Imp
 
   const lasWellName = lasPreview?.well_name ?? null
 
-  const applySourcePath = (nextPath: string) => {
-    const nextSourceType = detectLogSourceType(nextPath)
-    if (nextSourceType && nextSourceType !== sourceType) {
-      setSourceType(nextSourceType)
-    }
-    setCurrentStepIndex(0)
+  const resetPreviewState = () => {
     setMapping({})
     setCurveTypes({})
     setManualCurveTypeColumns(new Set())
     setWellSelection(activeWellId ?? '')
+  }
+
+  const applySourcePath = (
+    nextPath: string,
+    options: { nextStepIndex?: number; preserveQueue?: boolean } = {},
+  ) => {
+    const nextSourceType = detectLogSourceType(nextPath)
+    if (nextSourceType && nextSourceType !== sourceType) {
+      setSourceType(nextSourceType)
+    }
+    setCurrentStepIndex(options.nextStepIndex ?? 0)
+    resetPreviewState()
+    if (!options.preserveQueue) {
+      setFileQueue([])
+      setCurrentFileIndex(0)
+    }
     setSourcePath(nextPath)
   }
 
@@ -246,7 +268,7 @@ export function ImportLasDialog({ wells, activeWellId, onClose, onSuccess }: Imp
       : tabularPreview !== null
   const hasImportableLogCurves = Object.keys(curveTypes).length > 0
 
-  const steps = buildImportWizardSteps(currentStepIndex, sourceIsValid, STEP_LABELS)
+  const steps = buildImportWizardSteps(currentStepIndex, sourceIsValid, isSummaryStep ? SUMMARY_STEP_LABELS : STEP_LABELS)
   const validationMessages = currentStepIndex === 0 && !sourceIsValid
     ? [`${sourceType === 'las' ? 'LAS' : 'CSV'} path is required.`]
     : sourceTypeError
@@ -341,28 +363,61 @@ export function ImportLasDialog({ wells, activeWellId, onClose, onSuccess }: Imp
         rememberImportPath(nextPath)
         const warnings = payload.qc_warnings ?? []
         await onSuccess(payload.well_id)
-        onClose()
         if (warnings.length > 0) {
           addQcWarnings(warnings)
         }
+        if (isMultiFileRun) {
+          advanceMultiFileQueue('imported')
+          return
+        }
+        onClose()
       }, {
         projectPath,
         activeWellId: resolvedWellId ?? activeWellId ?? null,
         details: { inputPath: nextPath, createNewWell, depthColumn: mapping['depth'] ?? null },
       })
     } catch (cause) {
-      setError(cause instanceof Error ? cause.message : 'Failed to import logs')
+      const message = cause instanceof Error ? cause.message : 'Failed to import logs'
+      if (isMultiFileRun) {
+        advanceMultiFileQueue('failed', message)
+      } else {
+        setError(message)
+      }
     } finally {
       setIsSubmitting(false)
     }
   }
 
+  const advanceMultiFileQueue = (status: MultiFileImportStatus, message?: string) => {
+    setFileQueue((prev) => {
+      const updated = prev.map((item, index) => (
+        index === currentFileIndex ? { ...item, status, message } : item
+      ))
+      const nextIndex = nextPendingFileIndex(updated, currentFileIndex)
+      if (nextIndex >= 0) {
+        setCurrentFileIndex(nextIndex)
+        applySourcePath(updated[nextIndex].path, { nextStepIndex: 1, preserveQueue: true })
+      } else {
+        setCurrentStepIndex(2)
+      }
+      return updated
+    })
+  }
+
+  const handleSkipCurrentFile = () => {
+    if (!isMultiFileRun) return
+    advanceMultiFileQueue('skipped', 'Skipped by user')
+  }
+
   const handleBrowse = async () => {
     setError(null)
     try {
-      const picked = await pickFile(sourcePath || lastImportRoot, LOG_FILE_FILTERS)
-      if (picked) {
-        applySourcePath(picked)
+      const picked = await pickFiles(sourcePath || lastImportRoot, LOG_FILE_FILTERS)
+      const queue = createMultiFileQueue(picked)
+      if (queue.length > 0) {
+        setFileQueue(queue.length > 1 ? queue : [])
+        setCurrentFileIndex(0)
+        applySourcePath(queue[0].path, { nextStepIndex: 1, preserveQueue: queue.length > 1 })
         setCurrentStepIndex(1)
       }
     } catch (cause) {
@@ -381,6 +436,7 @@ export function ImportLasDialog({ wells, activeWellId, onClose, onSuccess }: Imp
       canAdvance={sourceIsValid}
       canSubmit={canSubmit}
       validationMessages={validationMessages}
+      hidePrimaryAction={isSummaryStep}
       onClose={onClose}
       onSubmit={handleSubmit}
       onStepChange={setCurrentStepIndex}
@@ -398,6 +454,11 @@ export function ImportLasDialog({ wells, activeWellId, onClose, onSuccess }: Imp
       {currentStepIndex === 1 ? (
         sourceType === 'las' ? (
           <>
+            {isMultiFileRun ? (
+              <div className="import-preview__status">
+                File {currentFileIndex + 1} of {fileQueue.length}: {currentFile?.path ?? sourcePath}
+              </div>
+            ) : null}
             <LasPreviewPane
               isLoading={previewLoading}
               error={previewError}
@@ -438,9 +499,19 @@ export function ImportLasDialog({ wells, activeWellId, onClose, onSuccess }: Imp
             {!previewLoading && lasPreview !== null && !hasImportableLogCurves && (
               <p className="project-dialog__error">No importable log curves were found in selected file.</p>
             )}
+            {isMultiFileRun ? (
+              <button type="button" className="project-dialog__button" onClick={handleSkipCurrentFile}>
+                Skip this file
+              </button>
+            ) : null}
           </>
         ) : (
           <>
+            {isMultiFileRun ? (
+              <div className="import-preview__status">
+                File {currentFileIndex + 1} of {fileQueue.length}: {currentFile?.path ?? sourcePath}
+              </div>
+            ) : null}
             <TabularPreviewPane
               isLoading={previewLoading}
               error={previewError}
@@ -498,8 +569,43 @@ export function ImportLasDialog({ wells, activeWellId, onClose, onSuccess }: Imp
             {!previewLoading && tabularPreview && mapping['depth'] && !hasImportableLogCurves && (
               <p className="project-dialog__error">No importable log curves were found in selected file.</p>
             )}
+            {isMultiFileRun ? (
+              <button type="button" className="project-dialog__button" onClick={handleSkipCurrentFile}>
+                Skip this file
+              </button>
+            ) : null}
           </>
         )
+      ) : null}
+
+      {isSummaryStep ? (
+        <div className="import-preview">
+          <p className="import-preview__status">
+            Imported {queueSummary.imported} of {queueSummary.total} files.
+            {queueSummary.failed > 0 ? ` Failed: ${queueSummary.failed}.` : ''}
+            {queueSummary.skipped > 0 ? ` Skipped: ${queueSummary.skipped}.` : ''}
+          </p>
+          <div className="import-preview__table-wrap">
+            <table className="import-preview__table">
+              <thead>
+                <tr>
+                  <th>File</th>
+                  <th>Status</th>
+                  <th>Message</th>
+                </tr>
+              </thead>
+              <tbody>
+                {fileQueue.map((item) => (
+                  <tr key={item.path}>
+                    <td>{item.path}</td>
+                    <td>{item.status}</td>
+                    <td>{item.message ?? ''}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
       ) : null}
 
     </ImportWizardShell>

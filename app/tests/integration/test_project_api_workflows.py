@@ -144,6 +144,26 @@ def test_pick_file_reports_native_picker_failures(api_client: TestClient, monkey
     assert 'Failed to open file picker' in response.json()['detail']
 
 
+def test_pick_files_uses_isolated_native_picker(api_client: TestClient, tmp_path: Path, monkeypatch: pytest.MonkeyPatch):
+    selected_paths = [tmp_path / 'a.las', tmp_path / 'b.csv']
+    calls = []
+
+    def fake_pick_paths(kind: str, initial_dir: str | None, file_types: list[tuple[str, str]] | None = None) -> list[str]:
+        calls.append((kind, initial_dir, file_types))
+        return [str(path) for path in selected_paths]
+
+    monkeypatch.setattr(projects_api, '_pick_paths', fake_pick_paths)
+
+    response = api_client.post('/api/projects/pick-files', json={
+        'initial_path': str(tmp_path),
+        'file_types': [['Log files', '*.las *.csv']],
+    })
+
+    assert response.status_code == 200, response.text
+    assert response.json() == {'paths': [str(path) for path in selected_paths]}
+    assert calls == [('files', str(tmp_path), [('Log files', '*.las *.csv')])]
+
+
 def test_project_lifecycle_save_close_reopen_preserves_wells(api_client: TestClient, tmp_path: Path):
     project_path = _create_project(api_client, tmp_path, 'lifecycle')
 

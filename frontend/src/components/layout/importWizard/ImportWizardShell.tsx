@@ -14,6 +14,7 @@ export function ImportWizardShell({
   onSubmit,
   onStepChange,
   onBrowse,
+  hidePrimaryAction = false,
   children,
 }: ImportWizardShellProps) {
   const finalStepIndex = steps.length - 1
@@ -75,7 +76,7 @@ export function ImportWizardShell({
               Back
             </button>
           ) : null}
-          {isFinalStep ? (
+          {hidePrimaryAction ? null : isFinalStep ? (
             <button
               type="submit"
               className="project-dialog__button project-dialog__button--primary"
