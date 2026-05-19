@@ -49,6 +49,13 @@ interface ImportLasResponse {
 
 type LogSourceType = 'las' | 'csv'
 
+const LOG_FILE_FILTERS: [string, string][] = [
+  ['Log files', '*.las *.csv *.tsv *.txt'],
+  ['LAS files', '*.las'],
+  ['Delimited text', '*.csv *.tsv *.txt'],
+  ['All files', '*.*'],
+]
+
 function normalizeLasDepthUnit(unit: string | null): 'm' | 'ft' | 'km' {
   if (!unit) return 'm'
   const u = unit.toLowerCase().trim()
@@ -79,6 +86,18 @@ function displayCurveMnemonic(columnName: string): string {
   return columnName.trim() || columnName
 }
 
+function detectLogSourceType(path: string): LogSourceType | null {
+  const extension = path.trim().split(/[\\/]/).pop()?.split('.').pop()?.toLowerCase()
+  if (!extension) return null
+  if (extension === 'las') return 'las'
+  if (extension === 'csv' || extension === 'tsv' || extension === 'txt') return 'csv'
+  return null
+}
+
+function hasFileExtension(path: string): boolean {
+  return /\.[^\\/.\s]+$/.test(path.trim())
+}
+
 export function ImportLasDialog({ wells, activeWellId, onClose, onSuccess }: ImportLasDialogProps) {
   const projectPath = useProjectStore((state) => state.projectPath)
   const addQcWarnings = useNotificationStore((state) => state.addQcWarnings)
@@ -98,6 +117,10 @@ export function ImportLasDialog({ wells, activeWellId, onClose, onSuccess }: Imp
   const lastImportRoot = getLastImportRoot()
   const preset = sourceType === 'las' ? importWizardPresets.logsLas : importWizardPresets.logsCsv
   const sourceIsValid = sourcePath.trim().length > 0
+  const detectedSourceType = detectLogSourceType(sourcePath)
+  const sourceTypeError = sourceIsValid && hasFileExtension(sourcePath) && detectedSourceType === null
+    ? 'Unsupported log file type. Select a LAS, CSV, TSV, or TXT file.'
+    : null
   const isOnPreviewStep = currentStepIndex === 1
   const logsCsvFields = useMemo(
     () => LOGS_CSV_FIELDS.map((field) => (
@@ -194,13 +217,17 @@ export function ImportLasDialog({ wells, activeWellId, onClose, onSuccess }: Imp
 
   const lasWellName = lasPreview?.well_name ?? null
 
-  const handleSourceTypeChange = (next: LogSourceType) => {
-    setSourceType(next)
+  const applySourcePath = (nextPath: string) => {
+    const nextSourceType = detectLogSourceType(nextPath)
+    if (nextSourceType && nextSourceType !== sourceType) {
+      setSourceType(nextSourceType)
+    }
     setCurrentStepIndex(0)
     setMapping({})
     setCurveTypes({})
     setManualCurveTypeColumns(new Set())
     setWellSelection(activeWellId ?? '')
+    setSourcePath(nextPath)
   }
 
   const handleCurveTypeChange = (column: string, type: 'continuous' | 'discrete') => {
@@ -222,11 +249,13 @@ export function ImportLasDialog({ wells, activeWellId, onClose, onSuccess }: Imp
   const steps = buildImportWizardSteps(currentStepIndex, sourceIsValid, STEP_LABELS)
   const validationMessages = currentStepIndex === 0 && !sourceIsValid
     ? [`${sourceType === 'las' ? 'LAS' : 'CSV'} path is required.`]
+    : sourceTypeError
+      ? [sourceTypeError]
     : []
 
   const canSubmit = sourceType === 'las'
-    ? sourceIsValid && previewReady && hasImportableLogCurves
-    : sourceIsValid && tabularPreview !== null && validateLogsCsvMapping(mapping).length === 0 && hasImportableLogCurves
+    ? sourceIsValid && sourceTypeError === null && previewReady && hasImportableLogCurves
+    : sourceIsValid && sourceTypeError === null && tabularPreview !== null && validateLogsCsvMapping(mapping).length === 0 && hasImportableLogCurves
   const csvWellNames = sourceType === 'csv' ? distinctMappedValues(tabularPreview, mapping, 'well_name') : []
   const isCsvMultiWell = csvWellNames.length > 1
   const csvCurveColumnLabels = useMemo(() => {
@@ -250,6 +279,10 @@ export function ImportLasDialog({ wells, activeWellId, onClose, onSuccess }: Imp
     const nextPath = sourcePath.trim()
     if (!nextPath) {
       setError(sourceType === 'las' ? 'LAS path is required' : 'CSV path is required')
+      return
+    }
+    if (sourceTypeError) {
+      setError(sourceTypeError)
       return
     }
 
@@ -327,9 +360,9 @@ export function ImportLasDialog({ wells, activeWellId, onClose, onSuccess }: Imp
   const handleBrowse = async () => {
     setError(null)
     try {
-      const picked = await pickFile(sourcePath || lastImportRoot, preset.acceptedFileFilters)
+      const picked = await pickFile(sourcePath || lastImportRoot, LOG_FILE_FILTERS)
       if (picked) {
-        setSourcePath(picked)
+        applySourcePath(picked)
         setCurrentStepIndex(1)
       }
     } catch (cause) {
@@ -354,22 +387,12 @@ export function ImportLasDialog({ wells, activeWellId, onClose, onSuccess }: Imp
       onBrowse={handleBrowse}
     >
       {currentStepIndex === 0 ? (
-        <>
-          <label className="project-dialog__field">
-            <span>Format</span>
-            <select value={sourceType} onChange={(event) => handleSourceTypeChange(event.target.value as LogSourceType)}>
-              <option value="las">LAS</option>
-              <option value="csv">CSV</option>
-            </select>
-          </label>
-
-          <ImportWizardFileField
-            label={sourceType === 'las' ? 'LAS file path' : 'CSV file path'}
-            value={sourcePath}
-            placeholder={sourceType === 'las' ? 'D:\\data\\well.las' : 'D:\\data\\well_logs.csv'}
-            onChange={setSourcePath}
-          />
-        </>
+        <ImportWizardFileField
+          label="Log file path"
+          value={sourcePath}
+          placeholder="D:\\data\\well.las or D:\\data\\well_logs.csv"
+          onChange={applySourcePath}
+        />
       ) : null}
 
       {currentStepIndex === 1 ? (
