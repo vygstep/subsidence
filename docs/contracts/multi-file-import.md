@@ -1,6 +1,6 @@
 # Multi-File Import
 
-Status: Draft
+Status: Implemented
 Branch: feature/multi-file-import
 
 ## Goal
@@ -45,10 +45,10 @@ Multi-file import applies to:
 1. Add backend `pick-files` endpoint and frontend `pickFiles()` helper. Done.
 2. Add a small shared multi-file queue/progress helper for import dialogs. Done.
 3. Implement multi-file logs first because it has mixed LAS/CSV file-type detection. Done.
-4. Add summary UI for completed multi-file runs. Done for logs; reuse for remaining importers.
-5. Extend the same sequential workflow to tops, deviation, wells, StratChart, and sea level curve imports.
-6. Add focused frontend tests for queue progression and summary behavior.
-7. Run backend picker/import tests where backend behavior changes.
+4. Add summary UI for completed multi-file runs. Done.
+5. Extend the same sequential workflow to tops, deviation, wells, StratChart, and sea level curve imports. Done.
+6. Add focused frontend tests for queue progression and summary behavior. Done.
+7. Run backend picker/import tests where backend behavior changes. Done.
 
 ## Non-Goals
 

@@ -7,6 +7,8 @@ import { recordOperation } from '@/utils/diagnostics'
 import {
   ImportWizardFileField,
   ImportWizardShell,
+  MultiFileCurrentFile,
+  MultiFileSummary,
   TabularPreviewPane,
   buildImportWizardSteps,
   createMultiFileQueue,
@@ -227,9 +229,7 @@ export function LoadSeaLevelCurveDialog({ onClose, onSuccess }: LoadSeaLevelCurv
       {currentStepIndex === 1 ? (
         <>
           {isMultiFileRun ? (
-            <div className="import-preview__status">
-              File {currentFileIndex + 1} of {fileQueue.length}: {currentFile?.path ?? csvPath}
-            </div>
+            <MultiFileCurrentFile currentIndex={currentFileIndex} total={fileQueue.length} path={currentFile?.path ?? csvPath} />
           ) : null}
           <label className="project-dialog__field">
             <span>Curve name</span>
@@ -260,33 +260,7 @@ export function LoadSeaLevelCurveDialog({ onClose, onSuccess }: LoadSeaLevelCurv
         </>
       ) : null}
       {isSummaryStep ? (
-        <div className="import-preview">
-          <p className="import-preview__status">
-            Imported {queueSummary.imported} of {queueSummary.total} files.
-            {queueSummary.failed > 0 ? ` Failed: ${queueSummary.failed}.` : ''}
-            {queueSummary.skipped > 0 ? ` Skipped: ${queueSummary.skipped}.` : ''}
-          </p>
-          <div className="import-preview__table-wrap">
-            <table className="import-preview__table">
-              <thead>
-                <tr>
-                  <th>File</th>
-                  <th>Status</th>
-                  <th>Message</th>
-                </tr>
-              </thead>
-              <tbody>
-                {fileQueue.map((item) => (
-                  <tr key={item.path}>
-                    <td>{item.path}</td>
-                    <td>{item.status}</td>
-                    <td>{item.message ?? ''}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        </div>
+        <MultiFileSummary queue={fileQueue} summary={queueSummary} />
       ) : null}
     </ImportWizardShell>
   )
