@@ -202,6 +202,12 @@ describe('Import dialogs target active well by default', () => {
   it('adds tops import QC warnings to the notification store', async () => {
     const user = userEvent.setup()
     vi.stubGlobal('fetch', vi.fn().mockImplementation((url: string) => {
+      if (url === '/api/projects/pick-files') {
+        return Promise.resolve({
+          ok: true,
+          json: async () => ({ paths: ['D:\\data\\imports\\tops.csv'] }),
+        })
+      }
       if (url === '/api/projects/pick-file') {
         return Promise.resolve({
           ok: true,
