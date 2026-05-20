@@ -25,7 +25,9 @@ import type { MultiFileImportItem, MultiFileImportStatus } from './importWizard'
 import {
   DEVIATION_FIELDS,
   autoMap,
+  defaultIgnoredUnmappedColumns,
   isMappingValid,
+  preservedColumnLabels,
   preservedUnmappedColumnLabels,
   validateDeviationMapping,
 } from './importWizard/mapping'
@@ -59,6 +61,7 @@ export function ImportDeviationDialog({ wells, activeWellId, onClose, onSuccess 
   const [csvPath, setCsvPath] = useState(() => getLastImportRoot())
   const [depthUnit, setDepthUnit] = useState<'m' | 'ft' | 'km'>('m')
   const [mapping, setMapping] = useState<ColumnMapping>({})
+  const [ignoredColumns, setIgnoredColumns] = useState<Set<string>>(() => new Set())
   const [fileQueue, setFileQueue] = useState<MultiFileImportItem[]>([])
   const [currentFileIndex, setCurrentFileIndex] = useState(0)
   const [currentStepIndex, setCurrentStepIndex] = useState(0)
@@ -81,9 +84,20 @@ export function ImportDeviationDialog({ wells, activeWellId, onClose, onSuccess 
 
   useEffect(() => {
     if (tabularPreview) {
-      setMapping(autoMap(tabularPreview.columns, DEVIATION_FIELDS))
+      const nextMapping = autoMap(tabularPreview.columns, DEVIATION_FIELDS)
+      setMapping(nextMapping)
+      setIgnoredColumns(new Set(defaultIgnoredUnmappedColumns(tabularPreview, nextMapping, { numericOnly: true })))
     }
   }, [tabularPreview])
+
+  const handleIgnoredColumnChange = (column: string, ignored: boolean) => {
+    setIgnoredColumns((prev) => {
+      const next = new Set(prev)
+      if (ignored) next.add(column)
+      else next.delete(column)
+      return next
+    })
+  }
 
   const mappingErrors = validateDeviationMapping(mapping)
   const mappingOk = isMappingValid(mappingErrors)
@@ -144,6 +158,7 @@ export function ImportDeviationDialog({ wells, activeWellId, onClose, onSuccess 
             create_new_well: createNewWell,
             multi_well: isMultiWell,
             column_map: Object.keys(columnMap).length > 0 ? columnMap : null,
+            ignored_columns: Array.from(ignoredColumns),
           }),
         })
         if (!response.ok) {
@@ -261,6 +276,10 @@ export function ImportDeviationDialog({ wells, activeWellId, onClose, onSuccess 
             fields={DEVIATION_FIELDS}
             mapping={mapping}
             unmappedColumnLabels={preservedUnmappedColumnLabels(tabularPreview, mapping, { numericOnly: true })}
+            userColumnLabels={preservedColumnLabels(tabularPreview, { numericOnly: true })}
+            unmappedColumnMode="user-attribute"
+            ignoredColumns={Array.from(ignoredColumns)}
+            onIgnoredColumnChange={handleIgnoredColumnChange}
             onMappingChange={(fieldId, col) => setMapping((prev) => ({ ...prev, [fieldId]: col }))}
           />
 

@@ -132,6 +132,7 @@ class ImportTopsRequest(BaseModel):
     create_new_well: bool = False
     multi_well: bool = False
     column_map: dict[str, str] | None = None
+    ignored_columns: list[str] = []
     zone_set_id: int | None = None
     create_zone_set: bool = False
     zone_set_name: str | None = None
@@ -144,11 +145,13 @@ class ImportDeviationRequest(BaseModel):
     create_new_well: bool = False
     multi_well: bool = False
     column_map: dict[str, str] | None = None
+    ignored_columns: list[str] = []
 
 
 class ImportWellsRequest(BaseModel):
     csv_path: str
     column_map: dict[str, str] | None = None
+    ignored_columns: list[str] = []
 
 
 class CreateCheckpointRequest(BaseModel):

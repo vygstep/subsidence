@@ -313,8 +313,8 @@ def import_wells(payload: ImportWellsRequest, request: Request) -> ImportWellsRe
 
                 source_path = Path(payload.csv_path)
                 fieldnames, rows = _read_csv_rows(source_path)
-                if payload.column_map:
-                    fieldnames, rows = _apply_column_map(fieldnames, rows, payload.column_map)
+                if payload.column_map or payload.ignored_columns:
+                    fieldnames, rows = _apply_column_map(fieldnames, rows, payload.column_map or {}, payload.ignored_columns)
                 wells, qc_warnings, imported_row_count = import_wells_rows(session, source_path, fieldnames, rows)
                 well_ids = [well.id for well in wells]
                 commands = [ImportWell.capture(session, manager.project_path, well.id) for well in wells]
@@ -350,8 +350,8 @@ def import_tops(payload: ImportTopsRequest, request: Request) -> ImportTopsRespo
 
                 source_path = Path(payload.csv_path)
                 fieldnames, prepared_rows = _read_csv_rows(source_path)
-                if payload.column_map:
-                    fieldnames, prepared_rows = _apply_column_map(fieldnames, prepared_rows, payload.column_map)
+                if payload.column_map or payload.ignored_columns:
+                    fieldnames, prepared_rows = _apply_column_map(fieldnames, prepared_rows, payload.column_map or {}, payload.ignored_columns)
                 rows_by_top_set = _group_rows_by_top_set_name(prepared_rows)
                 has_file_top_sets = any(name is not None for name in rows_by_top_set)
 
@@ -404,6 +404,7 @@ def import_tops(payload: ImportTopsRequest, request: Request) -> ImportTopsRespo
                         source_path,
                         payload.depth_ref,
                         column_map=payload.column_map or None,
+                        ignored_columns=payload.ignored_columns,
                         create_new_well=payload.create_new_well,
                         top_set_id=zone_set_id,
                     )
@@ -414,6 +415,7 @@ def import_tops(payload: ImportTopsRequest, request: Request) -> ImportTopsRespo
                         source_path,
                         payload.depth_ref,
                         column_map=payload.column_map or None,
+                        ignored_columns=payload.ignored_columns,
                         create_new_well=payload.create_new_well,
                         top_set_id=zone_set_id,
                     )
@@ -438,6 +440,7 @@ def import_tops(payload: ImportTopsRequest, request: Request) -> ImportTopsRespo
                             source_path,
                             payload.depth_ref,
                             column_map=payload.column_map or None,
+                            ignored_columns=payload.ignored_columns,
                             create_new_well=False,
                             top_set_id=zone_set_id,
                         )
@@ -501,6 +504,7 @@ def import_deviation(payload: ImportDeviationRequest, request: Request) -> Impor
                         manager.project_path,
                         Path(payload.csv_path),
                         column_map=payload.column_map or None,
+                        ignored_columns=payload.ignored_columns,
                         create_new_well=payload.create_new_well,
                     )
                     for survey in surveys:
@@ -534,6 +538,7 @@ def import_deviation(payload: ImportDeviationRequest, request: Request) -> Impor
                     payload.well_id,
                     Path(payload.csv_path),
                     column_map=payload.column_map or None,
+                    ignored_columns=payload.ignored_columns,
                     create_new_well=payload.create_new_well,
                 )
                 survey.depth_unit = payload.depth_unit

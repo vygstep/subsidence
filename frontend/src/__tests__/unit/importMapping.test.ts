@@ -3,6 +3,8 @@ import { describe, expect, it } from 'vitest'
 import {
   STRAT_CHART_FIELDS,
   autoMap,
+  defaultIgnoredUnmappedColumns,
+  preservedColumnLabels,
   preservedUnmappedColumnLabels,
 } from '@/components/layout/importWizard/mapping'
 
@@ -43,6 +45,23 @@ describe('import mapping definitions', () => {
     expect(
       preservedUnmappedColumnLabels(preview, { md: 'md', tvd: 'tvd' }, { numericOnly: true }),
     ).toEqual({
+      quality_code: 'quality_code',
+    })
+  })
+
+  it('identifies ignored nonnumeric columns when only numeric extras are preserved', () => {
+    const preview = {
+      columns: ['md', 'tvd', 'quality_code', 'comment'],
+      rows: [
+        ['0', '0', '1', 'tie'],
+        ['100', '99', '2', 'survey'],
+      ],
+    }
+
+    expect(defaultIgnoredUnmappedColumns(preview, { md: 'md', tvd: 'tvd' }, { numericOnly: true })).toEqual(['comment'])
+    expect(preservedColumnLabels(preview, { numericOnly: true })).toEqual({
+      md: 'md',
+      tvd: 'tvd',
       quality_code: 'quality_code',
     })
   })

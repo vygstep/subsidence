@@ -22,7 +22,9 @@ import type { MultiFileImportItem, MultiFileImportStatus } from './importWizard'
 import {
   WELLS_FIELDS,
   autoMap,
+  defaultIgnoredUnmappedColumns,
   isMappingValid,
+  preservedColumnLabels,
   preservedUnmappedColumnLabels,
   validateWellsMapping,
 } from './importWizard/mapping'
@@ -47,6 +49,7 @@ export function ImportWellsDialog({ onClose, onSuccess }: ImportWellsDialogProps
   const addQcWarnings = useNotificationStore((state) => state.addQcWarnings)
   const [csvPath, setCsvPath] = useState(() => getLastImportRoot())
   const [mapping, setMapping] = useState<ColumnMapping>({})
+  const [ignoredColumns, setIgnoredColumns] = useState<Set<string>>(() => new Set())
   const [fileQueue, setFileQueue] = useState<MultiFileImportItem[]>([])
   const [currentFileIndex, setCurrentFileIndex] = useState(0)
   const [currentStepIndex, setCurrentStepIndex] = useState(0)
@@ -69,9 +72,20 @@ export function ImportWellsDialog({ onClose, onSuccess }: ImportWellsDialogProps
 
   useEffect(() => {
     if (tabularPreview) {
-      setMapping(autoMap(tabularPreview.columns, WELLS_FIELDS))
+      const nextMapping = autoMap(tabularPreview.columns, WELLS_FIELDS)
+      setMapping(nextMapping)
+      setIgnoredColumns(new Set(defaultIgnoredUnmappedColumns(tabularPreview, nextMapping)))
     }
   }, [tabularPreview])
+
+  const handleIgnoredColumnChange = (column: string, ignored: boolean) => {
+    setIgnoredColumns((prev) => {
+      const next = new Set(prev)
+      if (ignored) next.add(column)
+      else next.delete(column)
+      return next
+    })
+  }
 
   const mappingErrors = validateWellsMapping(mapping)
   const mappingOk = isMappingValid(mappingErrors)
@@ -114,6 +128,7 @@ export function ImportWellsDialog({ onClose, onSuccess }: ImportWellsDialogProps
           body: JSON.stringify({
             csv_path: nextPath,
             column_map: Object.keys(columnMap).length > 0 ? columnMap : null,
+            ignored_columns: Array.from(ignoredColumns),
           }),
         })
         if (!response.ok) {
@@ -234,6 +249,10 @@ export function ImportWellsDialog({ onClose, onSuccess }: ImportWellsDialogProps
             fields={WELLS_FIELDS}
             mapping={mapping}
             unmappedColumnLabels={preservedUnmappedColumnLabels(tabularPreview, mapping)}
+            userColumnLabels={preservedColumnLabels(tabularPreview)}
+            unmappedColumnMode="user-attribute"
+            ignoredColumns={Array.from(ignoredColumns)}
+            onIgnoredColumnChange={handleIgnoredColumnChange}
             onMappingChange={(fieldId, col) => setMapping((prev) => ({ ...prev, [fieldId]: col }))}
           />
         </>

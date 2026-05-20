@@ -26,7 +26,9 @@ import type { MultiFileImportItem, MultiFileImportStatus } from './importWizard'
 import {
   TOPS_FIELDS,
   autoMap,
+  defaultIgnoredUnmappedColumns,
   isMappingValid,
+  preservedColumnLabels,
   preservedUnmappedColumnLabels,
   validateTopsMapping,
 } from './importWizard/mapping'
@@ -81,6 +83,7 @@ export function ImportTopsDialog({ wells, activeWellId, onClose, onSuccess }: Im
   const [depthRef, setDepthRef] = useState<'MD' | 'TVD' | 'TVDSS'>('MD')
   const [depthUnit, setDepthUnit] = useState<'m' | 'ft' | 'km'>('m')
   const [mapping, setMapping] = useState<ColumnMapping>({})
+  const [ignoredColumns, setIgnoredColumns] = useState<Set<string>>(() => new Set())
   const [fileQueue, setFileQueue] = useState<MultiFileImportItem[]>([])
   const [currentFileIndex, setCurrentFileIndex] = useState(0)
   const [currentStepIndex, setCurrentStepIndex] = useState(0)
@@ -103,9 +106,20 @@ export function ImportTopsDialog({ wells, activeWellId, onClose, onSuccess }: Im
 
   useEffect(() => {
     if (tabularPreview) {
-      setMapping(autoMap(tabularPreview.columns, TOPS_FIELDS))
+      const nextMapping = autoMap(tabularPreview.columns, TOPS_FIELDS)
+      setMapping(nextMapping)
+      setIgnoredColumns(new Set(defaultIgnoredUnmappedColumns(tabularPreview, nextMapping)))
     }
   }, [tabularPreview])
+
+  const handleIgnoredColumnChange = (column: string, ignored: boolean) => {
+    setIgnoredColumns((prev) => {
+      const next = new Set(prev)
+      if (ignored) next.add(column)
+      else next.delete(column)
+      return next
+    })
+  }
 
   useEffect(() => {
     setZoneSetName(fileBaseName(csvPath))
@@ -194,6 +208,7 @@ export function ImportTopsDialog({ wells, activeWellId, onClose, onSuccess }: Im
             create_new_well: createNewWell,
             multi_well: isMultiWell,
             column_map: Object.keys(columnMap).length > 0 ? columnMap : null,
+            ignored_columns: Array.from(ignoredColumns),
             zone_set_id: zoneSetPolicy === 'existing' ? Number(zoneSetId) : null,
             create_zone_set: zoneSetPolicy === 'create',
             zone_set_name: zoneSetPolicy === 'create' ? (zoneSetName.trim() || null) : null,
@@ -314,6 +329,10 @@ export function ImportTopsDialog({ wells, activeWellId, onClose, onSuccess }: Im
             fields={TOPS_FIELDS}
             mapping={mapping}
             unmappedColumnLabels={preservedUnmappedColumnLabels(tabularPreview, mapping)}
+            userColumnLabels={preservedColumnLabels(tabularPreview)}
+            unmappedColumnMode="user-attribute"
+            ignoredColumns={Array.from(ignoredColumns)}
+            onIgnoredColumnChange={handleIgnoredColumnChange}
             onMappingChange={(fieldId, col) => setMapping((prev) => ({ ...prev, [fieldId]: col }))}
           />
 

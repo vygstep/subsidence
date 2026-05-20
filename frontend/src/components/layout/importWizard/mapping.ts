@@ -16,6 +16,9 @@ interface PreservedColumnLabelOptions {
   numericOnly?: boolean
 }
 
+export const IGNORE_COLUMN_ROLE = '__ignore__'
+export const USER_COLUMN_ROLE = '__user__'
+
 export const TOPS_FIELDS: FieldDefinition[] = [
   {
     id: 'top_name',
@@ -34,6 +37,12 @@ export const TOPS_FIELDS: FieldDefinition[] = [
     label: 'Well name',
     required: false,
     aliases: ['well_name', 'well', 'wellname', 'well_id', 'uwi'],
+  },
+  {
+    id: 'topset_name',
+    label: 'TopSet name',
+    required: false,
+    aliases: ['topset_name', 'top_set_name', 'zone_set_name'],
   },
   {
     id: 'boundary_type',
@@ -59,6 +68,14 @@ export const TOPS_FIELDS: FieldDefinition[] = [
     required: false,
     aliases: ['eroded_thickness_m', 'eroded_m', 'eroded'],
   },
+  { id: 'water_depth_m', label: 'Paleobathymetry (m)', required: false, aliases: ['water_depth_m', 'paleobathymetry_m', 'paleobathymetry'] },
+  { id: 'sea_level_m_override', label: 'Sea level override (m)', required: false, aliases: ['sea_level_m_override', 'sea_level_override_m', 'sea_level'] },
+  { id: 'age_base_ma', label: 'Base age (Ma)', required: false, aliases: ['age_base_ma'] },
+  { id: 'lithology', label: 'Lithology', required: false, aliases: ['lithology'] },
+  { id: 'lithology_fractions', label: 'Lithology fractions', required: false, aliases: ['lithology_fractions'] },
+  { id: 'lithology_source', label: 'Lithology source', required: false, aliases: ['lithology_source'] },
+  { id: 'color', label: 'Color', required: false, aliases: ['color'] },
+  { id: 'note', label: 'Note', required: false, aliases: ['note'] },
 ]
 
 export const DEVIATION_FIELDS: FieldDefinition[] = [
@@ -93,10 +110,14 @@ export const WELLS_FIELDS: FieldDefinition[] = [
   { id: 'well_name', label: 'Well name', required: true, aliases: ['well_name', 'well', 'wellname', 'name'] },
   { id: 'uwi', label: 'UWI', required: false, aliases: ['uwi', 'api', 'well_id'] },
   { id: 'kb', label: 'KB', required: false, aliases: ['kb', 'kb_elev', 'kb_elevation'] },
+  { id: 'gl', label: 'GL', required: false, aliases: ['gl', 'gl_elev', 'gl_elevation'] },
   { id: 'td', label: 'TD', required: false, aliases: ['td', 'td_md', 'total_depth'] },
   { id: 'x', label: 'X', required: false, aliases: ['x', 'lon', 'longitude', 'easting'] },
   { id: 'y', label: 'Y', required: false, aliases: ['y', 'lat', 'latitude', 'northing'] },
   { id: 'crs', label: 'CRS', required: false, aliases: ['crs', 'coordinate_reference_system'] },
+  { id: 'depth_unit', label: 'Depth unit', required: false, aliases: ['depth_unit'] },
+  { id: 'color', label: 'Color', required: false, aliases: ['color_hex', 'color'] },
+  { id: 'source_las_path', label: 'Source LAS path', required: false, aliases: ['source_las_path'] },
 ]
 
 export const STRAT_CHART_FIELDS: FieldDefinition[] = [
@@ -150,6 +171,12 @@ function isNumericPreviewColumn(preview: PreviewLike, colIdx: number): boolean {
   return values.length > 0 && values.every((value) => Number.isFinite(Number(value)))
 }
 
+function mappedColumnSet(mapping: ColumnMapping): Set<string> {
+  return new Set(
+    Object.values(mapping).filter((value): value is string => value != null && value.length > 0),
+  )
+}
+
 export function preservedUnmappedColumnLabels(
   preview: PreviewLike | null,
   mapping: ColumnMapping,
@@ -157,9 +184,7 @@ export function preservedUnmappedColumnLabels(
 ): Record<string, string> {
   if (!preview) return {}
 
-  const mappedColumns = new Set(
-    Object.values(mapping).filter((value): value is string => value != null && value.length > 0),
-  )
+  const mappedColumns = mappedColumnSet(mapping)
   const labels: Record<string, string> = {}
 
   preview.columns.forEach((column, colIdx) => {
@@ -169,6 +194,30 @@ export function preservedUnmappedColumnLabels(
   })
 
   return labels
+}
+
+export function preservedColumnLabels(
+  preview: PreviewLike | null,
+  options: PreservedColumnLabelOptions = {},
+): Record<string, string> {
+  if (!preview) return {}
+  const labels: Record<string, string> = {}
+  preview.columns.forEach((column, colIdx) => {
+    if (options.numericOnly && !isNumericPreviewColumn(preview, colIdx)) return
+    labels[column] = column
+  })
+  return labels
+}
+
+export function defaultIgnoredUnmappedColumns(
+  preview: PreviewLike | null,
+  mapping: ColumnMapping,
+  options: PreservedColumnLabelOptions = {},
+): string[] {
+  if (!preview) return []
+  const mappedColumns = mappedColumnSet(mapping)
+  const preservedLabels = preservedUnmappedColumnLabels(preview, mapping, options)
+  return preview.columns.filter((column) => !mappedColumns.has(column) && preservedLabels[column] == null)
 }
 
 export function validateTopsMapping(mapping: ColumnMapping): string[] {

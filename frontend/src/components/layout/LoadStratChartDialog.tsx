@@ -22,7 +22,9 @@ import type { MultiFileImportItem, MultiFileImportStatus } from './importWizard'
 import {
   STRAT_CHART_FIELDS,
   autoMap,
+  defaultIgnoredUnmappedColumns,
   isMappingValid,
+  preservedColumnLabels,
   preservedUnmappedColumnLabels,
   validateStratChartMapping,
 } from './importWizard/mapping'
@@ -41,6 +43,7 @@ export function LoadStratChartDialog({ onClose, onSuccess }: LoadStratChartDialo
   const projectPath = useProjectStore((state) => state.projectPath)
   const [csvPath, setCsvPath] = useState(() => getLastImportRoot())
   const [mapping, setMapping] = useState<ColumnMapping>({})
+  const [ignoredColumns, setIgnoredColumns] = useState<Set<string>>(() => new Set())
   const [fileQueue, setFileQueue] = useState<MultiFileImportItem[]>([])
   const [currentFileIndex, setCurrentFileIndex] = useState(0)
   const [currentStepIndex, setCurrentStepIndex] = useState(0)
@@ -63,9 +66,20 @@ export function LoadStratChartDialog({ onClose, onSuccess }: LoadStratChartDialo
 
   useEffect(() => {
     if (tabularPreview) {
-      setMapping(autoMap(tabularPreview.columns, STRAT_CHART_FIELDS))
+      const nextMapping = autoMap(tabularPreview.columns, STRAT_CHART_FIELDS)
+      setMapping(nextMapping)
+      setIgnoredColumns(new Set(defaultIgnoredUnmappedColumns(tabularPreview, nextMapping)))
     }
   }, [tabularPreview])
+
+  const handleIgnoredColumnChange = (column: string, ignored: boolean) => {
+    setIgnoredColumns((prev) => {
+      const next = new Set(prev)
+      if (ignored) next.add(column)
+      else next.delete(column)
+      return next
+    })
+  }
 
   const mappingErrors = validateStratChartMapping(mapping)
   const mappingOk = isMappingValid(mappingErrors)
@@ -108,6 +122,7 @@ export function LoadStratChartDialog({ onClose, onSuccess }: LoadStratChartDialo
           body: JSON.stringify({
             csv_path: nextPath,
             column_map: columnMap,
+            ignored_columns: Array.from(ignoredColumns),
           }),
         })
         if (!response.ok) {
@@ -216,6 +231,10 @@ export function LoadStratChartDialog({ onClose, onSuccess }: LoadStratChartDialo
             fields={STRAT_CHART_FIELDS}
             mapping={mapping}
             unmappedColumnLabels={preservedUnmappedColumnLabels(tabularPreview, mapping)}
+            userColumnLabels={preservedColumnLabels(tabularPreview)}
+            unmappedColumnMode="user-attribute"
+            ignoredColumns={Array.from(ignoredColumns)}
+            onIgnoredColumnChange={handleIgnoredColumnChange}
             onMappingChange={(fieldId, col) => setMapping((prev) => ({ ...prev, [fieldId]: col }))}
           />
         </>

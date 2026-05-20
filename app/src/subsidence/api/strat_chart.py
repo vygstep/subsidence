@@ -61,6 +61,7 @@ def _require_open_project(request: Request) -> ProjectManager:
 class ImportStratChartRequest(BaseModel):
     csv_path: str
     column_map: dict[str, str]
+    ignored_columns: list[str] = []
 
 
 class ImportStratChartResponse(BaseModel):
@@ -86,12 +87,13 @@ def _is_builtin_chart(chart: StratChart) -> bool:
     return chart.name == 'ICS 2023' and source_name in {'', 'ics_2023.csv', 'ics_chart2023.csv', 'ics_chart2023_units.csv'}
 
 
-def _apply_column_map(row: dict[str, str], column_map: dict[str, str]) -> dict[str, str]:
+def _apply_column_map(row: dict[str, str], column_map: dict[str, str], ignored_columns: list[str] | None = None) -> dict[str, str]:
+    ignored = set(ignored_columns or [])
     mapped_sources = set(column_map.values())
     mapped = {
         key: value
         for key, value in row.items()
-        if key not in mapped_sources
+        if key not in mapped_sources and key not in ignored
     }
     mapped.update({
         canonical: row.get(source, '')
@@ -243,7 +245,7 @@ def _unit_code(row: dict[str, Any]) -> str | None:
     return None
 
 
-def _import_ics_csv(session, csv_path: Path, column_map: dict[str, str]) -> tuple[StratChart, int]:
+def _import_ics_csv(session, csv_path: Path, column_map: dict[str, str], ignored_columns: list[str] | None = None) -> tuple[StratChart, int]:
     required = {'unit_id', 'unit_name', 'start_age_ma', 'end_age_ma'}
     missing_mapping = sorted(required.difference(column_map))
     if missing_mapping:
@@ -254,7 +256,7 @@ def _import_ics_csv(session, csv_path: Path, column_map: dict[str, str]) -> tupl
         reader = csv.DictReader(handle)
         for row in reader:
             line_number = reader.line_num
-            row = _apply_column_map(row, column_map)
+            row = _apply_column_map(row, column_map, ignored_columns)
             unit_id_raw = (row.get('unit_id') or '').strip()
             name = (row.get('unit_name') or '').strip()
             if not unit_id_raw and not name:
@@ -417,7 +419,7 @@ def import_strat_chart(body: ImportStratChartRequest, request: Request) -> Impor
 
         with manager.get_session() as session:
             try:
-                chart, count = _import_ics_csv(session, csv_path, body.column_map)
+                chart, count = _import_ics_csv(session, csv_path, body.column_map, body.ignored_columns)
                 if chart.is_active:
                     auto_link_all_formations_to_chart(session, chart)
                 session.commit()

@@ -22,7 +22,9 @@ import type { MultiFileImportItem, MultiFileImportStatus } from './importWizard'
 import {
   SEA_LEVEL_CURVE_FIELDS,
   autoMap,
+  defaultIgnoredUnmappedColumns,
   isMappingValid,
+  preservedColumnLabels,
   preservedUnmappedColumnLabels,
   validateSeaLevelCurveMapping,
 } from './importWizard/mapping'
@@ -50,6 +52,7 @@ export function LoadSeaLevelCurveDialog({ onClose, onSuccess }: LoadSeaLevelCurv
   const [curveName, setCurveName] = useState('')
   const [curveNameEdited, setCurveNameEdited] = useState(false)
   const [mapping, setMapping] = useState<ColumnMapping>({})
+  const [ignoredColumns, setIgnoredColumns] = useState<Set<string>>(() => new Set())
   const [fileQueue, setFileQueue] = useState<MultiFileImportItem[]>([])
   const [currentFileIndex, setCurrentFileIndex] = useState(0)
   const [currentStepIndex, setCurrentStepIndex] = useState(0)
@@ -79,9 +82,20 @@ export function LoadSeaLevelCurveDialog({ onClose, onSuccess }: LoadSeaLevelCurv
 
   useEffect(() => {
     if (tabularPreview) {
-      setMapping(autoMap(tabularPreview.columns, SEA_LEVEL_CURVE_FIELDS))
+      const nextMapping = autoMap(tabularPreview.columns, SEA_LEVEL_CURVE_FIELDS)
+      setMapping(nextMapping)
+      setIgnoredColumns(new Set(defaultIgnoredUnmappedColumns(tabularPreview, nextMapping)))
     }
   }, [tabularPreview])
+
+  const handleIgnoredColumnChange = (column: string, ignored: boolean) => {
+    setIgnoredColumns((prev) => {
+      const next = new Set(prev)
+      if (ignored) next.add(column)
+      else next.delete(column)
+      return next
+    })
+  }
 
   const mappingErrors = validateSeaLevelCurveMapping(mapping)
   const mappingOk = isMappingValid(mappingErrors)
@@ -135,6 +149,7 @@ export function LoadSeaLevelCurveDialog({ onClose, onSuccess }: LoadSeaLevelCurv
             csv_path: nextPath,
             curve_name: nextName,
             column_map: columnMap,
+            ignored_columns: Array.from(ignoredColumns),
             delimiter: parserSettings.delimiter,
             header_row: parserSettings.headerRow,
           }),
@@ -255,6 +270,10 @@ export function LoadSeaLevelCurveDialog({ onClose, onSuccess }: LoadSeaLevelCurv
             fields={SEA_LEVEL_CURVE_FIELDS}
             mapping={mapping}
             unmappedColumnLabels={preservedUnmappedColumnLabels(tabularPreview, mapping)}
+            userColumnLabels={preservedColumnLabels(tabularPreview)}
+            unmappedColumnMode="user-attribute"
+            ignoredColumns={Array.from(ignoredColumns)}
+            onIgnoredColumnChange={handleIgnoredColumnChange}
             onMappingChange={(fieldId, col) => setMapping((prev) => ({ ...prev, [fieldId]: col }))}
           />
         </>

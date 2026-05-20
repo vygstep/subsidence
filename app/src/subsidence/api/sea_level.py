@@ -60,6 +60,7 @@ class ImportSeaLevelCurveRequest(BaseModel):
     csv_path: str
     curve_name: str
     column_map: dict[str, str]
+    ignored_columns: list[str] = []
     delimiter: str = 'auto'
     header_row: int = Field(default=0, ge=0)
 
@@ -114,6 +115,7 @@ def _import_sea_level_curve_csv(
     csv_path: Path,
     curve_name: str,
     column_map: dict[str, str],
+    ignored_columns: list[str] | None = None,
     delimiter: str = 'auto',
     header_row: int = 0,
 ) -> tuple[SeaLevelCurve, int]:
@@ -127,7 +129,7 @@ def _import_sea_level_curve_csv(
         raise ValueError('Curve name cannot be empty')
 
     fieldnames, rows = _read_sea_level_rows(csv_path, delimiter, header_row)
-    fieldnames, rows = _apply_column_map(fieldnames, rows, column_map)
+    fieldnames, rows = _apply_column_map(fieldnames, rows, column_map, ignored_columns)
     if not rows:
         raise ValueError('No sea level points found in CSV')
 
@@ -241,6 +243,7 @@ def import_sea_level_curve(body: ImportSeaLevelCurveRequest, request: Request) -
                     csv_path,
                     body.curve_name,
                     body.column_map,
+                    body.ignored_columns,
                     delimiter=body.delimiter,
                     header_row=body.header_row,
                 )

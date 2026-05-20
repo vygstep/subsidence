@@ -1824,12 +1824,15 @@ def test_wells_import_preserves_unknown_columns_as_extra_attributes(api_client: 
     _create_project(api_client, tmp_path, 'well-user-attributes')
     csv_path = tmp_path / 'wells_extra.csv'
     csv_path.write_text(
-        'well_name,kb,td,operator,extra_country\n'
-        'Extra Well,11,250,Acme,Norway\n',
+        'well_name,kb,td,operator,extra_country,ignored_note\n'
+        'Extra Well,11,250,Acme,Norway,do not import\n',
         encoding='utf-8',
     )
 
-    response = api_client.post('/api/projects/import-wells', json={'csv_path': str(csv_path)})
+    response = api_client.post('/api/projects/import-wells', json={
+        'csv_path': str(csv_path),
+        'ignored_columns': ['ignored_note'],
+    })
     assert response.status_code == 200, response.text
     well_id = response.json()['well_ids'][0]
 
@@ -1840,6 +1843,7 @@ def test_wells_import_preserves_unknown_columns_as_extra_attributes(api_client: 
         extra = json.loads(well.extra or '{}')
         assert extra['operator'] == 'Acme'
         assert extra['country'] == 'Norway'
+        assert 'ignored_note' not in extra
 
     response = api_client.post('/api/export/wells/info', json={'scope': 'current', 'well_id': well_id})
     assert response.status_code == 200, response.text

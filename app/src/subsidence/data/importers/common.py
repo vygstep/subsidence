@@ -358,6 +358,7 @@ def _apply_column_map(
     fieldnames: list[str],
     rows: list[dict[str, str]],
     column_map: dict[str, str],
+    ignored_columns: list[str] | None = None,
 ) -> tuple[list[str], list[dict[str, str]]]:
     """Rename file column names to canonical names.
 
@@ -365,9 +366,19 @@ def _apply_column_map(
     Returns updated fieldnames and rows with file column names replaced by
     their canonical counterparts.
     """
+    ignored = set(ignored_columns or [])
+    mapped_sources = set(column_map.values())
     inverse = {file_col: canonical for canonical, file_col in column_map.items()}
-    new_fieldnames = [inverse.get(col, col) for col in fieldnames]
-    new_rows = [{inverse.get(k, k): v for k, v in row.items()} for row in rows]
+    kept_fieldnames = [col for col in fieldnames if col not in ignored or col in mapped_sources]
+    new_fieldnames = [inverse.get(col, col) for col in kept_fieldnames]
+    new_rows = [
+        {
+            inverse.get(k, k): v
+            for k, v in row.items()
+            if k in kept_fieldnames
+        }
+        for row in rows
+    ]
     return new_fieldnames, new_rows
 
 
