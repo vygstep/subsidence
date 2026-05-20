@@ -1,6 +1,6 @@
 # Multi-File Import
 
-Status: Implemented
+Status: Post-verification fixes
 Branch: feature/multi-file-import
 
 ## Goal
@@ -49,6 +49,56 @@ Multi-file import applies to:
 5. Extend the same sequential workflow to tops, deviation, wells, StratChart, and sea level curve imports. Done.
 6. Add focused frontend tests for queue progression and summary behavior. Done.
 7. Run backend picker/import tests where backend behavior changes. Done.
+
+## Post-Verification Fixes
+
+These fixes are part of the same multi-file/import mapping UX work and should be implemented as small sequential commits with focused tests after each object or shared shell change.
+
+### A. Wizard Footer Actions
+
+- Move `Skip this file` out of importer preview bodies and into the shared wizard footer.
+- In multi-file preview steps, show `Skip this file` immediately to the left of `Cancel`.
+- Summary is a terminal state: do not show `Back` or `Cancel`.
+- Summary should show a single close action, labelled `Close`, because there is nothing left to cancel after files have been processed.
+- Implement this in `ImportWizardShell` through explicit footer action props so individual importers do not hand-roll button placement.
+
+### B. Log Depth Reference UX
+
+- LAS preview:
+  - Do not show inactive `depth` text in the Type column.
+  - Show the detected depth reference as `MD`, `TVD`, or `TVDSS`.
+  - Default to `MD` for generic LAS depth mnemonics such as `DEPTH`/`DEPT`.
+  - Use `TVD`/`TVDSS` only when the LAS depth mnemonic/header explicitly says so.
+- CSV logs preview:
+  - Keep the auto-detected depth mapping visible in the mapping row, for example `MD *`.
+  - Add a depth-reference dropdown below the mapped depth column with `MD`, `TVD`, and `TVDSS`.
+  - Default to `MD` for generic `DEPTH`/`DEPT`.
+  - Default to `TVD` or `TVDSS` only when the source header explicitly says so.
+  - Submit the selected value as `trusted_depth_reference`.
+
+### C. Extra Attribute Mapping Labels
+
+- For importers that preserve unmapped columns as user attributes, the mapping row must make that explicit.
+- Known/predefined fields should keep canonical labels such as `Depth`, `Formation name`, `Well name`, `Age (Ma)`, etc.
+- Unmapped preserved columns should show `user: <column name>` instead of a plain column name or `-`.
+- `-` means the column will not be imported.
+- Apply this consistently to all tabular importers that preserve extra attributes:
+  - Tops.
+  - Wells.
+  - StratChart.
+  - Sea level curve.
+- Deviation should keep numeric extra columns only if the backend preserves them; otherwise leave unmapped as `-`.
+- Logs CSV is different: unmapped numeric/log columns are imported as curves, so their dropdown labels should remain curve mnemonics rather than `user:`.
+
+### D. Test Plan For Fixes
+
+- Add or update frontend tests for:
+  - Footer button order and summary close-only behavior.
+  - LAS generic depth mnemonic -> `MD`.
+  - LAS explicit `TVD`/`TVDSS` mnemonic -> matching depth reference.
+  - CSV log depth dropdown default and submit payload.
+  - `user: <column name>` labels for extra-attribute importers.
+- Run the focused import wizard tests after each stage.
 
 ## Non-Goals
 
