@@ -154,25 +154,6 @@ export function TabularPreviewPane({
         <div className="import-preview__table-wrap">
           <table className="import-preview__table">
             <thead>
-              {showDepthReference && (
-                <tr className="import-preview__mapping-row">
-                  <th className="import-preview__row-num" />
-                  {preview.columns.map((_, colIdx) => (
-                    <th key={colIdx} className={colIdx === depthReferenceColIndex ? 'import-preview__col--depth' : undefined}>
-                      {colIdx === depthReferenceColIndex ? (
-                        <select
-                          value={depthReference}
-                          onChange={(e) => onDepthReferenceChange(e.target.value as 'MD' | 'TVD' | 'TVDSS')}
-                        >
-                          <option value="MD">MD</option>
-                          <option value="TVD">TVD</option>
-                          <option value="TVDSS">TVDSS</option>
-                        </select>
-                      ) : null}
-                    </th>
-                  ))}
-                </tr>
-              )}
               {showMapping && (
                 <tr className="import-preview__mapping-row">
                   <th className="import-preview__row-num" />
@@ -220,7 +201,16 @@ export function TabularPreviewPane({
                     const isExcluded = curveTypeExcludedColumns.includes(col)
                     return (
                       <th key={colIdx} className={isDepth ? 'import-preview__col--depth' : undefined}>
-                        {isDepth || isExcluded ? null : (
+                        {showDepthReference && colIdx === depthReferenceColIndex ? (
+                          <select
+                            value={depthReference}
+                            onChange={(e) => onDepthReferenceChange(e.target.value as 'MD' | 'TVD' | 'TVDSS')}
+                          >
+                            <option value="MD">MD</option>
+                            <option value="TVD">TVD</option>
+                            <option value="TVDSS">TVDSS</option>
+                          </select>
+                        ) : isDepth || isExcluded ? null : (
                           <select
                             value={curveTypes[col] ?? 'continuous'}
                             onChange={(e) => onCurveTypeChange(col, e.target.value as CurveType)}
