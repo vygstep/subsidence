@@ -1,6 +1,6 @@
 # Multi-File Import
 
-Status: Post-verification fixes
+Status: Implemented; pending manual verification
 Branch: feature/multi-file-import
 
 ## Goal
@@ -56,6 +56,8 @@ These fixes are part of the same multi-file/import mapping UX work and should be
 
 ### A. Wizard Footer Actions
 
+Status: Done.
+
 - Move `Skip this file` out of importer preview bodies and into the shared wizard footer.
 - In multi-file preview steps, show `Skip this file` immediately to the left of `Cancel`.
 - Summary is a terminal state: do not show `Back` or `Cancel`.
@@ -63,6 +65,8 @@ These fixes are part of the same multi-file/import mapping UX work and should be
 - Implement this in `ImportWizardShell` through explicit footer action props so individual importers do not hand-roll button placement.
 
 ### B. Log Depth Reference UX
+
+Status: Done.
 
 - LAS preview:
   - Do not show inactive `depth` text in the Type column.
@@ -77,6 +81,8 @@ These fixes are part of the same multi-file/import mapping UX work and should be
   - Submit the selected value as `trusted_depth_reference`.
 
 ### C. Column Role Mapping For Attributes
+
+Status: Done.
 
 - For importers that preserve unmapped columns as user attributes, the preview table should use two header layers:
   - Source header row: original column names from the file.
@@ -101,6 +107,8 @@ These fixes are part of the same multi-file/import mapping UX work and should be
 - LAS is different: well-header metadata is imported from the LAS header, not from the tabular mapping UI.
 
 ### D. Test Plan For Fixes
+
+Status: Done.
 
 - Add or update frontend tests for:
   - Footer button order and summary close-only behavior.
