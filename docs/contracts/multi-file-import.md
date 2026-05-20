@@ -76,19 +76,29 @@ These fixes are part of the same multi-file/import mapping UX work and should be
   - Default to `TVD` or `TVDSS` only when the source header explicitly says so.
   - Submit the selected value as `trusted_depth_reference`.
 
-### C. Extra Attribute Mapping Labels
+### C. Column Role Mapping For Attributes
 
-- For importers that preserve unmapped columns as user attributes, the mapping row must make that explicit.
-- Known/predefined fields should keep canonical labels such as `Depth`, `Formation name`, `Well name`, `Age (Ma)`, etc.
-- Unmapped preserved columns should show `user: <column name>` instead of a plain column name or `-`.
-- `-` means the column will not be imported.
+- For importers that preserve unmapped columns as user attributes, the preview table should use two header layers:
+  - Source header row: original column names from the file.
+  - Mapping row below it: dropdown for the import role of each source column.
+- The mapping dropdown auto-selects a predefined/canonical attribute when the source column name matches an alias.
+- If the source column does not match a predefined attribute and the importer supports extra attributes, the dropdown defaults to `user`.
+- The dropdown must allow reassignment:
+  - Any predefined/canonical attribute can be selected for any column.
+  - `user` means import this column as a user-defined extra attribute using the source column name as the attribute key.
+  - `-` means do not import this column.
+- Predefined/canonical labels should be domain labels such as `Depth`, `Formation name`, `Well name`, `Age (Ma)`, etc.
+- Round-trip rule:
+  - If a source column such as `index` is mapped to a predefined attribute such as `Unit code`, it must be stored/exported as the canonical field (`unit_code`) and auto-detected as `Unit code` on re-import.
+  - If the same source column is mapped to `user`, it remains a user attribute keyed by the source column name (`index`) and must not be exported as a predefined canonical field.
 - Apply this consistently to all tabular importers that preserve extra attributes:
   - Tops.
   - Wells.
   - StratChart.
   - Sea level curve.
-- Deviation should keep numeric extra columns only if the backend preserves them; otherwise leave unmapped as `-`.
+- Deviation preserves only numeric extra columns in the deviation parquet. For numeric extra columns, default to `user`; for nonnumeric unmatched columns, default to `-`.
 - Logs CSV is different: unmapped numeric/log columns are imported as curves, so their dropdown labels should remain curve mnemonics rather than `user:`.
+- LAS is different: well-header metadata is imported from the LAS header, not from the tabular mapping UI.
 
 ### D. Test Plan For Fixes
 
