@@ -281,6 +281,11 @@ export function ImportTopsDialog({ wells, activeWellId, onClose, onSuccess }: Im
       canSubmit={sourceIsValid && mappingOk && zoneSetOk}
       validationMessages={validationMessages}
       hidePrimaryAction={isSummaryStep}
+      terminalCloseOnly={isSummaryStep}
+      beforeCancelAction={isMultiFileRun && !isSummaryStep ? {
+        label: 'Skip this file',
+        onClick: handleSkipCurrentFile,
+      } : undefined}
       onClose={onClose}
       onSubmit={handleSubmit}
       onStepChange={setCurrentStepIndex}
@@ -392,11 +397,6 @@ export function ImportTopsDialog({ wells, activeWellId, onClose, onSuccess }: Im
               </div>
             </div>
           )}
-          {isMultiFileRun ? (
-            <button type="button" className="project-dialog__button" onClick={handleSkipCurrentFile}>
-              Skip this file
-            </button>
-          ) : null}
         </>
       ) : null}
       {isSummaryStep ? (

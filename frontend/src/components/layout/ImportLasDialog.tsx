@@ -439,6 +439,11 @@ export function ImportLasDialog({ wells, activeWellId, onClose, onSuccess }: Imp
       canSubmit={canSubmit}
       validationMessages={validationMessages}
       hidePrimaryAction={isSummaryStep}
+      terminalCloseOnly={isSummaryStep}
+      beforeCancelAction={isMultiFileRun && !isSummaryStep ? {
+        label: 'Skip this file',
+        onClick: handleSkipCurrentFile,
+      } : undefined}
       onClose={onClose}
       onSubmit={handleSubmit}
       onStepChange={setCurrentStepIndex}
@@ -499,11 +504,6 @@ export function ImportLasDialog({ wells, activeWellId, onClose, onSuccess }: Imp
             {!previewLoading && lasPreview !== null && !hasImportableLogCurves && (
               <p className="project-dialog__error">No importable log curves were found in selected file.</p>
             )}
-            {isMultiFileRun ? (
-              <button type="button" className="project-dialog__button" onClick={handleSkipCurrentFile}>
-                Skip this file
-              </button>
-            ) : null}
           </>
         ) : (
           <>
@@ -567,11 +567,6 @@ export function ImportLasDialog({ wells, activeWellId, onClose, onSuccess }: Imp
             {!previewLoading && tabularPreview && mapping['depth'] && !hasImportableLogCurves && (
               <p className="project-dialog__error">No importable log curves were found in selected file.</p>
             )}
-            {isMultiFileRun ? (
-              <button type="button" className="project-dialog__button" onClick={handleSkipCurrentFile}>
-                Skip this file
-              </button>
-            ) : null}
           </>
         )
       ) : null}

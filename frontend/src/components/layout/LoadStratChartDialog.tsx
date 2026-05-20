@@ -183,6 +183,11 @@ export function LoadStratChartDialog({ onClose, onSuccess }: LoadStratChartDialo
       canSubmit={sourceIsValid && mappingOk}
       validationMessages={validationMessages}
       hidePrimaryAction={isSummaryStep}
+      terminalCloseOnly={isSummaryStep}
+      beforeCancelAction={isMultiFileRun && !isSummaryStep ? {
+        label: 'Skip this file',
+        onClick: handleSkipCurrentFile,
+      } : undefined}
       onClose={onClose}
       onSubmit={handleSubmit}
       onStepChange={setCurrentStepIndex}
@@ -213,11 +218,6 @@ export function LoadStratChartDialog({ onClose, onSuccess }: LoadStratChartDialo
             unmappedColumnLabels={preservedUnmappedColumnLabels(tabularPreview, mapping)}
             onMappingChange={(fieldId, col) => setMapping((prev) => ({ ...prev, [fieldId]: col }))}
           />
-          {isMultiFileRun ? (
-            <button type="button" className="project-dialog__button" onClick={handleSkipCurrentFile}>
-              Skip this file
-            </button>
-          ) : null}
         </>
       ) : null}
       {isSummaryStep ? (
