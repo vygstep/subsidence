@@ -19,6 +19,9 @@ interface TabularPreviewPaneProps {
   settings: TabularParserSettings
   onSettingsChange: (patch: Partial<TabularParserSettings>) => void
   depthColumn?: string | null
+  depthReferenceColumn?: string | null
+  depthReference?: 'MD' | 'TVD' | 'TVDSS'
+  onDepthReferenceChange?: (value: 'MD' | 'TVD' | 'TVDSS') => void
   fields?: FieldDefinition[]
   mapping?: ColumnMapping
   onMappingChange?: (fieldId: string, colName: string | null) => void
@@ -35,6 +38,9 @@ export function TabularPreviewPane({
   settings,
   onSettingsChange,
   depthColumn,
+  depthReferenceColumn,
+  depthReference = 'MD',
+  onDepthReferenceChange,
   fields,
   mapping,
   onMappingChange,
@@ -45,6 +51,8 @@ export function TabularPreviewPane({
 }: TabularPreviewPaneProps) {
   const [headerRowDraft, setHeaderRowDraft] = useState(String(settings.headerRow))
   const depthColIndex = depthColumn != null && preview ? preview.columns.indexOf(depthColumn) : -1
+  const depthReferenceColIndex = depthReferenceColumn != null && preview ? preview.columns.indexOf(depthReferenceColumn) : -1
+  const showDepthReference = depthReferenceColIndex >= 0 && onDepthReferenceChange != null
   const showMapping = fields != null && mapping != null && onMappingChange != null && preview != null
   const showCurveTypes = curveTypes != null && onCurveTypeChange != null && preview != null
   const missingRequired = showMapping ? fields.filter((f) => f.required && !mapping[f.id]) : []
@@ -123,6 +131,25 @@ export function TabularPreviewPane({
         <div className="import-preview__table-wrap">
           <table className="import-preview__table">
             <thead>
+              {showDepthReference && (
+                <tr className="import-preview__mapping-row">
+                  <th className="import-preview__row-num" />
+                  {preview.columns.map((_, colIdx) => (
+                    <th key={colIdx} className={colIdx === depthReferenceColIndex ? 'import-preview__col--depth' : undefined}>
+                      {colIdx === depthReferenceColIndex ? (
+                        <select
+                          value={depthReference}
+                          onChange={(e) => onDepthReferenceChange(e.target.value as 'MD' | 'TVD' | 'TVDSS')}
+                        >
+                          <option value="MD">MD</option>
+                          <option value="TVD">TVD</option>
+                          <option value="TVDSS">TVDSS</option>
+                        </select>
+                      ) : null}
+                    </th>
+                  ))}
+                </tr>
+              )}
               {showMapping && (
                 <tr className="import-preview__mapping-row">
                   <th className="import-preview__row-num" />

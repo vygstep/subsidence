@@ -136,10 +136,8 @@ export function ImportLasDialog({ wells, activeWellId, onClose, onSuccess }: Imp
   const currentFile = isMultiFileRun ? fileQueue[currentFileIndex] : null
   const queueSummary = summarizeMultiFileQueue(fileQueue)
   const logsCsvFields = useMemo(
-    () => LOGS_CSV_FIELDS.map((field) => (
-      field.id === 'depth' ? { ...field, label: trustedDepthRef } : field
-    )),
-    [trustedDepthRef],
+    () => LOGS_CSV_FIELDS,
+    [],
   )
 
   const { isLoading: previewLoading, error: previewError, tabularPreview, lasPreview, parserSettings, updateParserSettings } = useImportPreview(
@@ -468,6 +466,7 @@ export function ImportLasDialog({ wells, activeWellId, onClose, onSuccess }: Imp
               isLoading={previewLoading}
               error={previewError}
               preview={lasPreview}
+              depthReference={trustedDepthRef}
               curveTypes={curveTypes}
               onCurveTypeChange={handleCurveTypeChange}
             />
@@ -517,6 +516,9 @@ export function ImportLasDialog({ wells, activeWellId, onClose, onSuccess }: Imp
               settings={parserSettings}
               onSettingsChange={updateParserSettings}
               depthColumn={mapping['depth'] ?? null}
+              depthReferenceColumn={mapping['depth'] ?? null}
+              depthReference={trustedDepthRef}
+              onDepthReferenceChange={setTrustedDepthRef}
               fields={logsCsvFields}
               mapping={mapping}
               onMappingChange={(fieldId, colName) => setMapping((prev) => ({ ...prev, [fieldId]: colName }))}

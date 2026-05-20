@@ -257,6 +257,7 @@ describe('Import dialogs target active well by default', () => {
     const user = userEvent.setup()
     const onSuccess = vi.fn()
     const importCalls: string[] = []
+    const importBodies: Record<string, unknown>[] = []
 
     vi.stubGlobal('fetch', vi.fn().mockImplementation((url: string, options?: RequestInit) => {
       if (url === '/api/projects/pick-files') {
@@ -284,6 +285,7 @@ describe('Import dialogs target active well by default', () => {
       if (url === '/api/projects/import-las' || url === '/api/projects/import-logs-csv') {
         importCalls.push(url)
         const body = JSON.parse(String(options?.body ?? '{}'))
+        importBodies.push(body)
         return Promise.resolve({
           ok: true,
           json: async () => ({
@@ -308,6 +310,7 @@ describe('Import dialogs target active well by default', () => {
 
     await advanceToPreview(user)
     expect(await screen.findByText(/File 1 of 2:/)).toBeTruthy()
+    expect(screen.getByText('MD')).toBeTruthy()
 
     await user.click(screen.getByRole('button', { name: 'Load logs' }))
     expect(await screen.findByText(/File 2 of 2:/)).toBeTruthy()
@@ -315,6 +318,10 @@ describe('Import dialogs target active well by default', () => {
     await user.click(screen.getByRole('button', { name: 'Load logs' }))
     expect(await screen.findByText(/Imported 2 of 2 files/)).toBeTruthy()
     expect(importCalls).toEqual(['/api/projects/import-las', '/api/projects/import-logs-csv'])
+    expect(importBodies[1]).toMatchObject({
+      depth_column: 'depth',
+      trusted_depth_reference: 'MD',
+    })
     expect(onSuccess).toHaveBeenCalledWith('well-las')
     expect(onSuccess).toHaveBeenCalledWith('well-csv')
   })

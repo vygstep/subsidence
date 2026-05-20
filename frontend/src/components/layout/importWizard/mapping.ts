@@ -83,7 +83,7 @@ export const LOGS_CSV_FIELDS: FieldDefinition[] = [
   },
   {
     id: 'depth',
-    label: 'Depth column',
+    label: 'Depth',
     required: true,
     aliases: ['dept', 'depth', 'md', 'tvd', 'tvdss', 'depth_md', 'measured_depth'],
   },
