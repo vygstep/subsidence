@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 
 import { type CurveType, CURVE_TYPES } from '@/utils/curveTypes'
+import { IGNORE_COLUMN_ROLE, USER_COLUMN_ROLE } from './mapping'
 import type { FieldDefinition, ColumnMapping } from './mapping'
 import type { TabularDelimiter, TabularParserSettings, TabularPreviewResponse } from './types'
 
@@ -19,13 +20,20 @@ interface TabularPreviewPaneProps {
   settings: TabularParserSettings
   onSettingsChange: (patch: Partial<TabularParserSettings>) => void
   depthColumn?: string | null
+  depthReferenceColumn?: string | null
+  depthReference?: 'MD' | 'TVD' | 'TVDSS'
+  onDepthReferenceChange?: (value: 'MD' | 'TVD' | 'TVDSS') => void
   fields?: FieldDefinition[]
   mapping?: ColumnMapping
   onMappingChange?: (fieldId: string, colName: string | null) => void
+  ignoredColumns?: string[]
+  onIgnoredColumnChange?: (colName: string, ignored: boolean) => void
+  unmappedColumnMode?: 'source-label' | 'user-attribute'
   curveTypes?: Record<string, CurveType>
   onCurveTypeChange?: (col: string, type: CurveType) => void
   curveTypeExcludedColumns?: string[]
   unmappedColumnLabels?: Record<string, string>
+  userColumnLabels?: Record<string, string>
 }
 
 export function TabularPreviewPane({
@@ -35,17 +43,28 @@ export function TabularPreviewPane({
   settings,
   onSettingsChange,
   depthColumn,
+  depthReferenceColumn,
+  depthReference = 'MD',
+  onDepthReferenceChange,
   fields,
   mapping,
   onMappingChange,
+  ignoredColumns = [],
+  onIgnoredColumnChange,
+  unmappedColumnMode = 'source-label',
   curveTypes,
   onCurveTypeChange,
   curveTypeExcludedColumns = [],
   unmappedColumnLabels = {},
+  userColumnLabels,
 }: TabularPreviewPaneProps) {
   const [headerRowDraft, setHeaderRowDraft] = useState(String(settings.headerRow))
   const depthColIndex = depthColumn != null && preview ? preview.columns.indexOf(depthColumn) : -1
+  const depthReferenceColIndex = depthReferenceColumn != null && preview ? preview.columns.indexOf(depthReferenceColumn) : -1
+  const showDepthReference = depthReferenceColIndex >= 0 && onDepthReferenceChange != null
   const showMapping = fields != null && mapping != null && onMappingChange != null && preview != null
+  const ignoredColumnSet = new Set(ignoredColumns)
+  const usesExplicitColumnRoles = onIgnoredColumnChange != null
   const showCurveTypes = curveTypes != null && onCurveTypeChange != null && preview != null
   const missingRequired = showMapping ? fields.filter((f) => f.required && !mapping[f.id]) : []
 
@@ -65,6 +84,18 @@ export function TabularPreviewPane({
       return
     }
     onSettingsChange({ headerRow: Math.max(0, Math.trunc(parsed)) })
+  }
+
+  const handleColumnRoleChange = (col: string, nextRole: string) => {
+    if (!mapping || !onMappingChange) return
+    const prevFieldId = Object.entries(mapping).find(([, v]) => v === col)?.[0]
+    if (prevFieldId) onMappingChange(prevFieldId, null)
+    if (usesExplicitColumnRoles) {
+      onIgnoredColumnChange?.(col, nextRole === IGNORE_COLUMN_ROLE)
+    }
+    if (nextRole && nextRole !== IGNORE_COLUMN_ROLE && nextRole !== USER_COLUMN_ROLE) {
+      onMappingChange(nextRole, col)
+    }
   }
 
   return (
@@ -128,18 +159,29 @@ export function TabularPreviewPane({
                   <th className="import-preview__row-num" />
                   {preview.columns.map((col, colIdx) => {
                     const assignedFieldId = Object.entries(mapping).find(([, v]) => v === col)?.[0] ?? ''
+                    const availableUserColumnLabels = userColumnLabels ?? unmappedColumnLabels
+                    const canUseAsUserAttribute = availableUserColumnLabels[col] != null
+                    const selectedRole = usesExplicitColumnRoles
+                      ? assignedFieldId || (ignoredColumnSet.has(col) || !canUseAsUserAttribute ? IGNORE_COLUMN_ROLE : USER_COLUMN_ROLE)
+                      : assignedFieldId
                     return (
                       <th key={colIdx}>
                         <select
-                          value={assignedFieldId}
-                          onChange={(e) => {
-                            const nextFieldId = e.target.value
-                            const prevFieldId = Object.entries(mapping).find(([, v]) => v === col)?.[0]
-                            if (prevFieldId) onMappingChange(prevFieldId, null)
-                            if (nextFieldId) onMappingChange(nextFieldId, col)
-                          }}
+                          value={selectedRole}
+                          onChange={(e) => handleColumnRoleChange(col, e.target.value)}
                         >
-                          <option value="">{unmappedColumnLabels[col] ?? '—'}</option>
+                          {usesExplicitColumnRoles ? (
+                            <>
+                              <option value={IGNORE_COLUMN_ROLE}>-</option>
+                              {canUseAsUserAttribute ? (
+                                <option value={USER_COLUMN_ROLE}>
+                                  {unmappedColumnMode === 'user-attribute' ? 'user' : availableUserColumnLabels[col]}
+                                </option>
+                              ) : null}
+                            </>
+                          ) : (
+                            <option value="">{unmappedColumnLabels[col] ?? '—'}</option>
+                          )}
                           {fields.map((f) => (
                             <option key={f.id} value={f.id}>
                               {f.label}{f.required ? ' *' : ''}
@@ -159,7 +201,16 @@ export function TabularPreviewPane({
                     const isExcluded = curveTypeExcludedColumns.includes(col)
                     return (
                       <th key={colIdx} className={isDepth ? 'import-preview__col--depth' : undefined}>
-                        {isDepth || isExcluded ? null : (
+                        {showDepthReference && colIdx === depthReferenceColIndex ? (
+                          <select
+                            value={depthReference}
+                            onChange={(e) => onDepthReferenceChange(e.target.value as 'MD' | 'TVD' | 'TVDSS')}
+                          >
+                            <option value="MD">MD</option>
+                            <option value="TVD">TVD</option>
+                            <option value="TVDSS">TVDSS</option>
+                          </select>
+                        ) : isDepth || isExcluded ? null : (
                           <select
                             value={curveTypes[col] ?? 'continuous'}
                             onChange={(e) => onCurveTypeChange(col, e.target.value as CurveType)}

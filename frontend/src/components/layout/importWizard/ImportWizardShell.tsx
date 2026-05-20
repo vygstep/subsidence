@@ -14,6 +14,9 @@ export function ImportWizardShell({
   onSubmit,
   onStepChange,
   onBrowse,
+  hidePrimaryAction = false,
+  terminalCloseOnly = false,
+  beforeCancelAction,
   children,
 }: ImportWizardShellProps) {
   const finalStepIndex = steps.length - 1
@@ -67,15 +70,25 @@ export function ImportWizardShell({
         {error && <p className="project-dialog__error">{error}</p>}
 
         <div className="project-dialog__actions">
+          {!terminalCloseOnly && beforeCancelAction ? (
+            <button
+              type="button"
+              className="project-dialog__button"
+              disabled={isSubmitting || beforeCancelAction.disabled}
+              onClick={beforeCancelAction.onClick}
+            >
+              {beforeCancelAction.label}
+            </button>
+          ) : null}
           <button type="button" className="project-dialog__button" disabled={isSubmitting} onClick={onClose}>
-            Cancel
+            {terminalCloseOnly ? 'Close' : 'Cancel'}
           </button>
-          {currentStepIndex > 0 ? (
+          {!terminalCloseOnly && currentStepIndex > 0 ? (
             <button type="button" className="project-dialog__button" disabled={isSubmitting} onClick={goBack}>
               Back
             </button>
           ) : null}
-          {isFinalStep ? (
+          {terminalCloseOnly || hidePrimaryAction ? null : isFinalStep ? (
             <button
               type="submit"
               className="project-dialog__button project-dialog__button--primary"

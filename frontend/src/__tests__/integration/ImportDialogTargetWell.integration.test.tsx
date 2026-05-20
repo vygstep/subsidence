@@ -34,8 +34,22 @@ const LAS_PREVIEW_RESPONSE = {
   warnings: [],
 }
 
+const LAS_PREVIEW_WITH_CURVE = {
+  ...LAS_PREVIEW_RESPONSE,
+  curves: [
+    { mnemonic: 'DEPT', unit: 'M', description: 'Depth' },
+    { mnemonic: 'GR', unit: 'API', description: 'Gamma ray' },
+  ],
+}
+
 function mockFetch(lasResponse = LAS_PREVIEW_RESPONSE, tabularResponse = TABULAR_PREVIEW_RESPONSE) {
   vi.stubGlobal('fetch', vi.fn().mockImplementation((url: string) => {
+    if (url === '/api/projects/pick-files') {
+      return Promise.resolve({
+        ok: true,
+        json: async () => ({ paths: ['D:\\data\\imports\\selected-file.las'] }),
+      })
+    }
     if (url === '/api/projects/pick-file') {
       return Promise.resolve({
         ok: true,
@@ -188,6 +202,12 @@ describe('Import dialogs target active well by default', () => {
   it('adds tops import QC warnings to the notification store', async () => {
     const user = userEvent.setup()
     vi.stubGlobal('fetch', vi.fn().mockImplementation((url: string) => {
+      if (url === '/api/projects/pick-files') {
+        return Promise.resolve({
+          ok: true,
+          json: async () => ({ paths: ['D:\\data\\imports\\tops.csv'] }),
+        })
+      }
       if (url === '/api/projects/pick-file') {
         return Promise.resolve({
           ok: true,
@@ -231,5 +251,78 @@ describe('Import dialogs target active well by default', () => {
       ])
     })
     expect(useNotificationStore.getState().isQcPanelOpen).toBe(true)
+  })
+
+  it('imports selected log files sequentially and shows a summary', async () => {
+    const user = userEvent.setup()
+    const onSuccess = vi.fn()
+    const importCalls: string[] = []
+    const importBodies: Record<string, unknown>[] = []
+
+    vi.stubGlobal('fetch', vi.fn().mockImplementation((url: string, options?: RequestInit) => {
+      if (url === '/api/projects/pick-files') {
+        return Promise.resolve({
+          ok: true,
+          json: async () => ({ paths: ['D:\\data\\imports\\a.las', 'D:\\data\\imports\\b.csv'] }),
+        })
+      }
+      if (url === '/api/import-preview/las') {
+        return Promise.resolve({ ok: true, json: async () => LAS_PREVIEW_WITH_CURVE })
+      }
+      if (url === '/api/import-preview/tabular') {
+        return Promise.resolve({
+          ok: true,
+          json: async () => ({
+            columns: ['depth', 'GR'],
+            rows: [['100', '80'], ['200', '85']],
+            detected_delimiter: ',',
+            header_row: 0,
+            total_rows: 2,
+            warnings: [],
+          }),
+        })
+      }
+      if (url === '/api/projects/import-las' || url === '/api/projects/import-logs-csv') {
+        importCalls.push(url)
+        const body = JSON.parse(String(options?.body ?? '{}'))
+        importBodies.push(body)
+        return Promise.resolve({
+          ok: true,
+          json: async () => ({
+            well_id: body.csv_path ? 'well-csv' : 'well-las',
+            well_name: body.csv_path ? 'CSV Well' : 'LAS Well',
+            curve_count: 1,
+            qc_warnings: [],
+          }),
+        })
+      }
+      return Promise.resolve({ ok: true, json: async () => TABULAR_PREVIEW_RESPONSE })
+    }))
+
+    render(
+      <ImportLasDialog
+        wells={wells}
+        activeWellId="well-b"
+        onClose={vi.fn()}
+        onSuccess={onSuccess}
+      />,
+    )
+
+    await advanceToPreview(user)
+    expect(await screen.findByText(/File 1 of 2:/)).toBeTruthy()
+    expect(screen.getByText('MD')).toBeTruthy()
+
+    await user.click(screen.getByRole('button', { name: 'Load logs' }))
+    expect(await screen.findByText(/File 2 of 2:/)).toBeTruthy()
+
+    await user.click(screen.getByRole('button', { name: 'Load logs' }))
+    expect(await screen.findByText(/Imported 2 of 2 files/)).toBeTruthy()
+    expect(importCalls).toEqual(['/api/projects/import-las', '/api/projects/import-logs-csv'])
+    expect(importBodies[1]).toMatchObject({
+      depth_column: 'depth',
+      trusted_depth_reference: 'MD',
+    })
+    expect(onSuccess).toHaveBeenCalledWith('well-las')
+    expect(onSuccess).toHaveBeenCalledWith('well-csv')
   })
 })

@@ -119,6 +119,22 @@ async function readPickedPath(response: Response, fallback: string): Promise<str
   return payload.path ?? ''
 }
 
+async function readPickedPaths(response: Response, fallback: string): Promise<string[]> {
+  if (!response.ok) {
+    try {
+      const payload = (await response.json()) as { detail?: string }
+      throw new Error(payload.detail ?? fallback)
+    } catch (cause) {
+      if (cause instanceof Error) {
+        throw cause
+      }
+      throw new Error(fallback)
+    }
+  }
+  const payload = (await response.json()) as { paths?: string[] | null }
+  return payload.paths ?? []
+}
+
 export async function pickFile(initialPath: string, fileTypes: Array<[string, string]>): Promise<string> {
   const response = await fetch('/api/projects/pick-file', {
     method: 'POST',
@@ -129,6 +145,18 @@ export async function pickFile(initialPath: string, fileTypes: Array<[string, st
     } satisfies PickFileRequest),
   })
   return readPickedPath(response, `Failed to open file picker (${response.status})`)
+}
+
+export async function pickFiles(initialPath: string, fileTypes: Array<[string, string]>): Promise<string[]> {
+  const response = await fetch('/api/projects/pick-files', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      initial_path: initialPath || null,
+      file_types: fileTypes,
+    } satisfies PickFileRequest),
+  })
+  return readPickedPaths(response, `Failed to open file picker (${response.status})`)
 }
 
 export async function pickFolder(initialPath: string): Promise<string> {

@@ -189,12 +189,13 @@ def import_deviation_csv(
     csv_path: Path | str,
     *,
     column_map: dict[str, str] | None = None,
+    ignored_columns: list[str] | None = None,
     create_new_well: bool = False,
 ) -> tuple[DeviationSurveyModel, list[str]]:
     path = Path(csv_path)
     fieldnames, rows = _read_csv_rows(path)
-    if column_map:
-        fieldnames, rows = _apply_column_map(fieldnames, rows, column_map)
+    if column_map or ignored_columns:
+        fieldnames, rows = _apply_column_map(fieldnames, rows, column_map or {}, ignored_columns)
     return _import_deviation_rows(
         session,
         project_path,
@@ -212,12 +213,13 @@ def import_deviation_csv_multi(
     csv_path: Path | str,
     *,
     column_map: dict[str, str] | None = None,
+    ignored_columns: list[str] | None = None,
     create_new_well: bool = False,
 ) -> tuple[list[DeviationSurveyModel], list[str], int]:
     path = Path(csv_path)
     fieldnames, rows = _read_csv_rows(path)
-    if column_map:
-        fieldnames, rows = _apply_column_map(fieldnames, rows, column_map)
+    if column_map or ignored_columns:
+        fieldnames, rows = _apply_column_map(fieldnames, rows, column_map or {}, ignored_columns)
     if not _has_multi_well_rows(rows):
         survey, warnings = _import_deviation_rows(
             session,

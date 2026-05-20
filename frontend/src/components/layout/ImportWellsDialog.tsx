@@ -7,23 +7,32 @@ import { recordOperation } from '@/utils/diagnostics'
 import {
   ImportWizardFileField,
   ImportWizardShell,
+  MultiFileCurrentFile,
+  MultiFileSummary,
   TabularPreviewPane,
   buildImportWizardSteps,
+  createMultiFileQueue,
   importWizardPresets,
+  nextPendingFileIndex,
   readImportError,
+  summarizeMultiFileQueue,
   useImportPreview,
 } from './importWizard'
+import type { MultiFileImportItem, MultiFileImportStatus } from './importWizard'
 import {
   WELLS_FIELDS,
   autoMap,
+  defaultIgnoredUnmappedColumns,
   isMappingValid,
+  preservedColumnLabels,
   preservedUnmappedColumnLabels,
   validateWellsMapping,
 } from './importWizard/mapping'
 import type { ColumnMapping } from './importWizard/mapping'
-import { getLastImportRoot, pickFile, rememberImportPath } from './pathMemory'
+import { getLastImportRoot, pickFiles, rememberImportPath } from './pathMemory'
 
 const STEP_LABELS = ['File', 'Preview']
+const SUMMARY_STEP_LABELS = ['File', 'Preview', 'Summary']
 
 interface ImportWellsDialogProps {
   onClose: () => void
@@ -40,6 +49,9 @@ export function ImportWellsDialog({ onClose, onSuccess }: ImportWellsDialogProps
   const addQcWarnings = useNotificationStore((state) => state.addQcWarnings)
   const [csvPath, setCsvPath] = useState(() => getLastImportRoot())
   const [mapping, setMapping] = useState<ColumnMapping>({})
+  const [ignoredColumns, setIgnoredColumns] = useState<Set<string>>(() => new Set())
+  const [fileQueue, setFileQueue] = useState<MultiFileImportItem[]>([])
+  const [currentFileIndex, setCurrentFileIndex] = useState(0)
   const [currentStepIndex, setCurrentStepIndex] = useState(0)
   const [error, setError] = useState<string | null>(null)
   const [isSubmitting, setIsSubmitting] = useState(false)
@@ -47,6 +59,10 @@ export function ImportWellsDialog({ onClose, onSuccess }: ImportWellsDialogProps
   const preset = importWizardPresets.wells
   const sourceIsValid = csvPath.trim().length > 0
   const isOnPreviewStep = currentStepIndex === 1
+  const isSummaryStep = currentStepIndex === 2
+  const isMultiFileRun = fileQueue.length > 1
+  const currentFile = isMultiFileRun ? fileQueue[currentFileIndex] : null
+  const queueSummary = summarizeMultiFileQueue(fileQueue)
 
   const { isLoading: previewLoading, error: previewError, tabularPreview, parserSettings, updateParserSettings } = useImportPreview(
     'tabular',
@@ -56,14 +72,38 @@ export function ImportWellsDialog({ onClose, onSuccess }: ImportWellsDialogProps
 
   useEffect(() => {
     if (tabularPreview) {
-      setMapping(autoMap(tabularPreview.columns, WELLS_FIELDS))
+      const nextMapping = autoMap(tabularPreview.columns, WELLS_FIELDS)
+      setMapping(nextMapping)
+      setIgnoredColumns(new Set(defaultIgnoredUnmappedColumns(tabularPreview, nextMapping)))
     }
   }, [tabularPreview])
 
+  const handleIgnoredColumnChange = (column: string, ignored: boolean) => {
+    setIgnoredColumns((prev) => {
+      const next = new Set(prev)
+      if (ignored) next.add(column)
+      else next.delete(column)
+      return next
+    })
+  }
+
   const mappingErrors = validateWellsMapping(mapping)
   const mappingOk = isMappingValid(mappingErrors)
-  const steps = buildImportWizardSteps(currentStepIndex, sourceIsValid, STEP_LABELS)
+  const steps = buildImportWizardSteps(currentStepIndex, sourceIsValid, isSummaryStep ? SUMMARY_STEP_LABELS : STEP_LABELS)
   const validationMessages = currentStepIndex === 0 && !sourceIsValid ? ['CSV path is required.'] : []
+
+  const applyCsvPath = (
+    nextPath: string,
+    options: { nextStepIndex?: number; preserveQueue?: boolean } = {},
+  ) => {
+    setCsvPath(nextPath)
+    setCurrentStepIndex(options.nextStepIndex ?? 0)
+    setMapping({})
+    if (!options.preserveQueue) {
+      setFileQueue([])
+      setCurrentFileIndex(0)
+    }
+  }
 
   const handleSubmit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault()
@@ -88,6 +128,7 @@ export function ImportWellsDialog({ onClose, onSuccess }: ImportWellsDialogProps
           body: JSON.stringify({
             csv_path: nextPath,
             column_map: Object.keys(columnMap).length > 0 ? columnMap : null,
+            ignored_columns: Array.from(ignoredColumns),
           }),
         })
         if (!response.ok) {
@@ -98,6 +139,13 @@ export function ImportWellsDialog({ onClose, onSuccess }: ImportWellsDialogProps
         rememberImportPath(nextPath)
         const warnings = payload.qc_warnings ?? []
         await onSuccess(payload.well_id)
+        if (isMultiFileRun) {
+          advanceMultiFileQueue('imported')
+          if (warnings.length > 0) {
+            addQcWarnings(warnings)
+          }
+          return
+        }
         onClose()
         if (warnings.length > 0) {
           addQcWarnings(warnings)
@@ -108,18 +156,47 @@ export function ImportWellsDialog({ onClose, onSuccess }: ImportWellsDialogProps
         details: { inputPath: nextPath },
       })
     } catch (cause) {
-      setError(cause instanceof Error ? cause.message : 'Failed to import wells')
+      const message = cause instanceof Error ? cause.message : 'Failed to import wells'
+      if (isMultiFileRun) {
+        advanceMultiFileQueue('failed', message)
+      } else {
+        setError(message)
+      }
     } finally {
       setIsSubmitting(false)
     }
   }
 
+  const advanceMultiFileQueue = (status: MultiFileImportStatus, message?: string) => {
+    setFileQueue((prev) => {
+      const updated = prev.map((item, index) => (
+        index === currentFileIndex ? { ...item, status, message } : item
+      ))
+      const nextIndex = nextPendingFileIndex(updated, currentFileIndex)
+      if (nextIndex >= 0) {
+        setCurrentFileIndex(nextIndex)
+        applyCsvPath(updated[nextIndex].path, { nextStepIndex: 1, preserveQueue: true })
+      } else {
+        setCurrentStepIndex(2)
+      }
+      return updated
+    })
+  }
+
+  const handleSkipCurrentFile = () => {
+    if (!isMultiFileRun) return
+    advanceMultiFileQueue('skipped', 'Skipped by user')
+  }
+
   const handleBrowse = async () => {
     setError(null)
     try {
-      const picked = await pickFile(csvPath || lastImportRoot, preset.acceptedFileFilters)
-      if (picked) {
-        setCsvPath(picked)
+      const picked = await pickFiles(csvPath || lastImportRoot, preset.acceptedFileFilters)
+      const queue = createMultiFileQueue(picked)
+      if (queue.length > 0) {
+        setFileQueue(queue.length > 1 ? queue : [])
+        setCurrentFileIndex(0)
+        applyCsvPath(queue[0].path, { nextStepIndex: 1, preserveQueue: queue.length > 1 })
         setCurrentStepIndex(1)
       }
     } catch (cause) {
@@ -138,6 +215,12 @@ export function ImportWellsDialog({ onClose, onSuccess }: ImportWellsDialogProps
       canAdvance={sourceIsValid}
       canSubmit={sourceIsValid && mappingOk}
       validationMessages={validationMessages}
+      hidePrimaryAction={isSummaryStep}
+      terminalCloseOnly={isSummaryStep}
+      beforeCancelAction={isMultiFileRun && !isSummaryStep ? {
+        label: 'Skip this file',
+        onClick: handleSkipCurrentFile,
+      } : undefined}
       onClose={onClose}
       onSubmit={handleSubmit}
       onStepChange={setCurrentStepIndex}
@@ -153,17 +236,29 @@ export function ImportWellsDialog({ onClose, onSuccess }: ImportWellsDialogProps
       ) : null}
 
       {currentStepIndex === 1 ? (
-        <TabularPreviewPane
-          isLoading={previewLoading}
-          error={previewError}
-          preview={tabularPreview}
-          settings={parserSettings}
-          onSettingsChange={updateParserSettings}
-          fields={WELLS_FIELDS}
-          mapping={mapping}
-          unmappedColumnLabels={preservedUnmappedColumnLabels(tabularPreview, mapping)}
-          onMappingChange={(fieldId, col) => setMapping((prev) => ({ ...prev, [fieldId]: col }))}
-        />
+        <>
+          {isMultiFileRun ? (
+            <MultiFileCurrentFile currentIndex={currentFileIndex} total={fileQueue.length} path={currentFile?.path ?? csvPath} />
+          ) : null}
+          <TabularPreviewPane
+            isLoading={previewLoading}
+            error={previewError}
+            preview={tabularPreview}
+            settings={parserSettings}
+            onSettingsChange={updateParserSettings}
+            fields={WELLS_FIELDS}
+            mapping={mapping}
+            unmappedColumnLabels={preservedUnmappedColumnLabels(tabularPreview, mapping)}
+            userColumnLabels={preservedColumnLabels(tabularPreview)}
+            unmappedColumnMode="user-attribute"
+            ignoredColumns={Array.from(ignoredColumns)}
+            onIgnoredColumnChange={handleIgnoredColumnChange}
+            onMappingChange={(fieldId, col) => setMapping((prev) => ({ ...prev, [fieldId]: col }))}
+          />
+        </>
+      ) : null}
+      {isSummaryStep ? (
+        <MultiFileSummary queue={fileQueue} summary={queueSummary} />
       ) : null}
     </ImportWizardShell>
   )

@@ -10,24 +10,33 @@ import {
   ImportWizardFileField,
   ImportWizardTargetWellSelect,
   IMPORT_WIZARD_CREATE_NEW_WELL,
+  MultiFileCurrentFile,
+  MultiFileSummary,
   TabularPreviewPane,
   buildImportWizardSteps,
+  createMultiFileQueue,
   distinctMappedValues,
   importWizardPresets,
+  nextPendingFileIndex,
   readImportError,
+  summarizeMultiFileQueue,
   useImportPreview,
 } from './importWizard'
+import type { MultiFileImportItem, MultiFileImportStatus } from './importWizard'
 import {
   TOPS_FIELDS,
   autoMap,
+  defaultIgnoredUnmappedColumns,
   isMappingValid,
+  preservedColumnLabels,
   preservedUnmappedColumnLabels,
   validateTopsMapping,
 } from './importWizard/mapping'
 import type { ColumnMapping } from './importWizard/mapping'
-import { getLastImportRoot, pickFile, rememberImportPath } from './pathMemory'
+import { getLastImportRoot, pickFiles, rememberImportPath } from './pathMemory'
 
 const STEP_LABELS = ['File', 'Preview']
+const SUMMARY_STEP_LABELS = ['File', 'Preview', 'Summary']
 
 interface WellOption {
   well_id: string
@@ -74,6 +83,9 @@ export function ImportTopsDialog({ wells, activeWellId, onClose, onSuccess }: Im
   const [depthRef, setDepthRef] = useState<'MD' | 'TVD' | 'TVDSS'>('MD')
   const [depthUnit, setDepthUnit] = useState<'m' | 'ft' | 'km'>('m')
   const [mapping, setMapping] = useState<ColumnMapping>({})
+  const [ignoredColumns, setIgnoredColumns] = useState<Set<string>>(() => new Set())
+  const [fileQueue, setFileQueue] = useState<MultiFileImportItem[]>([])
+  const [currentFileIndex, setCurrentFileIndex] = useState(0)
   const [currentStepIndex, setCurrentStepIndex] = useState(0)
   const [error, setError] = useState<string | null>(null)
   const [isSubmitting, setIsSubmitting] = useState(false)
@@ -81,6 +93,10 @@ export function ImportTopsDialog({ wells, activeWellId, onClose, onSuccess }: Im
   const preset = importWizardPresets.tops
   const sourceIsValid = csvPath.trim().length > 0
   const isOnPreviewStep = currentStepIndex === 1
+  const isSummaryStep = currentStepIndex === 2
+  const isMultiFileRun = fileQueue.length > 1
+  const currentFile = isMultiFileRun ? fileQueue[currentFileIndex] : null
+  const queueSummary = summarizeMultiFileQueue(fileQueue)
 
   const { isLoading: previewLoading, error: previewError, tabularPreview, parserSettings, updateParserSettings } = useImportPreview(
     'tabular',
@@ -90,9 +106,20 @@ export function ImportTopsDialog({ wells, activeWellId, onClose, onSuccess }: Im
 
   useEffect(() => {
     if (tabularPreview) {
-      setMapping(autoMap(tabularPreview.columns, TOPS_FIELDS))
+      const nextMapping = autoMap(tabularPreview.columns, TOPS_FIELDS)
+      setMapping(nextMapping)
+      setIgnoredColumns(new Set(defaultIgnoredUnmappedColumns(tabularPreview, nextMapping)))
     }
   }, [tabularPreview])
+
+  const handleIgnoredColumnChange = (column: string, ignored: boolean) => {
+    setIgnoredColumns((prev) => {
+      const next = new Set(prev)
+      if (ignored) next.add(column)
+      else next.delete(column)
+      return next
+    })
+  }
 
   useEffect(() => {
     setZoneSetName(fileBaseName(csvPath))
@@ -128,8 +155,27 @@ export function ImportTopsDialog({ wells, activeWellId, onClose, onSuccess }: Im
   const mappingOk = isMappingValid(mappingErrors)
   const zoneSetOk = zoneSetPolicy !== 'existing' || zoneSetId.length > 0
 
-  const steps = buildImportWizardSteps(currentStepIndex, sourceIsValid, STEP_LABELS)
+  const steps = buildImportWizardSteps(currentStepIndex, sourceIsValid, isSummaryStep ? SUMMARY_STEP_LABELS : STEP_LABELS)
   const validationMessages = currentStepIndex === 0 && !sourceIsValid ? ['CSV path is required.'] : []
+
+  const resetPreviewState = () => {
+    setMapping({})
+    setWellPolicy('override')
+    setWellId(activeWellId ?? '')
+  }
+
+  const applyCsvPath = (
+    nextPath: string,
+    options: { nextStepIndex?: number; preserveQueue?: boolean } = {},
+  ) => {
+    setCsvPath(nextPath)
+    setCurrentStepIndex(options.nextStepIndex ?? 0)
+    resetPreviewState()
+    if (!options.preserveQueue) {
+      setFileQueue([])
+      setCurrentFileIndex(0)
+    }
+  }
 
   const handleSubmit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault()
@@ -162,6 +208,7 @@ export function ImportTopsDialog({ wells, activeWellId, onClose, onSuccess }: Im
             create_new_well: createNewWell,
             multi_well: isMultiWell,
             column_map: Object.keys(columnMap).length > 0 ? columnMap : null,
+            ignored_columns: Array.from(ignoredColumns),
             zone_set_id: zoneSetPolicy === 'existing' ? Number(zoneSetId) : null,
             create_zone_set: zoneSetPolicy === 'create',
             zone_set_name: zoneSetPolicy === 'create' ? (zoneSetName.trim() || null) : null,
@@ -178,6 +225,10 @@ export function ImportTopsDialog({ wells, activeWellId, onClose, onSuccess }: Im
           addQcWarnings(warnings)
         }
         await onSuccess(payload.well_id)
+        if (isMultiFileRun) {
+          advanceMultiFileQueue('imported')
+          return
+        }
         onClose()
       }, {
         projectPath,
@@ -185,18 +236,47 @@ export function ImportTopsDialog({ wells, activeWellId, onClose, onSuccess }: Im
         details: { inputPath: nextPath, depthRef, depthUnit, zoneSetPolicy, createNewWell },
       })
     } catch (cause) {
-      setError(cause instanceof Error ? cause.message : 'Failed to import tops')
+      const message = cause instanceof Error ? cause.message : 'Failed to import tops'
+      if (isMultiFileRun) {
+        advanceMultiFileQueue('failed', message)
+      } else {
+        setError(message)
+      }
     } finally {
       setIsSubmitting(false)
     }
   }
 
+  const advanceMultiFileQueue = (status: MultiFileImportStatus, message?: string) => {
+    setFileQueue((prev) => {
+      const updated = prev.map((item, index) => (
+        index === currentFileIndex ? { ...item, status, message } : item
+      ))
+      const nextIndex = nextPendingFileIndex(updated, currentFileIndex)
+      if (nextIndex >= 0) {
+        setCurrentFileIndex(nextIndex)
+        applyCsvPath(updated[nextIndex].path, { nextStepIndex: 1, preserveQueue: true })
+      } else {
+        setCurrentStepIndex(2)
+      }
+      return updated
+    })
+  }
+
+  const handleSkipCurrentFile = () => {
+    if (!isMultiFileRun) return
+    advanceMultiFileQueue('skipped', 'Skipped by user')
+  }
+
   const handleBrowse = async () => {
     setError(null)
     try {
-      const picked = await pickFile(csvPath || lastImportRoot, preset.acceptedFileFilters)
-      if (picked) {
-        setCsvPath(picked)
+      const picked = await pickFiles(csvPath || lastImportRoot, preset.acceptedFileFilters)
+      const queue = createMultiFileQueue(picked)
+      if (queue.length > 0) {
+        setFileQueue(queue.length > 1 ? queue : [])
+        setCurrentFileIndex(0)
+        applyCsvPath(queue[0].path, { nextStepIndex: 1, preserveQueue: queue.length > 1 })
         setCurrentStepIndex(1)
       }
     } catch (cause) {
@@ -215,6 +295,12 @@ export function ImportTopsDialog({ wells, activeWellId, onClose, onSuccess }: Im
       canAdvance={sourceIsValid}
       canSubmit={sourceIsValid && mappingOk && zoneSetOk}
       validationMessages={validationMessages}
+      hidePrimaryAction={isSummaryStep}
+      terminalCloseOnly={isSummaryStep}
+      beforeCancelAction={isMultiFileRun && !isSummaryStep ? {
+        label: 'Skip this file',
+        onClick: handleSkipCurrentFile,
+      } : undefined}
       onClose={onClose}
       onSubmit={handleSubmit}
       onStepChange={setCurrentStepIndex}
@@ -231,6 +317,9 @@ export function ImportTopsDialog({ wells, activeWellId, onClose, onSuccess }: Im
 
       {currentStepIndex === 1 ? (
         <>
+          {isMultiFileRun ? (
+            <MultiFileCurrentFile currentIndex={currentFileIndex} total={fileQueue.length} path={currentFile?.path ?? csvPath} />
+          ) : null}
           <TabularPreviewPane
             isLoading={previewLoading}
             error={previewError}
@@ -240,6 +329,10 @@ export function ImportTopsDialog({ wells, activeWellId, onClose, onSuccess }: Im
             fields={TOPS_FIELDS}
             mapping={mapping}
             unmappedColumnLabels={preservedUnmappedColumnLabels(tabularPreview, mapping)}
+            userColumnLabels={preservedColumnLabels(tabularPreview)}
+            unmappedColumnMode="user-attribute"
+            ignoredColumns={Array.from(ignoredColumns)}
+            onIgnoredColumnChange={handleIgnoredColumnChange}
             onMappingChange={(fieldId, col) => setMapping((prev) => ({ ...prev, [fieldId]: col }))}
           />
 
@@ -324,6 +417,9 @@ export function ImportTopsDialog({ wells, activeWellId, onClose, onSuccess }: Im
             </div>
           )}
         </>
+      ) : null}
+      {isSummaryStep ? (
+        <MultiFileSummary queue={fileQueue} summary={queueSummary} />
       ) : null}
     </ImportWizardShell>
   )

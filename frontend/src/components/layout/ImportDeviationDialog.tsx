@@ -9,24 +9,33 @@ import {
   ImportWizardFileField,
   ImportWizardTargetWellSelect,
   IMPORT_WIZARD_CREATE_NEW_WELL,
+  MultiFileCurrentFile,
+  MultiFileSummary,
   TabularPreviewPane,
   buildImportWizardSteps,
+  createMultiFileQueue,
   distinctMappedValues,
   importWizardPresets,
+  nextPendingFileIndex,
   readImportError,
+  summarizeMultiFileQueue,
   useImportPreview,
 } from './importWizard'
+import type { MultiFileImportItem, MultiFileImportStatus } from './importWizard'
 import {
   DEVIATION_FIELDS,
   autoMap,
+  defaultIgnoredUnmappedColumns,
   isMappingValid,
+  preservedColumnLabels,
   preservedUnmappedColumnLabels,
   validateDeviationMapping,
 } from './importWizard/mapping'
 import type { ColumnMapping } from './importWizard/mapping'
-import { getLastImportRoot, pickFile, rememberImportPath } from './pathMemory'
+import { getLastImportRoot, pickFiles, rememberImportPath } from './pathMemory'
 
 const STEP_LABELS = ['File', 'Preview']
+const SUMMARY_STEP_LABELS = ['File', 'Preview', 'Summary']
 
 interface WellOption {
   well_id: string
@@ -52,6 +61,9 @@ export function ImportDeviationDialog({ wells, activeWellId, onClose, onSuccess 
   const [csvPath, setCsvPath] = useState(() => getLastImportRoot())
   const [depthUnit, setDepthUnit] = useState<'m' | 'ft' | 'km'>('m')
   const [mapping, setMapping] = useState<ColumnMapping>({})
+  const [ignoredColumns, setIgnoredColumns] = useState<Set<string>>(() => new Set())
+  const [fileQueue, setFileQueue] = useState<MultiFileImportItem[]>([])
+  const [currentFileIndex, setCurrentFileIndex] = useState(0)
   const [currentStepIndex, setCurrentStepIndex] = useState(0)
   const [error, setError] = useState<string | null>(null)
   const [isSubmitting, setIsSubmitting] = useState(false)
@@ -59,6 +71,10 @@ export function ImportDeviationDialog({ wells, activeWellId, onClose, onSuccess 
   const preset = importWizardPresets.deviation
   const sourceIsValid = csvPath.trim().length > 0
   const isOnPreviewStep = currentStepIndex === 1
+  const isSummaryStep = currentStepIndex === 2
+  const isMultiFileRun = fileQueue.length > 1
+  const currentFile = isMultiFileRun ? fileQueue[currentFileIndex] : null
+  const queueSummary = summarizeMultiFileQueue(fileQueue)
 
   const { isLoading: previewLoading, error: previewError, tabularPreview, parserSettings, updateParserSettings } = useImportPreview(
     'tabular',
@@ -68,9 +84,20 @@ export function ImportDeviationDialog({ wells, activeWellId, onClose, onSuccess 
 
   useEffect(() => {
     if (tabularPreview) {
-      setMapping(autoMap(tabularPreview.columns, DEVIATION_FIELDS))
+      const nextMapping = autoMap(tabularPreview.columns, DEVIATION_FIELDS)
+      setMapping(nextMapping)
+      setIgnoredColumns(new Set(defaultIgnoredUnmappedColumns(tabularPreview, nextMapping, { numericOnly: true })))
     }
   }, [tabularPreview])
+
+  const handleIgnoredColumnChange = (column: string, ignored: boolean) => {
+    setIgnoredColumns((prev) => {
+      const next = new Set(prev)
+      if (ignored) next.add(column)
+      else next.delete(column)
+      return next
+    })
+  }
 
   const mappingErrors = validateDeviationMapping(mapping)
   const mappingOk = isMappingValid(mappingErrors)
@@ -81,8 +108,26 @@ export function ImportDeviationDialog({ wells, activeWellId, onClose, onSuccess 
     setWellSelection(fileWellNames.length > 0 ? '' : (activeWellId ?? ''))
   }, [activeWellId, fileWellNames.length])
 
-  const steps = buildImportWizardSteps(currentStepIndex, sourceIsValid, STEP_LABELS)
+  const steps = buildImportWizardSteps(currentStepIndex, sourceIsValid, isSummaryStep ? SUMMARY_STEP_LABELS : STEP_LABELS)
   const validationMessages = currentStepIndex === 0 && !sourceIsValid ? ['CSV path is required.'] : []
+
+  const resetPreviewState = () => {
+    setMapping({})
+    setWellSelection(activeWellId ?? '')
+  }
+
+  const applyCsvPath = (
+    nextPath: string,
+    options: { nextStepIndex?: number; preserveQueue?: boolean } = {},
+  ) => {
+    setCsvPath(nextPath)
+    setCurrentStepIndex(options.nextStepIndex ?? 0)
+    resetPreviewState()
+    if (!options.preserveQueue) {
+      setFileQueue([])
+      setCurrentFileIndex(0)
+    }
+  }
 
   const handleSubmit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault()
@@ -113,6 +158,7 @@ export function ImportDeviationDialog({ wells, activeWellId, onClose, onSuccess 
             create_new_well: createNewWell,
             multi_well: isMultiWell,
             column_map: Object.keys(columnMap).length > 0 ? columnMap : null,
+            ignored_columns: Array.from(ignoredColumns),
           }),
         })
         if (!response.ok) {
@@ -123,6 +169,10 @@ export function ImportDeviationDialog({ wells, activeWellId, onClose, onSuccess 
         rememberImportPath(nextPath)
         const warnings = payload.qc_warnings ?? []
         await onSuccess(payload.well_id)
+        if (isMultiFileRun) {
+          advanceMultiFileQueue('imported')
+          return
+        }
         onClose()
         if (warnings.length > 0) {
           addQcWarnings(warnings)
@@ -133,18 +183,47 @@ export function ImportDeviationDialog({ wells, activeWellId, onClose, onSuccess 
         details: { inputPath: nextPath, depthUnit, createNewWell },
       })
     } catch (cause) {
-      setError(cause instanceof Error ? cause.message : 'Failed to import deviation')
+      const message = cause instanceof Error ? cause.message : 'Failed to import deviation'
+      if (isMultiFileRun) {
+        advanceMultiFileQueue('failed', message)
+      } else {
+        setError(message)
+      }
     } finally {
       setIsSubmitting(false)
     }
   }
 
+  const advanceMultiFileQueue = (status: MultiFileImportStatus, message?: string) => {
+    setFileQueue((prev) => {
+      const updated = prev.map((item, index) => (
+        index === currentFileIndex ? { ...item, status, message } : item
+      ))
+      const nextIndex = nextPendingFileIndex(updated, currentFileIndex)
+      if (nextIndex >= 0) {
+        setCurrentFileIndex(nextIndex)
+        applyCsvPath(updated[nextIndex].path, { nextStepIndex: 1, preserveQueue: true })
+      } else {
+        setCurrentStepIndex(2)
+      }
+      return updated
+    })
+  }
+
+  const handleSkipCurrentFile = () => {
+    if (!isMultiFileRun) return
+    advanceMultiFileQueue('skipped', 'Skipped by user')
+  }
+
   const handleBrowse = async () => {
     setError(null)
     try {
-      const picked = await pickFile(csvPath || lastImportRoot, preset.acceptedFileFilters)
-      if (picked) {
-        setCsvPath(picked)
+      const picked = await pickFiles(csvPath || lastImportRoot, preset.acceptedFileFilters)
+      const queue = createMultiFileQueue(picked)
+      if (queue.length > 0) {
+        setFileQueue(queue.length > 1 ? queue : [])
+        setCurrentFileIndex(0)
+        applyCsvPath(queue[0].path, { nextStepIndex: 1, preserveQueue: queue.length > 1 })
         setCurrentStepIndex(1)
       }
     } catch (cause) {
@@ -163,6 +242,12 @@ export function ImportDeviationDialog({ wells, activeWellId, onClose, onSuccess 
       canAdvance={sourceIsValid}
       canSubmit={sourceIsValid && mappingOk}
       validationMessages={validationMessages}
+      hidePrimaryAction={isSummaryStep}
+      terminalCloseOnly={isSummaryStep}
+      beforeCancelAction={isMultiFileRun && !isSummaryStep ? {
+        label: 'Skip this file',
+        onClick: handleSkipCurrentFile,
+      } : undefined}
       onClose={onClose}
       onSubmit={handleSubmit}
       onStepChange={setCurrentStepIndex}
@@ -179,6 +264,9 @@ export function ImportDeviationDialog({ wells, activeWellId, onClose, onSuccess 
 
       {currentStepIndex === 1 ? (
         <>
+          {isMultiFileRun ? (
+            <MultiFileCurrentFile currentIndex={currentFileIndex} total={fileQueue.length} path={currentFile?.path ?? csvPath} />
+          ) : null}
           <TabularPreviewPane
             isLoading={previewLoading}
             error={previewError}
@@ -188,6 +276,10 @@ export function ImportDeviationDialog({ wells, activeWellId, onClose, onSuccess 
             fields={DEVIATION_FIELDS}
             mapping={mapping}
             unmappedColumnLabels={preservedUnmappedColumnLabels(tabularPreview, mapping, { numericOnly: true })}
+            userColumnLabels={preservedColumnLabels(tabularPreview, { numericOnly: true })}
+            unmappedColumnMode="user-attribute"
+            ignoredColumns={Array.from(ignoredColumns)}
+            onIgnoredColumnChange={handleIgnoredColumnChange}
             onMappingChange={(fieldId, col) => setMapping((prev) => ({ ...prev, [fieldId]: col }))}
           />
 
@@ -217,6 +309,9 @@ export function ImportDeviationDialog({ wells, activeWellId, onClose, onSuccess 
             </div>
           )}
         </>
+      ) : null}
+      {isSummaryStep ? (
+        <MultiFileSummary queue={fileQueue} summary={queueSummary} />
       ) : null}
     </ImportWizardShell>
   )

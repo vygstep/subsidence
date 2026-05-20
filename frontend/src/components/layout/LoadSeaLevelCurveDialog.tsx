@@ -7,23 +7,32 @@ import { recordOperation } from '@/utils/diagnostics'
 import {
   ImportWizardFileField,
   ImportWizardShell,
+  MultiFileCurrentFile,
+  MultiFileSummary,
   TabularPreviewPane,
   buildImportWizardSteps,
+  createMultiFileQueue,
   importWizardPresets,
+  nextPendingFileIndex,
   readImportError,
+  summarizeMultiFileQueue,
   useImportPreview,
 } from './importWizard'
+import type { MultiFileImportItem, MultiFileImportStatus } from './importWizard'
 import {
   SEA_LEVEL_CURVE_FIELDS,
   autoMap,
+  defaultIgnoredUnmappedColumns,
   isMappingValid,
+  preservedColumnLabels,
   preservedUnmappedColumnLabels,
   validateSeaLevelCurveMapping,
 } from './importWizard/mapping'
 import type { ColumnMapping } from './importWizard/mapping'
-import { getLastImportRoot, pickFile, rememberImportPath } from './pathMemory'
+import { getLastImportRoot, pickFiles, rememberImportPath } from './pathMemory'
 
 const STEP_LABELS = ['File', 'Preview']
+const SUMMARY_STEP_LABELS = ['File', 'Preview', 'Summary']
 
 interface LoadSeaLevelCurveDialogProps {
   onClose: () => void
@@ -43,6 +52,9 @@ export function LoadSeaLevelCurveDialog({ onClose, onSuccess }: LoadSeaLevelCurv
   const [curveName, setCurveName] = useState('')
   const [curveNameEdited, setCurveNameEdited] = useState(false)
   const [mapping, setMapping] = useState<ColumnMapping>({})
+  const [ignoredColumns, setIgnoredColumns] = useState<Set<string>>(() => new Set())
+  const [fileQueue, setFileQueue] = useState<MultiFileImportItem[]>([])
+  const [currentFileIndex, setCurrentFileIndex] = useState(0)
   const [currentStepIndex, setCurrentStepIndex] = useState(0)
   const [error, setError] = useState<string | null>(null)
   const [isSubmitting, setIsSubmitting] = useState(false)
@@ -51,6 +63,10 @@ export function LoadSeaLevelCurveDialog({ onClose, onSuccess }: LoadSeaLevelCurv
   const sourceIsValid = csvPath.trim().length > 0
   const curveNameIsValid = curveName.trim().length > 0
   const isOnPreviewStep = currentStepIndex === 1
+  const isSummaryStep = currentStepIndex === 2
+  const isMultiFileRun = fileQueue.length > 1
+  const currentFile = isMultiFileRun ? fileQueue[currentFileIndex] : null
+  const queueSummary = summarizeMultiFileQueue(fileQueue)
 
   const { isLoading: previewLoading, error: previewError, tabularPreview, parserSettings, updateParserSettings } = useImportPreview(
     'tabular',
@@ -66,17 +82,43 @@ export function LoadSeaLevelCurveDialog({ onClose, onSuccess }: LoadSeaLevelCurv
 
   useEffect(() => {
     if (tabularPreview) {
-      setMapping(autoMap(tabularPreview.columns, SEA_LEVEL_CURVE_FIELDS))
+      const nextMapping = autoMap(tabularPreview.columns, SEA_LEVEL_CURVE_FIELDS)
+      setMapping(nextMapping)
+      setIgnoredColumns(new Set(defaultIgnoredUnmappedColumns(tabularPreview, nextMapping)))
     }
   }, [tabularPreview])
 
+  const handleIgnoredColumnChange = (column: string, ignored: boolean) => {
+    setIgnoredColumns((prev) => {
+      const next = new Set(prev)
+      if (ignored) next.add(column)
+      else next.delete(column)
+      return next
+    })
+  }
+
   const mappingErrors = validateSeaLevelCurveMapping(mapping)
   const mappingOk = isMappingValid(mappingErrors)
-  const steps = buildImportWizardSteps(currentStepIndex, sourceIsValid, STEP_LABELS)
+  const steps = buildImportWizardSteps(currentStepIndex, sourceIsValid, isSummaryStep ? SUMMARY_STEP_LABELS : STEP_LABELS)
   const validationMessages = [
     ...(currentStepIndex === 0 && !sourceIsValid ? ['CSV path is required.'] : []),
     ...(currentStepIndex === 1 && !curveNameIsValid ? ['Curve name is required.'] : []),
   ]
+
+  const applyCsvPath = (
+    nextPath: string,
+    options: { nextStepIndex?: number; preserveQueue?: boolean } = {},
+  ) => {
+    setCsvPath(nextPath)
+    setCurrentStepIndex(options.nextStepIndex ?? 0)
+    setMapping({})
+    setCurveNameEdited(false)
+    setCurveName(defaultCurveName(nextPath))
+    if (!options.preserveQueue) {
+      setFileQueue([])
+      setCurrentFileIndex(0)
+    }
+  }
 
   const handleSubmit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault()
@@ -107,6 +149,7 @@ export function LoadSeaLevelCurveDialog({ onClose, onSuccess }: LoadSeaLevelCurv
             csv_path: nextPath,
             curve_name: nextName,
             column_map: columnMap,
+            ignored_columns: Array.from(ignoredColumns),
             delimiter: parserSettings.delimiter,
             header_row: parserSettings.headerRow,
           }),
@@ -117,21 +160,54 @@ export function LoadSeaLevelCurveDialog({ onClose, onSuccess }: LoadSeaLevelCurv
         const payload = (await response.json()) as { curve_id: number; point_count: number }
         rememberImportPath(nextPath)
         onSuccess(payload.point_count)
+        if (isMultiFileRun) {
+          advanceMultiFileQueue('imported')
+          return
+        }
         onClose()
       }, { projectPath, details: { inputPath: nextPath } })
     } catch (cause) {
-      setError(cause instanceof Error ? cause.message : 'Import failed')
+      const message = cause instanceof Error ? cause.message : 'Import failed'
+      if (isMultiFileRun) {
+        advanceMultiFileQueue('failed', message)
+      } else {
+        setError(message)
+      }
     } finally {
       setIsSubmitting(false)
     }
   }
 
+  const advanceMultiFileQueue = (status: MultiFileImportStatus, message?: string) => {
+    setFileQueue((prev) => {
+      const updated = prev.map((item, index) => (
+        index === currentFileIndex ? { ...item, status, message } : item
+      ))
+      const nextIndex = nextPendingFileIndex(updated, currentFileIndex)
+      if (nextIndex >= 0) {
+        setCurrentFileIndex(nextIndex)
+        applyCsvPath(updated[nextIndex].path, { nextStepIndex: 1, preserveQueue: true })
+      } else {
+        setCurrentStepIndex(2)
+      }
+      return updated
+    })
+  }
+
+  const handleSkipCurrentFile = () => {
+    if (!isMultiFileRun) return
+    advanceMultiFileQueue('skipped', 'Skipped by user')
+  }
+
   const handleBrowse = async () => {
     setError(null)
     try {
-      const picked = await pickFile(csvPath || lastImportRoot, preset.acceptedFileFilters)
-      if (picked) {
-        setCsvPath(picked)
+      const picked = await pickFiles(csvPath || lastImportRoot, preset.acceptedFileFilters)
+      const queue = createMultiFileQueue(picked)
+      if (queue.length > 0) {
+        setFileQueue(queue.length > 1 ? queue : [])
+        setCurrentFileIndex(0)
+        applyCsvPath(queue[0].path, { nextStepIndex: 1, preserveQueue: queue.length > 1 })
         setCurrentStepIndex(1)
       }
     } catch (cause) {
@@ -150,6 +226,12 @@ export function LoadSeaLevelCurveDialog({ onClose, onSuccess }: LoadSeaLevelCurv
       canAdvance={sourceIsValid}
       canSubmit={sourceIsValid && curveNameIsValid && mappingOk}
       validationMessages={validationMessages}
+      hidePrimaryAction={isSummaryStep}
+      terminalCloseOnly={isSummaryStep}
+      beforeCancelAction={isMultiFileRun && !isSummaryStep ? {
+        label: 'Skip this file',
+        onClick: handleSkipCurrentFile,
+      } : undefined}
       onClose={onClose}
       onSubmit={handleSubmit}
       onStepChange={setCurrentStepIndex}
@@ -166,6 +248,9 @@ export function LoadSeaLevelCurveDialog({ onClose, onSuccess }: LoadSeaLevelCurv
 
       {currentStepIndex === 1 ? (
         <>
+          {isMultiFileRun ? (
+            <MultiFileCurrentFile currentIndex={currentFileIndex} total={fileQueue.length} path={currentFile?.path ?? csvPath} />
+          ) : null}
           <label className="project-dialog__field">
             <span>Curve name</span>
             <input
@@ -185,9 +270,16 @@ export function LoadSeaLevelCurveDialog({ onClose, onSuccess }: LoadSeaLevelCurv
             fields={SEA_LEVEL_CURVE_FIELDS}
             mapping={mapping}
             unmappedColumnLabels={preservedUnmappedColumnLabels(tabularPreview, mapping)}
+            userColumnLabels={preservedColumnLabels(tabularPreview)}
+            unmappedColumnMode="user-attribute"
+            ignoredColumns={Array.from(ignoredColumns)}
+            onIgnoredColumnChange={handleIgnoredColumnChange}
             onMappingChange={(fieldId, col) => setMapping((prev) => ({ ...prev, [fieldId]: col }))}
           />
         </>
+      ) : null}
+      {isSummaryStep ? (
+        <MultiFileSummary queue={fileQueue} summary={queueSummary} />
       ) : null}
     </ImportWizardShell>
   )

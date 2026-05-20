@@ -77,5 +77,12 @@ export interface ImportWizardShellProps {
   onSubmit: (event: FormEvent<HTMLFormElement>) => void
   onStepChange?: (stepIndex: number) => void
   onBrowse?: () => void
+  hidePrimaryAction?: boolean
+  terminalCloseOnly?: boolean
+  beforeCancelAction?: {
+    label: string
+    onClick: () => void
+    disabled?: boolean
+  }
   children: ReactNode
 }

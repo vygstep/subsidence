@@ -60,9 +60,17 @@ try:
                 initialdir=initial_dir or None,
                 filetypes=[tuple(item) for item in file_types] or [('All files', '*.*')],
             )
+        elif kind == 'files':
+            selected = list(filedialog.askopenfilenames(
+                initialdir=initial_dir or None,
+                filetypes=[tuple(item) for item in file_types] or [('All files', '*.*')],
+            ))
         else:
             raise ValueError(f'Unknown picker kind: {kind}')
-        print(json.dumps({'path': selected or None}))
+        if kind == 'files':
+            print(json.dumps({'paths': selected}))
+        else:
+            print(json.dumps({'path': selected or None}))
     finally:
         root.destroy()
 except Exception as exc:
@@ -124,6 +132,7 @@ class ImportTopsRequest(BaseModel):
     create_new_well: bool = False
     multi_well: bool = False
     column_map: dict[str, str] | None = None
+    ignored_columns: list[str] = []
     zone_set_id: int | None = None
     create_zone_set: bool = False
     zone_set_name: str | None = None
@@ -136,11 +145,13 @@ class ImportDeviationRequest(BaseModel):
     create_new_well: bool = False
     multi_well: bool = False
     column_map: dict[str, str] | None = None
+    ignored_columns: list[str] = []
 
 
 class ImportWellsRequest(BaseModel):
     csv_path: str
     column_map: dict[str, str] | None = None
+    ignored_columns: list[str] = []
 
 
 class CreateCheckpointRequest(BaseModel):
@@ -327,6 +338,10 @@ class PickPathResponse(BaseModel):
     path: str | None = None
 
 
+class PickPathsResponse(BaseModel):
+    paths: list[str] = []
+
+
 def _project_meta(session):
     meta = session.get(ProjectMeta, 1)
     if meta is None:
@@ -385,7 +400,7 @@ def _normalize_initial_dir(path: str | None) -> str | None:
     return None
 
 
-def _pick_path(kind: str, initial_dir: str | None, file_types: list[tuple[str, str]] | None = None) -> str | None:
+def _run_native_picker(kind: str, initial_dir: str | None, file_types: list[tuple[str, str]] | None = None) -> dict:
     """Run native Tk picker outside the API process.
 
     Tcl/Tk can crash a threaded FastAPI worker on Windows if a Tk root created
@@ -415,7 +430,20 @@ def _pick_path(kind: str, initial_dir: str | None, file_types: list[tuple[str, s
         raise RuntimeError(f'Native picker returned invalid output: {stdout}') from exc
     if payload.get('error'):
         raise RuntimeError(str(payload['error']))
+    return payload
+
+
+def _pick_path(kind: str, initial_dir: str | None, file_types: list[tuple[str, str]] | None = None) -> str | None:
+    payload = _run_native_picker(kind, initial_dir, file_types)
     return payload.get('path')
+
+
+def _pick_paths(kind: str, initial_dir: str | None, file_types: list[tuple[str, str]] | None = None) -> list[str]:
+    payload = _run_native_picker(kind, initial_dir, file_types)
+    paths = payload.get('paths') or []
+    if not isinstance(paths, list):
+        raise RuntimeError(f'Native picker returned invalid paths payload: {stdout}')
+    return [str(path) for path in paths if path]
 
 
 @router.post('', response_model=CreateProjectResponse)
@@ -551,6 +579,20 @@ def pick_file(payload: PickFileRequest, request: Request) -> PickPathResponse:
         raise HTTPException(status_code=500, detail=f'Failed to open file picker: {error}') from error
 
     return PickPathResponse(path=selected or None)
+
+
+@router.post('/pick-files', response_model=PickPathsResponse)
+def pick_files(payload: PickFileRequest, request: Request) -> PickPathsResponse:
+    _manager(request)
+    initial_dir = _normalize_initial_dir(payload.initial_path)
+    file_types = payload.file_types or [('All files', '*.*')]
+
+    try:
+        selected = _pick_paths('files', initial_dir, file_types)
+    except RuntimeError as error:
+        raise HTTPException(status_code=500, detail=f'Failed to open file picker: {error}') from error
+
+    return PickPathsResponse(paths=selected)
 
 
 @router.post('/close', response_model=CloseProjectResponse)

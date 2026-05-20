@@ -17,12 +17,7 @@ Implemented. Maintainer implementation notes are local-only and are not part of 
 
 ### 2. Multi-File Import
 
-- Support selecting and importing multiple files in one import workflow.
-- Decide per data type whether mapping is shared across files or configured per file.
-- Log imports should not require a manual LAS/CSV mode switch; file type should be detected from the selected file.
-- Multi-file log import should process files sequentially and show preview for the current file with the file name/path visible.
-- Show per-file success/error summary.
-- Keep this separate from the current multi-well CSV foundation.
+Moved to `docs/contracts/multi-file-import.md`.
 
 ### 3. Import Mapping UX
 

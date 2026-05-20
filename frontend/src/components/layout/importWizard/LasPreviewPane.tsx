@@ -5,11 +5,21 @@ interface LasPreviewPaneProps {
   isLoading: boolean
   error: string | null
   preview: LasPreviewResponse | null
+  depthReference?: 'MD' | 'TVD' | 'TVDSS'
+  onDepthReferenceChange?: (value: 'MD' | 'TVD' | 'TVDSS') => void
   curveTypes?: Record<string, CurveType>
   onCurveTypeChange?: (mnemonic: string, type: CurveType) => void
 }
 
-export function LasPreviewPane({ isLoading, error, preview, curveTypes, onCurveTypeChange }: LasPreviewPaneProps) {
+export function LasPreviewPane({
+  isLoading,
+  error,
+  preview,
+  depthReference = 'MD',
+  onDepthReferenceChange,
+  curveTypes,
+  onCurveTypeChange,
+}: LasPreviewPaneProps) {
   const showTypeColumn = curveTypes !== undefined && onCurveTypeChange !== undefined
 
   return (
@@ -80,7 +90,18 @@ export function LasPreviewPane({ isLoading, error, preview, curveTypes, onCurveT
                       {showTypeColumn && (
                         <td>
                           {idx === 0 ? (
-                            <span className="import-preview__depth-label">depth</span>
+                            onDepthReferenceChange ? (
+                              <select
+                                value={depthReference}
+                                onChange={(e) => onDepthReferenceChange(e.target.value as 'MD' | 'TVD' | 'TVDSS')}
+                              >
+                                <option value="MD">MD</option>
+                                <option value="TVD">TVD</option>
+                                <option value="TVDSS">TVDSS</option>
+                              </select>
+                            ) : (
+                              <span className="import-preview__depth-label">{depthReference}</span>
+                            )
                           ) : (
                             <select
                               value={curveTypes![curve.mnemonic] ?? 'continuous'}

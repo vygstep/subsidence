@@ -386,6 +386,7 @@ def import_tops_csv(
     depth_ref: str = 'MD',
     *,
     column_map: dict[str, str] | None = None,
+    ignored_columns: list[str] | None = None,
     strat_units_path: Path | str | None = None,
     strat_ranks_path: Path | str | None = None,
     create_new_well: bool = False,
@@ -393,8 +394,8 @@ def import_tops_csv(
 ) -> tuple[list[FormationTopModel], list[str]]:
     path = Path(csv_path)
     fieldnames, rows = _read_csv_rows(path)
-    if column_map:
-        fieldnames, rows = _apply_column_map(fieldnames, rows, column_map)
+    if column_map or ignored_columns:
+        fieldnames, rows = _apply_column_map(fieldnames, rows, column_map or {}, ignored_columns)
     return _import_tops_rows(
         session,
         well_id,
@@ -492,6 +493,7 @@ def import_tops_csv_multi(
     depth_ref: str = 'MD',
     *,
     column_map: dict[str, str] | None = None,
+    ignored_columns: list[str] | None = None,
     strat_units_path: Path | str | None = None,
     strat_ranks_path: Path | str | None = None,
     create_new_well: bool = False,
@@ -499,8 +501,8 @@ def import_tops_csv_multi(
 ) -> tuple[list[FormationTopModel], list[str], list[str], int]:
     path = Path(csv_path)
     fieldnames, rows = _read_csv_rows(path)
-    if column_map:
-        fieldnames, rows = _apply_column_map(fieldnames, rows, column_map)
+    if column_map or ignored_columns:
+        fieldnames, rows = _apply_column_map(fieldnames, rows, column_map or {}, ignored_columns)
     return import_tops_rows_multi(
         session,
         path,
