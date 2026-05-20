@@ -467,6 +467,7 @@ export function ImportLasDialog({ wells, activeWellId, onClose, onSuccess }: Imp
               error={previewError}
               preview={lasPreview}
               depthReference={trustedDepthRef}
+              onDepthReferenceChange={setTrustedDepthRef}
               curveTypes={curveTypes}
               onCurveTypeChange={handleCurveTypeChange}
             />
